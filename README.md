@@ -1,95 +1,132 @@
 # SmartFace: AIoT-Based Staff Management & Attendance System
 
-> An AIoT-based employee management and attendance platform integrating face authentication, anti-spoofing, and fingerprint fallback.
+> An AIoT-based employee management and attendance platform integrating face authentication, spatial-frequency presentation attack detection (PAD), and fingerprint fallback.
 
 ## Overview
 
-**SmartFace** is an AIoT-based staff management and attendance system designed to modernize traditional employee attendance workflows.
+**SmartFace** is an AIoT-based employee management and attendance platform designed to modernize traditional staff attendance and workforce-management workflows.
 
-Traditional attendance methods such as RFID cards, ID cards, PINs, and passwords are convenient but have practical limitations. Cards can be lost, forgotten, borrowed, or shared, while passwords and PINs can be forgotten or disclosed. These approaches also introduce additional interaction steps and may become inefficient when many employees check in or check out simultaneously.
+Traditional methods such as RFID/proximity cards, ID cards, PINs, and passwords can be lost, forgotten, borrowed, or shared. They can also introduce additional interaction steps and leave employee information, attendance records, and payroll-related data distributed across separate systems.
 
-SmartFace uses **face authentication as the primary identity mechanism**, combined with **anti-spoofing** to reduce presentation attacks and **fingerprint authentication as a fallback mechanism**.
+SmartFace uses **face authentication as the primary identity mechanism**, **Presentation Attack Detection (PAD)** as a security layer, and **fingerprint authentication as a fallback mechanism**.
 
-The project goes beyond face recognition itself by integrating authentication, attendance, employee management, working-hour tracking, and payroll-related data into a unified web/mobile platform.
+The project connects biometric authentication, attendance, employee self-service, management operations, working-hour information, and payroll-related data into one platform.
+
+```text
+Employee
+   ↓
+Face / Fingerprint Authentication
+   ↓
+Check-in / Check-out
+   ↓
+Attendance & Working Hours
+   ↓
+Employee Management
+   ↓
+Payroll-related Data
+```
 
 ---
 
 ## Motivation
 
-The goal is not simply to identify a person from a camera.
+The project aims to move employee authentication from methods based mainly on:
 
-The goal is to build a practical system that can answer:
+```text
+Something you have
+→ RFID / Attendance Card
+```
 
-> **Who is this employee, is the presented identity genuine, and should this interaction be recorded as a valid attendance event?**
+or:
 
-The system is designed around several practical problems:
+```text
+Something you know
+→ PIN / Password
+```
 
-* Employees may lose, forget, or share attendance cards.
-* Passwords and PINs are not directly tied to physical identity.
-* Manual attendance processes are slower and harder to manage.
-* Traditional systems may separate employee information, attendance records, and payroll data.
-* Employees often depend on administrators to update personal information or biometric registration.
-* A single authentication mechanism may fail under real-world conditions.
+toward:
 
-SmartFace addresses these issues through a unified biometric and employee-management platform.
+```text
+Something you are
+→ Face
+```
+
+Face authentication provides a contactless and convenient way to identify employees during attendance. However, face recognition alone is not sufficient for a security-sensitive system because an attacker may present a photo, printed image, replayed video, or another presentation attack.
+
+Therefore, SmartFace separates authentication into three conceptual stages:
+
+```text
+Face Detection
+      ↓
+Presentation Attack Detection (PAD)
+      ↓
+Face Recognition
+      ↓
+Identity Matching
+```
+
+The system also provides fingerprint as a fallback authentication channel so that attendance does not depend entirely on a single biometric modality.
 
 ---
 
-## Key Features
+# Key Features
 
-### AI-Powered Face Attendance
+## AI-powered face attendance
 
-* Face detection using a pretrained YOLO model.
-* Face alignment and basic quality checking.
-* Anti-spoofing/liveness detection.
-* Face embedding using a pretrained face-recognition model.
-* Vector similarity search for identity matching.
-* Support for both **check-in and check-out**.
+- Face detection using a pretrained YOLO model.
+- Face alignment and quality checking.
+- Lightweight RGB single-frame Presentation Attack Detection.
+- Face embedding using a pretrained recognition model.
+- Vector similarity search.
+- Face-based check-in.
+- Face-based check-out.
 
-### Fingerprint Fallback
+## Fingerprint fallback
 
-Fingerprint authentication provides an alternative when face authentication is temporarily unavailable or unsuitable, for example:
+Fingerprint provides a secondary authentication path when face authentication is unavailable or unsuitable.
 
-* Poor image quality.
-* Face occlusion.
-* Camera failure.
-* Temporary recognition failure.
+Examples include:
 
-Attendance records store the authentication method used:
+- Poor image quality.
+- Face occlusion.
+- Camera failure.
+- Temporary recognition failure.
+
+Attendance records preserve the authentication method:
 
 ```text
 FACE
 FINGERPRINT
 ```
 
-### Employee Management
+## Employee management
 
 Managers and administrators can:
 
-* Add employees.
-* Edit employee information.
-* Disable or remove employees.
-* Search and filter the employee list.
-* Manage employee profiles.
-* Enroll or update face data.
-* Manage authentication status.
+- Add employees.
+- Edit employee information.
+- Enable or disable employees.
+- Search and filter employees.
+- Manage employee profiles.
+- Enroll and update face data.
+- Manage authentication status.
 
-### Employee Self-Service
+## Employee self-service
 
-Employees can access their own account and:
+Employees can:
 
-* View personal information.
-* View department and position.
-* View working schedule.
-* View check-in/check-out records.
-* View attendance history.
-* View total working hours.
-* Update permitted profile information.
-* Update or re-enroll face data.
+- View personal information.
+- View department and position.
+- View working schedules.
+- View attendance history.
+- View check-in/check-out records.
+- View working hours.
+- Update permitted profile information.
+- Update or re-enroll face data.
 
-### Attendance Management
+## Attendance management
 
-The system records:
+The platform records:
 
 ```text
 Employee
@@ -104,15 +141,15 @@ Verification information
 
 Managers can monitor:
 
-* Attendance history.
-* Late arrivals.
-* Early departures.
-* Missing check-in/check-out.
-* Daily and monthly attendance.
+- Daily attendance.
+- Late arrivals.
+- Early departures.
+- Missing check-in/check-out.
+- Attendance history.
 
-### Payroll-Related Data
+## Payroll-related information
 
-Attendance information can be used as an input to payroll calculations:
+Attendance data can be used as input for payroll workflows:
 
 ```text
 Attendance
@@ -121,78 +158,76 @@ Working Hours
     ↓
 Late / Early Leave / Overtime
     ↓
-Payroll
+Payroll Calculation
 ```
 
-The V1 system focuses primarily on generating reliable attendance and working-hour data, while detailed payroll rules can be extended later.
+The platform is designed to provide reliable attendance and working-hour data that can be integrated with payroll processes.
 
 ---
 
-## System Architecture
-
-High-level V1 architecture:
+# System Architecture
 
 ```text
-                         ┌──────────────────┐
-                         │      Camera      │
-                         │ Raspberry Pi /   │
-                         │   IoT Device     │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Face Detection   │
-                         │ Pretrained YOLO  │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Face Alignment   │
-                         │ + Quality Check  │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Anti-Spoofing    │
-                         │ Trained Model    │
-                         └────────┬─────────┘
-                                  │
+                         ┌────────────────────┐
+                         │      Camera        │
+                         │ Raspberry Pi /     │
+                         │ IoT Edge Device    │
+                         └─────────┬──────────┘
+                                   │
+                                   ▼
+                         ┌────────────────────┐
+                         │ Face Detection     │
+                         │ Pretrained YOLO    │
+                         └─────────┬──────────┘
+                                   │
+                                   ▼
+                         ┌────────────────────┐
+                         │ Alignment +        │
+                         │ Quality Check       │
+                         └─────────┬──────────┘
+                                   │
+                                   ▼
+                         ┌────────────────────┐
+                         │ Spatial-Frequency  │
+                         │ PAD                │
+                         │ REAL / SPOOF       │
+                         └─────────┬──────────┘
+                                   │
                               REAL FACE
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Face Embedding   │
-                         │ Pretrained Model │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Vector Search    │
-                         │ pgvector / Qdrant│
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Identity Decision│
-                         └────────┬─────────┘
-                                  │
-                       ┌──────────┴──────────┐
-                       ▼                     ▼
-                   CHECK-IN              CHECK-OUT
-                       │                     │
-                       └──────────┬──────────┘
-                                  ▼
-                         ┌──────────────────┐
-                         │ Attendance       │
-                         │ Service          │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
+                                   │
+                                   ▼
+                         ┌────────────────────┐
+                         │ Face Embedding     │
+                         │ Pretrained Model   │
+                         └─────────┬──────────┘
+                                   │
+                                   ▼
+                         ┌────────────────────┐
+                         │ Vector Search      │
+                         │ pgvector / Qdrant  │
+                         └─────────┬──────────┘
+                                   │
+                                   ▼
+                         ┌────────────────────┐
+                         │ Identity Decision  │
+                         └─────────┬──────────┘
+                                   │
+                       ┌───────────┴───────────┐
+                       ▼                       ▼
+                   CHECK-IN                CHECK-OUT
+                       │                       │
+                       └───────────┬───────────┘
+                                   ▼
+                         ┌────────────────────┐
+                         │ Attendance Service │
+                         └─────────┬──────────┘
+                                   │
+                                   ▼
                          Employee / Payroll
                            Management
 ```
 
-Fallback authentication:
+Fingerprint fallback:
 
 ```text
 Face Authentication
@@ -203,141 +238,282 @@ Face Authentication
                     ↓
               Identity Verify
                     ↓
-             Check-in / out
+             Check-in / Check-out
 ```
 
 ---
 
-## AI Pipeline
+# AI Architecture
 
-The V1 AI pipeline contains three main components.
+SmartFace uses three main AI components.
 
-### 1. Face Detection
+## Face Detection
 
-A pretrained YOLO model detects faces from camera frames.
+A pretrained YOLO model detects faces from camera frames:
 
 ```text
 Camera Frame
-    ↓
-YOLO
-    ↓
+     ↓
+Pretrained YOLO
+     ↓
 Face Bounding Box
 ```
 
-The detector is not trained from scratch in V1.
+The detector is used as a pretrained component rather than being trained from scratch.
 
-### 2. Anti-Spoofing
+## Presentation Attack Detection
 
-Anti-spoofing is the main model trained specifically for this project.
+The PAD model is the main computer-vision research component of the system.
+
+The proposed architecture combines:
+
+- A **spatial branch** using MobileNetV3-Large.
+- A **frequency branch** using 2D DCT followed by a lightweight CNN.
+- Feature fusion through concatenation.
 
 ```text
-Face Crop
+                         FACE IMAGE
+                           224×224
+                              │
+             ┌────────────────┴────────────────┐
+             │                                 │
+             ▼                                 ▼
+       SPATIAL BRANCH                    FREQUENCY BRANCH
+       MobileNetV3-Large                       │
+       ImageNet pretrained                     ▼
+             │                                2D DCT
+             ▼                                  │
+      Feature Extraction                        ▼
+             │                            Frequency Map
+             ▼                                  │
+       Spatial Feature                          ▼
+           256-D                         Lightweight CNN
+                                                │
+                                                ▼
+                                        Frequency Feature
+                                             64-D
+             │                                 │
+             └────────────────┬────────────────┘
+                              ▼
+                         FEATURE FUSION
+                           Concatenate
+                              │
+                             320-D
+                              │
+                              ▼
+                            MLP / FC
+                              │
+                             128-D
+                              │
+                              ▼
+                         PAD CLASSIFIER
+                              │
+                              ▼
+                         REAL / SPOOF
+```
+
+### Spatial branch
+
+```text
+224×224×3
     ↓
-Lightweight CNN
+MobileNetV3-Large
+    ↓
+Global Average Pooling
+    ↓
+Projection
+    ↓
+256-D Spatial Feature
+```
+
+### Frequency branch
+
+The frequency branch uses a luminance/grayscale representation:
+
+```text
+RGB Face
+   ↓
+Luminance / Grayscale
+   ↓
+224 × 224
+   ↓
+2D DCT
+   ↓
+Frequency Map
+```
+
+The frequency representation can be normalized before being processed by a lightweight CNN.
+
+```text
+Frequency Map
+     ↓
+Depthwise / Pointwise Convolutions
+     ↓
+Global Average Pooling
+     ↓
+Linear Projection
+     ↓
+64-D Frequency Feature
+```
+
+### Why frequency information?
+
+Spatial CNNs can learn facial structure, edges, texture, illumination, and local patterns.
+
+Presentation attacks may also introduce low-level reproduction artifacts such as:
+
+- Paper and ink texture.
+- Display patterns.
+- Pixel/subpixel structures.
+- Moiré and aliasing.
+- Compression or reproduction artifacts.
+
+Frequency-domain features are investigated as complementary information.
+
+> **High frequency does not mean spoof.**
+
+Real faces also contain high-frequency information. The objective is to learn discriminative frequency patterns rather than simply measuring the amount of high-frequency content.
+
+---
+
+# PAD Research Direction
+
+The frequency branch is evaluated against a spatial-only baseline.
+
+## Spatial-only baseline
+
+```text
+Face Image
+    ↓
+MobileNetV3-Large
+    ↓
+256-D Spatial Feature
+    ↓
+Classifier
     ↓
 REAL / SPOOF
 ```
 
-Candidate lightweight backbones include:
+## Frequency-aware model
 
-* MobileNetV3
-* EfficientNet-B0
+```text
+                         Face Image
+                              │
+                ┌─────────────┴─────────────┐
+                ▼                           ▼
+        MobileNetV3-Large                  DCT
+                │                           │
+                ▼                           ▼
+         Spatial 256-D              Tiny Frequency CNN
+                                           │
+                                           ▼
+                                      Frequency 64-D
+                └─────────────┬─────────────┘
+                              ▼
+                            Fusion
+                              ↓
+                          Classifier
+                              ↓
+                           REAL / SPOOF
+```
 
-The initial model is trained using public datasets.
+The goal is to determine whether explicit frequency-domain information improves PAD performance, particularly under domain changes, while keeping additional computational cost low.
 
-Potential datasets:
-
-* CelebA-Spoof
-* OULU-NPU
-* SiW-Mv2
-* MSU-MFSD
-
-The initial V1 strategy is to use public data only. Camera-specific data will only be collected if the first model performs poorly after deployment.
-
-### 3. Face Embedding
-
-A pretrained face-recognition model is used to convert a face into a biometric representation.
-
-Candidate models include:
-
-* ArcFace
-* AdaFace
-
-The resulting embedding is stored and searched using a vector database.
+This is an empirical research question; the project does not assume that the frequency branch will always improve results.
 
 ---
 
-## Identity Management
+# PAD Evaluation
 
-Identity management is intentionally separated from the ML models.
+The evaluation focuses on both security and generalization.
 
-Adding or deleting an employee should not require model retraining.
+Important metrics include:
 
-### Add Employee
-
-```text
-Create Employee
-      ↓
-Face Enrollment
-      ↓
-Generate Embeddings
-      ↓
-Store Embeddings
-```
-
-### Update Face
+- APCER — Attack Presentation Classification Error Rate.
+- BPCER — Bona Fide Presentation Classification Error Rate.
+- ACER — Average Classification Error Rate.
 
 ```text
-New Face Samples
-      ↓
-Quality Check
-      ↓
-Anti-Spoofing
-      ↓
-Generate New Embeddings
-      ↓
-Update Vector Database
+ACER = (APCER + BPCER) / 2
 ```
 
-This allows an employee to update their face data after changes such as:
+Cross-dataset evaluation can be performed using public datasets such as:
 
-* Different hairstyle.
-* Beard or shaved beard.
-* Glasses.
-* Significant appearance changes.
-* Need for additional enrollment samples.
+- CelebA-Spoof.
+- OULU-NPU.
+- SiW.
+- SiW-Mv2.
+- MSU-MFSD.
 
-### Delete Employee
-
-Recommended V1 approach:
-
-```text
-Employee
-   ↓
-INACTIVE / DELETED
-   ↓
-Deactivate related embeddings
-```
-
-Physical deletion can be handled separately according to the application's retention policy.
+The main objective is to investigate whether the spatial-frequency representation generalizes better when identities, environments, cameras, or presentation attacks change.
 
 ---
 
-## Multiple Face Embeddings
+# Face Embedding & Recognition
 
-Instead of storing only one vector per employee, SmartFace can maintain multiple enrollment samples:
+SmartFace uses a pretrained face-recognition model rather than training an embedding network from scratch.
+
+Candidate approaches include:
+
+- ArcFace.
+- AdaFace.
+- Equivalent pretrained face-recognition models.
+
+Pipeline:
+
+```text
+Validated Face
+      ↓
+Face Embedding Model
+      ↓
+Embedding Vector
+      ↓
+Normalization
+      ↓
+Vector Search
+```
+
+---
+
+# Identity Enrollment
+
+An employee can have multiple face samples rather than a single embedding:
 
 ```text
 Employee A
- ├── frontal
- ├── left
- ├── right
- ├── smiling
- ├── glasses
- └── different lighting
+ ├── Frontal
+ ├── Left
+ ├── Right
+ ├── Smile
+ ├── Glasses
+ └── Different lighting
 ```
 
-During recognition:
+Enrollment flow:
+
+```text
+Camera
+   ↓
+Face Detection
+   ↓
+Quality Check
+   ↓
+PAD
+   ↓
+Face Alignment
+   ↓
+Embedding
+   ↓
+Multiple Embeddings
+   ↓
+Vector Store
+```
+
+This allows the system to accommodate moderate appearance changes without retraining the face embedding model.
+
+---
+
+# Identity Matching
 
 ```text
 Query Face
@@ -350,54 +526,82 @@ Group by Employee
     ↓
 Aggregate / Re-rank
     ↓
-Identity Decision
+Similarity Threshold
+    ↓
+Identity
 ```
 
-This helps the system handle moderate appearance changes without retraining the face embedding model.
+A final decision can consider multiple signals:
+
+```text
+Face Similarity
++
+Face Quality
++
+PAD Score
++
+System Policy
+```
 
 ---
 
-## User Roles
+# Employee Management
 
-### Admin
+Identity data is intentionally separated from AI models.
 
-Full system management:
+## Add employee
 
-* Employee management.
-* Attendance management.
-* Payroll-related management.
-* Device management.
-* Account and permission management.
-* System configuration.
+```text
+Create Employee
+      ↓
+Face Enrollment
+      ↓
+Generate Embeddings
+      ↓
+Store Embeddings
+```
 
-### Manager
+Adding an employee does not require model retraining.
 
-Typical management functions:
+## Update face
 
-* Employee list and profiles.
-* Attendance monitoring.
-* Working-hour information.
-* Payroll-related attendance data.
-* Device status.
+```text
+New Face Samples
+      ↓
+Quality Check
+      ↓
+PAD
+      ↓
+Generate Embeddings
+      ↓
+Update Vector Store
+```
 
-### Employee
+Employees can re-enroll after changes such as:
 
-Self-service functions:
+- Different hairstyle.
+- Beard or shaved beard.
+- Glasses.
+- Significant appearance changes.
+- Additional enrollment requirements.
 
-* Personal profile.
-* Working information.
-* Attendance history.
-* Check-in/check-out records.
-* Working hours.
-* Face enrollment/update.
+## Delete employee
 
-Role-based access control ensures employees can only access information they are authorized to view.
+A soft-delete/inactive state can be used:
+
+```text
+Employee
+   ↓
+INACTIVE / DELETED
+   ↓
+Deactivate related embeddings
+```
 
 ---
 
-## Attendance Flow
+# Two-Way Attendance
 
-### Check-in
+## Check-in
 
 ```text
 Employee arrives
@@ -406,18 +610,18 @@ Camera detects face
       ↓
 Quality check
       ↓
-Anti-spoofing
+PAD
       ↓
 Face recognition
       ↓
 Identity match
       ↓
-CHECK-IN event
+CHECK-IN
       ↓
 Attendance database
 ```
 
-### Check-out
+## Check-out
 
 ```text
 Employee leaves
@@ -426,18 +630,18 @@ Camera detects face
       ↓
 Quality check
       ↓
-Anti-spoofing
+PAD
       ↓
 Face recognition
       ↓
 Identity match
       ↓
-CHECK-OUT event
+CHECK-OUT
       ↓
 Attendance database
 ```
 
-### Fingerprint Fallback
+## Fingerprint fallback
 
 ```text
 Face authentication fails
@@ -446,16 +650,16 @@ Face authentication fails
              ↓
        Identity verified
              ↓
-        CHECK-IN / OUT
+         CHECK-IN / OUT
 ```
 
 ---
 
-## Web / Mobile Application
+# Web / Mobile Application
 
-The application is designed as an employee-management platform rather than only an attendance interface.
+SmartFace provides separate experiences for managers and employees.
 
-### Manager / Admin Dashboard
+## Manager / Admin
 
 Main modules:
 
@@ -469,7 +673,18 @@ Devices
 Account / Permissions
 ```
 
-### Employee Portal
+Functions include:
+
+- Employee list management.
+- Employee profile management.
+- Face enrollment/update.
+- Attendance monitoring.
+- Check-in/check-out history.
+- Late/early leave tracking.
+- Payroll-related data.
+- IoT device monitoring.
+
+## Employee
 
 Main modules:
 
@@ -481,13 +696,52 @@ My Working Hours
 My Face
 ```
 
-The employee portal reduces dependence on administrators for routine tasks such as viewing attendance or updating allowed profile/face information.
+Employees can:
+
+- View personal information.
+- View working schedule.
+- View attendance history.
+- View working hours.
+- Update permitted profile fields.
+- Update or re-enroll face data.
 
 ---
 
-## Data Architecture
+# Role-Based Access Control
 
-A practical V1 stack can use PostgreSQL together with pgvector.
+## Admin
+
+- Full employee management.
+- Attendance management.
+- Payroll-related management.
+- Device management.
+- Account and permission management.
+- System configuration.
+
+## Manager
+
+- Employee list and profiles.
+- Attendance monitoring.
+- Working-hour information.
+- Payroll-related attendance data.
+- Device status.
+
+## Employee
+
+- Personal profile.
+- Working information.
+- Attendance history.
+- Check-in/check-out records.
+- Working hours.
+- Face enrollment/update.
+
+Employees only access information and actions authorized for their role.
+
+---
+
+# Data Architecture
+
+A practical implementation can use PostgreSQL together with pgvector.
 
 ```text
 PostgreSQL
@@ -515,13 +769,13 @@ created_at
 is_active
 ```
 
-Model versioning is important so that embeddings generated by different face-recognition models are not mixed incorrectly.
+Model versioning allows embeddings from different face-recognition models to be handled safely during future migrations.
 
 ---
 
-## IoT Architecture
+# IoT Architecture
 
-The system can use Raspberry Pi or another edge device as the interface to physical devices.
+Raspberry Pi or another edge device can interface with physical devices:
 
 ```text
 Raspberry Pi / Edge Device
@@ -541,49 +795,94 @@ Depending on hardware constraints, AI inference can run on the edge device or on
 
 ---
 
-## V1 Scope
+# Technology Stack
 
-### Included
+## AI / Computer Vision
 
-* Pretrained YOLO face detection.
-* Face alignment and quality checks.
-* Self-trained anti-spoofing model.
-* Pretrained face embedding model.
-* Vector similarity search.
-* Employee CRUD.
-* Face enrollment.
-* Face information update.
-* Face-based check-in.
-* Face-based check-out.
-* Fingerprint fallback.
-* Attendance history.
-* Working-hour information.
-* Manager/Admin interface.
-* Employee interface.
-* Payroll-related attendance data.
-* IoT device integration.
+- Python
+- PyTorch
+- YOLO
+- OpenCV
+- MobileNetV3-Large
+- 2D DCT
+- Lightweight CNN
+- ArcFace / AdaFace
 
-### Not Required for V1
+## Backend
 
-The following are intentionally reserved for future versions:
+- FastAPI
+- REST API
+- Authentication
+- Role-Based Access Control
 
-* Continual learning.
-* Temporal liveness.
-* Camera-specific model adaptation.
-* Custom YOLO training.
-* Training a face embedding model from scratch.
-* Automatic hard-example mining.
-* Advanced MLOps and model monitoring.
+## Database
 
-The purpose of V1 is to deliver a complete end-to-end system before introducing additional AI complexity.
+- PostgreSQL
+- pgvector
+
+## IoT / Edge
+
+- Raspberry Pi
+- Camera
+- Fingerprint sensor
+
+## Frontend
+
+- Web application
+- Mobile application
+
+## Storage
+
+- Local or object storage for approved images and datasets when required.
 
 ---
 
-## Future Extensions
+# Project Structure
 
-### Continual Learning
+A suggested repository structure:
 
-Production data can be used to improve the system:
+```text
+smartface/
+├── apps/
+│   ├── web/
+│   └── mobile/
+│
+├── backend/
+│   ├── api/
+│   ├── services/
+│   ├── models/
+│   └── database/
+│
+├── ai/
+│   ├── face_detection/
+│   ├── pad/
+│   │   ├── baseline/
+│   │   ├── frequency/
+│   │   ├── datasets/
+│   │   ├── training/
+│   │   └── evaluation/
+│   └── face_embedding/
+│
+├── edge/
+│   ├── camera/
+│   └── fingerprint/
+│
+├── docs/
+│
+├── tests/
+│
+└── README.md
+```
+
+The exact repository structure may evolve during implementation.
+
+---
+
+# Future Extensions
+
+## Continual Learning
+
+Production data can later be incorporated through:
 
 ```text
 Production
@@ -596,14 +895,14 @@ Training Dataset
     ↓
 Fine-tuning
     ↓
-Model V2
+Model Update
 ```
 
-Continual learning is an extension, not a requirement for V1.
+Continual learning is intended as an extension rather than a dependency of the core system.
 
-### Temporal Liveness
+## Temporal Liveness
 
-Future anti-spoofing models can analyze multiple video frames instead of a single image:
+The current PAD concept is single-frame. A future system can use multiple frames:
 
 ```text
 Frame t-4
@@ -617,11 +916,9 @@ Temporal Model
 REAL / SPOOF
 ```
 
-Potential approaches include CNN + GRU/LSTM, temporal convolution, 3D CNN, or temporal Transformer models.
+## Camera-specific adaptation
 
-### Camera-Specific Adaptation
-
-If the initial public-dataset-trained anti-spoofing model performs poorly in the target environment:
+If public-data-trained PAD performs poorly on a target environment:
 
 ```text
 Camera Data
@@ -630,14 +927,14 @@ Hard Examples
      ↓
 Fine-tuning
      ↓
-Anti-Spoof V2
+Updated PAD Model
 ```
 
 ---
 
-## Design Principles
+# Design Principles
 
-### 1. Identity data and model data are separate
+### Identity data and AI models are separate
 
 ```text
 Employee CRUD
@@ -645,66 +942,35 @@ Employee CRUD
 Model Retraining
 ```
 
-Adding, updating, or deleting an employee should normally only modify the identity store and embeddings.
+Adding, updating, or deleting an employee normally changes identity data and embeddings, not the AI models.
 
-### 2. Pretrained first, train only where necessary
+### Pretrained first, train where the project has a clear research question
 
-V1 uses pretrained models for face detection and face embedding while focusing ML development effort on anti-spoofing.
+Face detection and face embedding use pretrained models, while PAD provides the main model-development and experimentation component.
 
-### 3. Security and usability must coexist
+### PAD complements face recognition
 
-Face authentication is the primary mechanism, anti-spoofing provides an additional security layer, and fingerprint provides operational redundancy.
+Face recognition asks:
 
-### 4. Build the complete system before advanced ML
+> Which enrolled identity does this face resemble?
 
-The project prioritizes a working end-to-end AIoT platform before adding continual learning, temporal liveness, or complex model adaptation.
+PAD asks:
 
----
+> Is this a genuine presentation or a presentation attack?
 
-## Proposed Technology Stack
+### Security, generalization, and efficiency matter together
 
-The exact stack may evolve during implementation, but the initial direction is:
+The PAD architecture is evaluated not only by classification performance, but also by cross-domain behavior and computational cost.
 
-### AI / Computer Vision
+### Build the integrated system before advanced learning
 
-* Python
-* PyTorch
-* YOLO
-* OpenCV
-* ArcFace / AdaFace
-* MobileNetV3 / EfficientNet for anti-spoofing
-
-### Backend
-
-* FastAPI
-* REST API
-* Authentication / RBAC
-
-### Database
-
-* PostgreSQL
-* pgvector
-
-### IoT / Edge
-
-* Raspberry Pi
-* Camera
-* Fingerprint sensor
-
-### Frontend
-
-* Web application
-* Mobile application
-
-### Storage
-
-* Local/Object storage for approved images and datasets when required.
+The platform prioritizes a working AIoT employee-management workflow. Continual learning and temporal liveness are future extensions.
 
 ---
 
-## Project Vision
+# Project Vision
 
-SmartFace aims to evolve from a simple facial-recognition attendance prototype into an integrated employee-management platform:
+SmartFace aims to become an integrated workforce-management platform in which biometric authentication is a practical part of everyday employee operations:
 
 ```text
 Employee
@@ -720,10 +986,25 @@ Employee Management
 Payroll
 ```
 
-The long-term goal is to make biometric authentication a practical part of everyday workforce management rather than an isolated AI component.
+The long-term vision is to bring together:
+
+**secure identity verification + convenient attendance + employee self-service + workforce management + IoT devices**
+
+within a single platform.
 
 ---
 
 ## Disclaimer
 
-This project is intended as an engineering/research prototype. A production deployment should additionally address biometric-data protection, access control, auditability, retention/deletion policies, device security, attack resistance, and applicable legal/regulatory requirements.
+This project is intended as an engineering and research-oriented prototype.
+
+A production deployment should additionally address:
+
+- Biometric-data protection.
+- Authentication and authorization security.
+- Auditability.
+- Retention and deletion policies.
+- Device security.
+- Presentation and injection attack resistance.
+- Model monitoring.
+- Applicable legal and regulatory requirements.

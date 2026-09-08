@@ -1,13 +1,13 @@
 """
-Real-time Face Anti-Spoofing & InsightFace SCRFD Face Detection Demo.
+Real-time Face Anti-Spoofing & YunNet Face Detection Demo.
 Integrated into SmartFace AIoT system.
 
 Usage (from SmartFace root or face_auth directory):
-    python face_auth/scripts/demo_antispoof.py
-    python face_auth/scripts/demo_antispoof.py --image path/to/image.jpg
+    python face_auth/scripts/demo_antispoof_yunnet.py
+    python face_auth/scripts/demo_antispoof_yunnet.py --image path/to/image.jpg
 
-    python face_auth/scripts/demo_antispoof.py \
-  --liveness-model face_auth/antispoof/models/mnv3_large_3class_best.onnx
+    python face_auth/scripts/demo_antispoof_yunnet.py \
+  --liveness-model face_auth/antispoof/models/mnv4_best_224.onnx
 
 """
 
@@ -27,7 +27,8 @@ for p in [str(_HERE), str(_FACE_AUTH), str(_SMARTFACE_ROOT)]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from detection.detector import FaceDetector
+from detection.yunnet_detector import YunNetFaceDetector
+from alignment.aligner import get_input_face
 from antispoof import (
     AntiSpoofPredictor,
     crop,
@@ -135,7 +136,29 @@ def draw_info_overlay(display_frame, fps_history, cpu_info, gpu_info, provider_n
     )
 
 
-def process_camera(args, detector: FaceDetector, predictor: AntiSpoofPredictor):
+def get_face_crop(image_rgb: np.ndarray, face: dict, predictor: AntiSpoofPredictor, use_align: bool = True) -> np.ndarray:
+    """
+    Cắt và chuẩn hóa khuôn mặt sử dụng hàm get_input_face trong alignment.aligner:
+    - Nếu use_align=True và có 5 điểm landmarks: xoay và căn mặt chuẩn theo ArcFace template.
+    - Nếu không: fallback crop theo bbox.
+    """
+    bbox = face["bbox"]
+    landmarks = face.get("landmarks") if use_align else None
+
+    crop_img = get_input_face(
+        image_rgb,
+        bbox,
+        landmarks,
+        output_size=(predictor.model_img_size, predictor.model_img_size),
+    )
+    if crop_img is not None:
+        return crop_img
+
+    # Fallback nếu get_input_face trả về None
+    return crop(image_rgb, bbox, predictor.bbox_expansion_factor)
+
+
+def process_camera(args, detector: YunNetFaceDetector, predictor: AntiSpoofPredictor):
     cap = cv2.VideoCapture(args.camera)
     if not cap.isOpened():
         print(f"Error: Could not open camera index {args.camera}", file=sys.stderr)
@@ -145,7 +168,7 @@ def process_camera(args, detector: FaceDetector, predictor: AntiSpoofPredictor):
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     cap.set(cv2.CAP_PROP_FPS, 30)
 
-    window_name = "SmartFace Anti-Spoofing Demo (InsightFace SCRFD + AntiSpoof ONNX)"
+    window_name = "SmartFace Anti-Spoofing Demo (YunNet + AntiSpoof ONNX)"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(window_name, 640, 480)
 
@@ -167,42 +190,43 @@ def process_camera(args, detector: FaceDetector, predictor: AntiSpoofPredictor):
             break
 
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        # FaceDetector của InsightFace nhận ảnh BGR từ camera
-        faces = detector.detect(frame)
+        faces = detector.detect(frame_rgb, margin=args.margin)  # detect frame
 
         if faces:
             face_crops = []
             valid_faces = []
             for face in faces:
-                x1, y1, x2, y2 = face["bbox"]
                 try:
-                    face_crop = crop(
-                        frame_rgb, (x1, y1, x2, y2), predictor.bbox_expansion_factor
+                    face_crop = get_face_crop(
+                        frame_rgb, face, predictor, use_align=args.align
                     )
                     face_crops.append(face_crop)
-                    valid_faces.append((face, (x1, y1, x2, y2)))
+                    valid_faces.append(face)
                 except Exception as e:
                     if args.verbose:
-                        print(f"Warning: Failed to crop face at ({x1},{y1},{x2},{y2}): {e}", file=sys.stderr)
+                        print(f"Warning: Failed to crop/align face: {e}", file=sys.stderr)
                     continue
 
             if face_crops:
                 results = predictor.predict_crops(face_crops)
 
-                for (face, (x1, y1, x2, y2)), result in zip(valid_faces, results):
+                for face, result in zip(valid_faces, results):
                     color = COLOR_REAL if result["is_real"] else COLOR_SPOOF
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                    bbox = face["bbox"]
+                    x, y, w, h = bbox[0], bbox[1], bbox[2], bbox[3]
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
 
                     # Draw 5 landmarks
-                    if face.get("landmarks"):
+                    if "landmarks" in face:
                         for pt in face["landmarks"]:
                             cv2.circle(frame, (int(pt[0]), int(pt[1])), 3, COLOR_LANDMARK, -1)
 
-                    label = f"{result.get('detailed_status', result['status'].upper())}: {result['logit_diff']:.2f}"
+                    align_str = " (Aligned)" if args.align and face.get("landmarks") else ""
+                    label = f"{result.get('detailed_status', result['status'].upper())}{align_str}: {result['logit_diff']:.2f}"
                     cv2.putText(
                         frame,
                         label,
-                        (x1, max(0, y1 - 10)),
+                        (x, max(0, y - 10)),
                         FONT,
                         0.6,
                         color,
@@ -233,14 +257,14 @@ def process_camera(args, detector: FaceDetector, predictor: AntiSpoofPredictor):
     cv2.destroyAllWindows()
 
 
-def process_image(args, detector: FaceDetector, predictor: AntiSpoofPredictor):
+def process_image(args, detector: YunNetFaceDetector, predictor: AntiSpoofPredictor):
     image = cv2.imread(args.image)
     if image is None:
         print(f"Error: Could not load image from '{args.image}'", file=sys.stderr)
         return
 
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    faces = detector.detect(image)
+    faces = detector.detect(image_rgb, margin=args.margin)
 
     if not faces:
         print("No faces detected in image.")
@@ -249,31 +273,33 @@ def process_image(args, detector: FaceDetector, predictor: AntiSpoofPredictor):
     face_crops = []
     valid_faces = []
     for face in faces:
-        x1, y1, x2, y2 = face["bbox"]
         try:
-            face_crop = crop(
-                image_rgb, (x1, y1, x2, y2), predictor.bbox_expansion_factor
+            face_crop = get_face_crop(
+                image_rgb, face, predictor, use_align=args.align
             )
             face_crops.append(face_crop)
-            valid_faces.append((face, (x1, y1, x2, y2)))
+            valid_faces.append(face)
         except Exception as e:
             if args.verbose:
-                print(f"Warning: Failed to crop face at ({x1},{y1},{x2},{y2}): {e}", file=sys.stderr)
+                print(f"Warning: Failed to crop/align face: {e}", file=sys.stderr)
             continue
 
     if face_crops:
         results = predictor.predict_crops(face_crops)
 
-        for (face, (x1, y1, x2, y2)), result in zip(valid_faces, results):
+        for face, result in zip(valid_faces, results):
             color = COLOR_REAL if result["is_real"] else COLOR_SPOOF
-            cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
+            bbox = face["bbox"]
+            x, y, w, h = bbox[0], bbox[1], bbox[2], bbox[3]
+            cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
 
-            if face.get("landmarks"):
+            if "landmarks" in face:
                 for pt in face["landmarks"]:
                     cv2.circle(image, (int(pt[0]), int(pt[1])), 3, COLOR_LANDMARK, -1)
 
-            label = f"{result.get('detailed_status', result['status'].upper())}: {result['logit_diff']:.2f}"
-            cv2.putText(image, label, (x1, max(0, y1 - 10)), FONT, 0.6, color, 2)
+            align_str = " (Aligned)" if args.align and face.get("landmarks") else ""
+            label = f"{result.get('detailed_status', result['status'].upper())}{align_str}: {result['logit_diff']:.2f}"
+            cv2.putText(image, label, (x, max(0, y - 10)), FONT, 0.6, color, 2)
 
     cv2.imshow("Result", image)
     cv2.waitKey(0)
@@ -282,20 +308,21 @@ def process_image(args, detector: FaceDetector, predictor: AntiSpoofPredictor):
 
 def main():
     # định nghĩa tham số dòng lệnh cho chương trình
-    parser = argparse.ArgumentParser(description="SmartFace Anti-Spoofing Demo (InsightFace SCRFD + AntiSpoof ONNX)")
+    parser = argparse.ArgumentParser(description="SmartFace Anti-Spoofing Demo (YunNet + AntiSpoof ONNX)")
     parser.add_argument("--image", type=str, default=None, help="Path to image file (if omitted, opens camera)")
     parser.add_argument("--camera", type=int, default=0, help="Camera device index (default: 0)")   # mặc định camera của máy 
     parser.add_argument("--threshold", type=float, default=0.5, help="Real/Spoof threshold (default: 0.5)") # ngưỡng phân loại
     parser.add_argument("--margin", type=int, default=5, help="Face edge margin (default: 5)")  # biên mở rộng
-    parser.add_argument("--detector-model", type=str, default="buffalo_s", help="InsightFace model pack name (default: buffalo_s)")  # tên model pack SCRFD
+    parser.add_argument("--detector-model", type=str, default=None, help="Path to YunNet ONNX detector model")  # đường dẫn tới model detect
     parser.add_argument("--liveness-model", type=str, default=None, help="Path to AntiSpoof ONNX model")    # đường dẫn tới model antiproof
+    parser.add_argument("--align", action="store_true", default=True, help="Enable face alignment using 5 landmarks (default: True)")
+    parser.add_argument("--no-align", action="store_false", dest="align", help="Disable face alignment, fallback to 1.5x bbox crop")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose error logging")  # true: log lỗi chi tiết
 
     # đọc tham số lưu vào args
     args = parser.parse_args()
 
-    detector_model_name = args.detector_model if args.detector_model else "buffalo_s"
-    detector = FaceDetector(model_name=detector_model_name, conf_thresh=args.threshold)
+    detector = YunNetFaceDetector(model_path=args.detector_model)
     predictor = AntiSpoofPredictor(model_path=args.liveness_model, threshold=args.threshold)
 
     if args.image is None:

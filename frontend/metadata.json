@@ -1,0 +1,6 @@
+{
+  "name": "AIoT Face Attendance",
+  "description": "Hệ thống Quản lý Nhân viên & Chấm công Khuôn mặt Thông minh (AIoT Face Attendance) cho Doanh nghiệp",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,11 +1,22 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { ToastContainer } from '../common/Toast';
+import { useApp } from '../../context/AppContext';
 
 export const AppLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { currentUser } = useApp();
+  const location = useLocation();
+
+  if (!currentUser) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  if (location.pathname.startsWith('/app/manager') && currentUser.role !== 'manager') {
+    return <Navigate to="/app/staff/dashboard" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 flex">

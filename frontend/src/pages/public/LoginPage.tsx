@@ -19,17 +19,18 @@ export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login, showToast } = useApp();
   const [emailOrId, setEmailOrId] = useState('manager@company.com');
-  const [password, setPassword] = useState('123456');
+  const [password, setPassword] = useState('Admin@123456');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
     if (!emailOrId.trim()) {
-      setErrorMsg('Vui lòng nhập Email hoặc Mã nhân viên');
+      setErrorMsg('Vui lòng nhập Email, Username hoặc Mã nhân viên');
       return;
     }
 
@@ -38,19 +39,20 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    const isManager = 
-      emailOrId.toLowerCase().includes('manager') || 
-      emailOrId.toLowerCase().includes('admin') || 
-      emailOrId.toUpperCase() === 'NV-003';
+    setLoading(true);
+    const res = await login(emailOrId, password);
+    setLoading(false);
 
-    const targetRole = isManager ? 'manager' : 'staff';
-    login(emailOrId, password);
-    navigate(targetRole === 'manager' ? '/app/manager/dashboard' : '/app/staff/dashboard');
+    if (res.success && res.role) {
+      navigate(res.role === 'manager' ? '/app/manager/dashboard' : '/app/staff/dashboard');
+    } else {
+      setErrorMsg(res.message || 'Xác thực thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.');
+    }
   };
 
   const fillCredentials = (email: string) => {
     setEmailOrId(email);
-    setPassword('123456');
+    setPassword('Admin@123456');
     setErrorMsg('');
     showToast(`Đã điền thông tin tài khoản: ${email}`, 'info');
   };
@@ -143,7 +145,7 @@ export const LoginPage: React.FC = () => {
                   <KeyRound className="w-3.5 h-3.5 text-blue-400" />
                   Tài khoản đăng nhập hệ thống:
                 </span>
-                <span className="text-[10px] font-mono text-slate-500">MẬT KHẨU CHUNG: 123456</span>
+                <span className="text-[10px] font-mono text-slate-500">MẬT KHẨU MẪU: Admin@123456</span>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-2.5 text-xs">
@@ -191,8 +193,9 @@ export const LoginPage: React.FC = () => {
 
             {/* Error feedback if any */}
             {errorMsg && (
-              <div className="mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
-                {errorMsg}
+              <div className="mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                <span className="font-semibold">⚠️</span>
+                <span>{errorMsg}</span>
               </div>
             )}
 
@@ -200,7 +203,7 @@ export const LoginPage: React.FC = () => {
             <form onSubmit={handleSubmit} className="mt-5 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Email hoặc Mã định danh nhân viên
+                  Email, Username hoặc Mã nhân viên
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -209,7 +212,7 @@ export const LoginPage: React.FC = () => {
                     required
                     value={emailOrId}
                     onChange={e => setEmailOrId(e.target.value)}
-                    placeholder="Ví dụ: manager@company.com hoặc staff@company.com"
+                    placeholder="Ví dụ: manager@company.com, admin, hoặc NV-001"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
                   />
                 </div>
@@ -226,7 +229,7 @@ export const LoginPage: React.FC = () => {
                     required
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    placeholder="Nhập mật khẩu (Mặc định: 123456)"
+                    placeholder="Nhập mật khẩu (Mặc định: Admin@123456)"
                     className="w-full pl-10 pr-10 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
                   />
                   <button
@@ -250,16 +253,23 @@ export const LoginPage: React.FC = () => {
                   <span>Ghi nhớ phiên đăng nhập</span>
                 </label>
                 <span className="text-xs text-slate-500">
-                  Mật khẩu mẫu: <strong className="text-slate-300 font-mono">123456</strong>
+                  Mật khẩu mẫu: <strong className="text-slate-300 font-mono">Admin@123456</strong>
                 </span>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
+                disabled={loading}
+                className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold text-sm shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
               >
-                <span>Xác thực & Đăng nhập hệ thống</span>
-                <ArrowRight className="w-4 h-4" />
+                {loading ? (
+                  <span>Đang xác thực với máy chủ...</span>
+                ) : (
+                  <>
+                    <span>Xác thực & Đăng nhập hệ thống</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </form>
           </div>

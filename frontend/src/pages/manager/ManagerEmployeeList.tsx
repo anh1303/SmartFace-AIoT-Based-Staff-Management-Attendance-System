@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { 
   Users, 
@@ -14,16 +15,26 @@ import {
   Phone, 
   Building2,
   Lock,
-  Briefcase
+  Briefcase,
+  X
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { Employee } from '../../types';
 
 export const ManagerEmployeeList: React.FC = () => {
   const { employees, addEmployee, updateEmployee, toggleEmployeeStatus, showToast } = useApp();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const querySearch = searchParams.get('search') || '';
+
+  const [searchTerm, setSearchTerm] = useState(querySearch);
   const [departmentFilter, setDepartmentFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  useEffect(() => {
+    if (querySearch) {
+      setSearchTerm(querySearch);
+    }
+  }, [querySearch]);
 
   // Modal States
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -46,10 +57,14 @@ export const ManagerEmployeeList: React.FC = () => {
   });
 
   const filteredEmployees = employees.filter(emp => {
-    const matchSearch = 
-      emp.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.employee_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.trim().toLowerCase();
+    const matchSearch = !term || 
+      emp.full_name.toLowerCase().includes(term) ||
+      emp.employee_id.toLowerCase().includes(term) ||
+      emp.email.toLowerCase().includes(term) ||
+      emp.phone.toLowerCase().includes(term) ||
+      emp.position.toLowerCase().includes(term) ||
+      emp.department.toLowerCase().includes(term);
     
     const matchDept = departmentFilter === 'ALL' || emp.department === departmentFilter;
     const matchStatus = statusFilter === 'ALL' || emp.status === statusFilter;
@@ -129,15 +144,32 @@ export const ManagerEmployeeList: React.FC = () => {
 
       {/* Bento Filters and Search Bar */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col lg:flex-row items-center justify-between gap-4">
-        <div className="relative w-full lg:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Tìm theo tên, mã NV, email..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
-          />
+        <div className="relative w-full lg:w-96 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Tìm theo tên, mã NV, email, vị trí, SĐT..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setSearchParams({});
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 rounded-full hover:bg-slate-800"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <span className="text-[11px] font-mono text-slate-400 shrink-0 bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-800">
+            {filteredEmployees.length} / {employees.length}
+          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">

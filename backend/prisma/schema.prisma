@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username      String     @unique @db.VarChar(50)
+  passwordHash  String     @map("password_hash") @db.VarChar(255)
+  role_id       Int
+  is_active     Boolean    @default(true)
+  last_login_at DateTime?  @db.Timestamptz(6)
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at    DateTime   @default(now()) @db.Timestamptz(6)
+  auditLogs     AuditLog[]
+  employees     Employee?
+  roles         roles      @relation(fields: [role_id], references: [id], onUpdate: NoAction)
+
+  @@index([username], map: "idx_users_username")
+  @@map("users")
+}
+
+model Department {
+  id              Int        @id @default(autoincrement())
+  department_code String     @unique @db.VarChar(50)
+  name            String     @db.VarChar(100)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  employees       Employee[]
+
+  @@map("departments")
+}
+
+model Employee {
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_code            String                     @unique @db.VarChar(50)
+  user_id                  String?                    @unique @db.Uuid
+  departmentId             Int?                       @map("department_id")
+  full_name                String                     @db.VarChar(100)
+  position                 String?                    @db.VarChar(100)
+  phone                    String?                    @db.VarChar(20)
+  email                    String?                    @unique @db.VarChar(100)
+  avatar_url               String?                    @db.Text
+  base_salary              Decimal?                   @default(0) @db.Decimal(15, 2)
+  status                   String                     @default("ACTIVE") @db.VarChar(20)
+  deleted_at               DateTime?                  @db.Timestamptz(6)
+  createdAt                DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  attendance_logs          attendance_logs[]
+  daily_attendance_summary daily_attendance_summary[]
+  employee_shifts          employee_shifts[]
+  department               Department?                @relation(fields: [departmentId], references: [id], onUpdate: NoAction)
+  users                    User?                      @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  face_embeddings          face_embeddings[]
+  payrollRecords           PayrollRecord[]
+
+  @@index([employee_code], map: "idx_employees_code")
+  @@index([departmentId], map: "idx_employees_dept")
+  @@index([status], map: "idx_employees_status")
+  @@map("employees")
+}
+
+model PayrollRecord {
+  id                        BigInt   @id @default(autoincrement())
+  employeeId                String   @map("employee_id") @db.Uuid
+  payroll_period            String   @db.VarChar(7)
+  base_salary               Decimal  @default(0) @db.Decimal(15, 2)
+  allowance                 Decimal  @default(0) @db.Decimal(15, 2)
+  deduction                 Decimal  @default(0) @db.Decimal(15, 2)
+  total_paid                Decimal  @default(0) @db.Decimal(15, 2)
+  standard_days             Decimal  @default(0) @db.Decimal(4, 1)
+  actual_working_days       Decimal  @default(0) @db.Decimal(4, 1)
+  total_working_hours       Decimal  @default(0) @db.Decimal(6, 2)
+  total_late_minutes        Int      @default(0)
+  total_early_leave_minutes Int      @default(0)
+  late_count                Int      @default(0)
+  status                    String   @default("PENDING") @db.VarChar(20)
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at                DateTime @default(now()) @db.Timestamptz(6)
+  employee                  Employee @relation(fields: [employeeId], references: [id], onUpdate: NoAction)
+
+  @@unique([employeeId, payroll_period], map: "uq_emp_payroll_period")
+  @@index([payroll_period], map: "idx_payroll_period")
+  @@map("payroll_records")
+}
+
+model AuditLog {
+  id           BigInt   @id @default(autoincrement())
+  userId       String?  @map("user_id") @db.Uuid
+  action       String   @db.VarChar(50)
+  target_table String   @db.VarChar(50)
+  record_id    String   @db.VarChar(100)
+  old_values   Json?
+  new_values   Json?
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  user         User?    @relation(fields: [userId], references: [id], onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_audit_created")
+  @@map("audit_logs")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model attendance_logs {
+  id                 BigInt   @id @default(autoincrement())
+  employee_id        String   @db.Uuid
+  event_time         DateTime @default(now()) @db.Timestamptz(6)
+  type               String   @db.VarChar(20)
+  method             String   @default("FACE") @db.VarChar(20)
+  device_info        String?  @db.VarChar(100)
+  verification_score Float?
+  liveness_score     Float?
+  status             String   @default("VALID") @db.VarChar(30)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  employees          Employee @relation(fields: [employee_id], references: [id], onUpdate: NoAction)
+
+  @@index([employee_id, event_time(sort: Desc)], map: "idx_attendance_emp_time")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model daily_attendance_summary {
+  id                  BigInt       @id @default(autoincrement())
+  employee_id         String       @db.Uuid
+  work_date           DateTime     @db.Date
+  shift_id            Int?
+  first_check_in      DateTime?    @db.Timestamptz(6)
+  last_check_out      DateTime?    @db.Timestamptz(6)
+  total_working_hours Decimal      @default(0) @db.Decimal(5, 2)
+  late_minutes        Int          @default(0)
+  early_leave_minutes Int          @default(0)
+  attendance_status   String       @default("PRESENT") @db.VarChar(30)
+  updated_at          DateTime     @default(now()) @db.Timestamptz(6)
+  employees           Employee     @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  work_shifts         work_shifts? @relation(fields: [shift_id], references: [id], onUpdate: NoAction)
+
+  @@unique([employee_id, work_date], map: "uq_emp_work_date")
+  @@index([work_date], map: "idx_daily_summary_date")
+}
+
+model employee_shifts {
+  id             BigInt      @id @default(autoincrement())
+  employee_id    String      @db.Uuid
+  shift_id       Int         @default(1)
+  effective_from DateTime    @db.Date
+  effective_to   DateTime?   @db.Date
+  shift_type     String?     @default("OFFICE_HOURS") @db.VarChar(50)
+  start_time     String?     @default("08:00") @db.VarChar(20)
+  end_time       String?     @default("17:30") @db.VarChar(20)
+  note           String?     @db.VarChar(255)
+  created_at     DateTime    @default(now()) @db.Timestamptz(6)
+  employees      Employee    @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  work_shifts    work_shifts @relation(fields: [shift_id], references: [id], onUpdate: NoAction)
+
+  @@unique([employee_id, effective_from], map: "uq_emp_shift_date")
+  @@index([employee_id, effective_from], map: "idx_emp_shifts_lookup")
+}
+
+model face_embeddings {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id   String   @db.Uuid
+  embedding     Float[]  @db.Real
+  model_version String   @default("arcface_v1") @db.VarChar(50)
+  sample_tag    String?  @default("FRONTAL") @db.VarChar(50)
+  quality_score Float?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  employees     Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([employee_id], map: "idx_face_embeddings_emp_id")
+}
+
+model roles {
+  id          Int     @id @default(autoincrement())
+  role_name   String  @unique @db.VarChar(50)
+  description String?
+  users       User[]
+}
+
+model work_shifts {
+  id                       Int                        @id @default(autoincrement())
+  shift_name               String                     @db.VarChar(50)
+  start_time               DateTime                   @db.Time(6)
+  end_time                 DateTime                   @db.Time(6)
+  grace_period_minutes     Int                        @default(15)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  daily_attendance_summary daily_attendance_summary[]
+  employee_shifts          employee_shifts[]
+}
+
+model Device {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String    @db.VarChar(100)
+  location  String    @db.VarChar(100)
+  ip        String?   @db.VarChar(45)
+  status    String    @default("OFFLINE") @db.VarChar(20)
+  last_seen DateTime? @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("devices")
+}

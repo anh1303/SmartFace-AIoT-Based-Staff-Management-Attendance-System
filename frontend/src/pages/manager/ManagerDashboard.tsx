@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { formatVNTime } from '../../utils/dateUtils';
 import { 
   Users, 
   Clock, 
@@ -32,29 +33,63 @@ export const ManagerDashboard: React.FC = () => {
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter(e => e.status === 'ACTIVE').length;
   
-  // Today's punches
-  const todayPunches = attendance.filter(a => a.timestamp.startsWith('2026-09-10'));
+  // Latest date punches or today
+  const latestDateStr = attendance.length > 0 
+    ? attendance[0].timestamp.slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+
+  const todayPunches = attendance.filter(a => a.timestamp.startsWith(latestDateStr));
   const onTimeCount = todayPunches.filter(a => a.status === 'ON_TIME').length;
-  const lateCount = todayPunches.filter(a => a.status === 'LATE').length;
-  const onTimeRate = todayPunches.length > 0 ? ((onTimeCount / todayPunches.length) * 100).toFixed(1) : '94.2';
+  const lateCount = todayPunches.filter(a => a.status === 'LATE' || a.status === 'EARLY_LEAVE').length;
+  const onTimeRate = todayPunches.length > 0 
+    ? ((onTimeCount / todayPunches.length) * 100).toFixed(1) 
+    : (attendance.length > 0 ? ((attendance.filter(a => a.status === 'ON_TIME').length / attendance.length) * 100).toFixed(1) : '100.0');
 
-  // Weekly attendance bar chart data (matching Bento Grid Design HTML)
+  // Dynamic Weekly attendance bar chart data from attendance records
+  const dayLabels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  const dayCounts: Record<string, { onTime: number; late: number }> = {
+    T2: { onTime: 0, late: 0 },
+    T3: { onTime: 0, late: 0 },
+    T4: { onTime: 0, late: 0 },
+    T5: { onTime: 0, late: 0 },
+    T6: { onTime: 0, late: 0 },
+    T7: { onTime: 0, late: 0 },
+    CN: { onTime: 0, late: 0 },
+  };
+
+  attendance.forEach(a => {
+    const d = new Date(a.timestamp);
+    const dayLabel = dayLabels[d.getDay()];
+    if (dayCounts[dayLabel]) {
+      if (a.status === 'ON_TIME') dayCounts[dayLabel].onTime += 1;
+      else dayCounts[dayLabel].late += 1;
+    }
+  });
+
   const weeklyAttendanceData = [
-    { day: 'T2', onTime: 28, late: 2 },
-    { day: 'T3', onTime: 36, late: 1 },
-    { day: 'T4', onTime: 32, late: 2 },
-    { day: 'T5', onTime: 40, late: 0 },
-    { day: 'T6', onTime: 24, late: 4 },
-    { day: 'T7', onTime: 14, late: 0 },
-    { day: 'CN', onTime: 0, late: 0 },
+    { day: 'T2', onTime: dayCounts.T2.onTime, late: dayCounts.T2.late },
+    { day: 'T3', onTime: dayCounts.T3.onTime, late: dayCounts.T3.late },
+    { day: 'T4', onTime: dayCounts.T4.onTime, late: dayCounts.T4.late },
+    { day: 'T5', onTime: dayCounts.T5.onTime, late: dayCounts.T5.late },
+    { day: 'T6', onTime: dayCounts.T6.onTime, late: dayCounts.T6.late },
+    { day: 'T7', onTime: dayCounts.T7.onTime, late: dayCounts.T7.late },
+    { day: 'CN', onTime: dayCounts.CN.onTime, late: dayCounts.CN.late },
   ];
 
-  // Department distribution (matching Bento Grid Design HTML)
-  const deptData = [
-    { name: 'Kỹ thuật', value: 42, color: '#3b82f6' },
-    { name: 'Kinh doanh', value: 28, color: '#22c55e' },
-    { name: 'Khác', value: 30, color: '#334155' },
-  ];
+  // Dynamic Department distribution from employees
+  const deptColors = ['#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#06b6d4', '#64748b'];
+  const deptCounts: Record<string, number> = {};
+  employees.forEach(e => {
+    const d = e.department || 'Chưa phân ban';
+    deptCounts[d] = (deptCounts[d] || 0) + 1;
+  });
+
+  const deptData = Object.entries(deptCounts).map(([name, count], idx) => ({
+    name,
+    value: count,
+    percentage: totalEmployees > 0 ? Math.round((count / totalEmployees) * 100) : 0,
+    color: deptColors[idx % deptColors.length],
+  }));
 
   return (
     <div className="space-y-6">
@@ -65,9 +100,6 @@ export const ManagerDashboard: React.FC = () => {
             <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
               Tổng Quan Hệ Thống
             </h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-mono font-medium border border-blue-500/20">
-              Bento AIoT v2.5
-            </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Bảng điều khiển theo dõi chấm công khuôn mặt & quản lý vận hành theo thời gian thực.
@@ -102,19 +134,19 @@ export const ManagerDashboard: React.FC = () => {
             Tổng nhân sự
           </span>
           <div className="flex items-end justify-between mt-3">
-            <span className="text-3xl font-bold text-white font-mono">{totalEmployees > 0 ? totalEmployees : 156}</span>
-            <span className="text-green-500 text-xs pb-1 font-medium">+2 tháng này</span>
+            <span className="text-3xl font-bold text-white font-mono">{totalEmployees}</span>
+            <span className="text-green-500 text-xs pb-1 font-medium">{activeEmployees} Đang hoạt động</span>
           </div>
         </div>
 
         {/* Card 2: Có mặt hôm nay */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
           <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            Có mặt hôm nay
+            Lượt quẹt ({latestDateStr})
           </span>
           <div className="flex items-end justify-between mt-3">
-            <span className="text-3xl font-bold text-white font-mono">{activeEmployees}</span>
-            <span className="text-slate-500 text-xs pb-1 font-mono">/ {totalEmployees}</span>
+            <span className="text-3xl font-bold text-white font-mono">{todayPunches.length}</span>
+            <span className="text-slate-500 text-xs pb-1 font-mono">/ {attendance.length} tổng</span>
           </div>
         </div>
 
@@ -125,20 +157,20 @@ export const ManagerDashboard: React.FC = () => {
           </span>
           <div className="flex items-end justify-between mt-3">
             <span className="text-3xl font-bold text-white font-mono">{onTimeRate}%</span>
-            <span className="text-orange-400 text-xs pb-1 font-medium">▼ 0.8%</span>
+            <span className="text-blue-400 text-xs pb-1 font-medium">{onTimeCount} đúng giờ</span>
           </div>
         </div>
 
         {/* Card 4: Cảnh báo vắng */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
           <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            Cảnh báo trễ / vắng
+            Cảnh báo trễ / sớm
           </span>
           <div className="flex items-end justify-between mt-3">
-            <span className="text-3xl font-bold text-red-400 font-mono">
+            <span className="text-3xl font-bold text-orange-400 font-mono">
               {String(lateCount).padStart(2, '0')}
             </span>
-            <span className="text-red-500 text-xs pb-1 font-medium">Cần xử lý</span>
+            <span className="text-orange-500 text-xs pb-1 font-medium">Lượt vi phạm</span>
           </div>
         </div>
       </div>
@@ -148,13 +180,13 @@ export const ManagerDashboard: React.FC = () => {
         {/* Left: Weekly Attendance Chart (col-span-8) */}
         <div className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-white text-base">Biểu đồ chấm công tuần này</h3>
+            <h3 className="font-bold text-white text-base">Biểu đồ chấm công chuyên cần</h3>
             <div className="flex gap-4">
               <span className="flex items-center gap-1.5 text-xs text-slate-400">
                 <span className="w-2 h-2 rounded-full bg-blue-500"></span> Đúng giờ
               </span>
               <span className="flex items-center gap-1.5 text-xs text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-orange-500"></span> Đi muộn
+                <span className="w-2 h-2 rounded-full bg-orange-500"></span> Đi muộn / về sớm
               </span>
             </div>
           </div>
@@ -202,31 +234,21 @@ export const ManagerDashboard: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                <span className="text-xl font-bold font-mono text-white">3</span>
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Teams</span>
+                <span className="text-xl font-bold font-mono text-white">{deptData.length}</span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Phòng ban</span>
               </div>
             </div>
           </div>
 
           <div className="space-y-2 mt-4 pt-4 border-t border-slate-800">
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-2 text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-blue-500"></span> Kỹ thuật AI
-              </span>
-              <span className="font-mono text-white font-medium">42%</span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-2 text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span> Kinh doanh
-              </span>
-              <span className="font-mono text-white font-medium">28%</span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-slate-700"></span> Khác (HR, IT)
-              </span>
-              <span className="font-mono text-white font-medium">30%</span>
-            </div>
+            {deptData.map((d, i) => (
+              <div key={i} className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2 text-slate-300 truncate max-w-[140px]">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.color }}></span> {d.name}
+                </span>
+                <span className="font-mono text-white font-medium">{d.value} NV ({d.percentage}%)</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -279,7 +301,7 @@ export const ManagerDashboard: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 font-mono text-xs text-slate-300">
-                      {dateObj.toLocaleTimeString('vi-VN')}
+                      {formatVNTime(att.timestamp)}
                     </td>
                     <td className="py-3 text-xs text-slate-400 font-mono">
                       {att.device_id}

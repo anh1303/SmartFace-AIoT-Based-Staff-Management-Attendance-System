@@ -1,6 +1,7 @@
 import { getMqttClient } from '../../config/mqtt.js'
 import { emitDeviceEvent } from '../../sockets/device.gateway.js'
 import { emitAttendanceEvent } from '../../sockets/attendance.gateway.js'
+import { DEVICE_STATUS, ATTENDANCE_METHOD } from '../../common/constants.js'
 import * as deviceService from './device.service.js'
 import * as attendance from '../attendance/attendance.service.js'
 
@@ -22,7 +23,7 @@ export function registerDeviceMqttHandlers() {
 
       if (event === 'status') {
         // Cập nhật trạng thái thiết bị (in-memory)
-        const device = deviceService.updateStatus(deviceId, payload.status ?? 'OFFLINE')
+        const device = deviceService.updateStatus(deviceId, payload.status ?? DEVICE_STATUS.OFFLINE)
         if (device) emitDeviceEvent('status', device)
       }
 
@@ -31,7 +32,7 @@ export function registerDeviceMqttHandlers() {
         const record = await attendance.checkIn({
           employeeId: payload.employeeId,
           device_info: `device:${deviceId}`,
-          method: 'FACE',
+          method: ATTENDANCE_METHOD.FACE,
         })
         emitAttendanceEvent('checked-in', record)
       }

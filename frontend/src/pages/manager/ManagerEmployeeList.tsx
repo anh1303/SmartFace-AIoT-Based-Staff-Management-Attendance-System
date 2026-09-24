@@ -50,9 +50,9 @@ export const ManagerEmployeeList: React.FC = () => {
     phone: '',
     email: '',
     status: 'ACTIVE' as const,
-    face_enrolled: true,
-    fingerprint_enrolled: true,
-    base_salary: 18000000,
+    face_enrolled: false,
+    fingerprint_enrolled: false,
+    hourly_rate: 50000,
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
   });
 
@@ -90,9 +90,9 @@ export const ManagerEmployeeList: React.FC = () => {
       phone: '',
       email: '',
       status: 'ACTIVE',
-      face_enrolled: true,
-      fingerprint_enrolled: true,
-      base_salary: 18000000,
+      face_enrolled: false,
+      fingerprint_enrolled: false,
+      hourly_rate: 50000,
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
     });
   };
@@ -107,7 +107,7 @@ export const ManagerEmployeeList: React.FC = () => {
       position: editEmployee.position,
       email: editEmployee.email,
       phone: editEmployee.phone,
-      base_salary: editEmployee.base_salary,
+      hourly_rate: editEmployee.hourly_rate,
       face_enrolled: editEmployee.face_enrolled,
       fingerprint_enrolled: editEmployee.fingerprint_enrolled,
     });
@@ -215,7 +215,7 @@ export const ManagerEmployeeList: React.FC = () => {
                 <th className="py-3.5 px-4 font-medium">Phòng ban & Vị trí</th>
                 <th className="py-3.5 px-4 font-medium">Liên hệ</th>
                 <th className="py-3.5 px-4 font-medium">Sinh trắc AI</th>
-                <th className="py-3.5 px-4 font-medium">Lương cơ bản</th>
+                <th className="py-3.5 px-4 font-medium">Lương theo giờ (VNĐ)</th>
                 <th className="py-3.5 px-4 font-medium">Trạng thái</th>
                 <th className="py-3.5 px-4 text-right font-medium">Thao tác</th>
               </tr>
@@ -248,20 +248,20 @@ export const ManagerEmployeeList: React.FC = () => {
                     </td>
 
                     {/* ID */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-blue-400">
+                    <td className="py-3.5 px-4 font-mono font-semibold text-blue-400">
                       {emp.employee_id}
                     </td>
 
                     {/* Department & Position */}
                     <td className="py-3.5 px-4">
-                      <p className="text-white font-medium">{emp.department}</p>
-                      <p className="text-[11px] text-slate-400">{emp.position}</p>
+                      <p className="font-medium text-white">{emp.position}</p>
+                      <p className="text-[11px] text-slate-400">{emp.department}</p>
                     </td>
 
                     {/* Contact */}
-                    <td className="py-3.5 px-4">
-                      <p className="text-slate-300 font-mono text-[11px]">{emp.email}</p>
-                      <p className="text-slate-500 font-mono text-[11px]">{emp.phone}</p>
+                    <td className="py-3.5 px-4 font-mono text-[11px]">
+                      <p className="text-slate-300">{emp.email}</p>
+                      <p className="text-slate-500">{emp.phone}</p>
                     </td>
 
                     {/* Biometrics */}
@@ -269,20 +269,20 @@ export const ManagerEmployeeList: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span
                           title={emp.face_enrolled ? "Face ID: Đã đăng ký" : "Chưa đăng ký Face ID"}
-                          className={`p-1.5 rounded-lg ${
+                          className={`p-1.5 rounded-lg border ${
                             emp.face_enrolled
-                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                              : 'bg-slate-800 text-slate-600'
+                              ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                              : 'bg-slate-800 text-slate-600 border-slate-700/50'
                           }`}
                         >
                           <ScanFace className="w-4 h-4" />
                         </span>
                         <span
                           title={emp.fingerprint_enrolled ? "Vân tay: Đã đăng ký" : "Chưa đăng ký Vân tay"}
-                          className={`p-1.5 rounded-lg ${
+                          className={`p-1.5 rounded-lg border ${
                             emp.fingerprint_enrolled
-                              ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                              : 'bg-slate-800 text-slate-600'
+                              ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                              : 'bg-slate-800 text-slate-600 border-slate-700/50'
                           }`}
                         >
                           <Fingerprint className="w-4 h-4" />
@@ -290,9 +290,9 @@ export const ManagerEmployeeList: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Base Salary */}
+                    {/* Hourly Rate */}
                     <td className="py-3.5 px-4 font-mono text-white font-medium">
-                      {(emp.base_salary || 0).toLocaleString('vi-VN')} ₫
+                      {((emp.hourly_rate ?? 0)).toLocaleString('vi-VN')} ₫
                     </td>
 
                     {/* Status Toggle */}
@@ -344,9 +344,9 @@ export const ManagerEmployeeList: React.FC = () => {
               <input
                 type="text"
                 required
+                readOnly
                 value={newEmp.employee_id}
-                onChange={e => setNewEmp({ ...newEmp, employee_id: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-mono"
+                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-400 font-mono cursor-not-allowed select-none focus:outline-none"
               />
             </div>
 
@@ -412,40 +412,17 @@ export const ManagerEmployeeList: React.FC = () => {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Lương cơ bản hợp đồng (VNĐ)</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Lương theo giờ (VNĐ)</label>
               <input
                 type="number"
                 required
-                step="500000"
-                value={newEmp.base_salary}
-                onChange={e => setNewEmp({ ...newEmp, base_salary: Number(e.target.value) })}
+                step="1000"
+                min="1000"
+                placeholder="50000"
+                value={newEmp.hourly_rate}
+                onChange={e => setNewEmp({ ...newEmp, hourly_rate: Number(e.target.value) })}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-mono"
               />
-            </div>
-          </div>
-
-          {/* Biometrics Enroll Toggles */}
-          <div className="pt-2 p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
-            <span className="text-xs font-semibold text-blue-400">Thiết lập đăng ký sinh trắc học:</span>
-            <div className="flex items-center gap-6">
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={newEmp.face_enrolled}
-                  onChange={e => setNewEmp({ ...newEmp, face_enrolled: e.target.checked })}
-                  className="rounded bg-slate-900 border-slate-700 text-blue-600"
-                />
-                <span>Kích hoạt Face ID 512-D</span>
-              </label>
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={newEmp.fingerprint_enrolled}
-                  onChange={e => setNewEmp({ ...newEmp, fingerprint_enrolled: e.target.checked })}
-                  className="rounded bg-slate-900 border-slate-700 text-blue-600"
-                />
-                <span>Kích hoạt Vân tay FAP30</span>
-              </label>
             </div>
           </div>
 
@@ -515,13 +492,14 @@ export const ManagerEmployeeList: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Lương cơ bản (VNĐ)</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Lương theo giờ (VNĐ)</label>
                 <input
                   type="number"
                   required
-                  step="500000"
-                  value={editEmployee.base_salary}
-                  onChange={e => setEditEmployee({ ...editEmployee, base_salary: Number(e.target.value) })}
+                  step="1000"
+                  min="1000"
+                  value={editEmployee.hourly_rate}
+                  onChange={e => setEditEmployee({ ...editEmployee, hourly_rate: Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-mono"
                 />
               </div>

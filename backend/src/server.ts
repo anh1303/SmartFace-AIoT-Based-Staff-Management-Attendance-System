@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'
+// Server entry point
 import { app } from './app.js'
 import { env } from './config/env.js'
 import { prisma } from './config/database.js'

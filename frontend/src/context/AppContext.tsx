@@ -1,20 +1,35 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_BASE } from '../utils/apiConfig';
 import { 
   Employee, 
   WorkShift, 
   AttendanceRecord, 
   PayrollRecord, 
+  BonusPenaltyPolicy,
   UserSession, 
   Role, 
   ToastMessage 
 } from '../types';
-import { 
-  INITIAL_EMPLOYEES, 
-  INITIAL_SHIFTS, 
-  INITIAL_ATTENDANCE, 
-  INITIAL_PAYROLL, 
-  DEMO_USERS 
-} from '../mocks/initialData';
+const DEFAULT_USERS: Record<Role, UserSession> = {
+  manager: {
+    employee_id: 'NV-001',
+    full_name: 'Nguyễn Văn A',
+    email: 'anv@aiot.corp',
+    role: 'manager',
+    position: 'AI Engineer Lead',
+    department: 'Kỹ thuật AI',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+  },
+  employee: {
+    employee_id: 'NV-002',
+    full_name: 'Lê Hoàng Phúc',
+    email: 'employee@company.com',
+    role: 'employee',
+    position: 'DevOps Engineer',
+    department: 'Vận hành & IT',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+  },
+};
 
 interface AppContextType {
   currentUser: UserSession | null;
@@ -39,11 +54,15 @@ interface AppContextType {
 
   // Payroll
   payroll: PayrollRecord[];
+  bonusPenalty: BonusPenaltyPolicy | null;
   selectedPeriod: string;
   setSelectedPeriod: (period: string) => void;
+  generatePayroll: (period: string) => Promise<void>;
   updatePayrollItem: (id: string, updates: Partial<PayrollRecord>) => void;
   finalizePayrollPeriod: (period: string) => void;
   unlockPayrollPeriod: (period: string) => void;
+  updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => Promise<void>;
+
 
   // Toasts
   toasts: ToastMessage[];
@@ -62,14 +81,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return null;
     }
   });
-  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [workShifts, setWorkShifts] = useState<WorkShift[]>(INITIAL_SHIFTS);
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>(INITIAL_ATTENDANCE);
-  const [payroll, setPayroll] = useState<PayrollRecord[]>(INITIAL_PAYROLL);
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("2026-08");
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [payroll, setPayroll] = useState<PayrollRecord[]>([]);
+  const [bonusPenalty, setBonusPenalty] = useState<BonusPenaltyPolicy | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  const role: Role = currentUser?.role || 'staff';
+  const role: Role = currentUser?.role || 'employee';
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -91,7 +114,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/login', {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier: identifier.trim(), password }),
@@ -101,7 +124,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (response.ok && resData.success && resData.data) {
         const { user, accessToken } = resData.data;
-        const targetRole: Role = user.role === 'manager' ? 'manager' : 'staff';
+        const targetRole: Role = user.role === 'manager' || user.role === 'ADMIN' ? 'manager' : 'employee';
         
         const session: UserSession = {
           employee_id: user.employee_id || user.username || 'EMP-001',
@@ -110,14 +133,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           role: targetRole,
           position: user.position || (targetRole === 'manager' ? 'Manager' : 'Employee'),
           department: user.department || 'Chung',
-          avatar: user.avatar || (targetRole === 'manager' ? DEMO_USERS.manager.avatar : DEMO_USERS.staff.avatar),
+          avatar: user.avatar || (targetRole === 'manager' ? DEFAULT_USERS.manager.avatar : DEFAULT_USERS.employee.avatar),
         };
 
         setCurrentUser(session);
         localStorage.setItem('userSession', JSON.stringify(session));
         localStorage.setItem('token', accessToken);
 
-        showToast(`Đăng nhập thành công! Vai trò: ${targetRole === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Staff)'}`, 'success');
+        showToast(`Đăng nhập thành công! Vai trò: ${targetRole === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Employee)'}`, 'success');
         return { success: true, role: targetRole };
       } else {
         const errMsg = resData.message === 'Invalid username/email or password'
@@ -128,7 +151,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (error) {
       console.error('Login API error:', error);
-      const errMsg = 'Không thể kết nối đến máy chủ Backend (http://localhost:3000). Vui lòng đảm bảo Backend đang chạy!';
+      const targetServer = API_BASE || 'Backend';
+      const errMsg = `Không thể kết nối đến máy chủ Backend (${targetServer}). Vui lòng đảm bảo Backend đang chạy!`;
       showToast(errMsg, 'error');
       return { success: false, message: errMsg };
     }
@@ -142,8 +166,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const switchRole = (newRole: Role) => {
-    setCurrentUser(DEMO_USERS[newRole]);
-    showToast(`Đã chuyển đổi sang giao diện: ${newRole === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Staff)'}`, 'info');
+    const matched = employees.find(e =>
+      newRole === 'manager'
+        ? e.position?.toLowerCase().includes('lead') || e.position?.toLowerCase().includes('manager')
+        : !e.position?.toLowerCase().includes('manager'),
+    ) || employees[0];
+
+    if (matched) {
+      const session: UserSession = {
+        employee_id: matched.employee_id,
+        full_name: matched.full_name,
+        email: matched.email || '',
+        role: newRole,
+        position: matched.position || (newRole === 'manager' ? 'Manager' : 'Employee'),
+        department: matched.department || 'Chung',
+        avatar: matched.avatar || '',
+      };
+      setCurrentUser(session);
+      localStorage.setItem('userSession', JSON.stringify(session));
+    } else {
+      setCurrentUser(DEFAULT_USERS[newRole]);
+    }
+    showToast(`Đã chuyển đổi sang giao diện: ${newRole === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Employee)'}`, 'info');
   };
 
   // Fetch employees, attendance, and payroll from Backend API
@@ -156,54 +200,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Fetch Employees
     try {
-      const res = await fetch('http://localhost:3000/api/employees?limit=100', { headers });
+      const res = await fetch(`${API_BASE}/api/employees?limit=100`, { headers });
       if (res.ok) {
         const data = await res.json();
-        if (data.success && data.data?.items) {
-          setEmployees(data.data.items);
+        if (data.success && Array.isArray(data.data?.items)) {
+          const empItems: Employee[] = data.data.items;
+          setEmployees(empItems);
+
+          // Sync currentUser with real DB employee
+          if (empItems.length > 0) {
+            setCurrentUser(prev => {
+              if (!prev) return null;
+              const match = empItems.find(e => e.employee_id === prev.employee_id || e.email === prev.email);
+              if (match) {
+                return {
+                  ...prev,
+                  employee_id: match.employee_id,
+                  full_name: match.full_name,
+                  email: match.email || prev.email,
+                  position: match.position || prev.position,
+                  department: match.department || prev.department,
+                  avatar: match.avatar || prev.avatar,
+                };
+              }
+              return prev;
+            });
+          }
         }
       }
     } catch (e) {
-      console.warn('Failed to fetch employees, using local fallback:', e);
+      console.warn('Failed to fetch employees from DB:', e);
     }
 
-    // Fetch Payroll
+    // Fetch Payroll & Bonus Penalty Policy
     try {
-      const res = await fetch('http://localhost:3000/api/payroll', { headers });
+      const res = await fetch(`${API_BASE}/api/payroll`, { headers });
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+        if (data.success && Array.isArray(data.data)) {
           setPayroll(data.data);
+          if (data.data.length > 0 && data.data[0].period) {
+            setSelectedPeriod(data.data[0].period);
+          }
         }
       }
     } catch (e) {
-      console.warn('Failed to fetch payroll, using local fallback:', e);
+      console.warn('Failed to fetch payroll from DB:', e);
+    }
+
+    try {
+      const resBp = await fetch(`${API_BASE}/api/payroll/bonus-penalty`, { headers });
+      if (resBp.ok) {
+        const dataBp = await resBp.json();
+        if (dataBp.success && dataBp.data) {
+          setBonusPenalty(dataBp.data);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch bonus-penalty policy from DB:', e);
     }
 
     // Fetch Attendance
     try {
-      const res = await fetch('http://localhost:3000/api/attendance', { headers });
+      const res = await fetch(`${API_BASE}/api/attendance`, { headers });
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+        if (data.success && Array.isArray(data.data)) {
           setAttendance(data.data);
         }
       }
     } catch (e) {
-      console.warn('Failed to fetch attendance, using local fallback:', e);
+      console.warn('Failed to fetch attendance from DB:', e);
     }
 
     // Fetch Shifts
     try {
-      const res = await fetch('http://localhost:3000/api/shifts', { headers });
+      const res = await fetch(`${API_BASE}/api/shifts`, { headers });
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+        if (data.success && Array.isArray(data.data)) {
           setWorkShifts(data.data);
         }
       }
     } catch (e) {
-      console.warn('Failed to fetch shifts, using local fallback:', e);
+      console.warn('Failed to fetch shifts from DB:', e);
     }
   };
 
@@ -215,7 +295,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addEmployee = async (newEmp: Omit<Employee, 'created_at' | 'updated_at'>) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:3000/api/employees', {
+      const response = await fetch(`${API_BASE}/api/employees`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -229,7 +309,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           phone: newEmp.phone,
           department: newEmp.department,
           status: newEmp.status,
-          base_salary: newEmp.base_salary,
+          hourly_rate: newEmp.hourly_rate,
           avatar_url: newEmp.avatar,
         }),
       });
@@ -263,7 +343,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateEmployee = async (id: string, updates: Partial<Employee>) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:3000/api/employees/${id}`, {
+      const response = await fetch(`${API_BASE}/api/employees/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -276,7 +356,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           phone: updates.phone,
           department: updates.department,
           status: updates.status,
-          base_salary: updates.base_salary,
+          hourly_rate: updates.hourly_rate,
           avatar_url: updates.avatar,
         }),
       });
@@ -284,9 +364,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const resData = await response.json().catch(() => null);
 
       if (response.ok && resData?.success && resData?.data) {
-        const updatedEmp: Employee = resData.data;
-        setEmployees(prev => prev.map(emp => (emp.employee_id === id || emp.employee_id === updatedEmp.employee_id) ? updatedEmp : emp));
-        showToast(`Đã cập nhật thông tin nhân viên ${updatedEmp.full_name} trong CSDL`, 'success');
+        setEmployees(prev => prev.map(emp => {
+          if (emp.id === id || emp.employee_id === id || emp.employee_id === resData.data.employee_id) {
+            return {
+              ...emp,
+              ...resData.data,
+              face_enrolled: updates.face_enrolled !== undefined ? updates.face_enrolled : emp.face_enrolled,
+              fingerprint_enrolled: updates.fingerprint_enrolled !== undefined ? updates.fingerprint_enrolled : emp.fingerprint_enrolled,
+            };
+          }
+          return emp;
+        }));
+        showToast(`Đã cập nhật thông tin nhân viên ${resData.data.full_name || id} trong CSDL`, 'success');
         return;
       } else if (resData) {
         showToast(resData.message || 'Lỗi khi cập nhật nhân viên', 'error');
@@ -321,7 +410,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const assignOrUpdateShift = async (shiftData: Omit<WorkShift, 'shift_id'> & { shift_id?: string }) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:3000/api/shifts', {
+      const response = await fetch(`${API_BASE}/api/shifts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -330,6 +419,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({
           employee_id: shiftData.employee_id,
           date: shiftData.date,
+          work_day: shiftData.work_day,
           shift_type: shiftData.shift_type,
           start_time: shiftData.start_time,
           end_time: shiftData.end_time,
@@ -387,7 +477,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const token = localStorage.getItem('token');
     const endpoint = record.type === 'CHECK_IN' ? 'check-in' : 'check-out';
     try {
-      const response = await fetch(`http://localhost:3000/api/attendance/${endpoint}`, {
+      const response = await fetch(`${API_BASE}/api/attendance/${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -423,19 +513,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Payroll
+  const generatePayroll = async (period: string) => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_BASE}/api/payroll/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ payroll_period: period }),
+      });
+
+      const resData = await response.json().catch(() => null);
+      if (response.ok && resData?.success && Array.isArray(resData?.data)) {
+        setPayroll(resData.data);
+        showToast(`Đã tính và tạo bảng lương kỳ ${period} từ CSDL`, 'success');
+        return;
+      } else if (resData) {
+        showToast(resData.message || 'Lỗi khi tạo bảng lương', 'error');
+      }
+    } catch (e) {
+      console.error('Generate payroll API error:', e);
+      showToast('Không thể kết nối đến máy chủ Backend', 'error');
+    }
+  };
+
   const updatePayrollItem = async (id: string, updates: Partial<PayrollRecord>) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:3000/api/payroll/${id}`, {
+      const response = await fetch(`${API_BASE}/api/payroll/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          base_salary: updates.base_salary,
+          hourly_rate: updates.hourly_rate,
           allowance: updates.allowance,
-          deduction: updates.deduction,
           status: updates.status,
         }),
       });
@@ -457,7 +572,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPayroll(prev => prev.map(p => {
       if (p.payroll_id === id || p.id === id) {
         const updated = { ...p, ...updates };
-        updated.total_paid = Math.max(0, updated.base_salary + updated.allowance - updated.deduction);
+        updated.net_salary = Math.max(0, (updated.hourly_rate || 0) * (updated.total_working_hours || 0) + (updated.allowance || 0));
         return updated;
       }
       return p;
@@ -468,7 +583,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const finalizePayrollPeriod = async (period: string) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:3000/api/payroll/period/${period}/finalize`, {
+      const response = await fetch(`${API_BASE}/api/payroll/period/${period}/finalize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -501,7 +616,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const unlockPayrollPeriod = async (period: string) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:3000/api/payroll/period/${period}/unlock`, {
+      const response = await fetch(`${API_BASE}/api/payroll/period/${period}/unlock`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -531,6 +646,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Đã mở khoá chỉnh sửa bảng lương kỳ ${period}`, 'warning');
   };
 
+  const updateBonusPenalty = async (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_BASE}/api/payroll/bonus-penalty`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        const resData = await response.json();
+        if (resData.success && resData.data) {
+          setBonusPenalty(resData.data);
+          await fetchAllData();
+          showToast('Cập nhật chính sách thưởng/phạt vào CSDL thành công', 'success');
+          return;
+        }
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        showToast(errData.message || 'Lỗi khi cập nhật chính sách thưởng/phạt', 'error');
+        return;
+      }
+    } catch (e) {
+      console.error('Update bonus penalty API error:', e);
+    }
+
+    // Fallback local state
+    setBonusPenalty(prev => ({
+      id: prev?.id || 1,
+      overtime_rate: data.overtime_rate !== undefined ? data.overtime_rate : (prev?.overtime_rate || 1.5),
+      late_early_penalty: data.late_early_penalty !== undefined ? data.late_early_penalty : (prev?.late_early_penalty || 50000),
+      description: data.description !== undefined ? data.description : (prev?.description || ''),
+    }));
+    showToast('Đã lưu thay đổi chính sách thưởng/phạt (Local)', 'info');
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -548,15 +702,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         attendance,
         addAttendanceRecord,
         payroll,
+        bonusPenalty,
         selectedPeriod,
         setSelectedPeriod,
+        generatePayroll,
         updatePayrollItem,
         finalizePayrollPeriod,
         unlockPayrollPeriod,
+        updateBonusPenalty,
         toasts,
         showToast,
         removeToast,
       }}
+
     >
       {children}
     </AppContext.Provider>

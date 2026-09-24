@@ -33,9 +33,9 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
 
-          {/* Staff Area */}
-          <Route path="/app/staff" element={<AppLayout />}>
-            <Route index element={<Navigate to="/app/staff/dashboard" replace />} />
+          {/* Employee Area */}
+          <Route path="/app/employee" element={<AppLayout />}>
+            <Route index element={<Navigate to="/app/employee/dashboard" replace />} />
             <Route path="dashboard" element={<StaffDashboard />} />
             <Route path="profile" element={<StaffProfile />} />
             <Route path="schedule" element={<StaffSchedule />} />
@@ -43,6 +43,7 @@ export default function App() {
             <Route path="salary-estimate" element={<StaffSalaryEstimate />} />
             <Route path="salary-history" element={<StaffSalaryHistory />} />
           </Route>
+          <Route path="/app/staff/*" element={<Navigate to="/app/employee/dashboard" replace />} />
 
           {/* Manager Area */}
           <Route path="/app/manager" element={<AppLayout />}>

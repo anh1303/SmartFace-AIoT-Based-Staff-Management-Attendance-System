@@ -1,6 +1,38 @@
 # ==============================================================================
-# 1. HỆ ĐIỀU HÀNH (OS Generated Files)
+# 1. BẢO MẬT & BẢO VỆ DỮ LIỆU NHẠY CẢM (Secrets & Environment)
 # ==============================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+certs/
+
+# ==============================================================================
+# 2. THƯ MỤC NẶNG & BUILD ARTIFACTS (Dependencies, Builds, Cache)
+# ==============================================================================
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+.next/
+.vite/
+.cache/
+*.tsbuildinfo
+coverage/
+**/coverage/
+
+# ==============================================================================
+# 3. MÔI TRƯỜNG PHÁT TRIỂN & HỆ ĐIỀU HÀNH (IDE & OS)
+# ==============================================================================
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
 .DS_Store
 .DS_Store?
 ._*
@@ -9,67 +41,35 @@ ehthumbs.db
 desktop.ini
 
 # ==============================================================================
-# 2. MÔI TRƯỜNG PHÁT TRIỂN & IDE (IDEs & Editors)
+# 4. LOGS & TEMPORARY FILES
 # ==============================================================================
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-*.sublime-project
-*.sublime-workspace
-
-# ==============================================================================
-# 3. BIẾN MÔI TRƯỜNG & BẢO MẬT (Environment Variables & Secrets)
-# ==============================================================================
-.env
-.env.local
-.env.*.local
-*.env
-*.pem
-*.key
-
-# ==============================================================================
-# 4. PYTHON, CÁC GÓI & MÔI TRƯỜNG ẢO (Python & Virtual Environments)
-# ==============================================================================
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
-.venv/
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-
-# ==============================================================================
-# 5. JUPYTER NOTEBOOKS, TESTING & LOGS
-# ==============================================================================
-.ipynb_checkpoints/
-*/.ipynb_checkpoints/*
-.pytest_cache/
-.coverage
-htmlcov/
 *.log
+<<<<<<< Updated upstream
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+uploads/
+**/uploads/
+temp/
+tmp/
+=======
 benchmark_cache/
 *.npy
 *.npz
+
+# ==============================================================================
+# 6. NODE.JS / FRONTEND & BACKEND DEPENDENCIES
+# ==============================================================================
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.turbo/
+.next/
+.nuxt/
+
+>>>>>>> Stashed changes

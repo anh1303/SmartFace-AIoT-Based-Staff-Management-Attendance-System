@@ -1,5 +1,6 @@
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
+import { BIOMETRIC_DEFAULTS } from '../../common/constants.js'
 
 async function resolveEmployeeId(idOrCode: string) {
   const emp = await prisma.employee.findFirst({
@@ -39,8 +40,8 @@ export async function register(
     data: {
       employee_id: employeeId,
       embedding,
-      model_version: options?.model_version ?? 'arcface_v1',
-      sample_tag: options?.sample_tag ?? 'FRONTAL',
+      model_version: options?.model_version ?? BIOMETRIC_DEFAULTS.MODEL_VERSION,
+      sample_tag: options?.sample_tag ?? BIOMETRIC_DEFAULTS.SAMPLE_TAG,
       quality_score: options?.quality_score ?? null,
       is_active: true,
     },

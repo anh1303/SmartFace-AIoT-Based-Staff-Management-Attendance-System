@@ -1,6 +1,7 @@
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere } from '../../common/utils.js'
+import { EMPLOYEE_STATUS } from '../../common/constants.js'
 import { employeeInclude } from './employee.model.js'
 
 export function formatEmployee(emp: any) {
@@ -16,9 +17,9 @@ export function formatEmployee(emp: any) {
     created_at: emp.createdAt ? emp.createdAt.toISOString() : new Date().toISOString(),
     updated_at: emp.updatedAt ? emp.updatedAt.toISOString() : new Date().toISOString(),
     face_enrolled: Array.isArray(emp.face_embeddings) && emp.face_embeddings.length > 0,
-    fingerprint_enrolled: true,
+    fingerprint_enrolled: Boolean(emp.fingerprint_enrolled),
     avatar: emp.avatar_url || '',
-    base_salary: emp.base_salary ? Number(emp.base_salary) : 0,
+    hourly_rate: emp.hourly_rate ? Number(emp.hourly_rate) : 0,
     departmentId: emp.departmentId,
   }
 }
@@ -34,7 +35,6 @@ export async function list(query: Record<string, unknown>) {
       : undefined
 
   const where = {
-    deleted_at: null,
     ...(search
       ? {
           OR: [
@@ -69,10 +69,7 @@ export async function list(query: Record<string, unknown>) {
 
 export async function get(idOrCode: string) {
   const item = await prisma.employee.findFirst({
-    where: {
-      ...buildIdOrCodeWhere(idOrCode),
-      deleted_at: null,
-    },
+    where: buildIdOrCodeWhere(idOrCode),
     include: employeeInclude,
   })
   if (!item) throw new AppError(404, 'Employee not found')
@@ -88,7 +85,7 @@ export async function create(data: {
   department?: string | null
   status?: string
   phone?: string | null
-  base_salary?: number
+  hourly_rate?: number
   avatar?: string | null
   avatar_url?: string | null
 }) {
@@ -116,6 +113,8 @@ export async function create(data: {
     }
   }
 
+  const rate = data.hourly_rate ?? 0
+
   const created = await prisma.employee.create({
     data: {
       employee_code: finalCode,
@@ -123,9 +122,9 @@ export async function create(data: {
       email: emailVal,
       position: data.position || null,
       departmentId: deptId ?? null,
-      status: data.status ?? 'ACTIVE',
+      status: data.status ?? EMPLOYEE_STATUS.ACTIVE,
       phone: data.phone || null,
-      base_salary: data.base_salary ?? 0,
+      hourly_rate: rate,
       avatar_url: data.avatar_url ?? data.avatar ?? null,
     },
     include: employeeInclude,
@@ -146,7 +145,7 @@ export async function update(
     phone?: string | null
     avatar_url?: string | null
     avatar?: string | null
-    base_salary?: number
+    hourly_rate?: number
   },
 ) {
   const existing = await prisma.employee.findFirst({
@@ -162,6 +161,8 @@ export async function update(
     if (dept) deptId = dept.id
   }
 
+  const rateVal = data.hourly_rate
+
   const updated = await prisma.employee.update({
     where: { id: existing.id },
     data: {
@@ -174,10 +175,17 @@ export async function update(
       ...(data.avatar_url !== undefined || data.avatar !== undefined
         ? { avatar_url: data.avatar_url ?? data.avatar }
         : {}),
-      ...(data.base_salary !== undefined ? { base_salary: data.base_salary } : {}),
+      ...(rateVal !== undefined ? { hourly_rate: rateVal } : {}),
     },
     include: employeeInclude,
   })
+
+  if (existing.user_id && data.status !== undefined) {
+    await prisma.user.update({
+      where: { id: existing.user_id },
+      data: { is_active: data.status === EMPLOYEE_STATUS.ACTIVE },
+    }).catch(() => {})
+  }
 
   return formatEmployee(updated)
 }
@@ -190,6 +198,6 @@ export async function remove(idOrCode: string) {
 
   await prisma.employee.update({
     where: { id: existing.id },
-    data: { deleted_at: new Date(), status: 'TERMINATED' },
+    data: { status: 'TERMINATED' },
   })
 }

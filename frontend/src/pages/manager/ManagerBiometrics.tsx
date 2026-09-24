@@ -130,9 +130,6 @@ export const ManagerBiometrics: React.FC = () => {
             <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
               Quản Lý & Cập Nhật Sinh Trắc Học
             </h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-mono font-medium border border-blue-500/20">
-              AIoT EDGE ENROLLMENT
-            </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Ghi nhận vector 512-D khuôn mặt từ hình ảnh hoặc phát tín hiệu IoT tới thiết bị FaceCam/Cảm biến vân tay FAP30.
@@ -151,50 +148,38 @@ export const ManagerBiometrics: React.FC = () => {
         </div>
       </div>
 
-      {/* 4 Bento Telemetry Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
+      {/* 3 Bento Telemetry Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors">
           <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Đã đăng ký Face ID</span>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-blue-400">
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-bold font-mono text-blue-400">
               {faceEnrolledCount}/{totalEmployees}
             </span>
             <span className="text-xs font-mono text-slate-500">
               ({Math.round((faceEnrolledCount / totalEmployees) * 100)}%)
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Trích xuất Landmark 512 điểm</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors">
           <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Đã đăng ký Vân tay</span>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-green-400">
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-bold font-mono text-green-400">
               {fingerEnrolledCount}/{totalEmployees}
             </span>
             <span className="text-xs font-mono text-slate-500">
               ({Math.round((fingerEnrolledCount / totalEmployees) * 100)}%)
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Chuẩn cảm biến FAP30 500 DPI</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors">
           <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Trạng thái Edge Devices</span>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xl font-bold font-mono text-white">12/12 Online</span>
+          <div className="mt-3 flex items-center gap-2.5">
+            <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-2xl font-bold font-mono text-white">12/12 Online</span>
           </div>
-          <p className="text-[11px] text-green-500 mt-1 font-mono">Độ trễ trung bình: 24ms</p>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
-          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Tiêu chuẩn mã hóa</span>
-          <div className="mt-2 flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-indigo-400" />
-            <span className="text-xl font-bold font-mono text-white">AES-256</span>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">Hardware Security Module</p>
         </div>
       </div>
 
@@ -309,10 +294,6 @@ export const ManagerBiometrics: React.FC = () => {
                   <span>Ghi nhận Vân tay (Gửi tín hiệu IoT)</span>
                 </button>
               </div>
-
-              <span className="hidden sm:inline-block text-xs font-mono text-slate-500">
-                Thao tác yêu cầu xác nhận lưu (Confirm)
-              </span>
             </div>
 
             {/* TAB 1: Face ID Upload & Landmark extraction */}

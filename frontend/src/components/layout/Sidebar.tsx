@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { 
+  ScanFace,
   LayoutDashboard, 
   CalendarDays, 
   Clock, 
@@ -33,13 +34,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     navigate('/login');
   };
 
-  const staffNavItems = [
-    { label: 'Bàn làm việc', path: '/app/staff/dashboard', icon: LayoutDashboard },
-    { label: 'Lịch trình làm việc', path: '/app/staff/schedule', icon: CalendarDays },
-    { label: 'Chấm công & Check-in', path: '/app/staff/attendance', icon: Clock },
-    { label: 'Hồ sơ & Sinh trắc', path: '/app/staff/profile', icon: User },
-    { label: 'Lương tạm tính', path: '/app/staff/salary-estimate', icon: DollarSign },
-    { label: 'Lịch sử phiếu lương', path: '/app/staff/salary-history', icon: FileText },
+  const employeeNavItems = [
+    { label: 'Bàn làm việc', path: '/app/employee/dashboard', icon: LayoutDashboard },
+    { label: 'Lịch trình làm việc', path: '/app/employee/schedule', icon: CalendarDays },
+    { label: 'Chấm công & Check-in', path: '/app/employee/attendance', icon: Clock },
+    { label: 'Hồ sơ & Sinh trắc', path: '/app/employee/profile', icon: User },
+    { label: 'Lương tạm tính', path: '/app/employee/salary-estimate', icon: DollarSign },
+    { label: 'Lịch sử phiếu lương', path: '/app/employee/salary-history', icon: FileText },
   ];
 
   const managerNavItems = [
@@ -52,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { label: 'Quản lý lương (Payroll)', path: '/app/manager/payroll', icon: Banknote },
   ];
 
-  const navItems = role === 'manager' ? managerNavItems : staffNavItems;
+  const navItems = role === 'manager' ? managerNavItems : employeeNavItems;
 
   return (
     <>
@@ -72,8 +73,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {/* Brand Header */}
         <div className="p-6 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-md font-bold text-white text-xs">
-              AI
+            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <ScanFace className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
@@ -81,7 +82,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   AIoT Attendance
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-mono">Enterprise Biometrics</p>
             </div>
           </div>
 
@@ -155,7 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   {currentUser?.full_name || 'Khách'}
                 </p>
                 <p className="text-xs text-slate-400 truncate">
-                  {currentUser?.email || (role === 'manager' ? 'manager@company.com' : 'staff@company.com')}
+                  {currentUser?.email || (role === 'manager' ? 'manager@company.com' : 'employee@company.com')}
                 </p>
               </div>
             </div>

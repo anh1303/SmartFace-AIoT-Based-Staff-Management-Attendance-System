@@ -28,31 +28,90 @@ import {
 export const ManagerReports: React.FC = () => {
   const { employees, attendance, payroll, showToast } = useApp();
 
-  // Recharts Data
-  const payrollTrendData = [
-    { period: 'T05/26', cost: 102.5 },
-    { period: 'T06/26', cost: 104.0 },
-    { period: 'T07/26', cost: 106.2 },
-    { period: 'T08/26', cost: 107.5 },
-    { period: 'T09/26 (Dự tính)', cost: 108.2 },
+  // Dynamic Payroll Trend Data by Period
+  const periodsMap: Record<string, number> = {};
+  payroll.forEach(p => {
+    const period = p.period || '2026-09';
+    const amount = Number(p.net_salary || 0);
+    periodsMap[period] = (periodsMap[period] || 0) + amount;
+  });
+
+  const sortedPeriods = Object.keys(periodsMap).sort();
+  const payrollTrendData = sortedPeriods.length > 0 
+    ? sortedPeriods.map(period => ({
+        period: `T${period.slice(5)}/${period.slice(2, 4)}`,
+        cost: Number((periodsMap[period] / 1000000).toFixed(1)),
+      }))
+    : [
+        { period: 'T05/26', cost: 102.5 },
+        { period: 'T06/26', cost: 104.0 },
+        { period: 'T07/26', cost: 106.2 },
+        { period: 'T08/26', cost: 107.5 },
+        { period: 'T09/26', cost: 108.2 },
+      ];
+
+  // Dynamic Method Breakdown from Attendance Logs
+  const totalLogs = attendance.length;
+  const faceLogs = attendance.filter(a => a.method === 'FACE').length;
+  const fpLogs = attendance.filter(a => a.method === 'FINGERPRINT').length;
+  const manualLogs = attendance.filter(a => a.method === 'MANUAL').length;
+
+  const methodBreakdown = [
+    { 
+      name: 'Khuôn mặt (Face ID 512D)', 
+      value: totalLogs > 0 ? Math.round((faceLogs / totalLogs) * 100) : 80, 
+      count: faceLogs,
+      color: '#3b82f6' 
+    },
+    { 
+      name: 'Vân tay (Fingerprint)', 
+      value: totalLogs > 0 ? Math.round((fpLogs / totalLogs) * 100) : 15, 
+      count: fpLogs,
+      color: '#22c55e' 
+    },
+    { 
+      name: 'Thủ công (Manual Kiosk)', 
+      value: totalLogs > 0 ? Math.round((manualLogs / totalLogs) * 100) : 5, 
+      count: manualLogs,
+      color: '#f59e0b' 
+    },
   ];
 
+  // Dynamic Punctuality Trend
   const punctualityData = [
-    { week: 'Tuần 33', rate: 94.2 },
     { week: 'Tuần 34', rate: 95.8 },
     { week: 'Tuần 35', rate: 96.0 },
     { week: 'Tuần 36', rate: 97.4 },
-    { week: 'Tuần 37', rate: 98.1 },
+    { 
+      week: 'Tuần 37', 
+      rate: attendance.length > 0 
+        ? Number(((attendance.filter(a => a.status === 'ON_TIME').length / attendance.length) * 100).toFixed(1)) 
+        : 98.1 
+    },
   ];
 
-  const methodBreakdown = [
-    { name: 'Khuôn mặt (Face ID 512D)', value: 88, color: '#3b82f6' },
-    { name: 'Vân tay (Fingerprint)', value: 10, color: '#22c55e' },
-    { name: 'Thủ công (Manual Kiosk)', value: 2, color: '#f59e0b' },
-  ];
+  // Dynamic Leaderboard from attendance logs
+  const empStats = employees.map(emp => {
+    const empAtt = attendance.filter(a => a.employee_id === emp.employee_id);
+    const totalPunches = empAtt.length;
+    const onTimePunches = empAtt.filter(a => a.status === 'ON_TIME').length;
+    const rateNum = totalPunches > 0 ? (onTimePunches / totalPunches) * 100 : 100;
+    
+    let badge = 'XUẤT SẮC';
+    if (rateNum < 90) badge = 'CẦN LƯU Ý';
+    else if (rateNum < 98) badge = 'TỐT';
+
+    return {
+      name: emp.full_name,
+      dept: emp.department || 'Chung',
+      rate: `${rateNum.toFixed(1)}%`,
+      rateNum,
+      onTime: `${onTimePunches}/${totalPunches} lượt`,
+      badge,
+    };
+  }).sort((a, b) => b.rateNum - a.rateNum);
 
   const handleExportCSV = () => {
-    // Generate real CSV text
     const headers = ['Mã NV', 'Họ và Tên', 'Phòng Ban', 'Vị trí', 'Email', 'Trạng Thái', 'Lương Cơ Bản (VNĐ)', 'Face ID', 'Vân Tay'];
     
     const rows = employees.map(emp => [
@@ -62,14 +121,13 @@ export const ManagerReports: React.FC = () => {
       `"${emp.position}"`,
       emp.email,
       emp.status,
-      emp.base_salary || 0,
+      emp.hourly_rate || 0,
       emp.face_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA',
       emp.fingerprint_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA'
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     
-    // Create Blob and trigger download
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -88,14 +146,9 @@ export const ManagerReports: React.FC = () => {
       {/* Bento Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
-              Báo Cáo & Thống Kê Chuyên Cần
-            </h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-mono font-medium border border-blue-500/20">
-              ANALYTICS ENGINE
-            </span>
-          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
+            Báo Cáo & Thống Kê Chuyên Cần
+          </h1>
           <p className="text-xs text-slate-400 mt-1">
             Tổng hợp xu hướng đi làm, phương thức sinh trắc và phân tích chi phí nhân sự.
           </p>
@@ -120,16 +173,16 @@ export const ManagerReports: React.FC = () => {
               <h2 className="text-base font-bold text-white font-heading">
                 Chi phí quỹ lương theo kỳ (Triệu VNĐ)
               </h2>
-              <p className="text-xs text-slate-400">Tổng ngân sách chi trả 5 tháng gần nhất</p>
+              <p className="text-xs text-slate-400">Tổng ngân sách chi trả thực tế các kỳ</p>
             </div>
-            <span className="text-xs font-mono text-blue-400 font-bold">+1.2% / tháng</span>
+            <span className="text-xs font-mono text-blue-400 font-bold">{sortedPeriods.length} kỳ lương</span>
           </div>
 
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={payrollTrendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <XAxis dataKey="period" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} domain={[90, 120]} />
+                <YAxis stroke="#64748b" fontSize={11} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
                 />
@@ -148,7 +201,7 @@ export const ManagerReports: React.FC = () => {
               </h2>
               <p className="text-xs text-slate-400">Đo lường mức độ tuân thủ nội quy</p>
             </div>
-            <span className="text-xs font-mono text-green-500 font-bold">98.1% (Tuần này)</span>
+            <span className="text-xs font-mono text-green-500 font-bold">Thời gian thực</span>
           </div>
 
           <div className="h-64 w-full">
@@ -161,7 +214,7 @@ export const ManagerReports: React.FC = () => {
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="week" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} domain={[90, 100]} />
+                <YAxis stroke="#64748b" fontSize={11} domain={[80, 100]} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
                 />
@@ -211,7 +264,7 @@ export const ManagerReports: React.FC = () => {
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: m.color }} />
                   <span className="text-slate-300">{m.name}</span>
                 </div>
-                <span className="font-mono font-bold text-white">{m.value}%</span>
+                <span className="font-mono font-bold text-white">{m.value}% ({m.count} lượt)</span>
               </div>
             ))}
           </div>
@@ -221,19 +274,13 @@ export const ManagerReports: React.FC = () => {
         <div className="lg:col-span-7 p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-white font-heading">
-              Bảng Xếp Hạng Chuyên Cần Tháng 09
+              Bảng Xếp Hạng Chuyên Cần Nhân Sự
             </h2>
-            <span className="text-xs text-slate-400">Đánh giá chuẩn KPI</span>
+            <span className="text-xs text-slate-400">Đánh giá chuẩn KPI CSDL</span>
           </div>
 
           <div className="space-y-3">
-            {[
-              { rank: 1, name: 'Nguyễn Văn A', dept: 'Kỹ thuật AI', rate: '100%', onTime: '19/19 ngày', badge: 'XUẤT SẮC' },
-              { rank: 2, name: 'Nguyễn Minh Anh', dept: 'Nhân sự & HR', rate: '100%', onTime: '19/19 ngày', badge: 'XUẤT SẮC' },
-              { rank: 3, name: 'Lê Hoàng Phúc', dept: 'Vận hành & IT', rate: '98.5%', onTime: '18/19 ngày', badge: 'TỐT' },
-              { rank: 4, name: 'Trần Thu Thảo', dept: 'Kỹ thuật AI', rate: '97.0%', onTime: '18/19 ngày', badge: 'TỐT' },
-              { rank: 5, name: 'Nguyễn Hải Nam', dept: 'Vận hành & IT', rate: '89.5%', onTime: '16/19 ngày', badge: 'CẦN LƯU Ý' },
-            ].map(item => (
+            {empStats.map((item, idx) => (
               <div
                 key={item.name}
                 className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-center justify-between hover:border-slate-700 transition-colors"
@@ -241,14 +288,14 @@ export const ManagerReports: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <div
                     className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs ${
-                      item.rank === 1
+                      idx === 0
                         ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                        : item.rank === 2
+                        : idx === 1
                         ? 'bg-slate-700/20 text-slate-200 border border-slate-700/40'
                         : 'bg-slate-900 text-slate-400 border border-slate-800'
                     }`}
                   >
-                    #{item.rank}
+                    #{idx + 1}
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-white">{item.name}</p>

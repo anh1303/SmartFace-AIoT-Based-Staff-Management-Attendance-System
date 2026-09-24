@@ -1,1010 +1,334 @@
-# SmartFace: AIoT-Based Staff Management & Attendance System
+# 🛡️ SmartFace: AIoT-Based Staff Management & Attendance System
 
-> An AIoT-based employee management and attendance platform integrating face authentication, spatial-frequency presentation attack detection (PAD), and fingerprint fallback.
+<<<<<<< Updated upstream
+> **SmartFace** là Nền tảng Quản lý Nhân sự & Chấm công Thông minh ứng dụng công nghệ **AIoT (Artificial Intelligence of Things)**. Hệ thống tích hợp xác thực sinh trắc học gương mặt qua Edge AI Camera, cơ chế phát hiện giả mạo gương mặt **PAD (Presentation Attack Detection)**, điểm danh vân tay dự phòng (**Fingerprint Fallback**), cùng hệ thống tự động tính lương (**Payroll Engine**) và giám sát thời gian thực qua **WebSockets/MQTT**.
+=======
+> **SmartFace** là Nền tảng Quản lý Nhân sự & Chấm công Thông minh ứng dụng AIoT, tích hợp xác thực khuôn mặt sinh trắc học, chống giả mạo (Presentation Attack Detection - PAD) và cơ chế điểm danh sinh trắc học vân tay dự phòng (Fingerprint Fallback).
+>>>>>>> Stashed changes
 
-## Overview
+---
 
-**SmartFace** is an AIoT-based employee management and attendance platform designed to modernize traditional staff attendance and workforce-management workflows.
+## 🏷️ Badges
 
-Traditional methods such as RFID/proximity cards, ID cards, PINs, and passwords can be lost, forgotten, borrowed, or shared. They can also introduce additional interaction steps and leave employee information, attendance records, and payroll-related data distributed across separate systems.
+<<<<<<< Updated upstream
+![Node.js](https://img.shields.io/badge/Node.js-v20+-339933.svg?style=flat-square&logo=nodedotjs)
+![React](https://img.shields.io/badge/React-v19-61DAFB.svg?style=flat-square&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-v5.8-3178C6.svg?style=flat-square&logo=typescript)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-v16-4169E1.svg?style=flat-square&logo=postgresql)
+![Prisma](https://img.shields.io/badge/Prisma-v6.4-2D3748.svg?style=flat-square&logo=prisma)
+![Vite](https://img.shields.io/badge/Vite-v6.2-646CFF.svg?style=flat-square&logo=vite)
+![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-v4.1-06B6D4.svg?style=flat-square&logo=tailwindcss)
+![Docker](https://img.shields.io/badge/Docker-Supported-2496ED.svg?style=flat-square&logo=docker)
+=======
+![Node.js](https://img.shields.io/badge/Node.js-v20+-green.svg?style=flat-square&logo=nodedotjs)
+![React](https://img.shields.io/badge/React-v19-61DAFB.svg?style=flat-square&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-v5.7-blue.svg?style=flat-square&logo=typescript)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-v16-336791.svg?style=flat-square&logo=postgresql)
+![Prisma](https://img.shields.io/badge/Prisma-v6.4-2D3748.svg?style=flat-square&logo=prisma)
+![Vite](https://img.shields.io/badge/Vite-v6.2-646CFF.svg?style=flat-square&logo=vite)
+>>>>>>> Stashed changes
+![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)
 
-SmartFace uses **face authentication as the primary identity mechanism**, **Presentation Attack Detection (PAD)** as a security layer, and **fingerprint authentication as a fallback mechanism**.
+---
 
-The project connects biometric authentication, attendance, employee self-service, management operations, working-hour information, and payroll-related data into one platform.
+## 🏗️ Sơ Đồ Kiến Trúc Hệ Thống (System Architecture)
 
 ```text
-Employee
-   ↓
-Face / Fingerprint Authentication
-   ↓
-Check-in / Check-out
-   ↓
-Attendance & Working Hours
-   ↓
-Employee Management
-   ↓
-Payroll-related Data
+<<<<<<< Updated upstream
+┌───────────────────────────────────────────────────────────────────────────┐
+│                        AIoT EDGE DEVICES / CAMERAS                        │
+│  - Edge Camera (YOLO Face Detection + MobileNetV3/DCT PAD + ArcFace)     │
+│  - Fingerprint Sensor Node (ESP32 / Optical Fingerprint Reader)           │
+└─────────────────────────────────────┬─────────────────────────────────────┘
+                                      │ MQTT Protocols / REST API
+                                      ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│                         BACKEND SERVICE (Node.js)                         │
+│  - RESTful API Gateway (Express.js + Zod DTO Validation)                  │
+│  - Real-time Gateway (Socket.IO Broadcast & MQTT Subscriber)              │
+│  - Security Layer (JWT Auth, Role-based AC, AES Biometric Encryption)     │
+│  - Business Engine (Attendance, Employee, Shift, Payroll, Biometrics)     │
+└───────────────────┬─────────────────────────────────┬─────────────────────┘
+                    │                                 │
+                    ▼ Prisma ORM                      ▼ WebSocket Stream
+┌──────────────────────────────────┐        ┌──────────────────────────────┐
+│       DATABASE LAYER             │        │     FRONTEND DASHBOARD       │
+│  - PostgreSQL 16 (Relational DB) │        │  - React 19 + Vite + TS      │
+│  - pgvector (512-D Embeddings)   │        │  - Tailwind CSS v4 + Recharts│
+└──────────────────────────────────┘        └──────────────────────────────┘
+=======
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        AIoT EDGE DEVICES / CAMERAS                       │
+│  - Edge Camera (YOLO Face Detection + MobileNetV3/DCT PAD + ArcFace)   │
+│  - Fingerprint Sensor Node (ESP32 / Optical Fingerprint Scanner)        │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │ MQTT / REST API
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         BACKEND SERVICE (Node.js)                       │
+│  - RESTful API (Express.js + Zod Validation)                            │
+│  - Authentication & AuthZ (JWT + Role-based Access Control)            │
+│  - Real-time Engine (Socket.IO Gateway & MQTT Subscriber)               │
+│  - Business Services (Attendance, Employee, Shift, Payroll, Biometrics) │
+└───────────────────┬─────────────────────────────────┬───────────────────┘
+                    │                                 │
+                    ▼ Prisma ORM                      ▼ WebSocket Broadcast
+┌───────────────────────────────┐         ┌───────────────────────────────┐
+│     DATABASE LAYER            │         │    FRONTEND DASHBOARD         │
+│ - PostgreSQL (Relational DB)  │         │ - React 19 + TypeScript       │
+│ - pgvector (Face Embeddings)  │         │ - Tailwind CSS + Vite Proxy   │
+└───────────────────────────────┘         └───────────────────────────────┘
+>>>>>>> Stashed changes
 ```
 
 ---
 
-## Motivation
-
-The project aims to move employee authentication from methods based mainly on:
-
-```text
-Something you have
-→ RFID / Attendance Card
-```
-
-or:
+<<<<<<< Updated upstream
+## 📁 Cấu Trúc Dự Án (Monorepo Layout)
 
 ```text
-Something you know
-→ PIN / Password
-```
-
-toward:
+SmartFace-AIoT-Based-Staff-Management-Attendance-System/
+├── run.bat                   # ⚡ File script tự động khởi chạy 1-click trên Windows
+├── backend/                  # REST API & Real-time Server (Node.js, Express, Prisma)
+│   ├── docker-compose.yml    # Docker Compose khởi chạy PostgreSQL & pgAdmin
+│   ├── prisma/               # Database Schema, Migrations & Seed data
+│   ├── src/                  # Controllers, Services, Middlewares, Sockets, DTOs
+│   └── README.md             # 📖 Tài liệu chi tiết phân hệ Backend -> backend/README.md
+├── frontend/                 # Web Application (React 19, Vite, Tailwind CSS v4)
+│   ├── src/                  # Components, Pages, Context, Types, Utils
+│   └── README.md             # 📖 Tài liệu chi tiết phân hệ Frontend -> frontend/README.md
+├── docs/                     # Tài liệu thiết kế kiến trúc & API specification
+├── .env.example              # Template biến môi trường mẫu
+├── .gitignore                # Git ignore root
+└── README.md                 # Tài liệu tổng quan hệ thống (Root)
+=======
+## 📁 Cấu Trúc Monorepo
 
 ```text
-Something you are
-→ Face
+SmartFace-AIoT-Based-Staff-Management-Attendance-System/
+├── backend/                  # REST API & Real-time Server (Node.js, Express, Prisma)
+│   ├── prisma/               # Database Schema, Migrations & Seed data
+│   ├── src/                  # Controllers, Services, Middlewares, Sockets
+│   └── README.md             # 📖 Tài liệu chi tiết Backend -> backend/README.md
+├── frontend/                 # Web Application (React 19, Vite, Tailwind CSS)
+│   ├── src/                  # Components, Pages, Context, Types, Utils
+│   └── README.md             # 📖 Tài liệu chi tiết Frontend -> frontend/README.md
+├── docs/                     # Tài liệu thiết kế & API specification
+├── .env.example              # Template cấu hình môi trường mẫu gốc
+├── .gitignore                # Git ignore root
+└── README.md                 # Tài liệu tổng quan hệ thống (Root)
 ```
 
-Face authentication provides a contactless and convenient way to identify employees during attendance. However, face recognition alone is not sufficient for a security-sensitive system because an attacker may present a photo, printed image, replayed video, or another presentation attack.
-
-Therefore, SmartFace separates authentication into three conceptual stages:
-
-```text
-Face Detection
-      ↓
-Presentation Attack Detection (PAD)
-      ↓
-Face Recognition
-      ↓
-Identity Matching
-```
-
-The system also provides fingerprint as a fallback authentication channel so that attendance does not depend entirely on a single biometric modality.
+> 📖 **Xem chi tiết tài liệu từng phân hệ**:
+> - [Backend Documentation](backend/README.md)
+> - [Frontend Documentation](frontend/README.md)
 
 ---
 
-# Key Features
+## ⚡ Quick Start (Khởi Chạy Nhanh)
 
-## AI-powered face attendance
+### Bước 1: Khởi chạy Backend Service
 
-- Face detection using a pretrained YOLO model.
-- Face alignment and quality checking.
-- Lightweight RGB single-frame Presentation Attack Detection.
-- Face embedding using a pretrained recognition model.
-- Vector similarity search.
-- Face-based check-in.
-- Face-based check-out.
+```bash
+# 1. Truy cập thư mục backend & cài đặt dependencies
+cd backend
+npm install
 
-## Fingerprint fallback
+# 2. Tạo file cấu hình môi trường & chạy migration database
+cp .env.example .env
+npm run prisma:migrate
+npm run prisma:seed
 
-Fingerprint provides a secondary authentication path when face authentication is unavailable or unsuitable.
-
-Examples include:
-
-- Poor image quality.
-- Face occlusion.
-- Camera failure.
-- Temporary recognition failure.
-
-Attendance records preserve the authentication method:
-
-```text
-FACE
-FINGERPRINT
+# 3. Khởi chạy server ở chế độ Development
+npm run dev
+# Server lắng nghe tại: http://localhost:3000
 ```
 
-## Employee management
+### Bước 2: Khởi chạy Frontend Web App
 
-Managers and administrators can:
+```bash
+# 1. Mở cửa sổ terminal mới, truy cập thư mục frontend & cài đặt dependencies
+cd frontend
+npm install
 
-- Add employees.
-- Edit employee information.
-- Enable or disable employees.
-- Search and filter employees.
-- Manage employee profiles.
-- Enroll and update face data.
-- Manage authentication status.
-
-## Employee self-service
-
-Employees can:
-
-- View personal information.
-- View department and position.
-- View working schedules.
-- View attendance history.
-- View check-in/check-out records.
-- View working hours.
-- Update permitted profile information.
-- Update or re-enroll face data.
-
-## Attendance management
-
-The platform records:
-
-```text
-Employee
-Check-in
-Check-out
-Timestamp
-Working hours
-Authentication method
-Device
-Verification information
-```
-
-Managers can monitor:
-
-- Daily attendance.
-- Late arrivals.
-- Early departures.
-- Missing check-in/check-out.
-- Attendance history.
-
-## Payroll-related information
-
-Attendance data can be used as input for payroll workflows:
-
-```text
-Attendance
-    ↓
-Working Hours
-    ↓
-Late / Early Leave / Overtime
-    ↓
-Payroll Calculation
-```
-
-The platform is designed to provide reliable attendance and working-hour data that can be integrated with payroll processes.
-
----
-
-# System Architecture
-
-```text
-                         ┌────────────────────┐
-                         │      Camera        │
-                         │ Raspberry Pi /     │
-                         │ IoT Edge Device    │
-                         └─────────┬──────────┘
-                                   │
-                                   ▼
-                         ┌────────────────────┐
-                         │ Face Detection     │
-                         │ Pretrained YOLO    │
-                         └─────────┬──────────┘
-                                   │
-                                   ▼
-                         ┌────────────────────┐
-                         │ Alignment +        │
-                         │ Quality Check       │
-                         └─────────┬──────────┘
-                                   │
-                                   ▼
-                         ┌────────────────────┐
-                         │ Spatial-Frequency  │
-                         │ PAD                │
-                         │ REAL / SPOOF       │
-                         └─────────┬──────────┘
-                                   │
-                              REAL FACE
-                                   │
-                                   ▼
-                         ┌────────────────────┐
-                         │ Face Embedding     │
-                         │ Pretrained Model   │
-                         └─────────┬──────────┘
-                                   │
-                                   ▼
-                         ┌────────────────────┐
-                         │ Vector Search      │
-                         │ pgvector / Qdrant  │
-                         └─────────┬──────────┘
-                                   │
-                                   ▼
-                         ┌────────────────────┐
-                         │ Identity Decision  │
-                         └─────────┬──────────┘
-                                   │
-                       ┌───────────┴───────────┐
-                       ▼                       ▼
-                   CHECK-IN                CHECK-OUT
-                       │                       │
-                       └───────────┬───────────┘
-                                   ▼
-                         ┌────────────────────┐
-                         │ Attendance Service │
-                         └─────────┬──────────┘
-                                   │
-                                   ▼
-                         Employee / Payroll
-                           Management
-```
-
-Fingerprint fallback:
-
-```text
-Face Authentication
-        │
-        └── unavailable / failed
-                    ↓
-               Fingerprint
-                    ↓
-              Identity Verify
-                    ↓
-             Check-in / Check-out
+# 2. Tạo file biến môi trường & khởi chạy Vite dev server
+cp .env.example .env
+npm run dev
+# Web application truy cập tại: http://localhost:5173
+>>>>>>> Stashed changes
 ```
 
 ---
 
-# AI Architecture
+<<<<<<< Updated upstream
+## ⚡ Quick Start (Khởi Chạy Nhanh Dự Án)
 
-SmartFace uses three main AI components.
+### 🟢 Cách 1: Tự Động Khởi Chạy Bằng 1-Click (`run.bat` - Dành cho Windows)
 
-## Face Detection
+Dự án đã tích hợp sẵn file script [run.bat](file:///e:/PBL6/SmartFace-AIoT-Based-Staff-Management-Attendance-System/run.bat) giúp khởi động toàn bộ ứng dụng chỉ bằng 1 thao tác:
 
-A pretrained YOLO model detects faces from camera frames:
-
-```text
-Camera Frame
-     ↓
-Pretrained YOLO
-     ↓
-Face Bounding Box
-```
-
-The detector is used as a pretrained component rather than being trained from scratch.
-
-## Presentation Attack Detection
-
-The PAD model is the main computer-vision research component of the system.
-
-The proposed architecture combines:
-
-- A **spatial branch** using MobileNetV3-Large.
-- A **frequency branch** using 2D DCT followed by a lightweight CNN.
-- Feature fusion through concatenation.
-
-```text
-                         FACE IMAGE
-                           224×224
-                              │
-             ┌────────────────┴────────────────┐
-             │                                 │
-             ▼                                 ▼
-       SPATIAL BRANCH                    FREQUENCY BRANCH
-       MobileNetV3-Large                       │
-       ImageNet pretrained                     ▼
-             │                                2D DCT
-             ▼                                  │
-      Feature Extraction                        ▼
-             │                            Frequency Map
-             ▼                                  │
-       Spatial Feature                          ▼
-           256-D                         Lightweight CNN
-                                                │
-                                                ▼
-                                        Frequency Feature
-                                             64-D
-             │                                 │
-             └────────────────┬────────────────┘
-                              ▼
-                         FEATURE FUSION
-                           Concatenate
-                              │
-                             320-D
-                              │
-                              ▼
-                            MLP / FC
-                              │
-                             128-D
-                              │
-                              ▼
-                         PAD CLASSIFIER
-                              │
-                              ▼
-                         REAL / SPOOF
-```
-
-### Spatial branch
-
-```text
-224×224×3
-    ↓
-MobileNetV3-Large
-    ↓
-Global Average Pooling
-    ↓
-Projection
-    ↓
-256-D Spatial Feature
-```
-
-### Frequency branch
-
-The frequency branch uses a luminance/grayscale representation:
-
-```text
-RGB Face
-   ↓
-Luminance / Grayscale
-   ↓
-224 × 224
-   ↓
-2D DCT
-   ↓
-Frequency Map
-```
-
-The frequency representation can be normalized before being processed by a lightweight CNN.
-
-```text
-Frequency Map
-     ↓
-Depthwise / Pointwise Convolutions
-     ↓
-Global Average Pooling
-     ↓
-Linear Projection
-     ↓
-64-D Frequency Feature
-```
-
-### Why frequency information?
-
-Spatial CNNs can learn facial structure, edges, texture, illumination, and local patterns.
-
-Presentation attacks may also introduce low-level reproduction artifacts such as:
-
-- Paper and ink texture.
-- Display patterns.
-- Pixel/subpixel structures.
-- Moiré and aliasing.
-- Compression or reproduction artifacts.
-
-Frequency-domain features are investigated as complementary information.
-
-> **High frequency does not mean spoof.**
-
-Real faces also contain high-frequency information. The objective is to learn discriminative frequency patterns rather than simply measuring the amount of high-frequency content.
+1. Mở Terminal / CMD tại thư mục gốc dự án hoặc nhấp đôi chuột vào file `run.bat`:
+   ```cmd
+   .\run.bat
+   ```
+2. Giao diện Menu tương tác sẽ xuất hiện cho phép chọn các tùy chọn khởi chạy:
+   - **`[1]` Chạy toàn bộ hệ thống**: Tự động mở Docker Database (PostgreSQL + pgAdmin) và khởi chạy Backend (Port 3000) cùng Frontend (Port 5173) trong 2 cửa sổ terminal riêng biệt.
+   - **`[2]` Chạy Backend & Frontend**: Bỏ qua bước Docker (dành cho môi trường đã bật DB).
+   - **`[6]` Cài đặt dependencies**: Tự động cài đặt gói cho cả Backend và Frontend.
+   - **`[7]` Chạy Prisma Migrate & Seed Data**: Khởi tạo cấu trúc bảng và nạp dữ liệu mẫu ban đầu.
 
 ---
 
-# PAD Research Direction
+### 🟡 Cách 2: Khởi Chạy Thủ Công (Manual Setup)
 
-The frequency branch is evaluated against a spatial-only baseline.
+#### Bước 1: Khởi động Cơ sở dữ liệu (PostgreSQL)
 
-## Spatial-only baseline
+Có thể sử dụng Docker Compose trong thư mục backend:
+```bash
+cd backend
+docker compose up -d
+```
+*Database sẽ khởi chạy tại port `5432` và pgAdmin tại port `5050`.*
 
-```text
-Face Image
-    ↓
-MobileNetV3-Large
-    ↓
-256-D Spatial Feature
-    ↓
-Classifier
-    ↓
-REAL / SPOOF
+#### Bước 2: Khởi chạy Backend Service
+
+```bash
+# 1. Truy cập thư mục backend & cài đặt dependencies
+cd backend
+npm install
+
+# 2. Tạo file cấu hình môi trường & chạy migration database
+cp .env.example .env
+npm run prisma:migrate
+npm run prisma:seed
+
+# 3. Khởi chạy Backend ở chế độ Development
+npm run dev
+# Server lắng nghe tại: http://localhost:3000
 ```
 
-## Frequency-aware model
+#### Bước 3: Khởi chạy Frontend Web App
 
-```text
-                         Face Image
-                              │
-                ┌─────────────┴─────────────┐
-                ▼                           ▼
-        MobileNetV3-Large                  DCT
-                │                           │
-                ▼                           ▼
-         Spatial 256-D              Tiny Frequency CNN
-                                           │
-                                           ▼
-                                      Frequency 64-D
-                └─────────────┬─────────────┘
-                              ▼
-                            Fusion
-                              ↓
-                          Classifier
-                              ↓
-                           REAL / SPOOF
-```
+```bash
+# 1. Truy cập thư mục frontend & cài đặt dependencies
+cd frontend
+npm install
 
-The goal is to determine whether explicit frequency-domain information improves PAD performance, particularly under domain changes, while keeping additional computational cost low.
-
-This is an empirical research question; the project does not assume that the frequency branch will always improve results.
-
----
-
-# PAD Evaluation
-
-The evaluation focuses on both security and generalization.
-
-Important metrics include:
-
-- APCER — Attack Presentation Classification Error Rate.
-- BPCER — Bona Fide Presentation Classification Error Rate.
-- ACER — Average Classification Error Rate.
-
-```text
-ACER = (APCER + BPCER) / 2
-```
-
-Cross-dataset evaluation can be performed using public datasets such as:
-
-- CelebA-Spoof.
-- OULU-NPU.
-- SiW.
-- SiW-Mv2.
-- MSU-MFSD.
-
-The main objective is to investigate whether the spatial-frequency representation generalizes better when identities, environments, cameras, or presentation attacks change.
-
----
-
-# Face Embedding & Recognition
-
-SmartFace uses a pretrained face-recognition model rather than training an embedding network from scratch.
-
-Candidate approaches include:
-
-- ArcFace.
-- AdaFace.
-- Equivalent pretrained face-recognition models.
-
-Pipeline:
-
-```text
-Validated Face
-      ↓
-Face Embedding Model
-      ↓
-Embedding Vector
-      ↓
-Normalization
-      ↓
-Vector Search
+# 2. Tạo file biến môi trường & khởi chạy Vite dev server
+cp .env.example .env
+npm run dev
+# Web App truy cập tại: http://localhost:5173
 ```
 
 ---
 
-# Identity Enrollment
+## ✨ Tính Năng Nổi Bật (Key Features)
 
-An employee can have multiple face samples rather than a single embedding:
-
-```text
-Employee A
- ├── Frontal
- ├── Left
- ├── Right
- ├── Smile
- ├── Glasses
- └── Different lighting
-```
-
-Enrollment flow:
-
-```text
-Camera
-   ↓
-Face Detection
-   ↓
-Quality Check
-   ↓
-PAD
-   ↓
-Face Alignment
-   ↓
-Embedding
-   ↓
-Multiple Embeddings
-   ↓
-Vector Store
-```
-
-This allows the system to accommodate moderate appearance changes without retraining the face embedding model.
+- 👁️ **Xác thực Sinh trắc học AIoT kép**: Điểm danh gương mặt chính xác cao qua Edge AI Camera và vân tay dự phòng (Fingerprint Fallback) qua node ESP32.
+- 🛡️ **Chống Giả Mạo Gương Mặt (PAD)**: Tích hợp kiến trúc Spatial-Frequency PAD kết hợp MobileNetV3 và 2D DCT chống tấn công bằng ảnh in, video hoặc màn hình thiết bị di động.
+- ⚡ **Giám sát Chấm công Real-time**: Cập nhật thông báo Check-in / Check-out tức thì trên Dashboard quản trị thông qua WebSockets (Socket.IO) & MQTT protocol.
+- 👥 **Quản lý Hồ sơ & Mã hóa Sinh trắc học**: Quản lý phòng ban, chức vụ, trạng thái hoạt động và lưu trữ vector đặc trưng gương mặt được mã hóa an toàn với chuẩn AES-256.
+- 📅 **Lập Lịch & Phân Ca Linh Hoạt**: Định nghĩa ca làm việc (ca sáng, hành chính, ca đêm) và phân lịch ca chi tiết cho từng nhân viên hoặc bộ phận.
+- 💰 **Hệ thống Tự động Tính Lương (Payroll Engine)**: Tự động tính toán tổng giờ làm, giờ phạt đi trễ / về sớm, hệ số tăng ca (OT), tạm ứng và chốt phiếu lương hàng tháng.
+- 📱 **Cổng Tự Phục Vụ Nhân Viên (Employee Portal)**: Giao diện dành riêng cho nhân viên tự tra cứu lịch làm việc, lịch sử điểm danh và ước tính thu nhập thực tế.
 
 ---
 
-# Identity Matching
+## 🛠 Tech Stack Tổng Quan
 
-```text
-Query Face
-    ↓
-Embedding
-    ↓
-Top-K Vector Search
-    ↓
-Group by Employee
-    ↓
-Aggregate / Re-rank
-    ↓
-Similarity Threshold
-    ↓
-Identity
-```
-
-A final decision can consider multiple signals:
-
-```text
-Face Similarity
-+
-Face Quality
-+
-PAD Score
-+
-System Policy
-```
+| Phân hệ | Công nghệ & Thư viện sử dụng |
+| :--- | :--- |
+| **Backend API** | Node.js (v20+), TypeScript, Express.js, Prisma ORM (v6.4), Zod Validation |
+| **Frontend Web** | React 19, Vite, TypeScript, Tailwind CSS v4, Lucide React, Recharts |
+| **Database Layer** | PostgreSQL 16 + pgvector extension (lưu trữ 512-D face embeddings) |
+| **Real-time & IoT** | Socket.IO (WebSockets), MQTT Client (`mqtt` broker connection) |
+| **Security & Auth** | JSON Web Tokens (JWT), Bcrypt hashing, AES-256 Biometric Encryption, Helmet |
 
 ---
 
-# Employee Management
+## 🖥️ Yêu Cầu Hệ Thống (System Requirements)
 
-Identity data is intentionally separated from AI models.
-
-## Add employee
-
-```text
-Create Employee
-      ↓
-Face Enrollment
-      ↓
-Generate Embeddings
-      ↓
-Store Embeddings
-```
-
-Adding an employee does not require model retraining.
-
-## Update face
-
-```text
-New Face Samples
-      ↓
-Quality Check
-      ↓
-PAD
-      ↓
-Generate Embeddings
-      ↓
-Update Vector Store
-```
-
-Employees can re-enroll after changes such as:
-
-- Different hairstyle.
-- Beard or shaved beard.
-- Glasses.
-- Significant appearance changes.
-- Additional enrollment requirements.
-
-## Delete employee
-
-A soft-delete/inactive state can be used:
-
-```text
-Employee
-   ↓
-INACTIVE / DELETED
-   ↓
-Deactivate related embeddings
-```
+- **Node.js**: `≥ 20.0.0`
+- **npm**: `≥ 10.0.0`
+- **PostgreSQL**: `≥ 14.0` (Khuyên dùng PostgreSQL 16 tích hợp `pgvector`)
+- **Docker & Docker Compose** *(Khuyên dùng để chạy DB & pgAdmin nhanh chóng)*
+- **MQTT Broker** *(Tùy chọn khi kết nối thiết bị phần cứng thật)*: Mosquitto hoặc EMQX
 
 ---
 
-# Two-Way Attendance
+## 🔗 Tài Liệu Chi Tiết Các Phân Hệ
 
-## Check-in
-
-```text
-Employee arrives
-      ↓
-Camera detects face
-      ↓
-Quality check
-      ↓
-PAD
-      ↓
-Face recognition
-      ↓
-Identity match
-      ↓
-CHECK-IN
-      ↓
-Attendance database
-```
-
-## Check-out
-
-```text
-Employee leaves
-      ↓
-Camera detects face
-      ↓
-Quality check
-      ↓
-PAD
-      ↓
-Face recognition
-      ↓
-Identity match
-      ↓
-CHECK-OUT
-      ↓
-Attendance database
-```
-
-## Fingerprint fallback
-
-```text
-Face authentication fails
-             ↓
-       Fingerprint scan
-             ↓
-       Identity verified
-             ↓
-         CHECK-IN / OUT
-```
+- 📘 [Tài liệu Backend Detail](backend/README.md) — Chi tiết REST API Endpoints, MQTT Topics, Socket.IO Events & Troubleshooting.
+- 🗄️ [Tài liệu Database & Prisma Detail](backend/prisma/README.md) — Chi tiết 13 Models Schema, ERD, Prisma CLI & Seed Data.
+- 📙 [Tài liệu Frontend Detail](frontend/README.md) — Chi tiết React Components, AppContext State Management, Routes, Theme Glassmorphism & Production Deployment.
 
 ---
 
-# Web / Mobile Application
+## 👥 Thành Viên Phát Triển (Development Team)
 
-SmartFace provides separate experiences for managers and employees.
-
-## Manager / Admin
-
-Main modules:
-
-```text
-Dashboard
-Employees
-Attendance
-Working Hours
-Payroll
-Devices
-Account / Permissions
-```
-
-Functions include:
-
-- Employee list management.
-- Employee profile management.
-- Face enrollment/update.
-- Attendance monitoring.
-- Check-in/check-out history.
-- Late/early leave tracking.
-- Payroll-related data.
-- IoT device monitoring.
-
-## Employee
-
-Main modules:
-
-```text
-My Profile
-My Schedule
-My Attendance
-My Working Hours
-My Face
-```
-
-Employees can:
-
-- View personal information.
-- View working schedule.
-- View attendance history.
-- View working hours.
-- Update permitted profile fields.
-- Update or re-enroll face data.
+| Họ và Tên | Vai trò chính | Email liên hệ |
+| :--- | :--- | :--- |
+| **Nguyễn Văn A** | AIoT & Embedded Systems Lead | `anv@aiot.corp` |
+| **Lê Hoàng Phúc** | Backend & Database Architect | `phuc.le@aiot.corp` |
+| **Trần Minh Anh** | Frontend & UI/UX Engineer | `anh.tran@aiot.corp` |
 
 ---
 
-# Role-Based Access Control
+## 📄 License
 
-## Admin
+Dự án được phân phối dưới giấy phép **MIT License**. Xem thêm chi tiết tại file [LICENSE](LICENSE).
+=======
+## ✨ Tính Năng Chính (Key Features)
 
-- Full employee management.
-- Attendance management.
-- Payroll-related management.
-- Device management.
-- Account and permission management.
-- System configuration.
-
-## Manager
-
-- Employee list and profiles.
-- Attendance monitoring.
-- Working-hour information.
-- Payroll-related attendance data.
-- Device status.
-
-## Employee
-
-- Personal profile.
-- Working information.
-- Attendance history.
-- Check-in/check-out records.
-- Working hours.
-- Face enrollment/update.
-
-Employees only access information and actions authorized for their role.
+- **Xác thực Sinh trắc học AIoT kép**: Chấm công gương mặt primary qua Edge AI Camera và vân tay dự phòng (Fingerprint Fallback).
+- **Chống Giả Mạo Gương Mặt (PAD)**: Tích hợp kiến trúc Spatial-Frequency PAD kết hợp MobileNetV3 và 2D DCT chống tấn công ảnh in / màn hình.
+- **Giám sát Chấm công Real-time**: Cập nhật lượt Check-in / Check-out theo thời gian thực lên Dashboard thông qua WebSockets (Socket.IO).
+- **Quản lý Nhân sự Toàn diện**: Quản lý hồ sơ nhân viên, trạng thái hoạt động, phòng ban, chức vụ và vector sinh trắc học mã hóa.
+- **Sắp xếp Lịch làm & Ca làm việc**: Phân ca linh hoạt (Ca sáng, ca chiều, hành chính, ca đêm) cho từng nhân viên hoặc bộ phận.
+- **Tự động Tính Lương (Payroll Engine)**: Tự động tổng hợp giờ làm, tính phạt đi trễ / về sớm, lương tăng ca (OT), tạm ứng và xuất phiếu lương.
+- **Cổng thông tin Nhân viên (Employee Portal)**: Nhân viên tự tra cứu lịch trình làm việc, lịch sử chấm công và bảng ước tính lương hàng tháng.
 
 ---
 
-# Data Architecture
+## 🛠 Tech Stack Tổng Quan
 
-A practical implementation can use PostgreSQL together with pgvector.
-
-```text
-PostgreSQL
-├── employees
-├── attendance
-├── users
-├── payroll_records
-├── devices
-└── audit_logs
-
-pgvector
-└── face_embeddings
-```
-
-Example face embedding record:
-
-```text
-embedding_id
-employee_id
-embedding
-model_version
-quality_score
-source
-created_at
-is_active
-```
-
-Model versioning allows embeddings from different face-recognition models to be handled safely during future migrations.
+| Layer | Công nghệ chính sử dụng |
+| :--- | :--- |
+| **Backend API** | Node.js, TypeScript, Express.js, Prisma ORM, Zod validation |
+| **Frontend Web** | React 19, Vite, TypeScript, Tailwind CSS v4, Lucide React, Recharts |
+| **Database** | PostgreSQL 16 + pgvector extension |
+| **Real-time & IoT** | Socket.IO (WebSockets), MQTT Protocol (`mqtt` broker client) |
+| **Authentication** | JSON Web Tokens (JWT), Bcrypt password hashing, AES-256 Biometric encryption |
 
 ---
 
-# IoT Architecture
+## 🖥️ Yêu Cầu Hệ Thống (System Requirements)
 
-Raspberry Pi or another edge device can interface with physical devices:
-
-```text
-Raspberry Pi / Edge Device
-├── Camera
-├── Fingerprint Reader
-└── Network Communication
-          │
-          ▼
-      Backend API
-          │
-    ┌─────┼─────┐
-    ▼     ▼     ▼
-    AI   DB   Vector Search
-```
-
-Depending on hardware constraints, AI inference can run on the edge device or on a backend/server.
+- **Node.js**: `≥ 20.0.0`
+- **npm**: `≥ 10.0.0`
+- **PostgreSQL**: `≥ 14.0` (Khuyên dùng PostgreSQL 16 có hỗ trợ `pgvector`)
+- **MQTT Broker** *(Tùy chọn cho thiết bị phần cứng)*: Eclipse Mosquitto hoặc EMQX
 
 ---
 
-# Technology Stack
+## 🔗 Liên Kết Tài Liệu (Documentation Links)
 
-## AI / Computer Vision
-
-- Python
-- PyTorch
-- YOLO
-- OpenCV
-- MobileNetV3-Large
-- 2D DCT
-- Lightweight CNN
-- ArcFace / AdaFace
-
-## Backend
-
-- FastAPI
-- REST API
-- Authentication
-- Role-Based Access Control
-
-## Database
-
-- PostgreSQL
-- pgvector
-
-## IoT / Edge
-
-- Raspberry Pi
-- Camera
-- Fingerprint sensor
-
-## Frontend
-
-- Web application
-- Mobile application
-
-## Storage
-
-- Local or object storage for approved images and datasets when required.
+- [Backend Documentation](backend/README.md) — Chi tiết API, database schema, MQTT/Socket events & troubleshooting.
+- [Frontend Documentation](frontend/README.md) — Chi tiết React components, state management (AppContext), routes & deployment.
 
 ---
 
-# Project Structure
+## 👥 Thành Viên Phát Triển (Team & Contact)
 
-A suggested repository structure:
-
-```text
-smartface/
-├── apps/
-│   ├── web/
-│   └── mobile/
-│
-├── backend/
-│   ├── api/
-│   ├── services/
-│   ├── models/
-│   └── database/
-│
-├── ai/
-│   ├── face_detection/
-│   ├── pad/
-│   │   ├── baseline/
-│   │   ├── frequency/
-│   │   ├── datasets/
-│   │   ├── training/
-│   │   └── evaluation/
-│   └── face_embedding/
-│
-├── edge/
-│   ├── camera/
-│   └── fingerprint/
-│
-├── docs/
-│
-├── tests/
-│
-└── README.md
-```
-
-The exact repository structure may evolve during implementation.
+| Họ và Tên | Vai trò | Email liên hệ |
+| :--- | :--- | :--- |
+| **Nguyễn Văn A** | AIoT & Embedded Systems Lead | `anv@aiot.corp` |
+| **Lê Hoàng Phúc** | Backend & Database Architect | `phuc.le@aiot.corp` |
+| **Trần Minh Anh** | Frontend & UI/UX Engineer | `anh.tran@aiot.corp` |
 
 ---
 
-# Future Extensions
+## 📄 License
 
-## Continual Learning
-
-Production data can later be incorporated through:
-
-```text
-Production
-    ↓
-Hard Samples
-    ↓
-Human Validation
-    ↓
-Training Dataset
-    ↓
-Fine-tuning
-    ↓
-Model Update
-```
-
-Continual learning is intended as an extension rather than a dependency of the core system.
-
-## Temporal Liveness
-
-The current PAD concept is single-frame. A future system can use multiple frames:
-
-```text
-Frame t-4
-Frame t-3
-Frame t-2
-Frame t-1
-Frame t
-    ↓
-Temporal Model
-    ↓
-REAL / SPOOF
-```
-
-## Camera-specific adaptation
-
-If public-data-trained PAD performs poorly on a target environment:
-
-```text
-Camera Data
-     ↓
-Hard Examples
-     ↓
-Fine-tuning
-     ↓
-Updated PAD Model
-```
-
----
-
-# Design Principles
-
-### Identity data and AI models are separate
-
-```text
-Employee CRUD
-    ≠
-Model Retraining
-```
-
-Adding, updating, or deleting an employee normally changes identity data and embeddings, not the AI models.
-
-### Pretrained first, train where the project has a clear research question
-
-Face detection and face embedding use pretrained models, while PAD provides the main model-development and experimentation component.
-
-### PAD complements face recognition
-
-Face recognition asks:
-
-> Which enrolled identity does this face resemble?
-
-PAD asks:
-
-> Is this a genuine presentation or a presentation attack?
-
-### Security, generalization, and efficiency matter together
-
-The PAD architecture is evaluated not only by classification performance, but also by cross-domain behavior and computational cost.
-
-### Build the integrated system before advanced learning
-
-The platform prioritizes a working AIoT employee-management workflow. Continual learning and temporal liveness are future extensions.
-
----
-
-# Project Vision
-
-SmartFace aims to become an integrated workforce-management platform in which biometric authentication is a practical part of everyday employee operations:
-
-```text
-Employee
-   ↓
-Face / Fingerprint Authentication
-   ↓
-Attendance
-   ↓
-Working Hours
-   ↓
-Employee Management
-   ↓
-Payroll
-```
-
-The long-term vision is to bring together:
-
-**secure identity verification + convenient attendance + employee self-service + workforce management + IoT devices**
-
-within a single platform.
-
----
-
-## Disclaimer
-
-This project is intended as an engineering and research-oriented prototype.
-
-A production deployment should additionally address:
-
-- Biometric-data protection.
-- Authentication and authorization security.
-- Auditability.
-- Retention and deletion policies.
-- Device security.
-- Presentation and injection attack resistance.
-- Model monitoring.
-- Applicable legal and regulatory requirements.
+Dự án được phân phối dưới giấy phép **MIT License**. Xem chi tiết tại file [LICENSE](LICENSE).
+>>>>>>> Stashed changes

@@ -1,8 +1,10 @@
 import { Router } from 'express'
-import { z } from 'zod'
 import { authenticate } from '../../middlewares/auth.middleware.js'
 import { authorize } from '../../middlewares/rbac.middleware.js'
+import { validate } from '../../middlewares/validate.middleware.js'
 import { successResponse } from '../../common/response.js'
+import { USER_ROLES } from '../../common/constants.js'
+import { registerBiometricSchema } from './biometric.dto.js'
 import * as service from './biometric.service.js'
 
 export const biometricRouter = Router()
@@ -17,32 +19,30 @@ biometricRouter.get('/:employeeId', async (req, res, next) => {
   }
 })
 
-biometricRouter.post('/:employeeId', authorize('ADMIN', 'MANAGER'), async (req, res, next) => {
-  try {
-    const employeeId = req.params.employeeId as string
-    const body = z.object({
-      embedding: z.array(z.number()).min(64).max(1024),
-      model_version: z.string().optional(),
-      sample_tag: z.string().optional(),
-      quality_score: z.number().min(0).max(1).optional(),
-    }).parse(req.body)
+biometricRouter.post(
+  '/:employeeId',
+  authorize(USER_ROLES.ADMIN, USER_ROLES.MANAGER),
+  validate(registerBiometricSchema),
+  async (req, res, next) => {
+    try {
+      const employeeId = req.params.employeeId as string
+      successResponse(
+        res,
+        await service.register(employeeId, req.body.embedding, {
+          model_version: req.body.model_version,
+          sample_tag: req.body.sample_tag,
+          quality_score: req.body.quality_score,
+        }),
+        'Biometric sample registered',
+        201,
+      )
+    } catch (e) {
+      next(e)
+    }
+  },
+)
 
-    successResponse(
-      res,
-      await service.register(employeeId, body.embedding, {
-        model_version: body.model_version,
-        sample_tag: body.sample_tag,
-        quality_score: body.quality_score,
-      }),
-      'Biometric sample registered',
-      201,
-    )
-  } catch (e) {
-    next(e)
-  }
-})
-
-biometricRouter.delete('/:employeeId', authorize('ADMIN', 'MANAGER'), async (req, res, next) => {
+biometricRouter.delete('/:employeeId', authorize(USER_ROLES.ADMIN, USER_ROLES.MANAGER), async (req, res, next) => {
   try {
     const employeeId = req.params.employeeId as string
     await service.removeAll(employeeId)

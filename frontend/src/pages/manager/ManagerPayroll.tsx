@@ -20,11 +20,13 @@ import { PayrollRecord } from '../../types';
 export const ManagerPayroll: React.FC = () => {
   const { 
     payroll, 
+    bonusPenalty,
     selectedPeriod, 
     setSelectedPeriod, 
     updatePayrollItem, 
     finalizePayrollPeriod, 
     unlockPayrollPeriod, 
+    updateBonusPenalty,
     employees, 
     showToast 
   } = useApp();
@@ -32,15 +34,39 @@ export const ManagerPayroll: React.FC = () => {
   const [confirmFinalizeOpen, setConfirmFinalizeOpen] = useState(false);
   const [confirmUnlockOpen, setConfirmUnlockOpen] = useState(false);
 
+  // Modal state for Bonus Penalty Policy
+  const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
+  const [policyData, setPolicyData] = useState({
+    overtime_rate: 100000,
+    late_early_penalty: 50000,
+    description: '',
+  });
+
+  const handleOpenPolicyModal = () => {
+    setPolicyData({
+      overtime_rate: bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000,
+      late_early_penalty: bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000,
+      description: bonusPenalty?.description || '',
+    });
+    setIsPolicyModalOpen(true);
+  };
+
+  const handleSavePolicy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await updateBonusPenalty(policyData);
+    setIsPolicyModalOpen(false);
+  };
+
+
   // Modal State for Editing a Payroll line item
   const [editingItem, setEditingItem] = useState<{
     record: PayrollRecord;
     empName: string;
-    base_salary: number;
-    working_days: number;
+    hourly_rate: number;
     working_hours: number;
+    total_overtime: number;
+    total_late_early: number;
     allowance: number;
-    deduction: number;
   } | null>(null);
 
   // Filter records by selected period
@@ -48,18 +74,21 @@ export const ManagerPayroll: React.FC = () => {
   const isFinalized = currentRecords.length > 0 && currentRecords.every(p => p.status === 'FINALIZED');
 
   // Compute metrics
-  const totalExpense = currentRecords.reduce((sum, r) => sum + r.total_paid, 0);
+  const totalExpense = currentRecords.reduce((sum, r) => sum + (r.net_salary || 0), 0);
+
+  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5;
+  const lateRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
 
   const handleOpenEdit = (record: PayrollRecord) => {
     const emp = employees.find(e => e.employee_id === record.employee_id);
     setEditingItem({
       record,
-      empName: emp?.full_name || record.employee_id,
-      base_salary: record.base_salary,
-      working_days: record.working_days,
-      working_hours: record.working_hours,
-      allowance: record.allowance,
-      deduction: record.deduction
+      empName: emp?.full_name || record.employee_name || record.employee_id,
+      hourly_rate: record.hourly_rate || 100000,
+      working_hours: record.total_working_hours || 176,
+      total_overtime: record.total_overtime ?? 0,
+      total_late_early: record.total_late_early ?? 0,
+      allowance: record.allowance || 0,
     });
   };
 
@@ -67,15 +96,24 @@ export const ManagerPayroll: React.FC = () => {
     e.preventDefault();
     if (!editingItem) return;
 
-    const net = Math.max(0, editingItem.base_salary + editingItem.allowance - editingItem.deduction);
+    const otPay = otRate <= 10
+      ? editingItem.total_overtime * editingItem.hourly_rate * otRate
+      : editingItem.total_overtime * otRate;
+
+    const lateDed = lateRate <= 10
+      ? editingItem.total_late_early * editingItem.hourly_rate * lateRate
+      : editingItem.total_late_early * lateRate;
+
+    const basePay = editingItem.hourly_rate * editingItem.working_hours;
+    const net = Math.max(0, Math.round(basePay + otPay - lateDed + editingItem.allowance));
 
     updatePayrollItem(editingItem.record.payroll_id, {
-      base_salary: editingItem.base_salary,
-      working_days: editingItem.working_days,
+      hourly_rate: editingItem.hourly_rate,
       working_hours: editingItem.working_hours,
+      total_overtime: editingItem.total_overtime,
+      total_late_early: editingItem.total_late_early,
       allowance: editingItem.allowance,
-      deduction: editingItem.deduction,
-      total_paid: net
+      net_salary: net,
     });
 
     showToast(`Đã lưu thay đổi bảng lương cho ${editingItem.empName}!`, 'success');
@@ -159,46 +197,91 @@ export const ManagerPayroll: React.FC = () => {
         </div>
       </div>
 
-      {/* 3 Bento Metric Cards */}
+      {/* 3 Bento Metric Cards (Mức thưởng tăng ca, Mức phạt đi trễ/về sớm, Trạng thái kỳ lương) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors">
-          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Tổng quỹ lương kỳ này</span>
-          <div className="mt-2 text-2xl font-bold font-mono text-white">
-            {totalExpense.toLocaleString('vi-VN')} <span className="text-sm font-normal text-slate-400">₫</span>
+        {/* Card 1: Mức thưởng tăng ca (Lấy từ bảng bonus_penalty) */}
+        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors group relative">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Mức thưởng tăng ca</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenPolicyModal}
+                className="text-[11px] text-blue-400 hover:text-blue-300 underline font-medium"
+              >
+                Cấu hình
+              </button>
+              <Sparkles className="w-4 h-4 text-amber-400" />
+            </div>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">Đã bao gồm phụ cấp & khấu trừ</p>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors">
-          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Nhân sự nhận lương</span>
-          <div className="mt-2 text-2xl font-bold font-mono text-white">
-            {currentRecords.length} <span className="text-sm font-normal text-slate-400">người</span>
-          </div>
-          <p className="text-[11px] text-green-500 mt-1 font-medium">100% nhân sự có hồ sơ hợp lệ</p>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors">
-          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Trạng thái bảo mật</span>
-          <div className="mt-2 text-xl font-bold font-mono flex items-center gap-2 text-white">
-            {isFinalized ? (
-              <>
-                <Lock className="w-5 h-5 text-green-500" />
-                <span className="text-green-500">Niêm phong</span>
-              </>
+          <div className="mt-2 text-2xl font-bold font-mono text-amber-400">
+            {bonusPenalty?.overtime_rate ? (
+              Number(bonusPenalty.overtime_rate) <= 10 ? (
+                <span>{bonusPenalty.overtime_rate}x <span className="text-sm font-normal text-slate-400">lương giờ</span></span>
+              ) : (
+                <span>{Number(bonusPenalty.overtime_rate).toLocaleString('vi-VN')} <span className="text-sm font-normal text-slate-400">₫/h</span></span>
+              )
             ) : (
-              <>
-                <Unlock className="w-5 h-5 text-amber-400" />
-                <span className="text-amber-400">Đang soạn thảo</span>
-              </>
+              <span>1.5x <span className="text-sm font-normal text-slate-400">lương giờ</span></span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">
-            {isFinalized ? 'Bảng lương đã khóa đối với sửa đổi' : 'Yêu cầu nút xác nhận trước khi lưu'}
+          <p className="text-[11px] text-slate-400 mt-1">Hệ số OT từ bảng <span className="text-blue-400 font-mono">bonus_penalty</span></p>
+        </div>
+
+        {/* Card 2: Mức phạt đi trễ / về sớm (Lấy từ bảng bonus_penalty) */}
+        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors group relative">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Mức phạt đi trễ / về sớm</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenPolicyModal}
+                className="text-[11px] text-blue-400 hover:text-blue-300 underline font-medium"
+              >
+                Cấu hình
+              </button>
+              <AlertCircle className="w-4 h-4 text-red-400" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold font-mono text-red-400">
+            {bonusPenalty?.late_early_penalty ? (
+              Number(bonusPenalty.late_early_penalty) <= 10 ? (
+                <span>{bonusPenalty.late_early_penalty}x <span className="text-sm font-normal text-slate-400">lương giờ</span></span>
+              ) : (
+                <span>{Number(bonusPenalty.late_early_penalty).toLocaleString('vi-VN')} <span className="text-sm font-normal text-slate-400">₫/h</span></span>
+              )
+            ) : (
+              <span>50.000 <span className="text-sm font-normal text-slate-400">₫/h</span></span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">Khấu trừ vi phạm từ bảng <span className="text-blue-400 font-mono">bonus_penalty</span></p>
+        </div>
+
+
+        {/* Card 3: Trạng thái kỳ lương */}
+        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Trạng thái kỳ lương</span>
+            {isFinalized ? (
+              <Lock className="w-4 h-4 text-green-500" />
+            ) : (
+              <Unlock className="w-4 h-4 text-amber-400" />
+            )}
+          </div>
+          <div className="mt-2 text-xl font-bold font-mono flex items-center gap-2 text-white">
+            {isFinalized ? (
+              <span className="text-green-500">Đã niêm phong (Khóa)</span>
+            ) : (
+              <span className="text-amber-400">Đang soạn thảo (Mở)</span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">
+            {currentRecords.length} nhân sự • Quỹ lương: <span className="font-mono text-white font-medium">{totalExpense.toLocaleString('vi-VN')} ₫</span>
           </p>
         </div>
       </div>
 
-      {/* Bento Table with Explicit Edit Confirmation */}
+      {/* Bento Table with Explicit Columns: Nhân sự, Lương theo giờ, Tổng giờ làm, Số giờ tăng ca, Số giờ đi trễ/về sớm, Phụ cấp, Thực lĩnh, Chỉnh sửa */}
       <div className="rounded-3xl bg-slate-900 border border-slate-800 overflow-hidden shadow-xl">
         <div className="p-5 border-b border-slate-800 flex items-center justify-between">
           <div>
@@ -206,7 +289,7 @@ export const ManagerPayroll: React.FC = () => {
               Chi tiết bảng lương từng nhân sự - Kỳ {selectedPeriod}
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Thay đổi số liệu thông qua nút &quot;Chỉnh sửa&quot; và xác nhận lưu để tránh nhầm lẫn.
+              Dữ liệu được tổng hợp tự động từ bảng <span className="text-blue-400 font-mono">payroll_records</span> và <span className="text-blue-400 font-mono">daily_attendance_summary</span>.
             </p>
           </div>
           <button
@@ -221,80 +304,84 @@ export const ManagerPayroll: React.FC = () => {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950 border-b border-slate-800 text-slate-500 uppercase font-mono text-[11px]">
+            <thead className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase font-mono text-[11px]">
               <tr>
-                <th className="py-3.5 px-4 font-medium">Nhân sự</th>
-                <th className="py-3.5 px-3 min-w-[130px] font-medium">Lương cơ bản</th>
-                <th className="py-3.5 px-3 min-w-[90px] font-medium">Ngày công</th>
-                <th className="py-3.5 px-3 min-w-[80px] font-medium">Giờ làm</th>
-                <th className="py-3.5 px-3 min-w-[110px] font-medium">Phụ cấp & OT</th>
-                <th className="py-3.5 px-3 min-w-[110px] font-medium">Khấu trừ</th>
-                <th className="py-3.5 px-3 min-w-[80px] font-medium">Đi trễ</th>
-                <th className="py-3.5 px-4 font-medium">Thực lĩnh (Net)</th>
-                <th className="py-3.5 px-4 text-right font-medium">Thao tác</th>
+                <th className="py-3.5 px-4 font-semibold text-white">Nhân sự</th>
+                <th className="py-3.5 px-3 min-w-[130px] font-semibold text-white">Lương theo giờ</th>
+                <th className="py-3.5 px-3 min-w-[100px] font-semibold text-white">Tổng giờ làm</th>
+                <th className="py-3.5 px-3 min-w-[110px] font-semibold text-white">Số giờ tăng ca</th>
+                <th className="py-3.5 px-3 min-w-[130px] font-semibold text-white">Số giờ đi trễ/về sớm</th>
+                <th className="py-3.5 px-3 min-w-[110px] font-semibold text-white">Phụ cấp</th>
+                <th className="py-3.5 px-4 min-w-[130px] font-semibold text-white">Thực lĩnh</th>
+                <th className="py-3.5 px-4 text-right font-semibold text-white">Chỉnh sửa</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50 text-slate-300">
               {currentRecords.map(record => {
                 const emp = employees.find(e => e.employee_id === record.employee_id);
+                const hourlyRate = record.hourly_rate || 0;
+                const netSalary = record.net_salary || 0;
+                const totalWorkingHours = record.total_working_hours || 176;
+                const totalOvertime = record.total_overtime ?? 0;
+                const totalLateEarly = record.total_late_early ?? 0;
+                const allowance = record.allowance || 0;
 
                 return (
                   <tr key={record.payroll_id} className="hover:bg-slate-800/40 transition-colors">
-                    {/* Employee Profile */}
+                    {/* 1. Nhân sự */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2.5">
                         <img
-                          src={emp?.avatar}
-                          alt={emp?.full_name}
+                          src={emp?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'}
+                          alt={emp?.full_name || record.employee_name || record.employee_id}
                           className="w-8 h-8 rounded-full object-cover border border-slate-700"
                         />
                         <div>
-                          <p className="font-semibold text-white truncate">{emp?.full_name}</p>
+                          <p className="font-semibold text-white truncate">{emp?.full_name || record.employee_name || record.employee_id}</p>
                           <p className="text-[10px] font-mono text-blue-400">{record.employee_id}</p>
                         </div>
                       </div>
                     </td>
 
-                    {/* Base Salary */}
+                    {/* 2. Lương theo giờ */}
                     <td className="py-3.5 px-3 font-mono text-white font-medium">
-                      {record.base_salary.toLocaleString('vi-VN')} ₫
+                      {hourlyRate.toLocaleString('vi-VN')} ₫
                     </td>
 
-                    {/* Working Days */}
-                    <td className="py-3.5 px-3 font-mono text-slate-300">
-                      {record.working_days} ngày
+                    {/* 3. Tổng giờ làm */}
+                    <td className="py-3.5 px-3 font-mono text-slate-200">
+                      {totalWorkingHours}h
                     </td>
 
-                    {/* Working Hours */}
-                    <td className="py-3.5 px-3 font-mono text-slate-300">
-                      {record.working_hours}h
-                    </td>
-
-                    {/* Allowance */}
-                    <td className="py-3.5 px-3 font-mono text-green-400">
-                      +{record.allowance.toLocaleString('vi-VN')} ₫
-                    </td>
-
-                    {/* Deduction */}
-                    <td className="py-3.5 px-3 font-mono text-red-400">
-                      -{record.deduction.toLocaleString('vi-VN')} ₫
-                    </td>
-
-                    {/* Late Count */}
+                    {/* 4. Số giờ tăng ca */}
                     <td className="py-3.5 px-3 font-mono">
-                      {record.late_count > 0 ? (
-                        <span className="text-amber-400 font-bold">{record.late_count} lần</span>
+                      {totalOvertime > 0 ? (
+                        <span className="text-amber-400 font-semibold font-mono">+{totalOvertime}h</span>
                       ) : (
-                        <span className="text-green-500 font-medium">0</span>
+                        <span className="text-slate-400">0h</span>
                       )}
                     </td>
 
-                    {/* Total Net Paid */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-white text-sm">
-                      {record.total_paid.toLocaleString('vi-VN')} ₫
+                    {/* 5. Số giờ đi trễ/về sớm */}
+                    <td className="py-3.5 px-3 font-mono">
+                      {totalLateEarly > 0 ? (
+                        <span className="text-red-400 font-semibold font-mono">-{totalLateEarly}h</span>
+                      ) : (
+                        <span className="text-green-400 font-medium">0h</span>
+                      )}
                     </td>
 
-                    {/* Edit Action Button */}
+                    {/* 6. Phụ cấp */}
+                    <td className="py-3.5 px-3 font-mono text-green-400 font-medium">
+                      {allowance > 0 ? `+${allowance.toLocaleString('vi-VN')} ₫` : '0 ₫'}
+                    </td>
+
+                    {/* 7. Thực lĩnh */}
+                    <td className="py-3.5 px-4 font-mono font-bold text-white text-sm">
+                      {netSalary.toLocaleString('vi-VN')} ₫
+                    </td>
+
+                    {/* 8. Chỉnh sửa */}
                     <td className="py-3.5 px-4 text-right">
                       {isFinalized ? (
                         <span className="text-[11px] font-mono text-slate-500">Đã khóa</span>
@@ -317,7 +404,7 @@ export const ManagerPayroll: React.FC = () => {
         </div>
       </div>
 
-      {/* EDIT MODAL: Modifying fields requires explicit confirmation */}
+      {/* EDIT MODAL: Modifying fields with live formula preview */}
       <Modal
         isOpen={!!editingItem}
         onClose={() => setEditingItem(null)}
@@ -327,44 +414,29 @@ export const ManagerPayroll: React.FC = () => {
       >
         {editingItem && (
           <form onSubmit={handleConfirmEditSave} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Lương cơ bản hợp đồng (VNĐ):
-              </label>
-              <input
-                type="number"
-                step="100000"
-                required
-                value={editingItem.base_salary}
-                onChange={e => setEditingItem({ ...editingItem, base_salary: Number(e.target.value) })}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Số ngày công tính lương:
+                  Lương theo giờ (VNĐ/h):
                 </label>
                 <input
                   type="number"
-                  step="0.5"
+                  step="1000"
                   min="0"
-                  max="31"
                   required
-                  value={editingItem.working_days}
-                  onChange={e => setEditingItem({ ...editingItem, working_days: Number(e.target.value) })}
+                  value={editingItem.hourly_rate}
+                  onChange={e => setEditingItem({ ...editingItem, hourly_rate: Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Tổng số giờ làm việc:
+                  Tổng số giờ làm việc (h):
                 </label>
                 <input
                   type="number"
-                  step="1"
+                  step="0.5"
                   min="0"
                   required
                   value={editingItem.working_hours}
@@ -377,39 +449,71 @@ export const ManagerPayroll: React.FC = () => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Phụ cấp & Thưởng OT (VNĐ):
+                  Số giờ tăng ca (h):
                 </label>
                 <input
                   type="number"
-                  step="50000"
+                  step="0.5"
                   min="0"
-                  value={editingItem.allowance}
-                  onChange={e => setEditingItem({ ...editingItem, allowance: Number(e.target.value) })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-green-400 font-mono focus:outline-none focus:border-blue-500"
+                  value={editingItem.total_overtime}
+                  onChange={e => setEditingItem({ ...editingItem, total_overtime: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-amber-400 font-mono focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Khấu trừ & Phạt vi phạm (VNĐ):
+                  Số giờ đi trễ / về sớm (h):
                 </label>
                 <input
                   type="number"
-                  step="50000"
+                  step="0.5"
                   min="0"
-                  value={editingItem.deduction}
-                  onChange={e => setEditingItem({ ...editingItem, deduction: Number(e.target.value) })}
+                  value={editingItem.total_late_early}
+                  onChange={e => setEditingItem({ ...editingItem, total_late_early: Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-red-400 font-mono focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Phụ cấp (VNĐ):
+              </label>
+              <input
+                type="number"
+                step="50000"
+                min="0"
+                value={editingItem.allowance}
+                onChange={e => setEditingItem({ ...editingItem, allowance: Number(e.target.value) })}
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-green-400 font-mono focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
             {/* Live Net preview */}
-            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-              <span className="text-slate-400">Lương thực lĩnh dự kiến (Net):</span>
-              <span className="font-mono text-base font-bold text-white">
-                {Math.max(0, editingItem.base_salary + editingItem.allowance - editingItem.deduction).toLocaleString('vi-VN')} ₫
-              </span>
+            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                <span>Lương cơ bản: {(editingItem.hourly_rate * editingItem.working_hours).toLocaleString('vi-VN')} ₫</span>
+                <span>Thưởng OT: {((otRate <= 10 ? editingItem.total_overtime * editingItem.hourly_rate * otRate : editingItem.total_overtime * otRate)).toLocaleString('vi-VN')} ₫</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                <span>Phạt đi trễ: -{((lateRate <= 10 ? editingItem.total_late_early * editingItem.hourly_rate * lateRate : editingItem.total_late_early * lateRate)).toLocaleString('vi-VN')} ₫</span>
+                <span>Phụ cấp: +{editingItem.allowance.toLocaleString('vi-VN')} ₫</span>
+              </div>
+              <div className="border-t border-slate-800 pt-1.5 flex items-center justify-between">
+                <span className="text-slate-300 font-medium">Lương thực lĩnh (Net):</span>
+                <span className="font-mono text-base font-bold text-white">
+                  {Math.max(
+                    0,
+                    Math.round(
+                      editingItem.hourly_rate * editingItem.working_hours +
+                      (otRate <= 10 ? editingItem.total_overtime * editingItem.hourly_rate * otRate : editingItem.total_overtime * otRate) -
+                      (lateRate <= 10 ? editingItem.total_late_early * editingItem.hourly_rate * lateRate : editingItem.total_late_early * lateRate) +
+                      editingItem.allowance
+                    )
+                  ).toLocaleString('vi-VN')} ₫
+                </span>
+              </div>
             </div>
 
             {/* Explicit Confirm Button */}
@@ -511,6 +615,72 @@ export const ManagerPayroll: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Modal: Edit Bonus / Penalty Policy */}
+      <Modal
+        isOpen={isPolicyModalOpen}
+        onClose={() => setIsPolicyModalOpen(false)}
+        title="Cấu hình quy định Thưởng / Phạt (bonus_penalty)"
+        subtitle="Thiết lập hệ số tăng ca (OT) và định mức vi phạm đi trễ / về sớm"
+      >
+        <form onSubmit={handleSavePolicy} className="space-y-4">
+          <div>
+            <label className="block text-xs text-slate-400 font-medium mb-1">Mức thưởng OT (Hệ số x hoặc ₫/h)</label>
+            <input
+              type="number"
+              step="any"
+              value={policyData.overtime_rate}
+              onChange={(e) => setPolicyData(p => ({ ...p, overtime_rate: parseFloat(e.target.value) || 0 }))}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-mono"
+              placeholder="Ví dụ: 1.5 (gấp 1.5x) hoặc 100000 (100.000 ₫/h)"
+              required
+            />
+            <p className="text-[11px] text-slate-500 mt-1">Nhập ≤ 10 nếu là hệ số nhân lương giờ (VD: 1.5x), nhập &gt; 10 nếu là số tiền ₫/h (VD: 100000 ₫/h).</p>
+          </div>
+
+          <div>
+            <label className="block text-xs text-slate-400 font-medium mb-1">Mức phạt đi trễ / về sớm (Hệ số x hoặc ₫/h)</label>
+            <input
+              type="number"
+              step="any"
+              value={policyData.late_early_penalty}
+              onChange={(e) => setPolicyData(p => ({ ...p, late_early_penalty: parseFloat(e.target.value) || 0 }))}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-mono"
+              placeholder="Ví dụ: 50000 (50.000 ₫/h)"
+              required
+            />
+            <p className="text-[11px] text-slate-500 mt-1">Nhập ≤ 10 nếu là hệ số khấu trừ lương giờ, nhập &gt; 10 nếu là số tiền phạt ₫/h.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs text-slate-400 font-medium mb-1">Ghi chú / Mô tả quy định</label>
+            <textarea
+              rows={2}
+              value={policyData.description}
+              onChange={(e) => setPolicyData(p => ({ ...p, description: e.target.value }))}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+              placeholder="Mô tả chính sách áp dụng..."
+            />
+          </div>
+
+          <div className="pt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsPolicyModalOpen(false)}
+              className="px-4 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md"
+            >
+              Lưu cấu hình quy định
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };
+

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { formatVNTime, formatVNDate } from '../../utils/dateUtils';
 import { 
   Clock, 
   Calendar, 
@@ -113,9 +114,8 @@ export const StaffAttendance: React.FC = () => {
                 </tr>
               ) : (
                 filteredRecords.map(record => {
-                  const dateObj = new Date(record.timestamp);
-                  const timeFormatted = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                  const dateFormatted = dateObj.toLocaleDateString('vi-VN');
+                  const timeFormatted = formatVNTime(record.timestamp);
+                  const dateFormatted = formatVNDate(record.timestamp);
 
                   return (
                     <tr key={record.attendance_id} className="hover:bg-slate-800/40 transition-colors">

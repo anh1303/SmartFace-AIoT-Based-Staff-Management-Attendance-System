@@ -2,27 +2,27 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { formatVNTime } from '../../utils/dateUtils';
-import { 
-  Users, 
-  Clock, 
-  CheckCircle2, 
-  AlertTriangle, 
-  ScanFace, 
-  ArrowUpRight, 
-  Plus, 
-  CalendarRange, 
+import {
+  Users,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  ScanFace,
+  ArrowUpRight,
+  Plus,
+  CalendarRange,
   ChevronRight
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
-  Cell 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
 
 export const ManagerDashboard: React.FC = () => {
@@ -32,17 +32,17 @@ export const ManagerDashboard: React.FC = () => {
   // Metric computations
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter(e => e.status === 'ACTIVE').length;
-  
+
   // Latest date punches or today
-  const latestDateStr = attendance.length > 0 
+  const latestDateStr = attendance.length > 0
     ? attendance[0].timestamp.slice(0, 10)
     : new Date().toISOString().slice(0, 10);
 
   const todayPunches = attendance.filter(a => a.timestamp.startsWith(latestDateStr));
   const onTimeCount = todayPunches.filter(a => a.status === 'ON_TIME').length;
   const lateCount = todayPunches.filter(a => a.status === 'LATE' || a.status === 'EARLY_LEAVE').length;
-  const onTimeRate = todayPunches.length > 0 
-    ? ((onTimeCount / todayPunches.length) * 100).toFixed(1) 
+  const onTimeRate = todayPunches.length > 0
+    ? ((onTimeCount / todayPunches.length) * 100).toFixed(1)
     : (attendance.length > 0 ? ((attendance.filter(a => a.status === 'ON_TIME').length / attendance.length) * 100).toFixed(1) : '100.0');
 
   // Dynamic Weekly attendance bar chart data from attendance records
@@ -210,7 +210,7 @@ export const ManagerDashboard: React.FC = () => {
         {/* Right: Department Structure (col-span-4) */}
         <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col justify-between">
           <h3 className="font-bold text-white text-base mb-4">Cấu trúc phòng ban</h3>
-          
+
           <div className="flex-1 flex items-center justify-center py-2">
             <div className="relative w-36 h-36">
               <ResponsiveContainer width="100%" height="100%">
@@ -257,7 +257,7 @@ export const ManagerDashboard: React.FC = () => {
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-white text-base">Nhật ký chấm công Face ID (Real-time)</h3>
-          <button 
+          <button
             type="button"
             onClick={() => navigate('/app/manager/attendance')}
             className="text-xs text-blue-500 hover:text-blue-400 font-semibold"
@@ -313,11 +313,10 @@ export const ManagerDashboard: React.FC = () => {
                     </td>
                     <td className="py-3 text-right">
                       <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${
-                          att.status === 'ON_TIME'
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${att.status === 'ON_TIME'
                             ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
                             : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
-                        }`}
+                          }`}
                       >
                         {att.status === 'ON_TIME' ? 'Đúng giờ' : 'Muộn ca'}
                       </span>

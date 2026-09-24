@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { 
-  ScanFace, 
-  ShieldCheck, 
-  Zap, 
-  Clock, 
-  Users, 
-  Building2, 
-  Cpu, 
-  CheckCircle2, 
-  ChevronRight, 
+import {
+  ScanFace,
+  ShieldCheck,
+  Zap,
+  Clock,
+  Users,
+  Building2,
+  Cpu,
+  CheckCircle2,
+  ChevronRight,
   ArrowRight,
   Award,
   Lock,

@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-<<<<<<< Updated upstream
-import { API_BASE } from '../../utils/apiConfig';
-=======
->>>>>>> Stashed changes
 import {
   Eye,
   Clock,
@@ -49,11 +45,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   const fetchSummaries = async () => {
     const token = localStorage.getItem('token');
     try {
-<<<<<<< Updated upstream
-      const res = await fetch(`${API_BASE}/api/attendance/summaries`, {
-=======
       const res = await fetch('http://localhost:3000/api/attendance/summaries', {
->>>>>>> Stashed changes
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -530,11 +522,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
 
     const token = localStorage.getItem('token');
     try {
-<<<<<<< Updated upstream
-      const response = await fetch(`${API_BASE}/api/attendance/adjust`, {
-=======
       const response = await fetch('http://localhost:3000/api/attendance/adjust', {
->>>>>>> Stashed changes
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -762,16 +750,15 @@ export const ManagerAttendanceMonitor: React.FC = () => {
                 </tr>
               ) : (
                 filteredEmployeePairs.map((item, empIdx) => {
-<<<<<<< Updated upstream
-                  const { 
-                    employee, 
-                    shift, 
-                    events, 
-                    hasCheckedOut, 
-                    overtimeStr, 
-                    currentOTSec, 
-                    currentLateEarlySec, 
-                    lateEarlyStr 
+                  const {
+                    employee,
+                    shift,
+                    events,
+                    hasCheckedOut,
+                    overtimeStr,
+                    currentOTSec,
+                    currentLateEarlySec,
+                    lateEarlyStr
                   } = item;
                   const inEvent = events[0];
                   const outEvent = events[1];
@@ -779,12 +766,6 @@ export const ManagerAttendanceMonitor: React.FC = () => {
                   const isLateEarlyActive = currentLateEarlySec > 0;
                   const isOvertimeActive = hasCheckedOut && currentOTSec > 0;
 
-=======
-                  const { employee, shift, events, hasCheckedOut, overtimeStr, lateEarlySec, lateEarlyStr } = item;
-                  const inEvent = events[0];
-                  const outEvent = events[1];
-
->>>>>>> Stashed changes
                   return (
                     <React.Fragment key={employee.employee_id}>
                       {/* Row 1: Vào Ca */}
@@ -852,42 +833,22 @@ export const ManagerAttendanceMonitor: React.FC = () => {
                           </span>
                         </td>
 
-<<<<<<< Updated upstream
                         {/* Thời gian đi trễ/về sớm (rowSpan = 2) - Nổi bật đỏ nếu > 0, ảm đạm nếu = 0 */}
                         <td rowSpan={2} className="py-3.5 px-4 border-r border-slate-800/80 align-middle text-center bg-slate-950/30 whitespace-nowrap">
-                          <span className={`font-mono text-sm px-3 py-1 rounded-xl border inline-block transition-all ${
-                            isLateEarlyActive
-                              ? 'text-red-400 bg-red-500/20 border-red-500/40 shadow-sm shadow-red-500/20 font-bold'
-                              : 'text-slate-500 bg-slate-800/30 border-slate-700/40 font-normal'
-                          }`}>
-=======
-                        {/* Thời gian đi trễ/về sớm (rowSpan = 2) - Màu đỏ, làm tròn 30 phút */}
-                        <td rowSpan={2} className="py-3.5 px-4 border-r border-slate-800/80 align-middle text-center bg-slate-950/30 whitespace-nowrap">
-                          <span className={`font-mono font-bold text-sm px-3 py-1 rounded-xl border inline-block ${lateEarlySec > 0
-                            ? 'text-red-400 bg-red-500/10 border-red-500/30 shadow-sm'
-                            : 'text-red-400/50 bg-red-500/5 border-red-500/10'
+                          <span className={`font-mono text-sm px-3 py-1 rounded-xl border inline-block transition-all ${isLateEarlyActive
+                            ? 'text-red-400 bg-red-500/20 border-red-500/40 shadow-sm shadow-red-500/20 font-bold'
+                            : 'text-slate-500 bg-slate-800/30 border-slate-700/40 font-normal'
                             }`}>
->>>>>>> Stashed changes
                             {lateEarlyStr}
                           </span>
                         </td>
 
-<<<<<<< Updated upstream
                         {/* Tăng ca (rowSpan = 2) - Nổi bật vàng nếu > 0, ảm đạm nếu = 0 */}
                         <td rowSpan={2} className="py-3.5 px-4 border-r border-slate-800/80 align-middle text-center bg-slate-950/30 whitespace-nowrap">
-                          <span className={`font-mono text-sm px-3 py-1 rounded-xl border inline-block transition-all ${
-                            isOvertimeActive
-                              ? 'text-amber-400 bg-amber-500/20 border-amber-500/40 shadow-sm shadow-amber-500/20 font-bold'
-                              : 'text-slate-500 bg-slate-800/30 border-slate-700/40 font-normal'
-                          }`}>
-=======
-                        {/* Tăng ca (rowSpan = 2) */}
-                        <td rowSpan={2} className="py-3.5 px-4 border-r border-slate-800/80 align-middle text-center bg-slate-950/30 whitespace-nowrap">
-                          <span className={`font-mono font-bold text-sm px-3 py-1 rounded-xl border inline-block ${hasCheckedOut
-                            ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                            : 'text-slate-500 bg-slate-800/40 border-slate-700/50'
+                          <span className={`font-mono text-sm px-3 py-1 rounded-xl border inline-block transition-all ${isOvertimeActive
+                            ? 'text-amber-400 bg-amber-500/20 border-amber-500/40 shadow-sm shadow-amber-500/20 font-bold'
+                            : 'text-slate-500 bg-slate-800/30 border-slate-700/40 font-normal'
                             }`}>
->>>>>>> Stashed changes
                             {overtimeStr}
                           </span>
                         </td>
@@ -1157,4 +1118,3 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     </div>
   );
 };
-

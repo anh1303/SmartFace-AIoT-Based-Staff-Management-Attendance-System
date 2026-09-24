@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { formatVNTime } from '../../utils/dateUtils';
-import { 
-  Menu, 
-  LogOut, 
+import {
+  Menu,
+  LogOut,
   User
 } from 'lucide-react';
 
@@ -65,9 +65,8 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
             <p className="text-xs font-semibold text-white leading-tight">
               {currentUser?.full_name || (role === 'manager' ? 'Nguyễn Minh Anh' : 'Nguyễn Văn A')}
             </p>
-            <span className={`text-[10px] font-mono uppercase font-bold ${
-              role === 'manager' ? 'text-amber-400' : 'text-blue-400'
-            }`}>
+            <span className={`text-[10px] font-mono uppercase font-bold ${role === 'manager' ? 'text-amber-400' : 'text-blue-400'
+              }`}>
               {role === 'manager' ? 'Quản lý' : 'Nhân viên'}
             </span>
           </div>

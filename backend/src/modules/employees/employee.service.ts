@@ -1,7 +1,6 @@
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere } from '../../common/utils.js'
-import { EMPLOYEE_STATUS } from '../../common/constants.js'
 import { employeeInclude } from './employee.model.js'
 
 export function formatEmployee(emp: any) {
@@ -37,12 +36,12 @@ export async function list(query: Record<string, unknown>) {
   const where = {
     ...(search
       ? {
-          OR: [
-            { full_name: { contains: search, mode: 'insensitive' as const } },
-            { email: { contains: search, mode: 'insensitive' as const } },
-            { employee_code: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
+        OR: [
+          { full_name: { contains: search, mode: 'insensitive' as const } },
+          { email: { contains: search, mode: 'insensitive' as const } },
+          { employee_code: { contains: search, mode: 'insensitive' as const } },
+        ],
+      }
       : {}),
     ...(typeof query.status === 'string' ? { status: query.status } : {}),
     ...(departmentId ? { departmentId } : {}),
@@ -122,7 +121,7 @@ export async function create(data: {
       email: emailVal,
       position: data.position || null,
       departmentId: deptId ?? null,
-      status: data.status ?? EMPLOYEE_STATUS.ACTIVE,
+      status: data.status ?? 'ACTIVE',
       phone: data.phone || null,
       hourly_rate: rate,
       avatar_url: data.avatar_url ?? data.avatar ?? null,
@@ -183,8 +182,8 @@ export async function update(
   if (existing.user_id && data.status !== undefined) {
     await prisma.user.update({
       where: { id: existing.user_id },
-      data: { is_active: data.status === EMPLOYEE_STATUS.ACTIVE },
-    }).catch(() => {})
+      data: { is_active: data.status === 'ACTIVE' },
+    }).catch(() => { })
   }
 
   return formatEmployee(updated)

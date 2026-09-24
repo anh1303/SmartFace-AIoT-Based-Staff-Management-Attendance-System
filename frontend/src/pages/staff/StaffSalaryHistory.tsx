@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  FileText, 
-  Download, 
-  Calendar, 
-  CheckCircle2, 
-  DollarSign, 
-  Eye, 
-  Building2, 
-  CreditCard 
+import {
+  FileText,
+  Download,
+  Calendar,
+  CheckCircle2,
+  DollarSign,
+  Eye,
+  Building2,
+  CreditCard
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { PayrollRecord } from '../../types';
@@ -96,11 +96,10 @@ export const StaffSalaryHistory: React.FC = () => {
                     </td>
                     <td className="py-3.5 px-4">
                       <span
-                        className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-mono ${
-                          p.status === 'FINALIZED'
-                            ? 'bg-green-500/10 text-green-500 border border-green-500/20'
-                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                        }`}
+                        className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-mono ${p.status === 'FINALIZED'
+                          ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          }`}
                       >
                         {p.status === 'FINALIZED' ? 'ĐÃ CHỐT' : 'CHỜ DUYỆT'}
                       </span>

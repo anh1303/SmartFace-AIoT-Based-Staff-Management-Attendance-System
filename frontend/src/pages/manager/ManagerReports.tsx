@@ -1,28 +1,28 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  BarChart3, 
-  Download, 
-  Calendar, 
-  TrendingUp, 
-  Award, 
-  AlertTriangle, 
-  CheckCircle2, 
+import {
+  BarChart3,
+  Download,
+  Calendar,
+  TrendingUp,
+  Award,
+  AlertTriangle,
+  CheckCircle2,
   ScanFace,
   FileSpreadsheet
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  ResponsiveContainer, 
-  AreaChart, 
-  Area, 
-  PieChart, 
-  Pie, 
-  Cell 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
 
 export const ManagerReports: React.FC = () => {
@@ -37,18 +37,18 @@ export const ManagerReports: React.FC = () => {
   });
 
   const sortedPeriods = Object.keys(periodsMap).sort();
-  const payrollTrendData = sortedPeriods.length > 0 
+  const payrollTrendData = sortedPeriods.length > 0
     ? sortedPeriods.map(period => ({
-        period: `T${period.slice(5)}/${period.slice(2, 4)}`,
-        cost: Number((periodsMap[period] / 1000000).toFixed(1)),
-      }))
+      period: `T${period.slice(5)}/${period.slice(2, 4)}`,
+      cost: Number((periodsMap[period] / 1000000).toFixed(1)),
+    }))
     : [
-        { period: 'T05/26', cost: 102.5 },
-        { period: 'T06/26', cost: 104.0 },
-        { period: 'T07/26', cost: 106.2 },
-        { period: 'T08/26', cost: 107.5 },
-        { period: 'T09/26', cost: 108.2 },
-      ];
+      { period: 'T05/26', cost: 102.5 },
+      { period: 'T06/26', cost: 104.0 },
+      { period: 'T07/26', cost: 106.2 },
+      { period: 'T08/26', cost: 107.5 },
+      { period: 'T09/26', cost: 108.2 },
+    ];
 
   // Dynamic Method Breakdown from Attendance Logs
   const totalLogs = attendance.length;
@@ -57,23 +57,23 @@ export const ManagerReports: React.FC = () => {
   const manualLogs = attendance.filter(a => a.method === 'MANUAL').length;
 
   const methodBreakdown = [
-    { 
-      name: 'Khuôn mặt (Face ID 512D)', 
-      value: totalLogs > 0 ? Math.round((faceLogs / totalLogs) * 100) : 80, 
+    {
+      name: 'Khuôn mặt (Face ID 512D)',
+      value: totalLogs > 0 ? Math.round((faceLogs / totalLogs) * 100) : 80,
       count: faceLogs,
-      color: '#3b82f6' 
+      color: '#3b82f6'
     },
-    { 
-      name: 'Vân tay (Fingerprint)', 
-      value: totalLogs > 0 ? Math.round((fpLogs / totalLogs) * 100) : 15, 
+    {
+      name: 'Vân tay (Fingerprint)',
+      value: totalLogs > 0 ? Math.round((fpLogs / totalLogs) * 100) : 15,
       count: fpLogs,
-      color: '#22c55e' 
+      color: '#22c55e'
     },
-    { 
-      name: 'Thủ công (Manual Kiosk)', 
-      value: totalLogs > 0 ? Math.round((manualLogs / totalLogs) * 100) : 5, 
+    {
+      name: 'Thủ công (Manual Kiosk)',
+      value: totalLogs > 0 ? Math.round((manualLogs / totalLogs) * 100) : 5,
       count: manualLogs,
-      color: '#f59e0b' 
+      color: '#f59e0b'
     },
   ];
 
@@ -82,11 +82,11 @@ export const ManagerReports: React.FC = () => {
     { week: 'Tuần 34', rate: 95.8 },
     { week: 'Tuần 35', rate: 96.0 },
     { week: 'Tuần 36', rate: 97.4 },
-    { 
-      week: 'Tuần 37', 
-      rate: attendance.length > 0 
-        ? Number(((attendance.filter(a => a.status === 'ON_TIME').length / attendance.length) * 100).toFixed(1)) 
-        : 98.1 
+    {
+      week: 'Tuần 37',
+      rate: attendance.length > 0
+        ? Number(((attendance.filter(a => a.status === 'ON_TIME').length / attendance.length) * 100).toFixed(1))
+        : 98.1
     },
   ];
 
@@ -96,7 +96,7 @@ export const ManagerReports: React.FC = () => {
     const totalPunches = empAtt.length;
     const onTimePunches = empAtt.filter(a => a.status === 'ON_TIME').length;
     const rateNum = totalPunches > 0 ? (onTimePunches / totalPunches) * 100 : 100;
-    
+
     let badge = 'XUẤT SẮC';
     if (rateNum < 90) badge = 'CẦN LƯU Ý';
     else if (rateNum < 98) badge = 'TỐT';
@@ -113,7 +113,7 @@ export const ManagerReports: React.FC = () => {
 
   const handleExportCSV = () => {
     const headers = ['Mã NV', 'Họ và Tên', 'Phòng Ban', 'Vị trí', 'Email', 'Trạng Thái', 'Lương Cơ Bản (VNĐ)', 'Face ID', 'Vân Tay'];
-    
+
     const rows = employees.map(emp => [
       emp.employee_id,
       `"${emp.full_name}"`,
@@ -127,7 +127,7 @@ export const ManagerReports: React.FC = () => {
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    
+
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -209,8 +209,8 @@ export const ManagerReports: React.FC = () => {
               <AreaChart data={punctualityData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="punctualityColor" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="week" stroke="#64748b" fontSize={11} />
@@ -287,13 +287,12 @@ export const ManagerReports: React.FC = () => {
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs ${
-                      idx === 0
+                    className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs ${idx === 0
                         ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
                         : idx === 1
-                        ? 'bg-slate-700/20 text-slate-200 border border-slate-700/40'
-                        : 'bg-slate-900 text-slate-400 border border-slate-800'
-                    }`}
+                          ? 'bg-slate-700/20 text-slate-200 border border-slate-700/40'
+                          : 'bg-slate-900 text-slate-400 border border-slate-800'
+                      }`}
                   >
                     #{idx + 1}
                   </div>
@@ -306,13 +305,12 @@ export const ManagerReports: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-xs font-bold text-blue-400">{item.rate}</span>
                   <span
-                    className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                      item.badge === 'XUẤT SẮC'
+                    className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${item.badge === 'XUẤT SẮC'
                         ? 'bg-green-500/10 text-green-500 border border-green-500/20'
                         : item.badge === 'TỐT'
-                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                    }`}
+                          ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                      }`}
                   >
                     {item.badge}
                   </span>

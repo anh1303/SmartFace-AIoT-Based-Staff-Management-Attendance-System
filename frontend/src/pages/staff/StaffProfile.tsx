@@ -1,15 +1,15 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  Briefcase, 
-  Calendar, 
-  ShieldCheck, 
-  ScanFace, 
-  Fingerprint, 
-  Lock, 
+import {
+  User,
+  Mail,
+  Phone,
+  Briefcase,
+  Calendar,
+  ShieldCheck,
+  ScanFace,
+  Fingerprint,
+  Lock,
   Building2,
   CheckCircle2,
   AlertTriangle

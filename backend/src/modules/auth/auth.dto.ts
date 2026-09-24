@@ -1,11 +1,10 @@
 import { z } from 'zod'
-import { USER_ROLES } from '../../common/constants.js'
 
 export const loginSchema = z
   .object({
     email: z.string().email().optional(),
     identifier: z.string().min(1).optional(),
-    password: z.string().min(8),
+    password: z.string().min(6),
   })
   .refine((v) => v.email || v.identifier, { message: 'email or identifier is required' })
 
@@ -14,8 +13,7 @@ export const registerSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum([USER_ROLES.ADMIN, USER_ROLES.MANAGER, USER_ROLES.EMPLOYEE]).default(USER_ROLES.EMPLOYEE),
-  departmentId: z.number().int().positive().nullable().optional(),
+  role: z.enum(['ADMIN', 'MANAGER', 'EMPLOYEE']).default('EMPLOYEE'),
+  departmentId: z.string().uuid().optional(),
   position: z.string().min(2).default('Employee'),
 })
-

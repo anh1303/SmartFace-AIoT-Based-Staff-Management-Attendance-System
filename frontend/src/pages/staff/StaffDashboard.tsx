@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatVNTime } from '../../utils/dateUtils';
-import { 
-  Clock, 
-  CheckCircle2, 
-  Calendar, 
-  TrendingUp, 
-  ScanFace, 
-  Fingerprint, 
-  ArrowUpRight, 
-  FileText, 
+import {
+  Clock,
+  CheckCircle2,
+  Calendar,
+  TrendingUp,
+  ScanFace,
+  Fingerprint,
+  ArrowUpRight,
+  FileText,
   Briefcase,
   ShieldCheck
 } from 'lucide-react';
@@ -43,7 +43,7 @@ export const StaffDashboard: React.FC = () => {
 
   // Current period payroll record
   const currentPayroll = payroll.find(p => p.employee_id === empCode) || payroll[0];
-  const netSalaryFormatted = currentPayroll 
+  const netSalaryFormatted = currentPayroll
     ? Number(currentPayroll.net_salary || 0).toLocaleString('vi-VN') + '₫'
     : ((currentEmp?.hourly_rate || 120000) * 160).toLocaleString('vi-VN') + '₫';
 
@@ -56,7 +56,7 @@ export const StaffDashboard: React.FC = () => {
   };
   const monday = getMonday(new Date());
   const dayNames = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
-  
+
   const weekRhythm = [0, 1, 2, 3, 4, 5, 6].map(offset => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + offset);
@@ -244,15 +244,14 @@ export const StaffDashboard: React.FC = () => {
           {weekRhythm.map((item, idx) => (
             <div
               key={idx}
-              className={`p-3.5 rounded-2xl border text-xs transition-all ${
-                item.status === 'ON_TIME'
+              className={`p-3.5 rounded-2xl border text-xs transition-all ${item.status === 'ON_TIME'
                   ? 'bg-slate-950 border-slate-800 hover:border-blue-500/50'
                   : item.status === 'LATE'
-                  ? 'bg-orange-950/20 border-orange-500/40'
-                  : item.status === 'OFF'
-                  ? 'bg-slate-950 border-slate-800/40 opacity-50'
-                  : 'bg-slate-950 border-slate-800/70'
-              }`}
+                    ? 'bg-orange-950/20 border-orange-500/40'
+                    : item.status === 'OFF'
+                      ? 'bg-slate-950 border-slate-800/40 opacity-50'
+                      : 'bg-slate-950 border-slate-800/70'
+                }`}
             >
               <div className="flex justify-between items-center text-slate-500 text-[11px] mb-1">
                 <span>{item.day}</span>
@@ -354,10 +353,10 @@ export const StaffDashboard: React.FC = () => {
                         {shift.shift_type === 'OFFICE_HOURS'
                           ? 'Ca Hành Chính'
                           : shift.shift_type === 'MORNING'
-                          ? 'Ca Sáng'
-                          : shift.shift_type === 'AFTERNOON'
-                          ? 'Ca Chiều'
-                          : 'Nghỉ ca'}
+                            ? 'Ca Sáng'
+                            : shift.shift_type === 'AFTERNOON'
+                              ? 'Ca Chiều'
+                              : 'Nghỉ ca'}
                         {shift.note ? ` • ${shift.note}` : ''}
                       </p>
                       <p className="text-[11px] font-mono text-slate-400">

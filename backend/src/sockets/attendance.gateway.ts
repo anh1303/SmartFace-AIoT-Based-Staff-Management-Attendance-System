@@ -11,4 +11,3 @@ export const initializeAttendanceGateway = (server: Server) => {
 
 export const emitAttendanceEvent = (event: string, payload: unknown) =>
   io?.of('/attendance').emit(event, payload)
-

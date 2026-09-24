@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { 
-  ScanFace, 
-  ShieldCheck, 
-  Lock, 
-  Mail, 
-  Eye, 
-  EyeOff, 
-  ArrowRight, 
+import {
+  ScanFace,
+  ShieldCheck,
+  Lock,
+  Mail,
+  Eye,
+  EyeOff,
+  ArrowRight,
   CheckCircle2
 } from 'lucide-react';
 
@@ -41,7 +41,7 @@ export const LoginPage: React.FC = () => {
     setLoading(false);
 
     if (res.success && res.role) {
-      navigate(res.role === 'manager' ? '/app/manager/dashboard' : '/app/employee/dashboard');
+      navigate(res.role === 'manager' ? '/app/manager/dashboard' : '/app/staff/dashboard');
     } else {
       setErrorMsg(res.message || 'Xác thực thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.');
     }

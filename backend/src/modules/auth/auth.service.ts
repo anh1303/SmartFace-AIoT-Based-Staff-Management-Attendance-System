@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken'
 import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
 import { AppError } from '../../common/AppError.js'
-import { USER_ROLES, EMPLOYEE_STATUS } from '../../common/constants.js'
 import type { z } from 'zod'
 import type { loginSchema, registerSchema } from './auth.dto.js'
 
@@ -22,12 +21,8 @@ function safeUser(user: {
   } | null
 }) {
   const roleName = user.roles.role_name.toUpperCase()
-  const frontendRole: 'manager' | 'employee' =
-<<<<<<< Updated upstream
-    roleName === USER_ROLES.ADMIN || roleName === USER_ROLES.MANAGER ? 'manager' : 'employee'
-=======
-    roleName === 'ADMIN' || roleName === 'MANAGER' ? 'manager' : 'employee'
->>>>>>> Stashed changes
+  const frontendRole: 'manager' | 'staff' =
+    roleName === 'ADMIN' || roleName === 'MANAGER' ? 'manager' : 'staff'
 
   const emp = user.employees
 
@@ -84,11 +79,7 @@ export async function login(input: z.infer<typeof loginSchema>) {
     throw new AppError(401, 'Invalid username/email or password')
   }
 
-<<<<<<< Updated upstream
-  if (!user.is_active || (user.employees && user.employees.status === EMPLOYEE_STATUS.INACTIVE)) {
-=======
   if (!user.is_active || (user.employees && user.employees.status === 'INACTIVE')) {
->>>>>>> Stashed changes
     throw new AppError(403, 'Tài khoản nhân viên đang ở trạng thái TẠM NGƯNG, không thể đăng nhập vào hệ thống!')
   }
 
@@ -106,11 +97,6 @@ export async function register(input: z.infer<typeof registerSchema>) {
   const roleRecord = await prisma.roles.findFirst({ where: { role_name: input.role } })
   if (!roleRecord) throw new AppError(400, `Role '${input.role}' not found`)
 
-  if (input.departmentId) {
-    const dept = await prisma.department.findUnique({ where: { id: input.departmentId } })
-    if (!dept) throw new AppError(400, `Department ID ${input.departmentId} not found`)
-  }
-
   return prisma.$transaction(async (tx) => {
     const employee = await tx.employee.create({
       data: {
@@ -118,7 +104,7 @@ export async function register(input: z.infer<typeof registerSchema>) {
         full_name: input.name,
         email: input.email,
         position: input.position ?? null,
-        departmentId: input.departmentId ?? null,
+        departmentId: null,
       },
     })
 

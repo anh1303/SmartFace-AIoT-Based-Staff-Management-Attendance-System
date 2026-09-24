@@ -1,10 +1,8 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import { authenticate } from '../../middlewares/auth.middleware.js'
 import { authorize } from '../../middlewares/rbac.middleware.js'
-import { validate } from '../../middlewares/validate.middleware.js'
 import { successResponse } from '../../common/response.js'
-import { USER_ROLES } from '../../common/constants.js'
-import { assignShiftSchema } from './shift.dto.js'
 import * as service from './shift.service.js'
 
 export const shiftRouter = Router()
@@ -18,16 +16,21 @@ shiftRouter.get('/', async (req, res, next) => {
   }
 })
 
-shiftRouter.post(
-  '/',
-  authorize(USER_ROLES.ADMIN, USER_ROLES.MANAGER),
-  validate(assignShiftSchema),
-  async (req, res, next) => {
-    try {
-      const result = await service.assignOrUpdate(req.body)
-      successResponse(res, result, 'Work shift saved', 200)
-    } catch (e) {
-      next(e)
-    }
-  },
-)
+shiftRouter.post('/', authorize('ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const body = z.object({
+      employee_id: z.string().min(1),
+      date: z.string().min(1),
+      work_day: z.string().optional(),
+      shift_type: z.string().min(1),
+      start_time: z.string().optional(),
+      end_time: z.string().optional(),
+      note: z.string().optional(),
+    }).parse(req.body)
+
+    const result = await service.assignOrUpdate(body)
+    successResponse(res, result, 'Work shift saved', 200)
+  } catch (e) {
+    next(e)
+  }
+})

@@ -11,4 +11,3 @@ export const initializeDeviceGateway = (server: Server) => {
 
 export const emitDeviceEvent = (event: string, payload: unknown) =>
   io?.of('/devices').emit(event, payload)
-

@@ -1,11 +1,11 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  DollarSign, 
-  Calendar, 
-  TrendingUp, 
-  ShieldCheck, 
-  CheckCircle2, 
+import {
+  DollarSign,
+  Calendar,
+  TrendingUp,
+  ShieldCheck,
+  CheckCircle2,
   AlertCircle,
   HelpCircle,
   Clock,
@@ -17,7 +17,7 @@ export const StaffSalaryEstimate: React.FC = () => {
 
   const empCode = currentUser?.employee_id || 'NV-001';
   const currentEmp = employees.find(e => e.employee_id === empCode);
-  const currentPayroll = payroll.find(p => p.employee_id === empCode && (p.period === '2026-09' || !p.period)) 
+  const currentPayroll = payroll.find(p => p.employee_id === empCode && (p.period === '2026-09' || !p.period))
     || payroll.find(p => p.employee_id === empCode)
     || payroll[0];
 
@@ -32,7 +32,7 @@ export const StaffSalaryEstimate: React.FC = () => {
   const penaltyAmount = lateEarlyHours * penaltyRate;
   const standardHours = 160; // 20 ngày x 8h
   const baseSalary = standardHours * hourlyRate;
-  const netSalary = currentPayroll?.net_salary 
+  const netSalary = currentPayroll?.net_salary
     ? Number(currentPayroll.net_salary)
     : (baseSalary + otAmount - penaltyAmount + allowance);
 

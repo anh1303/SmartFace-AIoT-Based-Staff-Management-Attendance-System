@@ -538,56 +538,16 @@ async function main() {
   // 12. Bảng 11: Bonus Penalty
   await prisma.bonusPenalty.create({
     data: {
-<<<<<<< Updated upstream
-      overtime_rate: 1.5,
-      late_early_penalty: 50000,
-      description: 'Quy định thưởng OT 1.5x và phạt đi trễ/về sớm 50.000 ₫/h năm 2026',
-    },
-  })
-  console.log('✅ 11. Bảng bonus_penalty (Mức thưởng OT: 1.5x, Mức phạt: 50.000 ₫/h)')
-=======
       overtime_rate: 100000,
       late_early_penalty: 50000,
       description: 'Quy định mức thưởng tăng ca 100.000 ₫/h và phạt đi trễ/về sớm 50.000 ₫/h năm 2026',
     },
   })
   console.log('✅ 11. Bảng bonus_penalty (Mức thưởng OT: 100.000 ₫/h, Mức phạt: 50.000 ₫/h)')
->>>>>>> Stashed changes
 
   // 13. Bảng 12: Payroll Records
   const initialPayroll = [
     // Kỳ 2026-09 (Kỳ hiện tại)
-<<<<<<< Updated upstream
-    { code: 'NV-001', period: '2026-09', hourly: 120000, ot: 4.0, late: 0, allowance: 2500000, status: 'PENDING' },
-    { code: 'NV-002', period: '2026-09', hourly: 110000, ot: 1.5, late: 0.5, allowance: 1800000, status: 'PENDING' },
-    { code: 'NV-003', period: '2026-09', hourly: 150000, ot: 6.0, late: 0, allowance: 3200000, status: 'PENDING' },
-    { code: 'NV-004', period: '2026-09', hourly: 125000, ot: 2.0, late: 0, allowance: 2000000, status: 'PENDING' },
-    { code: 'NV-005', period: '2026-09', hourly: 100000, ot: 3.5, late: 1.5, allowance: 1500000, status: 'PENDING' },
-
-    // Kỳ 2026-08 (Đã chốt)
-    { code: 'NV-001', period: '2026-08', hourly: 120000, ot: 5.5, late: 0, allowance: 2500000, status: 'FINALIZED' },
-    { code: 'NV-002', period: '2026-08', hourly: 110000, ot: 2.0, late: 1.0, allowance: 1800000, status: 'FINALIZED' },
-    { code: 'NV-003', period: '2026-08', hourly: 150000, ot: 8.0, late: 0, allowance: 3200000, status: 'FINALIZED' },
-    { code: 'NV-004', period: '2026-08', hourly: 125000, ot: 0, late: 0.5, allowance: 2000000, status: 'FINALIZED' },
-    { code: 'NV-005', period: '2026-08', hourly: 100000, ot: 4.0, late: 2.5, allowance: 1500000, status: 'FINALIZED' },
-
-    // Kỳ 2026-07 (Đã chốt)
-    { code: 'NV-001', period: '2026-07', hourly: 120000, ot: 3.0, late: 0, allowance: 2200000, status: 'FINALIZED' },
-    { code: 'NV-002', period: '2026-07', hourly: 110000, ot: 0, late: 0, allowance: 1800000, status: 'FINALIZED' },
-    { code: 'NV-003', period: '2026-07', hourly: 150000, ot: 6.5, late: 0, allowance: 3200000, status: 'FINALIZED' },
-    { code: 'NV-004', period: '2026-07', hourly: 125000, ot: 1.0, late: 0, allowance: 2000000, status: 'FINALIZED' },
-    { code: 'NV-005', period: '2026-07', hourly: 100000, ot: 2.0, late: 1.0, allowance: 1500000, status: 'FINALIZED' },
-
-    // Kỳ 2026-06 (Đã chốt)
-    { code: 'NV-001', period: '2026-06', hourly: 120000, ot: 2.0, late: 0, allowance: 2200000, status: 'FINALIZED' },
-    { code: 'NV-002', period: '2026-06', hourly: 110000, ot: 1.0, late: 0, allowance: 1800000, status: 'FINALIZED' },
-    { code: 'NV-003', period: '2026-06', hourly: 150000, ot: 5.0, late: 0, allowance: 3200000, status: 'FINALIZED' },
-
-    // Kỳ 2026-05 (Đã chốt)
-    { code: 'NV-001', period: '2026-05', hourly: 120000, ot: 1.0, late: 0, allowance: 2200000, status: 'FINALIZED' },
-    { code: 'NV-002', period: '2026-05', hourly: 110000, ot: 0, late: 0.5, allowance: 1800000, status: 'FINALIZED' },
-    { code: 'NV-003', period: '2026-05', hourly: 150000, ot: 4.0, late: 0, allowance: 3200000, status: 'FINALIZED' },
-=======
     { code: 'NV-001', period: '2026-09', hourly: 120000, ot: 4.0, late: 0, allowance: 2500000, net: 23900000, status: 'PENDING' },
     { code: 'NV-002', period: '2026-09', hourly: 110000, ot: 1.5, late: 0.5, allowance: 1800000, net: 21100000, status: 'PENDING' },
     { code: 'NV-003', period: '2026-09', hourly: 150000, ot: 6.0, late: 0, allowance: 3200000, net: 30200000, status: 'PENDING' },
@@ -617,39 +577,21 @@ async function main() {
     { code: 'NV-001', period: '2026-05', hourly: 120000, ot: 1.0, late: 0, allowance: 2200000, net: 24380000, status: 'FINALIZED' },
     { code: 'NV-002', period: '2026-05', hourly: 110000, ot: 0, late: 0.5, allowance: 1800000, net: 22015000, status: 'FINALIZED' },
     { code: 'NV-003', period: '2026-05', hourly: 150000, ot: 4.0, late: 0, allowance: 3200000, net: 30800000, status: 'FINALIZED' },
->>>>>>> Stashed changes
   ]
 
   let prCount = 0
   for (const pr of initialPayroll) {
     const emp = employeesMap[pr.code]
     if (emp) {
-      const working_hours = 176
-      const otRate = 1.5
-      const lateRate = 50000
-
-      const otPay = pr.ot * pr.hourly * otRate
-      const lateDed = pr.late * lateRate
-      const basePay = pr.hourly * working_hours
-      const net_salary = Math.max(0, Math.round(basePay + otPay - lateDed + pr.allowance))
-
       await prisma.payrollRecord.create({
         data: {
           employeeId: emp.id,
           payroll_period: pr.period,
           hourly_rate: pr.hourly,
-<<<<<<< Updated upstream
-          total_working_hours: working_hours,
-          total_overtime: pr.ot,
-          total_late_early: pr.late,
-          allowance: pr.allowance,
-          net_salary: net_salary,
-=======
           total_overtime: pr.ot,
           total_late_early: pr.late,
           allowance: pr.allowance,
           net_salary: pr.net,
->>>>>>> Stashed changes
           status: pr.status,
         },
       })
@@ -658,7 +600,7 @@ async function main() {
   }
   console.log(`✅ 12. Bảng payroll_records (${prCount} bản ghi)`)
 
-  // 13. Bảng 13: Audit Logs
+  // 13. Bảng 12: Audit Logs
   await prisma.auditLog.create({
     data: {
       userId: adminUser.id,
@@ -677,9 +619,9 @@ async function main() {
       new_values: { message: 'Phân ca làm việc tuần 37 thành công' },
     },
   })
-  console.log('✅ 13. Bảng audit_logs (2 bản ghi)')
+  console.log('✅ 12. Bảng audit_logs (2 bản ghi)')
 
-  console.log('🎉 Hoàn tất seed dữ liệu cho 13/13 bảng thành công!')
+  console.log('🎉 Hoàn tất seed dữ liệu cho 12/12 bảng thành công!')
 }
 
 main()

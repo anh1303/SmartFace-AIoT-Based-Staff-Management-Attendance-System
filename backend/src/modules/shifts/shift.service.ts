@@ -1,13 +1,12 @@
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere } from '../../common/utils.js'
-import { SHIFT_TYPE, EMPLOYEE_STATUS } from '../../common/constants.js'
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 
 export function formatShift(s: any) {
-  const dateStr = s.work_date instanceof Date 
-    ? s.work_date.toISOString().slice(0, 10) 
+  const dateStr = s.work_date instanceof Date
+    ? s.work_date.toISOString().slice(0, 10)
     : String(s.work_date).slice(0, 10)
 
   let workDay = s.work_day
@@ -23,7 +22,7 @@ export function formatShift(s: any) {
     work_day: workDay,
     start_time: s.start_time || '08:00',
     end_time: s.end_time || '17:30',
-    shift_type: s.shift_type || SHIFT_TYPE.OFFICE_HOURS,
+    shift_type: s.shift_type || 'OFFICE_HOURS',
     department: s.employees?.department?.name || '',
     note: s.note || '',
   }
@@ -70,7 +69,7 @@ export async function assignOrUpdate(data: {
   })
   if (!emp) throw new AppError(404, 'Employee not found')
 
-  if (emp.status === EMPLOYEE_STATUS.INACTIVE || emp.status !== EMPLOYEE_STATUS.ACTIVE) {
+  if (emp.status === 'INACTIVE' || emp.status !== 'ACTIVE') {
     throw new AppError(400, 'Không thể phân ca làm việc cho nhân viên đang ở trạng thái TẠM NGƯNG!')
   }
 

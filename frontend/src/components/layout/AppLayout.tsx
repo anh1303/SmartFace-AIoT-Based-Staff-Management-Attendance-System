@@ -15,7 +15,7 @@ export const AppLayout: React.FC = () => {
   }
 
   if (location.pathname.startsWith('/app/manager') && currentUser.role !== 'manager') {
-    return <Navigate to="/app/employee/dashboard" replace />;
+    return <Navigate to="/app/staff/dashboard" replace />;
   }
 
   return (

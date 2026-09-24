@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { 
-  Users, 
-  Search, 
-  Filter, 
-  Plus, 
-  Edit, 
-  CheckCircle2, 
-  XCircle, 
-  ScanFace, 
-  Fingerprint, 
-  Mail, 
-  Phone, 
+import {
+  Users,
+  Search,
+  Filter,
+  Plus,
+  Edit,
+  CheckCircle2,
+  XCircle,
+  ScanFace,
+  Fingerprint,
+  Mail,
+  Phone,
   Building2,
   Lock,
   Briefcase,
@@ -58,14 +58,14 @@ export const ManagerEmployeeList: React.FC = () => {
 
   const filteredEmployees = employees.filter(emp => {
     const term = searchTerm.trim().toLowerCase();
-    const matchSearch = !term || 
+    const matchSearch = !term ||
       emp.full_name.toLowerCase().includes(term) ||
       emp.employee_id.toLowerCase().includes(term) ||
       emp.email.toLowerCase().includes(term) ||
       emp.phone.toLowerCase().includes(term) ||
       emp.position.toLowerCase().includes(term) ||
       emp.department.toLowerCase().includes(term);
-    
+
     const matchDept = departmentFilter === 'ALL' || emp.department === departmentFilter;
     const matchStatus = statusFilter === 'ALL' || emp.status === statusFilter;
 
@@ -269,21 +269,19 @@ export const ManagerEmployeeList: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span
                           title={emp.face_enrolled ? "Face ID: Đã đăng ký" : "Chưa đăng ký Face ID"}
-                          className={`p-1.5 rounded-lg border ${
-                            emp.face_enrolled
+                          className={`p-1.5 rounded-lg border ${emp.face_enrolled
                               ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                               : 'bg-slate-800 text-slate-600 border-slate-700/50'
-                          }`}
+                            }`}
                         >
                           <ScanFace className="w-4 h-4" />
                         </span>
                         <span
                           title={emp.fingerprint_enrolled ? "Vân tay: Đã đăng ký" : "Chưa đăng ký Vân tay"}
-                          className={`p-1.5 rounded-lg border ${
-                            emp.fingerprint_enrolled
+                          className={`p-1.5 rounded-lg border ${emp.fingerprint_enrolled
                               ? 'bg-green-500/10 text-green-400 border-green-500/20'
                               : 'bg-slate-800 text-slate-600 border-slate-700/50'
-                          }`}
+                            }`}
                         >
                           <Fingerprint className="w-4 h-4" />
                         </span>
@@ -300,11 +298,10 @@ export const ManagerEmployeeList: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setConfirmStatusEmployee(emp)}
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono transition-all ${
-                          emp.status === 'ACTIVE'
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono transition-all ${emp.status === 'ACTIVE'
                             ? 'bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20'
                             : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'
-                        }`}
+                          }`}
                       >
                         {emp.status === 'ACTIVE' ? 'HOẠT ĐỘNG' : 'TẠM NGƯNG'}
                       </button>

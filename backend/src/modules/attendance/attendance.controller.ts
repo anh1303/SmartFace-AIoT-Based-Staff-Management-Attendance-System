@@ -1,11 +1,9 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import { authenticate } from '../../middlewares/auth.middleware.js'
 import { authorize } from '../../middlewares/rbac.middleware.js'
-import { validate } from '../../middlewares/validate.middleware.js'
 import { successResponse } from '../../common/response.js'
 import { AppError } from '../../common/AppError.js'
-import { USER_ROLES } from '../../common/constants.js'
-import { checkInSchema, adjustAttendanceSchema, checkOutSchema } from './attendance.dto.js'
 import * as service from './attendance.service.js'
 import { emitAttendanceEvent } from '../../sockets/attendance.gateway.js'
 
@@ -30,14 +28,19 @@ attendanceRouter.get('/statistics', async (_req, res, next) => {
 
 attendanceRouter.post(
   '/check-in',
-  authorize(USER_ROLES.ADMIN, USER_ROLES.MANAGER),
-  validate(checkInSchema),
+  authorize('ADMIN', 'MANAGER'),
   async (req, res, next) => {
     try {
+      const body = z.object({
+        employeeId: z.string().min(1),
+        device_info: z.string().optional(),
+        method: z.enum(['FACE', 'FINGERPRINT', 'MANUAL']).optional(),
+      }).parse(req.body)
+
       const record = await service.checkIn({
-        employeeId: req.body.employeeId,
-        device_info: req.body.device_info,
-        method: req.body.method,
+        employeeId: body.employeeId,
+        device_info: body.device_info,
+        method: body.method,
       })
       emitAttendanceEvent('checked-in', record)
       successResponse(res, record, 'Checked in', 201)
@@ -57,11 +60,17 @@ attendanceRouter.get('/summaries', async (req, res, next) => {
 
 attendanceRouter.patch(
   '/adjust',
-  authorize(USER_ROLES.ADMIN, USER_ROLES.MANAGER),
-  validate(adjustAttendanceSchema),
+  authorize('ADMIN', 'MANAGER'),
   async (req, res, next) => {
     try {
-      const updated = await service.adjustAttendance(req.body)
+      const body = z.object({
+        employeeId: z.string().min(1),
+        date: z.string().min(1),
+        late_early: z.number().int().min(0).default(0),
+        overtime: z.number().int().min(0).default(0),
+      }).parse(req.body)
+
+      const updated = await service.adjustAttendance(body)
       successResponse(res, updated, 'Attendance adjusted successfully')
     } catch (e) {
       next(e)
@@ -69,13 +78,18 @@ attendanceRouter.patch(
   },
 )
 
-attendanceRouter.post('/check-out', validate(checkOutSchema), async (req, res, next) => {
+attendanceRouter.post('/check-out', async (req, res, next) => {
   try {
-    if (req.user?.role === USER_ROLES.EMPLOYEE && req.user.employeeId !== req.body.employeeId) {
+    const body = z.object({
+      employeeId: z.string().min(1),
+      device_info: z.string().optional(),
+    }).parse(req.body)
+
+    if (req.user?.role === 'EMPLOYEE' && req.user.employeeId !== body.employeeId) {
       return next(new AppError(403, 'Forbidden'))
     }
 
-    const record = await service.checkOut(req.body.employeeId, req.body.device_info)
+    const record = await service.checkOut(body.employeeId, body.device_info)
     emitAttendanceEvent('checked-out', record)
     successResponse(res, record, 'Checked out')
   } catch (e) {

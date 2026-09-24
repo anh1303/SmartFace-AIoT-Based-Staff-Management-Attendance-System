@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  Banknote, 
-  Lock, 
-  Unlock, 
-  Download, 
-  CheckCircle2, 
-  AlertCircle, 
-  FileSpreadsheet, 
+import {
+  Banknote,
+  Lock,
+  Unlock,
+  Download,
+  CheckCircle2,
+  AlertCircle,
+  FileSpreadsheet,
   Calendar,
   Sparkles,
   Edit,
@@ -18,17 +18,17 @@ import { Modal } from '../../components/common/Modal';
 import { PayrollRecord } from '../../types';
 
 export const ManagerPayroll: React.FC = () => {
-  const { 
-    payroll, 
+  const {
+    payroll,
     bonusPenalty,
-    selectedPeriod, 
-    setSelectedPeriod, 
-    updatePayrollItem, 
-    finalizePayrollPeriod, 
-    unlockPayrollPeriod, 
+    selectedPeriod,
+    setSelectedPeriod,
+    updatePayrollItem,
+    finalizePayrollPeriod,
+    unlockPayrollPeriod,
     updateBonusPenalty,
-    employees, 
-    showToast 
+    employees,
+    showToast
   } = useApp();
 
   const [confirmFinalizeOpen, setConfirmFinalizeOpen] = useState(false);
@@ -144,11 +144,10 @@ export const ManagerPayroll: React.FC = () => {
               Quản Lý Bảng Lương & Chi Trả
             </h1>
             <span
-              className={`text-xs px-2.5 py-0.5 rounded-full font-mono font-medium border ${
-                isFinalized
-                  ? 'bg-green-500/10 text-green-500 border-green-500/20'
-                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-              }`}
+              className={`text-xs px-2.5 py-0.5 rounded-full font-mono font-medium border ${isFinalized
+                ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                }`}
             >
               {isFinalized ? 'ĐÃ CHỐT SỔ (FINALIZED)' : 'ĐANG SOẠN THẢO (PENDING)'}
             </span>
@@ -683,4 +682,3 @@ export const ManagerPayroll: React.FC = () => {
     </div>
   );
 };
-

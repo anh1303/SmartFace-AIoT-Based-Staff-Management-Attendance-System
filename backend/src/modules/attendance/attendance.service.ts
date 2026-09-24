@@ -1,15 +1,6 @@
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere } from '../../common/utils.js'
-import {
-  ATTENDANCE_TYPE,
-  ATTENDANCE_METHOD,
-  ATTENDANCE_LOG_STATUS,
-  DAILY_ATTENDANCE_STATUS,
-  EMPLOYEE_STATUS,
-  type AttendanceType,
-  type AttendanceMethod,
-} from '../../common/constants.js'
 import { attendanceInclude } from './attendance.model.js'
 
 const startOfToday = () => {
@@ -24,18 +15,18 @@ export function formatAttendanceRecord(log: any) {
   const vnTimeParts = eventDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }).split(':')
   const hour = parseInt(vnTimeParts[0] || '0', 10)
   const minutes = parseInt(vnTimeParts[1] || '0', 10)
-  const isLate = log.type === ATTENDANCE_TYPE.CHECK_IN && (hour > 8 || (hour === 8 && minutes > 30))
+  const isLate = log.type === 'CHECK_IN' && (hour > 8 || (hour === 8 && minutes > 30))
 
   return {
     id: log.id.toString(),
     attendance_id: `ATT-${log.id}`,
     employee_id: log.employees?.employee_code || log.employee_id,
-    type: log.type as AttendanceType,
+    type: log.type as 'CHECK_IN' | 'CHECK_OUT',
     timestamp: eventDate.toISOString(),
-    method: (log.method || ATTENDANCE_METHOD.FACE) as AttendanceMethod,
+    method: (log.method || 'FACE') as 'FACE' | 'FINGERPRINT' | 'MANUAL',
     device_id: log.device_info || 'FaceCam-01',
     verification_score: log.verification_score ?? 0.98,
-    status: isLate ? DAILY_ATTENDANCE_STATUS.LATE : 'ON_TIME',
+    status: isLate ? 'LATE' : 'ON_TIME',
     raw_status: log.status,
   }
 }
@@ -165,7 +156,7 @@ export async function adjustAttendance(data: {
       total_working_hours: workingHours,
       late_early: roundedLateEarly,
       overtime: roundedOvertime,
-      attendance_status: roundedLateEarly > 0 ? DAILY_ATTENDANCE_STATUS.LATE : DAILY_ATTENDANCE_STATUS.PRESENT,
+      attendance_status: roundedLateEarly > 0 ? 'LATE' : 'PRESENT',
     },
   })
 
@@ -180,7 +171,7 @@ export async function adjustAttendance(data: {
   }
 }
 
-export async function checkIn(data: { employeeId: string; device_info?: string; method?: AttendanceMethod }) {
+export async function checkIn(data: { employeeId: string; device_info?: string; method?: 'FACE' | 'FINGERPRINT' | 'MANUAL' }) {
   const employee = await prisma.employee.findFirst({
     where: buildIdOrCodeWhere(data.employeeId),
   })
@@ -189,7 +180,7 @@ export async function checkIn(data: { employeeId: string; device_info?: string; 
   const todayCheckIn = await prisma.attendance_logs.findFirst({
     where: {
       employee_id: employee.id,
-      type: ATTENDANCE_TYPE.CHECK_IN,
+      type: 'CHECK_IN',
       event_time: { gte: startOfToday() },
     },
     orderBy: { event_time: 'desc' },
@@ -199,7 +190,7 @@ export async function checkIn(data: { employeeId: string; device_info?: string; 
     const subsequentCheckOut = await prisma.attendance_logs.findFirst({
       where: {
         employee_id: employee.id,
-        type: ATTENDANCE_TYPE.CHECK_OUT,
+        type: 'CHECK_OUT',
         event_time: { gt: todayCheckIn.event_time },
       },
     })
@@ -209,11 +200,11 @@ export async function checkIn(data: { employeeId: string; device_info?: string; 
   const created = await prisma.attendance_logs.create({
     data: {
       employee_id: employee.id,
-      type: ATTENDANCE_TYPE.CHECK_IN,
-      method: data.method ?? ATTENDANCE_METHOD.FACE,
+      type: 'CHECK_IN',
+      method: data.method ?? 'FACE',
       device_info: data.device_info ?? 'FaceCam-01',
       verification_score: 0.99,
-      status: ATTENDANCE_LOG_STATUS.VALID,
+      status: 'VALID',
     },
     include: attendanceInclude,
   })
@@ -230,7 +221,7 @@ export async function checkOut(employeeId: string, device_info?: string) {
   const lastCheckIn = await prisma.attendance_logs.findFirst({
     where: {
       employee_id: employee.id,
-      type: ATTENDANCE_TYPE.CHECK_IN,
+      type: 'CHECK_IN',
       event_time: { gte: startOfToday() },
     },
     orderBy: { event_time: 'desc' },
@@ -241,7 +232,7 @@ export async function checkOut(employeeId: string, device_info?: string) {
   const subsequentCheckOut = await prisma.attendance_logs.findFirst({
     where: {
       employee_id: employee.id,
-      type: ATTENDANCE_TYPE.CHECK_OUT,
+      type: 'CHECK_OUT',
       event_time: { gt: lastCheckIn.event_time },
     },
   })
@@ -251,11 +242,11 @@ export async function checkOut(employeeId: string, device_info?: string) {
   const created = await prisma.attendance_logs.create({
     data: {
       employee_id: employee.id,
-      type: ATTENDANCE_TYPE.CHECK_OUT,
-      method: ATTENDANCE_METHOD.FACE,
+      type: 'CHECK_OUT',
+      method: 'FACE',
       device_info: device_info ?? 'FaceCam-01',
       verification_score: 0.99,
-      status: ATTENDANCE_LOG_STATUS.VALID,
+      status: 'VALID',
     },
     include: attendanceInclude,
   })
@@ -268,9 +259,9 @@ export async function statistics() {
   const [checkedInToday, totalActiveEmployees] = await Promise.all([
     prisma.attendance_logs.groupBy({
       by: ['employee_id'],
-      where: { type: ATTENDANCE_TYPE.CHECK_IN, event_time: { gte: start } },
+      where: { type: 'CHECK_IN', event_time: { gte: start } },
     }),
-    prisma.employee.count({ where: { status: EMPLOYEE_STATUS.ACTIVE } }),
+    prisma.employee.count({ where: { status: 'ACTIVE' } }),
   ])
 
   const checkedIn = checkedInToday.length

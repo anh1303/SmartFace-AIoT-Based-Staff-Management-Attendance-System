@@ -10,6 +10,7 @@ import {
   Role, 
   ToastMessage 
 } from '../types';
+
 const DEFAULT_USERS: Record<Role, UserSession> = {
   manager: {
     employee_id: 'NV-001',
@@ -62,7 +63,6 @@ interface AppContextType {
   finalizePayrollPeriod: (period: string) => void;
   unlockPayrollPeriod: (period: string) => void;
   updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => Promise<void>;
-
 
   // Toasts
   toasts: ToastMessage[];
@@ -198,41 +198,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 
-    // Fetch Employees
     try {
       const res = await fetch(`${API_BASE}/api/employees?limit=100`, { headers });
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.data?.items)) {
-          const empItems: Employee[] = data.data.items;
-          setEmployees(empItems);
-
-          // Sync currentUser with real DB employee
-          if (empItems.length > 0) {
-            setCurrentUser(prev => {
-              if (!prev) return null;
-              const match = empItems.find(e => e.employee_id === prev.employee_id || e.email === prev.email);
-              if (match) {
-                return {
-                  ...prev,
-                  employee_id: match.employee_id,
-                  full_name: match.full_name,
-                  email: match.email || prev.email,
-                  position: match.position || prev.position,
-                  department: match.department || prev.department,
-                  avatar: match.avatar || prev.avatar,
-                };
-              }
-              return prev;
-            });
-          }
+        if (data.success && Array.isArray(data.data)) {
+          const mapped: Employee[] = data.data.map((emp: any) => ({
+            id: emp.id,
+            employee_id: emp.employee_code || emp.employee_id || emp.id,
+            full_name: emp.full_name,
+            department: emp.department?.name || emp.department || 'Chung',
+            position: emp.position || 'Nhân viên',
+            phone: emp.phone || '',
+            email: emp.email || '',
+            status: emp.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+            created_at: emp.createdAt || emp.created_at || new Date().toISOString(),
+            updated_at: emp.updatedAt || emp.updated_at || new Date().toISOString(),
+            face_enrolled: Array.isArray(emp.face_embeddings) ? emp.face_embeddings.length > 0 : Boolean(emp.face_enrolled),
+            fingerprint_enrolled: Boolean(emp.fingerprint_enrolled),
+            avatar: emp.avatar_url || emp.avatar || undefined,
+            hourly_rate: emp.hourly_rate ? Number(emp.hourly_rate) : undefined,
+          }));
+          setEmployees(mapped);
         }
       }
     } catch (e) {
       console.warn('Failed to fetch employees from DB:', e);
     }
 
-    // Fetch Payroll & Bonus Penalty Policy
     try {
       const res = await fetch(`${API_BASE}/api/payroll`, { headers });
       if (res.ok) {
@@ -260,7 +253,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Failed to fetch bonus-penalty policy from DB:', e);
     }
 
-    // Fetch Attendance
     try {
       const res = await fetch(`${API_BASE}/api/attendance`, { headers });
       if (res.ok) {
@@ -273,7 +265,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Failed to fetch attendance from DB:', e);
     }
 
-    // Fetch Shifts
     try {
       const res = await fetch(`${API_BASE}/api/shifts`, { headers });
       if (res.ok) {
@@ -289,9 +280,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     fetchAllData();
-  }, [currentUser]);
+  }, []);
 
-  // Employee CRUD with Backend Sync
   const addEmployee = async (newEmp: Omit<Employee, 'created_at' | 'updated_at'>) => {
     const token = localStorage.getItem('token');
     try {
@@ -307,29 +297,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           email: newEmp.email,
           position: newEmp.position,
           phone: newEmp.phone,
-          department: newEmp.department,
-          status: newEmp.status,
-          hourly_rate: newEmp.hourly_rate,
-          avatar_url: newEmp.avatar,
+          department_id: newEmp.department ? 1 : undefined,
+          hourly_rate: newEmp.hourly_rate || 0,
         }),
       });
-
       const resData = await response.json().catch(() => null);
-
       if (response.ok && resData?.success && resData?.data) {
-        const createdEmp: Employee = resData.data;
-        setEmployees(prev => [createdEmp, ...prev]);
-        showToast(`Đã thêm nhân viên ${createdEmp.full_name} (${createdEmp.employee_id}) vào CSDL`, 'success');
-        return;
-      } else if (resData) {
-        showToast(resData.message || 'Lỗi khi thêm nhân viên vào CSDL', 'error');
+        showToast(`Đã thêm nhân viên ${newEmp.full_name} vào CSDL thành công`, 'success');
+        fetchAllData();
         return;
       }
     } catch (e) {
       console.error('Add employee API error:', e);
     }
-
-    // Local fallback ONLY if network is completely unreachable
     const now = new Date().toISOString();
     const created: Employee = {
       ...newEmp,
@@ -337,7 +317,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updated_at: now,
     };
     setEmployees(prev => [created, ...prev]);
-    showToast(`Đã thêm nhân viên ${newEmp.full_name} (${newEmp.employee_id}) (Chế độ offline)`, 'warning');
+    showToast(`Đã thêm nhân viên ${newEmp.full_name} (${newEmp.employee_id}) (Chế độ local)`, 'info');
   };
 
   const updateEmployee = async (id: string, updates: Partial<Employee>) => {
@@ -360,9 +340,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           avatar_url: updates.avatar,
         }),
       });
-
       const resData = await response.json().catch(() => null);
-
       if (response.ok && resData?.success && resData?.data) {
         setEmployees(prev => prev.map(emp => {
           if (emp.id === id || emp.employee_id === id || emp.employee_id === resData.data.employee_id) {
@@ -375,38 +353,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
           return emp;
         }));
-        showToast(`Đã cập nhật thông tin nhân viên ${resData.data.full_name || id} trong CSDL`, 'success');
-        return;
-      } else if (resData) {
-        showToast(resData.message || 'Lỗi khi cập nhật nhân viên', 'error');
+        showToast(`Đã cập nhật thông tin nhân viên trong CSDL`, 'success');
         return;
       }
     } catch (e) {
       console.error('Update employee API error:', e);
     }
+    setEmployees(prev => prev.map(emp => (emp.employee_id === id || emp.id === id) ? { ...emp, ...updates } : emp));
+    showToast(`Đã cập nhật thông tin nhân viên`, 'info');
+  };
 
-    // Local fallback ONLY if network is completely unreachable
+  const toggleEmployeeStatus = (id: string) => {
     setEmployees(prev => prev.map(emp => {
-      if (emp.employee_id === id) {
-        return {
-          ...emp,
-          ...updates,
-          updated_at: new Date().toISOString()
-        };
+      if (emp.employee_id === id || emp.id === id) {
+        const nextStatus = emp.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+        updateEmployee(id, { status: nextStatus });
+        return { ...emp, status: nextStatus };
       }
       return emp;
     }));
-    showToast(`Đã cập nhật thông tin nhân viên ${id} (Chế độ offline)`, 'warning');
   };
 
-  const toggleEmployeeStatus = async (id: string) => {
-    const targetEmp = employees.find(e => e.employee_id === id);
-    if (!targetEmp) return;
-    const nextStatus = targetEmp.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    await updateEmployee(id, { status: nextStatus });
-  };
-
-  // Shift assignment
   const assignOrUpdateShift = async (shiftData: Omit<WorkShift, 'shift_id'> & { shift_id?: string }) => {
     const token = localStorage.getItem('token');
     try {
@@ -417,16 +384,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          employee_id: shiftData.employee_id,
-          date: shiftData.date,
-          work_day: shiftData.work_day,
+          employeeId: shiftData.employee_id,
+          work_date: shiftData.date,
           shift_type: shiftData.shift_type,
           start_time: shiftData.start_time,
           end_time: shiftData.end_time,
           note: shiftData.note,
         }),
       });
-
       if (response.ok) {
         const resData = await response.json();
         if (resData.success && resData.data) {
@@ -448,31 +413,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Assign shift API error:', e);
     }
 
-    // Local fallback if offline
     setWorkShifts(prev => {
-      const existingIndex = prev.findIndex(
-        s => s.employee_id === shiftData.employee_id && s.date === shiftData.date
-      );
+      const existingIndex = prev.findIndex(s => s.employee_id === shiftData.employee_id && s.date === shiftData.date);
       if (existingIndex >= 0) {
         const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          ...shiftData,
-          shift_id: updated[existingIndex].shift_id
-        };
+        updated[existingIndex] = { ...updated[existingIndex], ...shiftData, shift_id: updated[existingIndex].shift_id };
         return updated;
-      } else {
-        const newShift: WorkShift = {
-          ...shiftData,
-          shift_id: shiftData.shift_id || `S-${Date.now()}`
-        };
-        return [...prev, newShift];
       }
+      return [...prev, { ...shiftData, shift_id: shiftData.shift_id || `S-${Date.now()}` }];
     });
-    showToast(`Đã lưu lịch làm việc cho ${shiftData.date}`, 'success');
+    showToast(`Đã lưu lịch làm việc cho ${shiftData.date}`, 'info');
   };
 
-  // Attendance
   const addAttendanceRecord = async (record: Omit<AttendanceRecord, 'attendance_id'>) => {
     const token = localStorage.getItem('token');
     const endpoint = record.type === 'CHECK_IN' ? 'check-in' : 'check-out';
@@ -489,30 +441,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           method: record.method,
         }),
       });
-
       if (response.ok) {
-        const resData = await response.json();
-        if (resData.success && resData.data) {
-          const newRec: AttendanceRecord = resData.data;
-          setAttendance(prev => [newRec, ...prev]);
-          showToast(`Đã ghi nhận CSDL chấm công: ${record.type}`, 'success');
-          return;
-        }
+        showToast('Điểm danh thành công', 'success');
+        fetchAllData();
+        return;
       }
     } catch (e) {
       console.error('Attendance API error:', e);
     }
-
-    // Local fallback
     const newRecord: AttendanceRecord = {
       ...record,
-      attendance_id: `ATT-${Date.now()}`
+      attendance_id: `ATT-${Date.now()}`,
     };
     setAttendance(prev => [newRecord, ...prev]);
-    showToast(`Đã ghi nhận chấm công: ${record.type}`, 'success');
+    showToast(`Ghi nhận lượt điểm danh ${record.type} (Local)`, 'info');
   };
 
-  // Payroll
   const generatePayroll = async (period: string) => {
     const token = localStorage.getItem('token');
     try {
@@ -522,21 +466,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ payroll_period: period }),
+        body: JSON.stringify({ period }),
       });
-
-      const resData = await response.json().catch(() => null);
-      if (response.ok && resData?.success && Array.isArray(resData?.data)) {
-        setPayroll(resData.data);
-        showToast(`Đã tính và tạo bảng lương kỳ ${period} từ CSDL`, 'success');
-        return;
-      } else if (resData) {
-        showToast(resData.message || 'Lỗi khi tạo bảng lương', 'error');
+      if (response.ok) {
+        const resData = await response.json();
+        if (resData.success && Array.isArray(resData.data)) {
+          setPayroll(resData.data);
+          setSelectedPeriod(period);
+          showToast(`Đã tính toán bảng lương kỳ ${period} từ CSDL`, 'success');
+          return;
+        }
       }
     } catch (e) {
       console.error('Generate payroll API error:', e);
-      showToast('Không thể kết nối đến máy chủ Backend', 'error');
     }
+    showToast(`Lỗi khi tính toán bảng lương kỳ ${period}`, 'error');
   };
 
   const updatePayrollItem = async (id: string, updates: Partial<PayrollRecord>) => {
@@ -554,7 +498,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           status: updates.status,
         }),
       });
-
       if (response.ok) {
         const resData = await response.json();
         if (resData.success && resData.data) {
@@ -567,8 +510,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.error('Update payroll item API error:', e);
     }
-
-    // Fallback
     setPayroll(prev => prev.map(p => {
       if (p.payroll_id === id || p.id === id) {
         const updated = { ...p, ...updates };
@@ -577,7 +518,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return p;
     }));
-    showToast('Đã lưu thay đổi phiếu lương', 'success');
+    showToast('Đã lưu thay đổi phiếu lương (Local)', 'info');
   };
 
   const finalizePayrollPeriod = async (period: string) => {
@@ -590,27 +531,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-
       if (response.ok) {
-        const resData = await response.json();
-        if (resData.success && Array.isArray(resData.data)) {
-          setPayroll(resData.data);
-          showToast(`Đã chốt bảng lương kỳ ${period} trong CSDL`, 'success');
-          return;
-        }
+        showToast(`Đã chốt bảng lương kỳ ${period} trong CSDL`, 'success');
+        fetchAllData();
+        return;
       }
     } catch (e) {
       console.error('Finalize payroll API error:', e);
     }
-
-    // Fallback
-    setPayroll(prev => prev.map(p => {
-      if (p.period === period) {
-        return { ...p, status: 'FINALIZED' };
-      }
-      return p;
-    }));
-    showToast(`Đã chốt bảng lương kỳ ${period}`, 'success');
+    setPayroll(prev => prev.map(p => p.period === period ? { ...p, status: 'FINALIZED' } : p));
+    showToast(`Đã chốt bảng lương kỳ ${period}`, 'info');
   };
 
   const unlockPayrollPeriod = async (period: string) => {
@@ -623,7 +553,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-
       if (response.ok) {
         const resData = await response.json();
         if (resData.success && Array.isArray(resData.data)) {
@@ -635,15 +564,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.error('Unlock payroll API error:', e);
     }
-
-    // Fallback
-    setPayroll(prev => prev.map(p => {
-      if (p.period === period) {
-        return { ...p, status: 'PENDING' };
-      }
-      return p;
-    }));
-    showToast(`Đã mở khoá chỉnh sửa bảng lương kỳ ${period}`, 'warning');
+    setPayroll(prev => prev.map(p => p.period === period ? { ...p, status: 'PENDING' } : p));
+    showToast(`Đã mở khoá chỉnh sửa bảng lương kỳ ${period}`, 'info');
   };
 
   const updateBonusPenalty = async (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => {
@@ -657,25 +579,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         },
         body: JSON.stringify(data),
       });
-
       if (response.ok) {
         const resData = await response.json();
         if (resData.success && resData.data) {
           setBonusPenalty(resData.data);
-          await fetchAllData();
           showToast('Cập nhật chính sách thưởng/phạt vào CSDL thành công', 'success');
           return;
         }
-      } else {
-        const errData = await response.json().catch(() => ({}));
-        showToast(errData.message || 'Lỗi khi cập nhật chính sách thưởng/phạt', 'error');
-        return;
       }
     } catch (e) {
       console.error('Update bonus penalty API error:', e);
     }
-
-    // Fallback local state
     setBonusPenalty(prev => ({
       id: prev?.id || 1,
       overtime_rate: data.overtime_rate !== undefined ? data.overtime_rate : (prev?.overtime_rate || 1.5),
@@ -714,7 +628,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         showToast,
         removeToast,
       }}
-
     >
       {children}
     </AppContext.Provider>

@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  Calendar, 
-  Clock, 
-  CheckCircle2, 
-  Users, 
-  ArrowLeftRight, 
-  FileText, 
-  ShieldCheck, 
+import {
+  Calendar,
+  Clock,
+  CheckCircle2,
+  Users,
+  ArrowLeftRight,
+  FileText,
+  ShieldCheck,
   CalendarDays,
   Sparkles,
   ChevronLeft,
@@ -184,13 +184,12 @@ export const StaffSchedule: React.FC = () => {
             return (
               <div
                 key={day.date}
-                className={`p-4 rounded-2xl border flex flex-col justify-between min-h-[190px] transition-all ${
-                  isToday
+                className={`p-4 rounded-2xl border flex flex-col justify-between min-h-[190px] transition-all ${isToday
                     ? 'bg-blue-950/30 border-blue-500/80 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/40'
                     : shift?.shift_type === 'OFF'
-                    ? 'bg-slate-950 border-slate-800/60 opacity-60'
-                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                }`}
+                      ? 'bg-slate-950 border-slate-800/60 opacity-60'
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                  }`}
               >
                 <div>
                   <div className="flex justify-between items-start">
@@ -210,10 +209,10 @@ export const StaffSchedule: React.FC = () => {
                       {shift?.shift_type === 'OFFICE_HOURS'
                         ? 'Ca Hành Chính'
                         : shift?.shift_type === 'MORNING'
-                        ? 'Ca Sáng'
-                        : shift?.shift_type === 'AFTERNOON'
-                        ? 'Ca Chiều'
-                        : 'Nghỉ Ca'}
+                          ? 'Ca Sáng'
+                          : shift?.shift_type === 'AFTERNOON'
+                            ? 'Ca Chiều'
+                            : 'Nghỉ Ca'}
                     </p>
                     {shift?.shift_type !== 'OFF' && (
                       <p className="text-[11px] font-mono text-slate-300 mt-1">

@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  CalendarRange, 
-  Clock, 
-  Users, 
-  CheckCircle2, 
-  Filter, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  CalendarRange,
+  Clock,
+  Users,
+  CheckCircle2,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
   Sparkles,
   Edit3
 } from 'lucide-react';

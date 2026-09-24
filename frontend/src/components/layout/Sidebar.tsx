@@ -1,22 +1,22 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { 
+import {
   ScanFace,
-  LayoutDashboard, 
-  CalendarDays, 
-  Clock, 
-  User, 
-  DollarSign, 
-  FileText, 
-  Users, 
-  CalendarRange, 
-  Eye, 
-  BarChart3, 
-  Banknote, 
-  Fingerprint, 
-  LogOut, 
-  ShieldCheck, 
+  LayoutDashboard,
+  CalendarDays,
+  Clock,
+  User,
+  DollarSign,
+  FileText,
+  Users,
+  CalendarRange,
+  Eye,
+  BarChart3,
+  Banknote,
+  Fingerprint,
+  LogOut,
+  ShieldCheck,
   ExternalLink
 } from 'lucide-react';
 
@@ -34,13 +34,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     navigate('/login');
   };
 
-  const employeeNavItems = [
-    { label: 'Bàn làm việc', path: '/app/employee/dashboard', icon: LayoutDashboard },
-    { label: 'Lịch trình làm việc', path: '/app/employee/schedule', icon: CalendarDays },
-    { label: 'Chấm công & Check-in', path: '/app/employee/attendance', icon: Clock },
-    { label: 'Hồ sơ & Sinh trắc', path: '/app/employee/profile', icon: User },
-    { label: 'Lương tạm tính', path: '/app/employee/salary-estimate', icon: DollarSign },
-    { label: 'Lịch sử phiếu lương', path: '/app/employee/salary-history', icon: FileText },
+  const staffNavItems = [
+    { label: 'Bàn làm việc', path: '/app/staff/dashboard', icon: LayoutDashboard },
+    { label: 'Lịch trình làm việc', path: '/app/staff/schedule', icon: CalendarDays },
+    { label: 'Chấm công & Check-in', path: '/app/staff/attendance', icon: Clock },
+    { label: 'Hồ sơ & Sinh trắc', path: '/app/staff/profile', icon: User },
+    { label: 'Lương tạm tính', path: '/app/staff/salary-estimate', icon: DollarSign },
+    { label: 'Lịch sử phiếu lương', path: '/app/staff/salary-history', icon: FileText },
   ];
 
   const managerNavItems = [
@@ -53,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { label: 'Quản lý lương (Payroll)', path: '/app/manager/payroll', icon: Banknote },
   ];
 
-  const navItems = role === 'manager' ? managerNavItems : employeeNavItems;
+  const navItems = role === 'manager' ? managerNavItems : staffNavItems;
 
   return (
     <>
@@ -66,9 +66,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       )}
 
       <aside
-        className={`fixed lg:static top-0 bottom-0 left-0 z-40 w-64 bg-slate-900 border-r border-slate-800 flex flex-col transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+        className={`fixed lg:static top-0 bottom-0 left-0 z-40 w-64 bg-slate-900 border-r border-slate-800 flex flex-col transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          }`}
       >
         {/* Brand Header */}
         <div className="p-6 border-b border-slate-800">
@@ -111,10 +110,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 to={item.path}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-blue-600/10 text-blue-400 font-semibold border border-blue-500/20'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${isActive
+                    ? 'bg-blue-600/10 text-blue-400 font-semibold border border-blue-500/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                   }`
                 }
               >
@@ -155,7 +153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   {currentUser?.full_name || 'Khách'}
                 </p>
                 <p className="text-xs text-slate-400 truncate">
-                  {currentUser?.email || (role === 'manager' ? 'manager@company.com' : 'employee@company.com')}
+                  {currentUser?.email || (role === 'manager' ? 'manager@company.com' : 'staff@company.com')}
                 </p>
               </div>
             </div>

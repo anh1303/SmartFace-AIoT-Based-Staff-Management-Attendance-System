@@ -72,15 +72,14 @@ EMBEDDING_MODEL_VERSION = _get_env_str("EMBEDDING_MODEL_VERSION", MODEL_PACK_NAM
 # ctx_id: -1 = CPU, >=0 = GPU device index (chỉ có ý nghĩa khi dùng CUDAExecutionProvider)
 MODEL_CTX_ID = _get_env_int("MODEL_CTX_ID", -1)
 
-# Detector Config — YunNet / SCRFD
+# Detector Config — YunNet (cv2.FaceDetectorYN, ONNX ~122 KB)
 # DETECTOR_MODEL_PATH: None = dùng đường dẫn mặc định trong detection/models/
 DETECTOR_MODEL_PATH = _get_env_str("DETECTOR_MODEL_PATH", None)
 DETECTOR_CONF_THRESH = _get_env_float("DETECTOR_CONF_THRESH", 0.5)
 DETECTOR_NMS_THRESH = _get_env_float("DETECTOR_NMS_THRESH", 0.3)
 DETECTOR_TOP_K = _get_env_int("DETECTOR_TOP_K", 5000)
 
-# Kích thước khuôn mặt tối thiểu (pixel chiều rộng & chiều cao), áp dụng cho
-# cả YunNet và SCRFD trước khi tạo detection/track.
+# Kích thước khuôn mặt tối thiểu (pixel chiều rộng & chiều cao).
 # - Tăng giá trị (ví dụ: 60 - 100) để tập trung nhận diện người đứng gần camera/kiosk,
 #   tự động bỏ qua người đi lại ở hậu cảnh xa.
 # - Giảm giá trị (ví dụ: 20 - 30) nếu muốn nhận diện người từ khoảng cách xa.
@@ -166,9 +165,6 @@ PAD_GAMMA_ENABLED = _get_env_bool("PAD_GAMMA_ENABLED", False)
 # Target luma (kênh V, [0-255]) mà adaptive gamma hướng đến.
 # 110 ≈ 43% — đủ sáng để model học texture, không bị over-expose.
 PAD_GAMMA_TARGET  = _get_env_float("PAD_GAMMA_TARGET", 110.0)
-
-# Hệ số mở rộng bbox khi crop khuôn mặt đưa vào PAD.
-PAD_BBOX_EXPANSION_FACTOR = _get_env_float("PAD_BBOX_EXPANSION_FACTOR", 1.55)
 
 # Đường dẫn thư mục chứa tất cả model anti-spoofing
 _ANTISPOOF_MODELS_DIR = os.path.join(os.path.dirname(__file__), "antispoof", "models")
@@ -261,16 +257,6 @@ ATTENDANCE_STABLE_COUNT = _get_env_int("ATTENDANCE_STABLE_COUNT", 3)
 # Validation
 def validate_config():
     """Kiểm tra tính hợp lệ của các tham số cấu hình hệ thống."""
-    if PAD_BBOX_EXPANSION_FACTOR <= 0:
-        raise ValueError(
-            f"Cấu hình PAD_BBOX_EXPANSION_FACTOR={PAD_BBOX_EXPANSION_FACTOR} không hợp lệ. "
-            "Yêu cầu > 0."
-        )
-    if DETECTOR_MIN_FACE_SIZE < 0:
-        raise ValueError(
-            f"Cấu hình DETECTOR_MIN_FACE_SIZE={DETECTOR_MIN_FACE_SIZE} không hợp lệ. "
-            "Yêu cầu >= 0."
-        )
     if PAD_SMOOTH_WINDOW < 1:
         raise ValueError(f"Cấu hình PAD_SMOOTH_WINDOW={PAD_SMOOTH_WINDOW} không hợp lệ. Yêu cầu >= 1.")
     if not (1 <= PAD_MIN_VOTES <= PAD_SMOOTH_WINDOW):

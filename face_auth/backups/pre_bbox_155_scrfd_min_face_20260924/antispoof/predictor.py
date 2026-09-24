@@ -47,7 +47,7 @@ class AntiSpoofPredictor:
         model_path: Optional[str] = None,
         threshold: Optional[float] = None,
         model_img_size: int = 128,
-        bbox_expansion_factor: float = 1.55,
+        bbox_expansion_factor: float = 1.5,
         mean: Optional[List[float]] = None,
         std: Optional[List[float]] = None,
         apply_gamma: Optional[bool] = None,
@@ -61,7 +61,7 @@ class AntiSpoofPredictor:
             model_path (Optional[str]): Đường dẫn tới file .onnx.
             threshold (float): Ngưỡng xác suất P(REAL). Không phải logit difference.
             model_img_size (int): Kích thước ảnh vuông đầu vào của mô hình (mặc định 128x128).
-            bbox_expansion_factor (float): Tỷ lệ mở rộng khung bao bbox khi crop mặt (mặc định 1.55x).
+            bbox_expansion_factor (float): Tỷ lệ mở rộng khung bao bbox khi crop mặt (mặc định 1.5x).
             mean (Optional[List[float]]): Giá trị mean chuẩn hóa kênh màu [R, G, B].
             std (Optional[List[float]]): Giá trị std chuẩn hóa kênh màu [R, G, B].
             apply_gamma (Optional[bool]): Bật/tắt adaptive gamma correction. Khi None,

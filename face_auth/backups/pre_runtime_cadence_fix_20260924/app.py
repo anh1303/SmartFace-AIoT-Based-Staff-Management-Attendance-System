@@ -275,7 +275,6 @@ def main():
             ctx_id=config.MODEL_CTX_ID,
             det_size=config.DETECTOR_DET_SIZE,
             conf_thresh=config.DETECTOR_CONF_THRESH,
-            min_face_size=config.DETECTOR_MIN_FACE_SIZE,
         )
     else:  # yunnet
         detector = FaceDetector(
@@ -315,12 +314,10 @@ def main():
                 model_path=str(_pad_model_path.resolve()),
                 threshold=args.pad_threshold,
                 threshold_logit=effective_pad_threshold_logit,
-                bbox_expansion_factor=config.PAD_BBOX_EXPANSION_FACTOR,
                 apply_gamma=config.PAD_GAMMA_ENABLED,
                 color_order=config.PAD_COLOR_ORDER,
             )
             print(f"  PAD              = ON  ({pad_predictor.model_path})")
-            print(f"  PAD_BBOX_EXPAND  = {pad_predictor.bbox_expansion_factor:.2f}x")
             print(f"  PAD threshold    = p={pad_predictor.threshold_probability:.12f}, d={pad_predictor.logit_threshold:.12f} ({pad_predictor.threshold_input_type})")
             print(f"  PAD_GAMMA        = {'ON' if config.PAD_GAMMA_ENABLED else 'OFF'}  (target luma={config.PAD_GAMMA_TARGET:.0f})")
             print(f"  PAD providers    = {list(pad_predictor.providers)}")
@@ -574,7 +571,6 @@ def main():
                             model_path=str(_pad_model_path.resolve()),
                             threshold=args.pad_threshold,
                             threshold_logit=effective_pad_threshold_logit,
-                            bbox_expansion_factor=config.PAD_BBOX_EXPANSION_FACTOR,
                             apply_gamma=config.PAD_GAMMA_ENABLED,
                             color_order=config.PAD_COLOR_ORDER,
                         )

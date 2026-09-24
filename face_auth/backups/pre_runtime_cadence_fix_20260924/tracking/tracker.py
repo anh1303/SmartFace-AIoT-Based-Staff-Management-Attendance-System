@@ -396,7 +396,7 @@ class FaceTracker:
         if not self.tracks:
             return True
         return any(
-            track.tracker_status not in {"tracking", "detected"}
+            track.tracker_status != "tracking"
             or not self._valid_bbox(track.bbox)
             for track in self.tracks
         )

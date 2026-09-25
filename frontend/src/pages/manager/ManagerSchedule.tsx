@@ -1,21 +1,43 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  CalendarRange, 
-  Clock, 
-  Users, 
-  CheckCircle2, 
-  Filter, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  CalendarRange,
+  Clock,
+  Users,
+  CheckCircle2,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
   Sparkles,
   Edit3
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { WorkShift } from '../../types';
 
+function getMonday(d: Date): Date {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(date.setDate(diff));
+}
+
+function formatDateToYYYYMMDD(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getISOWeekNumber(d: Date): number {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
 export const ManagerSchedule: React.FC = () => {
-  const { employees, workShifts, assignOrUpdateShift } = useApp();
+  const { employees, workShifts, assignOrUpdateShift, showToast } = useApp();
   const [departmentFilter, setDepartmentFilter] = useState('ALL');
   const [editingShift, setEditingShift] = useState<{
     employeeId: string;
@@ -25,21 +47,56 @@ export const ManagerSchedule: React.FC = () => {
     shift: WorkShift | undefined;
   } | null>(null);
 
+  // Solar Calendar Week State (Default Monday of current week)
+  const [currentMonday, setCurrentMonday] = useState<Date>(() => getMonday(new Date()));
+
   // Form state inside modal
   const [modalShiftType, setModalShiftType] = useState<WorkShift['shift_type']>('OFFICE_HOURS');
   const [modalStartTime, setModalStartTime] = useState('08:00');
   const [modalEndTime, setModalEndTime] = useState('17:30');
   const [modalNote, setModalNote] = useState('');
 
-  const daysOfWeek = [
-    { name: 'Thứ 2', date: '2026-09-07', label: '07/09' },
-    { name: 'Thứ 3', date: '2026-09-08', label: '08/09' },
-    { name: 'Thứ 4', date: '2026-09-09', label: '09/09' },
-    { name: 'Thứ 5', date: '2026-09-10', label: '10/09' },
-    { name: 'Thứ 6', date: '2026-09-11', label: '11/09' },
-    { name: 'Thứ 7', date: '2026-09-12', label: '12/09' },
-    { name: 'Chủ Nhật', date: '2026-09-13', label: '13/09' },
-  ];
+  const daysOfWeek = [0, 1, 2, 3, 4, 5, 6].map(offset => {
+    const d = new Date(currentMonday);
+    d.setDate(currentMonday.getDate() + offset);
+    const dayNames = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
+    const dateStr = formatDateToYYYYMMDD(d);
+    const dayNum = String(d.getDate()).padStart(2, '0');
+    const monthNum = String(d.getMonth() + 1).padStart(2, '0');
+    return {
+      name: dayNames[offset],
+      date: dateStr,
+      label: `${dayNum}/${monthNum}`,
+    };
+  });
+
+  const weekNumber = getISOWeekNumber(currentMonday);
+  const startDateObj = currentMonday;
+  const endDateObj = new Date(currentMonday);
+  endDateObj.setDate(currentMonday.getDate() + 6);
+
+  const startLabel = `${String(startDateObj.getDate()).padStart(2, '0')}/${String(startDateObj.getMonth() + 1).padStart(2, '0')}`;
+  const endLabel = `${String(endDateObj.getDate()).padStart(2, '0')}/${String(endDateObj.getMonth() + 1).padStart(2, '0')}`;
+
+  const handlePrevWeek = () => {
+    const prev = new Date(currentMonday);
+    prev.setDate(currentMonday.getDate() - 7);
+    setCurrentMonday(prev);
+  };
+
+  const handleNextWeek = () => {
+    const next = new Date(currentMonday);
+    next.setDate(currentMonday.getDate() + 7);
+    setCurrentMonday(next);
+  };
+
+  const handleDateSelect = (dateString: string) => {
+    if (!dateString) return;
+    const selected = new Date(dateString);
+    if (!isNaN(selected.getTime())) {
+      setCurrentMonday(getMonday(selected));
+    }
+  };
 
   const filteredEmployees = employees.filter(e => {
     if (departmentFilter !== 'ALL' && e.department !== departmentFilter) return false;
@@ -47,6 +104,12 @@ export const ManagerSchedule: React.FC = () => {
   });
 
   const handleCellClick = (empId: string, empName: string, date: string, dayLabel: string) => {
+    const targetEmp = employees.find(e => e.employee_id === empId);
+    if (targetEmp?.status === 'INACTIVE') {
+      showToast(`Nhân viên ${empName} đang ở trạng thái TẠM NGƯNG, không thể phân bổ hoặc chỉnh sửa ca làm việc!`, 'warning');
+      return;
+    }
+
     const existing = workShifts.find(s => s.employee_id === empId && s.date === date);
     setEditingShift({
       employeeId: empId,
@@ -74,15 +137,19 @@ export const ManagerSchedule: React.FC = () => {
     if (!editingShift) return;
 
     const emp = employees.find(e => e.employee_id === editingShift.employeeId);
+    const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+    const dayIndex = new Date(`${editingShift.date}T00:00:00.000Z`).getUTCDay();
+    const workDay = editingShift.shift?.work_day || dayNames[dayIndex];
 
     assignOrUpdateShift({
       shift_id: editingShift.shift?.shift_id,
       employee_id: editingShift.employeeId,
       date: editingShift.date,
+      work_day: workDay,
       start_time: modalShiftType === 'OFF' ? '00:00' : modalStartTime,
       end_time: modalShiftType === 'OFF' ? '00:00' : modalEndTime,
       shift_type: modalShiftType,
-      department: emp?.department || 'Kỹ thuật AI',
+      department: emp?.department || 'Nhân viên',
       note: modalNote,
     });
 
@@ -127,9 +194,37 @@ export const ManagerSchedule: React.FC = () => {
             <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
               Sắp Xếp & Phân Bổ Ca Làm Việc
             </h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-mono font-medium border border-blue-500/20">
-              TUẦN 37 (07/09 - 13/09)
-            </span>
+            {/* Interactive Solar Calendar Week Selector */}
+            <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-2xl border border-slate-800 shadow-inner">
+              <button
+                type="button"
+                onClick={handlePrevWeek}
+                title="Tuần trước"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <div className="relative flex items-center gap-1.5 font-mono text-xs text-blue-400 font-semibold px-2 cursor-pointer group" title="Bấm để chọn tuần theo lịch dương">
+                <CalendarRange className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+                <span>TUẦN {weekNumber} ({startLabel} - {endLabel})</span>
+                <input
+                  type="date"
+                  value={formatDateToYYYYMMDD(currentMonday)}
+                  onChange={e => handleDateSelect(e.target.value)}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNextWeek}
+                title="Tuần sau"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Bấm vào bất kỳ ô ca trực nào để phân bổ hoặc điều chỉnh giờ làm cho nhân viên.
@@ -139,18 +234,18 @@ export const ManagerSchedule: React.FC = () => {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <Filter className="w-3.5 h-3.5 text-blue-400" />
-            <span>Phòng ban:</span>
+            <span>Chức vụ:</span>
           </div>
           <select
             value={departmentFilter}
             onChange={e => setDepartmentFilter(e.target.value)}
             className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500"
           >
-            <option value="ALL">Tất cả phòng ban</option>
-            <option value="Kỹ thuật AI">Kỹ thuật AI</option>
-            <option value="Vận hành & IT">Vận hành & IT</option>
-            <option value="Nhân sự & HR">Nhân sự & HR</option>
-            <option value="Kinh doanh & Dự án">Kinh doanh & Dự án</option>
+            <option value="ALL">Tất cả chức vụ</option>
+            <option value="Bảo vệ">Bảo vệ</option>
+            <option value="Nhân viên">Nhân viên</option>
+            <option value="Thu ngân">Thu ngân</option>
+            <option value="Quản lý">Quản lý</option>
           </select>
         </div>
       </div>
@@ -173,41 +268,51 @@ export const ManagerSchedule: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50 text-slate-300">
-              {filteredEmployees.map(emp => (
-                <tr key={emp.employee_id} className="hover:bg-slate-800/30 transition-colors">
-                  {/* Employee Fixed Column */}
-                  <td className="py-3 px-4 sticky left-0 bg-slate-900 z-10 border-r border-slate-800">
-                    <div className="flex items-center gap-2.5">
-                      <img
-                        src={emp.avatar}
-                        alt={emp.full_name}
-                        className="w-8 h-8 rounded-full object-cover border border-slate-700 shrink-0"
-                      />
-                      <div className="overflow-hidden">
-                        <p className="font-semibold text-white truncate">{emp.full_name}</p>
-                        <p className="text-[10px] font-mono text-blue-400 truncate">{emp.employee_id}</p>
+              {filteredEmployees.map(emp => {
+                const isInactive = emp.status === 'INACTIVE';
+                return (
+                  <tr key={emp.employee_id} className={`transition-colors ${isInactive ? 'bg-slate-950/40 opacity-70' : 'hover:bg-slate-800/30'}`}>
+                    {/* Employee Fixed Column */}
+                    <td className="py-3 px-4 sticky left-0 bg-slate-900 z-10 border-r border-slate-800">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={emp.avatar}
+                          alt={emp.full_name}
+                          className={`w-8 h-8 rounded-full object-cover border shrink-0 ${isInactive ? 'border-amber-500/50 grayscale' : 'border-slate-700'}`}
+                        />
+                        <div className="overflow-hidden">
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-semibold text-white truncate">{emp.full_name}</p>
+                            {isInactive && (
+                              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                                TẠM NGƯNG
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] font-mono text-blue-400 truncate">{emp.employee_id}</p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Day Columns */}
-                  {daysOfWeek.map(day => {
-                    const shift = workShifts.find(
-                      s => s.employee_id === emp.employee_id && s.date === day.date
-                    );
+                    {/* Day Columns */}
+                    {daysOfWeek.map(day => {
+                      const shift = workShifts.find(
+                        s => s.employee_id === emp.employee_id && s.date === day.date
+                      );
 
-                    return (
-                      <td
-                        key={day.date}
-                        onClick={() => handleCellClick(emp.employee_id, emp.full_name, day.date, `${day.name} (${day.label})`)}
-                        className="py-2.5 px-2 border-r border-slate-800/60 last:border-r-0 cursor-pointer group hover:bg-blue-600/10 transition-colors"
-                      >
-                        {renderShiftBadge(shift)}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                      return (
+                        <td
+                          key={day.date}
+                          onClick={() => handleCellClick(emp.employee_id, emp.full_name, day.date, `${day.name} (${day.label})`)}
+                          className={`py-2.5 px-2 border-r border-slate-800/60 last:border-r-0 ${isInactive ? 'cursor-not-allowed opacity-60' : 'cursor-pointer group hover:bg-blue-600/10'} transition-colors`}
+                        >
+                          {renderShiftBadge(shift)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

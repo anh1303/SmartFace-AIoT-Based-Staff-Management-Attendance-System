@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  Calendar, 
-  Clock, 
-  CheckCircle2, 
-  Users, 
-  ArrowLeftRight, 
-  FileText, 
-  ShieldCheck, 
+import { getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
+import {
+  Calendar,
+  Clock,
+  CheckCircle2,
+  Users,
+  ArrowLeftRight,
+  FileText,
+  ShieldCheck,
   CalendarDays,
   Sparkles,
   ChevronLeft,
@@ -16,20 +17,42 @@ import {
 import { Modal } from '../../components/common/Modal';
 
 export const StaffSchedule: React.FC = () => {
-  const { currentUser, workShifts, employees, showToast } = useApp();
+  const { currentUser, workShifts, employees, attendance, showToast } = useApp();
   const [exchangeModalOpen, setExchangeModalOpen] = useState(false);
   const [exchangeTargetEmp, setExchangeTargetEmp] = useState('');
-  const [exchangeDate, setExchangeDate] = useState('2026-09-11');
+  const [exchangeDate, setExchangeDate] = useState(() => getTodayVNString());
   const [exchangeReason, setExchangeReason] = useState('');
 
-  // Current staff's shifts
-  const myShifts = workShifts.filter(
-    s => s.employee_id === (currentUser?.employee_id || 'NV-001')
-  );
+  const getMonday = (d: Date) => {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+  };
 
-  // Teammates in same department or on duty today
+  const [currentMonday, setCurrentMonday] = useState<Date>(() => getMonday(new Date()));
+
+  const handlePrevWeek = () => {
+    const prev = new Date(currentMonday);
+    prev.setDate(currentMonday.getDate() - 7);
+    setCurrentMonday(prev);
+  };
+
+  const handleNextWeek = () => {
+    const next = new Date(currentMonday);
+    next.setDate(currentMonday.getDate() + 7);
+    setCurrentMonday(next);
+  };
+
+  const empCode = currentUser?.employee_id || 'NV-001';
+
+  // Current staff's shifts
+  const myShifts = workShifts.filter(s => s.employee_id === empCode);
+  const myAttendance = attendance.filter(a => a.employee_id === empCode);
+
+  // Teammates in same department or on duty
   const teammates = employees.filter(
-    e => e.employee_id !== (currentUser?.employee_id || 'NV-001') && e.status === 'ACTIVE'
+    e => e.employee_id !== empCode && e.status === 'ACTIVE'
   );
 
   const handleExchangeSubmit = (e: React.FormEvent) => {
@@ -39,15 +62,31 @@ export const StaffSchedule: React.FC = () => {
     setExchangeReason('');
   };
 
-  const daysOfWeek = [
-    { name: 'Thứ 2', date: '2026-09-07', label: '07/09' },
-    { name: 'Thứ 3', date: '2026-09-08', label: '08/09' },
-    { name: 'Thứ 4', date: '2026-09-09', label: '09/09' },
-    { name: 'Thứ 5 (Hôm nay)', date: '2026-09-10', label: '10/09' },
-    { name: 'Thứ 6', date: '2026-09-11', label: '11/09' },
-    { name: 'Thứ 7', date: '2026-09-12', label: '12/09' },
-    { name: 'Chủ Nhật', date: '2026-09-13', label: '13/09' },
-  ];
+  const dayNames = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
+  const daysOfWeek = [0, 1, 2, 3, 4, 5, 6].map(offset => {
+    const d = new Date(currentMonday);
+    d.setDate(currentMonday.getDate() + offset);
+    const dateStr = formatVNDateISO(d);
+    const label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return {
+      name: dayNames[offset],
+      date: dateStr,
+      label,
+    };
+  });
+
+  const todayStr = getTodayVNString();
+  const weekShifts = daysOfWeek.map(d => myShifts.find(s => s.date === d.date)).filter(Boolean);
+  const totalHours = weekShifts.reduce((acc, s) => {
+    if (!s || s.shift_type === 'OFF') return acc;
+    if (s.shift_type === 'MORNING') return acc + 4;
+    if (s.shift_type === 'AFTERNOON') return acc + 5;
+    return acc + 8;
+  }, 0);
+
+  const completedShifts = weekShifts.filter(s => s && s.date <= todayStr && s.shift_type !== 'OFF').length;
+  const onTimeCount = myAttendance.filter(a => (a.punctuality || (a.status === 'VALID' ? 'ON_TIME' : a.status)) === 'ON_TIME').length;
+  const onTimeRate = myAttendance.length > 0 ? ((onTimeCount / myAttendance.length) * 100).toFixed(0) : '100';
 
   return (
     <div className="space-y-6">
@@ -59,7 +98,7 @@ export const StaffSchedule: React.FC = () => {
               Lịch trình làm việc & Phân bổ ca
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-mono font-medium border border-blue-500/20">
-              TUẦN 37 • 2026
+              {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
@@ -68,6 +107,26 @@ export const StaffSchedule: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1">
+            <button
+              type="button"
+              onClick={handlePrevWeek}
+              className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 text-xs font-mono text-slate-300">
+              {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
+            </span>
+            <button
+              type="button"
+              onClick={handleNextWeek}
+              className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => setExchangeModalOpen(true)}
@@ -82,27 +141,27 @@ export const StaffSchedule: React.FC = () => {
       {/* 4 Bento Telemetry Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors">
-          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Tổng giờ dự kiến</span>
-          <div className="mt-2 text-2xl font-bold font-mono text-white">40.0h</div>
-          <p className="text-[11px] text-blue-400 mt-1">05 ca tiêu chuẩn</p>
+          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Tổng giờ tuần</span>
+          <div className="mt-2 text-2xl font-bold font-mono text-white">{totalHours.toFixed(1)}h</div>
+          <p className="text-[11px] text-blue-400 mt-1">{weekShifts.length} ca đã phân bổ</p>
         </div>
 
         <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors">
           <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Số ca hoàn thành</span>
-          <div className="mt-2 text-2xl font-bold font-mono text-green-500">04 / 5 ca</div>
-          <p className="text-[11px] text-slate-500 mt-1">Đạt 80% tiến độ tuần</p>
+          <div className="mt-2 text-2xl font-bold font-mono text-green-500">{completedShifts} / {weekShifts.length} ca</div>
+          <p className="text-[11px] text-slate-500 mt-1">Đạt {weekShifts.length > 0 ? Math.round((completedShifts / weekShifts.length) * 100) : 100}% tiến độ</p>
         </div>
 
         <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors">
-          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Ca làm thêm (OT)</span>
-          <div className="mt-2 text-2xl font-bold font-mono text-amber-400">01 ca (4h)</div>
-          <p className="text-[11px] text-amber-400/80 mt-1">Thứ 7 • Đã phê duyệt</p>
+          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Tổng lượt quẹt</span>
+          <div className="mt-2 text-2xl font-bold font-mono text-amber-400">{myAttendance.length} lượt</div>
+          <p className="text-[11px] text-amber-400/80 mt-1">Ghi nhận qua AI Cam</p>
         </div>
 
         <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors">
           <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Tỷ lệ đúng giờ</span>
-          <div className="mt-2 text-2xl font-bold font-mono text-white">100%</div>
-          <p className="text-[11px] text-green-500 mt-1">0 trễ • 0 vắng mặt</p>
+          <div className="mt-2 text-2xl font-bold font-mono text-white">{onTimeRate}%</div>
+          <p className="text-[11px] text-green-500 mt-1">{onTimeCount} lượt đúng giờ</p>
         </div>
       </div>
 
@@ -110,29 +169,28 @@ export const StaffSchedule: React.FC = () => {
       <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-white font-heading">
-            Chi tiết các ca trong tuần (07/09 - 13/09/2026)
+            Chi tiết các ca trong tuần ({daysOfWeek[0]?.label} - {daysOfWeek[6]?.label})
           </h2>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-mono">Tuần hiện tại</span>
+            <span className="text-xs text-slate-400 font-mono">Đồng bộ từ CSDL</span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
           {daysOfWeek.map((day) => {
             const shift = myShifts.find(s => s.date === day.date);
-            const isToday = day.date === '2026-09-10';
-            const isPast = day.date < '2026-09-10';
+            const isToday = day.date === todayStr;
+            const isPast = day.date < todayStr;
 
             return (
               <div
                 key={day.date}
-                className={`p-4 rounded-2xl border flex flex-col justify-between min-h-[190px] transition-all ${
-                  isToday
+                className={`p-4 rounded-2xl border flex flex-col justify-between min-h-[190px] transition-all ${isToday
                     ? 'bg-blue-950/30 border-blue-500/80 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/40'
                     : shift?.shift_type === 'OFF'
-                    ? 'bg-slate-950 border-slate-800/60 opacity-60'
-                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                }`}
+                      ? 'bg-slate-950 border-slate-800/60 opacity-60'
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                  }`}
               >
                 <div>
                   <div className="flex justify-between items-start">
@@ -152,10 +210,10 @@ export const StaffSchedule: React.FC = () => {
                       {shift?.shift_type === 'OFFICE_HOURS'
                         ? 'Ca Hành Chính'
                         : shift?.shift_type === 'MORNING'
-                        ? 'Ca Sáng'
-                        : shift?.shift_type === 'AFTERNOON'
-                        ? 'Ca Chiều'
-                        : 'Nghỉ Ca'}
+                          ? 'Ca Sáng'
+                          : shift?.shift_type === 'AFTERNOON'
+                            ? 'Ca Chiều'
+                            : 'Nghỉ Ca'}
                     </p>
                     {shift?.shift_type !== 'OFF' && (
                       <p className="text-[11px] font-mono text-slate-300 mt-1">
@@ -163,7 +221,7 @@ export const StaffSchedule: React.FC = () => {
                       </p>
                     )}
                     {shift?.note && (
-                      <p className="text-[10px] text-slate-400 mt-1 italic">
+                      <p className="text-[10px] text-slate-400 mt-1 italic truncate">
                         {shift.note}
                       </p>
                     )}
@@ -173,11 +231,11 @@ export const StaffSchedule: React.FC = () => {
                 <div className="pt-3 border-t border-slate-800/80">
                   {isPast ? (
                     <span className="text-[10px] font-semibold text-green-500 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Đã hoàn thành
+                      <CheckCircle2 className="w-3 h-3" /> Đã qua
                     </span>
                   ) : isToday ? (
                     <span className="text-[10px] font-semibold text-blue-400 flex items-center gap-1">
-                      <Clock className="w-3 h-3 animate-spin" /> Đang trực ca
+                      <Clock className="w-3 h-3 animate-pulse" /> Đang ca
                     </span>
                   ) : shift?.shift_type === 'OFF' ? (
                     <span className="text-[10px] text-slate-500 font-mono">
@@ -200,11 +258,11 @@ export const StaffSchedule: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-white font-heading">
-              Đồng đội cùng ca trực hôm nay (10/09/2026)
+              Đồng đội cùng bộ phận & ca trực
             </h2>
             <p className="text-xs text-slate-400">Danh sách nhân sự đang cùng làm việc tại trụ sở</p>
           </div>
-          <span className="text-xs text-blue-400 font-mono">{teammates.length} nhân sự trực ca</span>
+          <span className="text-xs text-blue-400 font-mono">{teammates.length} đồng đội</span>
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -215,7 +273,7 @@ export const StaffSchedule: React.FC = () => {
             >
               <div className="flex items-center gap-3">
                 <img
-                  src={emp.avatar}
+                  src={emp.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"}
                   alt={emp.full_name}
                   className="w-10 h-10 rounded-full object-cover border border-slate-700"
                 />
@@ -228,7 +286,7 @@ export const StaffSchedule: React.FC = () => {
 
               <div className="text-right">
                 <span className="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-green-500/10 text-green-500 border border-green-500/20">
-                  ONLINE
+                  {emp.status === 'ACTIVE' ? 'ONLINE' : 'OFFLINE'}
                 </span>
               </div>
             </div>

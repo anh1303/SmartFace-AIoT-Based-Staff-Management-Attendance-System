@@ -14,7 +14,7 @@ export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   role: z.enum(['ADMIN', 'MANAGER', 'EMPLOYEE']).default('EMPLOYEE'),
-  departmentId: z.string().uuid().optional(),
+  departmentId: z.union([z.number().int().positive(), z.string()]).optional().nullable(),
+  department_id: z.union([z.number().int().positive(), z.string()]).optional().nullable(),
   position: z.string().min(2).default('Employee'),
 })
-

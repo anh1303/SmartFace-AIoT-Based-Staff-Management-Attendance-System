@@ -3,11 +3,11 @@ import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { ToastContainer } from '../common/Toast';
-import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 
 export const AppLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
   const location = useLocation();
 
   if (!currentUser) {

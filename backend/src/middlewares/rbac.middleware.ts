@@ -8,11 +8,7 @@ export const authorize = (...roles: string[]) =>
     const userRole = (req.user.role || '').toUpperCase()
     const allowedRoles = roles.map((r) => r.toUpperCase())
 
-    const isAllowed =
-      allowedRoles.includes(userRole) ||
-      (userRole === 'MANAGER' && allowedRoles.includes('ADMIN')) ||
-      (userRole === 'STAFF' && allowedRoles.includes('EMPLOYEE')) ||
-      (userRole === 'EMPLOYEE' && allowedRoles.includes('STAFF'))
+    const isAllowed = allowedRoles.includes(userRole)
 
     if (!isAllowed) return next(new AppError(403, 'Insufficient permissions'))
     next()

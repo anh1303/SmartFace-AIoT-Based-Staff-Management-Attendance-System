@@ -1,7 +1,9 @@
+import { Device } from '@prisma/client'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
+import { logAction } from '../audit-logs/audit.service.js'
 
-export function formatDevice(d: any) {
+export function formatDevice(d: Device) {
   return {
     id: d.id,
     name: d.name,
@@ -14,22 +16,25 @@ export function formatDevice(d: any) {
 }
 
 export async function list() {
-  const devices = await (prisma as any).device.findMany({
+  const devices = await prisma.device.findMany({
     orderBy: { createdAt: 'desc' },
   })
   return devices.map(formatDevice)
 }
 
 export async function get(id: string) {
-  const device = await (prisma as any).device.findUnique({
+  const device = await prisma.device.findUnique({
     where: { id },
   })
   if (!device) throw new AppError(404, 'Device not found')
   return formatDevice(device)
 }
 
-export async function create(data: { name: string; location: string; ip?: string | null; status?: string }) {
-  const device = await (prisma as any).device.create({
+export async function create(
+  data: { name: string; location: string; ip?: string | null; status?: string },
+  actorUserId?: string,
+) {
+  const device = await prisma.device.create({
     data: {
       name: data.name,
       location: data.location,
@@ -37,12 +42,30 @@ export async function create(data: { name: string; location: string; ip?: string
       status: data.status ?? 'OFFLINE',
     },
   })
+
+  await logAction({
+    userId: actorUserId,
+    action: 'CREATE_DEVICE',
+    target_table: 'devices',
+    record_id: device.id,
+    new_values: {
+      name: device.name,
+      location: device.location,
+      ip: device.ip,
+      status: device.status,
+    },
+  })
+
   return formatDevice(device)
 }
 
-export async function update(id: string, data: { name?: string; location?: string; ip?: string | null; status?: string }) {
-  await get(id)
-  const updated = await (prisma as any).device.update({
+export async function update(
+  id: string,
+  data: { name?: string; location?: string; ip?: string | null; status?: string },
+  actorUserId?: string,
+) {
+  const existing = await get(id)
+  const updated = await prisma.device.update({
     where: { id },
     data: {
       ...(data.name !== undefined ? { name: data.name } : {}),
@@ -51,17 +74,50 @@ export async function update(id: string, data: { name?: string; location?: strin
       ...(data.status !== undefined ? { status: data.status } : {}),
     },
   })
+
+  await logAction({
+    userId: actorUserId,
+    action: 'UPDATE_DEVICE',
+    target_table: 'devices',
+    record_id: id,
+    old_values: {
+      name: existing.name,
+      location: existing.location,
+      ip: existing.ip,
+      status: existing.status,
+    },
+    new_values: {
+      name: updated.name,
+      location: updated.location,
+      ip: updated.ip,
+      status: updated.status,
+    },
+  })
+
   return formatDevice(updated)
 }
 
-export async function remove(id: string): Promise<void> {
-  await get(id)
-  await (prisma as any).device.delete({ where: { id } })
+export async function remove(id: string, actorUserId?: string): Promise<void> {
+  const existing = await get(id)
+  await prisma.device.delete({ where: { id } })
+
+  await logAction({
+    userId: actorUserId,
+    action: 'DELETE_DEVICE',
+    target_table: 'devices',
+    record_id: id,
+    old_values: {
+      name: existing.name,
+      location: existing.location,
+      ip: existing.ip,
+      status: existing.status,
+    },
+  })
 }
 
 export async function updateStatus(id: string, status: string) {
   try {
-    const updated = await (prisma as any).device.update({
+    const updated = await prisma.device.update({
       where: { id },
       data: { status, last_seen: new Date() },
     })

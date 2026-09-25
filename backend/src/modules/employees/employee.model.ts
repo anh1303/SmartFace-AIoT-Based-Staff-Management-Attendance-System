@@ -11,7 +11,7 @@ export const employeeInclude = {
   department: true,
   employee_shifts: {
     include: { work_shifts: true },
-    orderBy: { effective_from: 'desc' as const },
+    orderBy: { work_date: 'desc' as const },
     take: 1,
   },
   face_embeddings: {

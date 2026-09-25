@@ -1,22 +1,42 @@
 import React from 'react';
-import { useApp } from '../../context/AppContext';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  Briefcase, 
-  Calendar, 
-  ShieldCheck, 
-  ScanFace, 
-  Fingerprint, 
-  Lock, 
+import { useAuth } from '../../context/AuthContext';
+import { useEmployees } from '../../hooks/useEmployees';
+import {
+  User,
+  Mail,
+  Phone,
+  Briefcase,
+  Calendar,
+  ShieldCheck,
+  ScanFace,
+  Fingerprint,
+  Lock,
   Building2,
   CheckCircle2,
   AlertTriangle
 } from 'lucide-react';
 
 export const StaffProfile: React.FC = () => {
-  const { currentUser } = useApp();
+  const { currentUser } = useAuth();
+  const { employees } = useEmployees();
+
+  const currentEmployee = employees.find(
+    e => e.employee_id === currentUser?.employee_id || e.id === currentUser?.employee_id
+  );
+
+  const formatDisplayDate = (dateStr?: string) => {
+    if (!dateStr) return '15/01/2024';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return dateStr;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -49,7 +69,7 @@ export const StaffProfile: React.FC = () => {
           <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 text-center flex flex-col items-center">
             <div className="relative mb-4">
               <img
-                src={currentUser?.avatar || "https://lh3.googleusercontent.com/aida-public/AB6AXuA0KS6nUhHdsndSeZ0LOeLkOfZAEfZAfm63Txsb3ryYsAUsiH0gLZ9VIT3CcW3uMw_MkVbDlsl53kBdUR8_KlS0J9tew5ToWiUd-q4Ct0wcosdejjVyvTptYjYHD0OY6LKozVPucFXEEHhfJqTf9_78zsEhE0xrMlMTYy2M9jxhP8ZrayoGhJz_E9WrMsLfaZlj-stHu3rWBibcwNnFos3o70DrOeSmxACoW5JdNeIoP3zwcbW4dK42"}
+                src={currentUser?.avatar || currentEmployee?.avatar || "https://lh3.googleusercontent.com/aida-public/AB6AXuA0KS6nUhHdsndSeZ0LOeLkOfZAEfZAfm63Txsb3ryYsAUsiH0gLZ9VIT3CcW3uMw_MkVbDlsl53kBdUR8_KlS0J9tew5ToWiUd-q4Ct0wcosdejjVyvTptYjYHD0OY6LKozVPucFXEEHhfJqTf9_78zsEhE0xrMlMTYy2M9jxhP8ZrayoGhJz_E9WrMsLfaZlj-stHu3rWBibcwNnFos3o70DrOeSmxACoW5JdNeIoP3zwcbW4dK42"}
                 alt={currentUser?.full_name}
                 className="w-28 h-28 rounded-2xl object-cover border-2 border-blue-500 shadow-xl"
               />
@@ -58,9 +78,9 @@ export const StaffProfile: React.FC = () => {
               </div>
             </div>
 
-            <h2 className="text-lg font-bold text-white font-heading">{currentUser?.full_name}</h2>
+            <h2 className="text-lg font-bold text-white font-heading">{currentUser?.full_name || currentEmployee?.full_name}</h2>
             <p className="text-xs font-mono text-blue-400 mt-0.5">{currentUser?.employee_id}</p>
-            <p className="text-xs text-slate-400 mt-1">{currentUser?.position}</p>
+            <p className="text-xs text-slate-400 mt-1">{currentUser?.position || currentEmployee?.position}</p>
             <span className="mt-3 inline-block px-3 py-1 rounded-full bg-green-500/10 text-green-500 border border-green-500/20 text-[11px] font-semibold">
               ĐANG HOẠT ĐỘNG (ACTIVE)
             </span>
@@ -122,10 +142,10 @@ export const StaffProfile: React.FC = () => {
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
                 <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-blue-400" /> Phòng ban
+                  <Building2 className="w-3.5 h-3.5 text-blue-400" /> Chức vụ
                 </span>
                 <p className="text-sm font-semibold text-white mt-1">
-                  {currentUser?.department || 'Kỹ thuật AI'}
+                  {currentUser?.department || currentEmployee?.department || 'Nhân viên'}
                 </p>
               </div>
 
@@ -134,7 +154,7 @@ export const StaffProfile: React.FC = () => {
                   <Briefcase className="w-3.5 h-3.5 text-blue-400" /> Vị trí công việc
                 </span>
                 <p className="text-sm font-semibold text-white mt-1">
-                  {currentUser?.position || 'AI Engineer Lead'}
+                  {currentUser?.position || currentEmployee?.position || 'AI Engineer Lead'}
                 </p>
               </div>
 
@@ -143,7 +163,7 @@ export const StaffProfile: React.FC = () => {
                   <Mail className="w-3.5 h-3.5 text-blue-400" /> Email doanh nghiệp
                 </span>
                 <p className="text-sm font-semibold text-white mt-1 font-mono">
-                  {currentUser?.email || 'anv@aiot.corp'}
+                  {currentUser?.email || currentEmployee?.email || 'anv@aiot.corp'}
                 </p>
               </div>
 
@@ -152,7 +172,7 @@ export const StaffProfile: React.FC = () => {
                   <Phone className="w-3.5 h-3.5 text-blue-400" /> Số điện thoại
                 </span>
                 <p className="text-sm font-semibold text-white mt-1 font-mono">
-                  0987.654.321
+                  {currentEmployee?.phone || '0987.654.321'}
                 </p>
               </div>
 
@@ -161,7 +181,7 @@ export const StaffProfile: React.FC = () => {
                   <Calendar className="w-3.5 h-3.5 text-blue-400" /> Ngày gia nhập công ty
                 </span>
                 <p className="text-sm font-semibold text-white mt-1 font-mono">
-                  15/01/2024
+                  {currentEmployee?.created_at ? formatDisplayDate(currentEmployee.created_at) : '15/01/2024'}
                 </p>
               </div>
 
@@ -170,7 +190,7 @@ export const StaffProfile: React.FC = () => {
                   <Lock className="w-3.5 h-3.5 text-blue-400" /> Phân cấp quyền hạn
                 </span>
                 <p className="text-sm font-semibold text-green-500 mt-1 font-mono">
-                  ROLE_STAFF • LEVEL 2
+                  {currentUser?.role === 'manager' ? 'ROLE_MANAGER • LEVEL 1' : 'ROLE_STAFF • LEVEL 2'}
                 </p>
               </div>
             </div>
@@ -197,7 +217,7 @@ export const StaffProfile: React.FC = () => {
               </div>
               <div className="flex justify-between items-center py-2.5">
                 <span>Thiết bị điểm danh mặc định</span>
-                <span className="font-mono text-blue-400 font-semibold">FaceCam-01 (Cổng chính Tòa nhà A)</span>
+                <span className="font-mono text-blue-400 font-semibold">FaceCam-01 (Cổng chính - Tầng 1)</span>
               </div>
             </div>
           </div>

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  Clock, 
-  Calendar, 
-  CheckCircle2, 
-  AlertCircle, 
-  ScanFace, 
-  Fingerprint, 
-  Filter, 
-  ShieldCheck, 
-  Lock 
+import { formatVNTime, formatVNDate } from '../../utils/dateUtils';
+import {
+  Clock,
+  Calendar,
+  CheckCircle2,
+  AlertCircle,
+  ScanFace,
+  Fingerprint,
+  Filter,
+  ShieldCheck,
+  Lock
 } from 'lucide-react';
 
 export const StaffAttendance: React.FC = () => {
@@ -113,9 +114,8 @@ export const StaffAttendance: React.FC = () => {
                 </tr>
               ) : (
                 filteredRecords.map(record => {
-                  const dateObj = new Date(record.timestamp);
-                  const timeFormatted = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                  const dateFormatted = dateObj.toLocaleDateString('vi-VN');
+                  const timeFormatted = formatVNTime(record.timestamp);
+                  const dateFormatted = formatVNDate(record.timestamp);
 
                   return (
                     <tr key={record.attendance_id} className="hover:bg-slate-800/40 transition-colors">
@@ -128,11 +128,10 @@ export const StaffAttendance: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4">
                         <span
-                          className={`inline-block px-2.5 py-1 rounded-lg font-bold text-[10px] uppercase font-mono ${
-                            record.type === 'CHECK_IN'
+                          className={`inline-block px-2.5 py-1 rounded-lg font-bold text-[10px] uppercase font-mono ${record.type === 'CHECK_IN'
                               ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                               : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                          }`}
+                            }`}
                         >
                           {record.type === 'CHECK_IN' ? 'VÀO CA' : 'TAN CA'}
                         </span>
@@ -161,17 +160,30 @@ export const StaffAttendance: React.FC = () => {
                         {(record.verification_score * 100).toFixed(1)}% Match
                       </td>
                       <td className="py-3.5 px-4">
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-semibold ${
-                            record.status === 'ON_TIME'
-                              ? 'bg-green-500/10 text-green-500 border border-green-500/20'
-                              : record.status === 'LATE'
-                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                              : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                          }`}
-                        >
-                          {record.status === 'ON_TIME' ? 'ĐÚNG GIỜ' : record.status === 'LATE' ? 'ĐI MUỘN' : 'VẮNG MẶT'}
-                        </span>
+                        {(() => {
+                          const punctuality = record.punctuality || (record.status === 'VALID' ? 'ON_TIME' : record.status);
+                          return (
+                            <span
+                              className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-semibold ${
+                                punctuality === 'ON_TIME'
+                                  ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+                                  : punctuality === 'LATE'
+                                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                    : punctuality === 'EARLY_LEAVE'
+                                      ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                              }`}
+                            >
+                              {punctuality === 'ON_TIME'
+                                ? 'ĐÚNG GIỜ'
+                                : punctuality === 'LATE'
+                                  ? 'ĐI MUỘN'
+                                  : punctuality === 'EARLY_LEAVE'
+                                    ? 'VỀ SỚM'
+                                    : 'VẮNG MẶT'}
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );

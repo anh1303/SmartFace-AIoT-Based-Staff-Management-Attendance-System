@@ -1,11 +1,12 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  DollarSign, 
-  Calendar, 
-  TrendingUp, 
-  ShieldCheck, 
-  CheckCircle2, 
+import { formatVNDateISO } from '../../utils/dateUtils';
+import {
+  DollarSign,
+  Calendar,
+  TrendingUp,
+  ShieldCheck,
+  CheckCircle2,
   AlertCircle,
   HelpCircle,
   Clock,
@@ -13,7 +14,34 @@ import {
 } from 'lucide-react';
 
 export const StaffSalaryEstimate: React.FC = () => {
-  const { currentUser } = useApp();
+  const { currentUser, payroll, employees, bonusPenalty, attendance } = useApp();
+
+  const empCode = currentUser?.employee_id || 'NV-001';
+  const currentEmp = employees.find(e => e.employee_id === empCode);
+  const currentPayroll = payroll.find(p => p.employee_id === empCode && (p.period === '2026-09' || !p.period))
+    || payroll.find(p => p.employee_id === empCode)
+    || payroll[0];
+
+  const hourlyRate = currentEmp?.hourly_rate || currentPayroll?.hourly_rate || 120000;
+  const overtimeHours = currentPayroll?.total_overtime ?? 4.0;
+  const lateEarlyHours = currentPayroll?.total_late_early ?? 0;
+  const allowance = currentPayroll?.allowance ?? 2500000;
+  const otRate = bonusPenalty?.overtime_rate || 100000;
+  const penaltyRate = bonusPenalty?.late_early_penalty || 50000;
+
+  const otAmount = overtimeHours * otRate;
+  const penaltyAmount = lateEarlyHours * penaltyRate;
+  const standardHours = 160; // 20 ngày x 8h
+  const baseSalary = standardHours * hourlyRate;
+  const netSalary = currentPayroll?.net_salary
+    ? Number(currentPayroll.net_salary)
+    : (baseSalary + otAmount - penaltyAmount + allowance);
+
+  // Attended days count
+  const myAttendance = attendance.filter(a => a.employee_id === empCode);
+  const distinctDays = Array.from(new Set(myAttendance.map(a => formatVNDateISO(a.timestamp)))).length;
+  const workDaysCount = distinctDays > 0 ? distinctDays : 19;
+  const progressPercent = Math.min(100, Math.round((workDaysCount / 22) * 100));
 
   return (
     <div className="space-y-6">
@@ -22,20 +50,20 @@ export const StaffSalaryEstimate: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
-              Lương Tạm Tính (Tháng 09/2026)
+              Lương Tạm Tính ({currentPayroll?.period ? `Kỳ ${currentPayroll.period}` : 'Tháng 09/2026'})
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-mono font-medium border border-amber-500/20">
-              ĐANG TÍCH LŨY CÔNG
+              {currentPayroll?.status === 'FINALIZED' ? 'ĐÃ CHỐT' : 'ĐANG TÍCH LŨY CÔNG'}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Số liệu tự động đồng bộ từ giờ quẹt thẻ/nhận diện khuôn mặt tính đến 10/09/2026.
+            Số liệu tự động tính toán từ ca làm việc, giờ quẹt thẻ và chính sách thưởng/phạt CSDL.
           </p>
         </div>
 
         <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-blue-400 text-xs font-mono">
           <ShieldCheck className="w-4 h-4 text-green-500" />
-          <span>CHỈ ĐỌC • MINH BẠCH 100%</span>
+          <span>CHỈ ĐỌC • MINH BẠCH CSDL</span>
         </div>
       </div>
 
@@ -44,30 +72,30 @@ export const StaffSalaryEstimate: React.FC = () => {
         <div className="relative z-10 grid md:grid-cols-12 gap-6 items-center">
           <div className="md:col-span-7 space-y-3">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Ước tính thực lĩnh đến hiện tại (Net)
+              Ước tính thực lĩnh đến hiện tại (Net Salary)
             </span>
             <div className="text-4xl sm:text-5xl font-extrabold font-mono text-white tracking-tight">
-              18.450.000 <span className="text-2xl text-blue-400 font-normal">₫</span>
+              {netSalary.toLocaleString('vi-VN')} <span className="text-2xl text-blue-400 font-normal">₫</span>
             </div>
             <p className="text-xs text-slate-400">
-              Dựa trên <strong>19 ngày công</strong> đã hoàn thành + <strong>4.0 giờ làm thêm OT</strong> được duyệt.
+              Mức lương theo giờ: <strong>{hourlyRate.toLocaleString('vi-VN')} ₫/h</strong> • Đã tích lũy <strong>{overtimeHours}h OT</strong>.
             </p>
           </div>
 
           <div className="md:col-span-5 bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
             <div className="flex justify-between text-xs">
-              <span className="text-slate-400 font-medium">Tiến độ ngày công tháng</span>
-              <span className="font-mono text-blue-400 font-bold">19 / 22 ngày (86%)</span>
+              <span className="text-slate-400 font-medium">Tiến độ tích lũy ngày công</span>
+              <span className="font-mono text-blue-400 font-bold">{workDaysCount} / 22 ngày ({progressPercent}%)</span>
             </div>
             <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
               <div
-                className="bg-blue-600 h-full rounded-full"
-                style={{ width: '86%' }}
+                className="bg-blue-600 h-full rounded-full transition-all"
+                style={{ width: `${progressPercent}%` }}
               />
             </div>
             <div className="flex justify-between text-[11px] text-slate-500 font-mono">
-              <span>Bắt đầu: 01/09</span>
-              <span>Kỳ chốt: 30/09</span>
+              <span>Đơn giá OT: {otRate.toLocaleString('vi-VN')} ₫/h</span>
+              <span>Đơn giá phạt: {penaltyRate.toLocaleString('vi-VN')} ₫/h</span>
             </div>
           </div>
         </div>
@@ -78,40 +106,32 @@ export const StaffSalaryEstimate: React.FC = () => {
         {/* Earnings Breakdown */}
         <div className="lg:col-span-7 p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
           <h2 className="text-base font-bold text-white font-heading">
-            Chi tiết các khoản thu nhập (Earnings)
+            Chi tiết các khoản thu nhập (Thu nhập chuẩn CSDL)
           </h2>
 
           <div className="space-y-3">
             <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-white">Lương cơ bản theo hợp đồng</p>
-                <p className="text-[11px] text-slate-400">Khung ngạch Senior AI Engineer</p>
+                <p className="text-xs font-semibold text-white">Lương theo giờ tiêu chuẩn ca</p>
+                <p className="text-[11px] text-slate-400">{hourlyRate.toLocaleString('vi-VN')} ₫/h × 160h định mức</p>
               </div>
-              <span className="font-mono text-xs font-bold text-white">22.000.000 ₫</span>
+              <span className="font-mono text-xs font-bold text-white">{baseSalary.toLocaleString('vi-VN')} ₫</span>
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-white">Lương công nhật lũy kế (19 ngày)</p>
-                <p className="text-[11px] text-slate-400">22.000.000 ÷ 22 × 19</p>
+                <p className="text-xs font-semibold text-white">Thưởng tăng ca (Overtime)</p>
+                <p className="text-[11px] text-slate-400">{overtimeHours}h OT × {otRate.toLocaleString('vi-VN')} ₫/h</p>
               </div>
-              <span className="font-mono text-xs font-bold text-blue-400">19.000.000 ₫</span>
+              <span className="font-mono text-xs font-bold text-green-400">+ {otAmount.toLocaleString('vi-VN')} ₫</span>
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-white">Phụ cấp ăn trưa & xăng xe</p>
-                <p className="text-[11px] text-slate-400">Cố định hàng tháng</p>
+                <p className="text-xs font-semibold text-white">Khoản phụ cấp (Allowance)</p>
+                <p className="text-[11px] text-slate-400">Phụ cấp chức vụ & trách nhiệm</p>
               </div>
-              <span className="font-mono text-xs font-bold text-green-500">+ 1.500.000 ₫</span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-white">Làm thêm giờ (OT) tuần 36 & 37</p>
-                <p className="text-[11px] text-slate-400">4 giờ × 150% hệ số</p>
-              </div>
-              <span className="font-mono text-xs font-bold text-amber-400">+ 750.000 ₫</span>
+              <span className="font-mono text-xs font-bold text-green-500">+ {allowance.toLocaleString('vi-VN')} ₫</span>
             </div>
           </div>
         </div>
@@ -119,45 +139,26 @@ export const StaffSalaryEstimate: React.FC = () => {
         {/* Deductions Breakdown */}
         <div className="lg:col-span-5 p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
           <h2 className="text-base font-bold text-white font-heading">
-            Các khoản khấu trừ luật định
+            Khấu trừ & Quy tắc phạt CSDL
           </h2>
 
           <div className="space-y-3">
             <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-white">Bảo hiểm Xã hội (BHXH 8%)</p>
-                <p className="text-[11px] text-slate-400">Trích lương người lao động</p>
+                <p className="text-xs font-semibold text-white">Phạt đi muộn / về sớm</p>
+                <p className="text-[11px] text-slate-400">{lateEarlyHours}h vi phạm × {penaltyRate.toLocaleString('vi-VN')} ₫/h</p>
               </div>
-              <span className="font-mono text-xs font-bold text-red-400">- 1.200.000 ₫</span>
+              <span className={`font-mono text-xs font-bold ${penaltyAmount > 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                {penaltyAmount > 0 ? `- ${penaltyAmount.toLocaleString('vi-VN')} ₫` : '0 ₫'}
+              </span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-white">Bảo hiểm Y tế (BHYT 1.5%)</p>
-                <p className="text-[11px] text-slate-400">BHYT bắt buộc</p>
-              </div>
-              <span className="font-mono text-xs font-bold text-red-400">- 225.000 ₫</span>
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-slate-400 space-y-1.5">
+              <p className="font-bold text-blue-400">Công thức tính:</p>
+              <p className="font-mono text-[11px] text-slate-300">
+                Thực nhận = (Lương giờ × Tổng giờ ca) + (OT × Mức thưởng OT) - (Đi muộn/Về sớm × Mức phạt) + Phụ cấp
+              </p>
             </div>
-
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-white">Bảo hiểm Thất nghiệp (BHTN 1%)</p>
-                <p className="text-[11px] text-slate-400">BHTN nhà nước</p>
-              </div>
-              <span className="font-mono text-xs font-bold text-red-400">- 150.000 ₫</span>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-white">Phạt vi phạm đi muộn</p>
-                <p className="text-[11px] text-slate-400">0 lần vi phạm trong kỳ</p>
-              </div>
-              <span className="font-mono text-xs font-bold text-green-500">0 ₫</span>
-            </div>
-          </div>
-
-          <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-slate-400">
-            <span className="font-bold text-blue-400">Ghi chú:</span> Số tiền thực nhận sẽ được chuyển khoản qua tài khoản ngân hàng liên kết vào ngày 05 tháng kế tiếp.
           </div>
         </div>
       </div>

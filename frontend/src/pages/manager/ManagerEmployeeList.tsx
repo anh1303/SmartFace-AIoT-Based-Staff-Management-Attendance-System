@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { 
-  Users, 
-  Search, 
-  Filter, 
-  Plus, 
-  Edit, 
-  CheckCircle2, 
-  XCircle, 
-  ScanFace, 
-  Fingerprint, 
-  Mail, 
-  Phone, 
+import {
+  Users,
+  Search,
+  Filter,
+  Plus,
+  Edit,
+  CheckCircle2,
+  XCircle,
+  ScanFace,
+  Fingerprint,
+  Mail,
+  Phone,
   Building2,
   Lock,
   Briefcase,
@@ -45,27 +45,27 @@ export const ManagerEmployeeList: React.FC = () => {
   const [newEmp, setNewEmp] = useState({
     employee_id: `NV-${String(employees.length + 1).padStart(3, '0')}`,
     full_name: '',
-    department: 'Kỹ thuật AI',
-    position: 'Kỹ sư phần mềm',
+    department: 'Nhân viên',
+    position: 'Nhân viên bán hàng',
     phone: '',
     email: '',
     status: 'ACTIVE' as const,
-    face_enrolled: true,
-    fingerprint_enrolled: true,
-    base_salary: 18000000,
+    face_enrolled: false,
+    fingerprint_enrolled: false,
+    hourly_rate: 50000,
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
   });
 
   const filteredEmployees = employees.filter(emp => {
     const term = searchTerm.trim().toLowerCase();
-    const matchSearch = !term || 
+    const matchSearch = !term ||
       emp.full_name.toLowerCase().includes(term) ||
       emp.employee_id.toLowerCase().includes(term) ||
       emp.email.toLowerCase().includes(term) ||
       emp.phone.toLowerCase().includes(term) ||
       emp.position.toLowerCase().includes(term) ||
       emp.department.toLowerCase().includes(term);
-    
+
     const matchDept = departmentFilter === 'ALL' || emp.department === departmentFilter;
     const matchStatus = statusFilter === 'ALL' || emp.status === statusFilter;
 
@@ -85,14 +85,14 @@ export const ManagerEmployeeList: React.FC = () => {
     setNewEmp({
       employee_id: `NV-${String(employees.length + 2).padStart(3, '0')}`,
       full_name: '',
-      department: 'Kỹ thuật AI',
-      position: 'Kỹ sư phần mềm',
+      department: 'Nhân viên',
+      position: 'Nhân viên bán hàng',
       phone: '',
       email: '',
       status: 'ACTIVE',
-      face_enrolled: true,
-      fingerprint_enrolled: true,
-      base_salary: 18000000,
+      face_enrolled: false,
+      fingerprint_enrolled: false,
+      hourly_rate: 50000,
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
     });
   };
@@ -107,7 +107,7 @@ export const ManagerEmployeeList: React.FC = () => {
       position: editEmployee.position,
       email: editEmployee.email,
       phone: editEmployee.phone,
-      base_salary: editEmployee.base_salary,
+      hourly_rate: editEmployee.hourly_rate,
       face_enrolled: editEmployee.face_enrolled,
       fingerprint_enrolled: editEmployee.fingerprint_enrolled,
     });
@@ -175,18 +175,18 @@ export const ManagerEmployeeList: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <Filter className="w-3.5 h-3.5 text-blue-400" />
-            <span>Phòng ban:</span>
+            <span>Chức vụ:</span>
           </div>
           <select
             value={departmentFilter}
             onChange={e => setDepartmentFilter(e.target.value)}
             className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500"
           >
-            <option value="ALL">Tất cả phòng ban</option>
-            <option value="Kỹ thuật AI">Kỹ thuật AI</option>
-            <option value="Vận hành & IT">Vận hành & IT</option>
-            <option value="Nhân sự & HR">Nhân sự & HR</option>
-            <option value="Kinh doanh & Dự án">Kinh doanh & Dự án</option>
+            <option value="ALL">Tất cả chức vụ</option>
+            <option value="Bảo vệ">Bảo vệ</option>
+            <option value="Nhân viên">Nhân viên</option>
+            <option value="Thu ngân">Thu ngân</option>
+            <option value="Quản lý">Quản lý</option>
           </select>
 
           <div className="flex items-center gap-1.5 text-xs text-slate-400 ml-2">
@@ -212,10 +212,10 @@ export const ManagerEmployeeList: React.FC = () => {
               <tr>
                 <th className="py-3.5 px-4 font-medium">Nhân sự</th>
                 <th className="py-3.5 px-4 font-medium">Mã NV</th>
-                <th className="py-3.5 px-4 font-medium">Phòng ban & Vị trí</th>
+                <th className="py-3.5 px-4 font-medium">Chức vụ</th>
                 <th className="py-3.5 px-4 font-medium">Liên hệ</th>
                 <th className="py-3.5 px-4 font-medium">Sinh trắc AI</th>
-                <th className="py-3.5 px-4 font-medium">Lương cơ bản</th>
+                <th className="py-3.5 px-4 font-medium">Lương theo giờ (VNĐ)</th>
                 <th className="py-3.5 px-4 font-medium">Trạng thái</th>
                 <th className="py-3.5 px-4 text-right font-medium">Thao tác</th>
               </tr>
@@ -248,20 +248,20 @@ export const ManagerEmployeeList: React.FC = () => {
                     </td>
 
                     {/* ID */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-blue-400">
+                    <td className="py-3.5 px-4 font-mono font-semibold text-blue-400">
                       {emp.employee_id}
                     </td>
 
                     {/* Department & Position */}
                     <td className="py-3.5 px-4">
-                      <p className="text-white font-medium">{emp.department}</p>
-                      <p className="text-[11px] text-slate-400">{emp.position}</p>
+                      <p className="font-medium text-white">{emp.position}</p>
+                      <p className="text-[11px] text-slate-400">{emp.department}</p>
                     </td>
 
                     {/* Contact */}
-                    <td className="py-3.5 px-4">
-                      <p className="text-slate-300 font-mono text-[11px]">{emp.email}</p>
-                      <p className="text-slate-500 font-mono text-[11px]">{emp.phone}</p>
+                    <td className="py-3.5 px-4 font-mono text-[11px]">
+                      <p className="text-slate-300">{emp.email}</p>
+                      <p className="text-slate-500">{emp.phone}</p>
                     </td>
 
                     {/* Biometrics */}
@@ -269,30 +269,28 @@ export const ManagerEmployeeList: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span
                           title={emp.face_enrolled ? "Face ID: Đã đăng ký" : "Chưa đăng ký Face ID"}
-                          className={`p-1.5 rounded-lg ${
-                            emp.face_enrolled
-                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                              : 'bg-slate-800 text-slate-600'
-                          }`}
+                          className={`p-1.5 rounded-lg border ${emp.face_enrolled
+                              ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                              : 'bg-slate-800 text-slate-600 border-slate-700/50'
+                            }`}
                         >
                           <ScanFace className="w-4 h-4" />
                         </span>
                         <span
                           title={emp.fingerprint_enrolled ? "Vân tay: Đã đăng ký" : "Chưa đăng ký Vân tay"}
-                          className={`p-1.5 rounded-lg ${
-                            emp.fingerprint_enrolled
-                              ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                              : 'bg-slate-800 text-slate-600'
-                          }`}
+                          className={`p-1.5 rounded-lg border ${emp.fingerprint_enrolled
+                              ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                              : 'bg-slate-800 text-slate-600 border-slate-700/50'
+                            }`}
                         >
                           <Fingerprint className="w-4 h-4" />
                         </span>
                       </div>
                     </td>
 
-                    {/* Base Salary */}
+                    {/* Hourly Rate */}
                     <td className="py-3.5 px-4 font-mono text-white font-medium">
-                      {(emp.base_salary || 0).toLocaleString('vi-VN')} ₫
+                      {((emp.hourly_rate ?? 0)).toLocaleString('vi-VN')} ₫
                     </td>
 
                     {/* Status Toggle */}
@@ -300,11 +298,10 @@ export const ManagerEmployeeList: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setConfirmStatusEmployee(emp)}
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono transition-all ${
-                          emp.status === 'ACTIVE'
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono transition-all ${emp.status === 'ACTIVE'
                             ? 'bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20'
                             : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'
-                        }`}
+                          }`}
                       >
                         {emp.status === 'ACTIVE' ? 'HOẠT ĐỘNG' : 'TẠM NGƯNG'}
                       </button>
@@ -344,9 +341,9 @@ export const ManagerEmployeeList: React.FC = () => {
               <input
                 type="text"
                 required
+                readOnly
                 value={newEmp.employee_id}
-                onChange={e => setNewEmp({ ...newEmp, employee_id: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-mono"
+                className="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl text-xs text-slate-400 font-mono cursor-not-allowed select-none focus:outline-none"
               />
             </div>
 
@@ -363,16 +360,16 @@ export const ManagerEmployeeList: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Phòng ban</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Chức vụ</label>
               <select
                 value={newEmp.department}
                 onChange={e => setNewEmp({ ...newEmp, department: e.target.value })}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white"
               >
-                <option value="Kỹ thuật AI">Kỹ thuật AI</option>
-                <option value="Vận hành & IT">Vận hành & IT</option>
-                <option value="Nhân sự & HR">Nhân sự & HR</option>
-                <option value="Kinh doanh & Dự án">Kinh doanh & Dự án</option>
+                <option value="Bảo vệ">Bảo vệ</option>
+                <option value="Nhân viên">Nhân viên</option>
+                <option value="Thu ngân">Thu ngân</option>
+                <option value="Quản lý">Quản lý</option>
               </select>
             </div>
 
@@ -412,40 +409,17 @@ export const ManagerEmployeeList: React.FC = () => {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Lương cơ bản hợp đồng (VNĐ)</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Lương theo giờ (VNĐ)</label>
               <input
                 type="number"
                 required
-                step="500000"
-                value={newEmp.base_salary}
-                onChange={e => setNewEmp({ ...newEmp, base_salary: Number(e.target.value) })}
+                step="1000"
+                min="1000"
+                placeholder="50000"
+                value={newEmp.hourly_rate}
+                onChange={e => setNewEmp({ ...newEmp, hourly_rate: Number(e.target.value) })}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-mono"
               />
-            </div>
-          </div>
-
-          {/* Biometrics Enroll Toggles */}
-          <div className="pt-2 p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
-            <span className="text-xs font-semibold text-blue-400">Thiết lập đăng ký sinh trắc học:</span>
-            <div className="flex items-center gap-6">
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={newEmp.face_enrolled}
-                  onChange={e => setNewEmp({ ...newEmp, face_enrolled: e.target.checked })}
-                  className="rounded bg-slate-900 border-slate-700 text-blue-600"
-                />
-                <span>Kích hoạt Face ID 512-D</span>
-              </label>
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={newEmp.fingerprint_enrolled}
-                  onChange={e => setNewEmp({ ...newEmp, fingerprint_enrolled: e.target.checked })}
-                  className="rounded bg-slate-900 border-slate-700 text-blue-600"
-                />
-                <span>Kích hoạt Vân tay FAP30</span>
-              </label>
             </div>
           </div>
 
@@ -490,16 +464,16 @@ export const ManagerEmployeeList: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Phòng ban</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Chức vụ</label>
                 <select
                   value={editEmployee.department}
                   onChange={e => setEditEmployee({ ...editEmployee, department: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white"
                 >
-                  <option value="Kỹ thuật AI">Kỹ thuật AI</option>
-                  <option value="Vận hành & IT">Vận hành & IT</option>
-                  <option value="Nhân sự & HR">Nhân sự & HR</option>
-                  <option value="Kinh doanh & Dự án">Kinh doanh & Dự án</option>
+                  <option value="Bảo vệ">Bảo vệ</option>
+                  <option value="Nhân viên">Nhân viên</option>
+                  <option value="Thu ngân">Thu ngân</option>
+                  <option value="Quản lý">Quản lý</option>
                 </select>
               </div>
 
@@ -515,13 +489,14 @@ export const ManagerEmployeeList: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Lương cơ bản (VNĐ)</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Lương theo giờ (VNĐ)</label>
                 <input
                   type="number"
                   required
-                  step="500000"
-                  value={editEmployee.base_salary}
-                  onChange={e => setEditEmployee({ ...editEmployee, base_salary: Number(e.target.value) })}
+                  step="1000"
+                  min="1000"
+                  value={editEmployee.hourly_rate}
+                  onChange={e => setEditEmployee({ ...editEmployee, hourly_rate: Number(e.target.value) })}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white font-mono"
                 />
               </div>

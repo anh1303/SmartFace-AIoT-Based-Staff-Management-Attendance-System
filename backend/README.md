@@ -30,9 +30,11 @@
 
 ## 🚀 Hướng Dẫn Cài Đặt & Khởi Chạy
 
-### 🟢 Cách 1: Sử dụng Script Tự Động (`run.bat` tại thư mục gốc dự án)
+### 🟢 Cách 1: Sử dụng Script Tự Động (`run.bat` trên Windows hoặc `run.sh` trên macOS/Linux)
 
 Mở Terminal tại thư mục gốc `SmartFace-AIoT-Based-Staff-Management-Attendance-System/` và chọn menu tùy chọn:
+- Windows: `.\run.bat`
+- macOS / Linux: `chmod +x run.sh && ./run.sh`
 - Select `[1]`: Chạy toàn bộ (Khởi động Docker DB + Backend + Frontend).
 - Select `[3]`: Chỉ chạy riêng phân hệ Backend Service (`http://localhost:3000`).
 

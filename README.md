@@ -58,6 +58,7 @@
 ```text
 SmartFace-AIoT-Based-Staff-Management-Attendance-System/
 ├── run.bat                   # ⚡ Script tự động khởi chạy 1-click cho Windows
+├── run.sh                    # ⚡ Script tự động khởi chạy 1-click cho macOS (và Linux)
 ├── .gitignore                # Cấu hình GitIgnore (đã loại trừ node_modules, build, __tests__/)
 ├── backend/                  # Phân hệ Máy chủ & CSDL (Node.js, Express, Prisma)
 │   ├── docker-compose.yml    # Docker Compose khởi chạy PostgreSQL 16 & pgAdmin4
@@ -141,20 +142,27 @@ Trước khi khởi chạy dự án, máy tính cần cài đặt sẵn:
 
 ## ⚡ Hướng Dẫn Cài Đặt & Khởi Chạy
 
-### 🟢 Cách 1: Tự động khởi chạy bằng `run.bat` (Khuyên dùng trên Windows)
+### 🟢 Cách 1: Tự động khởi chạy bằng 1-Click Script (Khuyên dùng)
 
-File script [run.bat](file:///e:/PBL6/SmartFace-AIoT-Based-Staff-Management-Attendance-System/run.bat) đã được thiết kế sẵn menu điều khiển tự động hóa (đã tích hợp cơ chế tự động kiểm tra và tạo file `.env` nếu máy bạn chưa có):
+Dự án cung cấp sẵn script menu tự động hóa toàn bộ quy trình (tự động kiểm tra và tạo file `.env` mẫu nếu máy chưa có, cài đặt thư viện, khởi chạy Docker và chạy song song Backend + Frontend trong các cửa sổ riêng):
 
-1. Mở Terminal / CMD tại thư mục gốc dự án và gõ:
-   ```cmd
-   .\run.bat
-   ```
-2. Với **lần đầu tiên sau khi clone**, bạn thực hiện lần lượt theo thứ tự:
-   - **Nhập `[6]`**: Tự động tạo `.env` và chạy `npm install` cho cả Backend và Frontend.
-   - **Nhập `[5]`**: Khởi động Docker Database (`PBL6_db` và `pbl6_pgadmin`).
-   - **Nhập `[7]`**: Tự động chạy `prisma:generate`, `prisma:migrate` và nạp dữ liệu mẫu `prisma:seed`.
-   - **Nhập `[1]`**: Khởi chạy toàn bộ hệ thống (tự động mở 2 cửa sổ cmd riêng biệt chạy song song Backend: `3000` và Frontend: `5173`).
-3. Các lần tiếp theo: Chỉ cần nhập **`[1]`** để chạy toàn bộ hệ thống!
+- **Trên Windows (`run.bat`)**:
+  ```cmd
+  .\run.bat
+  ```
+- **Trên macOS / Linux (`run.sh`)**:
+  ```bash
+  chmod +x run.sh
+  ./run.sh
+  ```
+  *(Trên macOS, `run.sh` sử dụng AppleScript để tự động mở 2 tab/cửa sổ Terminal.app riêng biệt chạy song song Backend: `3000` và Frontend: `5173` giống hệt `run.bat` trên Windows).*
+
+#### Quy trình thao tác lần đầu tiên sau khi clone:
+1. **Nhập `[6]`**: Tự động tạo `.env` nếu thiếu và chạy `npm install` cho cả Backend và Frontend.
+2. **Nhập `[5]`**: Khởi động Docker Database (`PBL6_db` và `pbl6_pgadmin`).
+3. **Nhập `[7]`**: Tự động chạy `prisma:generate`, `prisma:migrate` và nạp dữ liệu mẫu `prisma:seed`.
+4. **Nhập `[1]`**: Khởi chạy toàn bộ hệ thống (tự động mở 2 cửa sổ chạy song song Backend và Frontend).
+> 💡 *Các lần tiếp theo, bạn chỉ cần mở script và nhập **`[1]`** để khởi động toàn bộ!*
 
 ---
 

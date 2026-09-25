@@ -128,63 +128,103 @@ Hệ thống kết nối và hiển thị trạng thái thời gian thực của
 
 ---
 
-## ⚡ Hướng Dẫn Cài Đặt & Khởi Chạy Nhanh
+## 📋 Yêu Cầu Tiên Quyết (Prerequisites)
 
-### 🟢 Cách 1: Tự động khởi chạy bằng `run.bat` (Khuyên dùng trên Windows)
-
-1. Mở Terminal / Command Prompt tại thư mục gốc của dự án:
-   ```cmd
-   .\run.bat
-   ```
-2. Menu tương tác hiển thị cho phép bạn chọn nhanh:
-   - **`[1]`**: Khởi động toàn bộ: Bật Docker Container (PostgreSQL + pgAdmin) và khởi chạy đồng thời Backend (Port 3000) & Frontend (Port 5173).
-   - **`[2]`**: Chỉ chạy Backend & Frontend (khi Database đã đang chạy sẵn).
-   - **`[5]`**: Khởi động Docker Database.
-   - **`[6]`**: Cài đặt `npm install` tự động cho cả Backend và Frontend.
-   - **`[7]`**: Chạy `prisma migrate` và nạp dữ liệu mẫu (`seed`).
+Trước khi khởi chạy dự án, máy tính cần cài đặt sẵn:
+1. **Git**: Dùng để tải mã nguồn (`git clone`).
+2. **Node.js**: Phiên bản **v20+** hoặc **v22+ LTS** (kèm theo trình quản lý gói `npm`).
+3. **Docker & Docker Desktop**:
+   - **Bắt buộc** cài đặt và **phải khởi động ứng dụng Docker Desktop** trước khi chạy dự án.
+   - *Lý do*: Dự án sử dụng hệ quản trị PostgreSQL 16 tích hợp extension vector **`pgvector`** (image `pgvector/pgvector:pg16`) để lưu trữ và so khớp 512-dimension embeddings khuôn mặt (ArcFace). Việc cài đặt trực tiếp PostgreSQL kèm pgvector trên Windows bằng tay rất phức tạp và dễ phát sinh lỗi, do đó Docker là giải pháp chuẩn hóa, ổn định nhất.
 
 ---
 
-### 🟡 Cách 2: Khởi chạy thủ công từng bước
+## ⚡ Hướng Dẫn Cài Đặt & Khởi Chạy
 
-#### 1. Khởi động Cơ sở dữ liệu (PostgreSQL 16)
+### 🟢 Cách 1: Tự động khởi chạy bằng `run.bat` (Khuyên dùng trên Windows)
+
+File script [run.bat](file:///e:/PBL6/SmartFace-AIoT-Based-Staff-Management-Attendance-System/run.bat) đã được thiết kế sẵn menu điều khiển tự động hóa (đã tích hợp cơ chế tự động kiểm tra và tạo file `.env` nếu máy bạn chưa có):
+
+1. Mở Terminal / CMD tại thư mục gốc dự án và gõ:
+   ```cmd
+   .\run.bat
+   ```
+2. Với **lần đầu tiên sau khi clone**, bạn thực hiện lần lượt theo thứ tự:
+   - **Nhập `[6]`**: Tự động tạo `.env` và chạy `npm install` cho cả Backend và Frontend.
+   - **Nhập `[5]`**: Khởi động Docker Database (`PBL6_db` và `pbl6_pgadmin`).
+   - **Nhập `[7]`**: Tự động chạy `prisma:generate`, `prisma:migrate` và nạp dữ liệu mẫu `prisma:seed`.
+   - **Nhập `[1]`**: Khởi chạy toàn bộ hệ thống (tự động mở 2 cửa sổ cmd riêng biệt chạy song song Backend: `3000` và Frontend: `5173`).
+3. Các lần tiếp theo: Chỉ cần nhập **`[1]`** để chạy toàn bộ hệ thống!
+
+---
+
+### 🟡 Cách 2: Khởi chạy thủ công từng bước (Cross-Platform: Windows / Linux / macOS)
+
+#### Bước 1: Tạo các file biến môi trường (`.env`)
+> [!IMPORTANT]
+> Vì lý do bảo mật, file `.env` được loại trừ trong `.gitignore`. Bạn cần tạo file `.env` cho cả Backend và Frontend trước khi khởi chạy.
+
+- **Cho Backend**:
+  - Windows PowerShell: `Copy-Item backend/.env.example backend/.env`
+  - Windows CMD: `copy backend\.env.example backend\.env`
+  - Linux / macOS / Git Bash: `cp backend/.env.example backend/.env`
+
+- **Cho Frontend**:
+  - Windows PowerShell: `Copy-Item frontend/.env.example frontend/.env`
+  - Windows CMD: `copy frontend\.env.example frontend\.env`
+  - Linux / macOS / Git Bash: `cp frontend/.env.example frontend/.env`
+
+#### Bước 2: Khởi động Cơ sở dữ liệu qua Docker
 ```bash
 cd backend
 docker compose up -d
 ```
-*PostgreSQL khởi chạy tại port `5432`, pgAdmin khởi chạy tại port `5050`.*
+*PostgreSQL khởi chạy tại port `5432`, pgAdmin4 khởi chạy tại port `5050`.*
 
-#### 2. Cấu hình & Chạy Backend
+#### Bước 3: Cấu hình, Migrate & Khởi chạy Backend
 ```bash
 cd backend
 # 1. Cài đặt dependencies
 npm install
 
-# 2. Tạo biến môi trường từ mẫu
-cp .env.example .env
+# 2. Sinh Prisma Client
+npm run prisma:generate
 
-# 3. Đồng bộ cấu trúc Database & Nạp dữ liệu mẫu
+# 3. Đồng bộ cấu trúc Database & Kích hoạt extension pgvector
 npm run prisma:migrate
+
+# 4. Nạp bộ dữ liệu mẫu ban đầu (seed)
 npm run prisma:seed
 
-# 4. Khởi chạy Backend server
+# 5. Khởi chạy Backend server
 npm run dev
 # Backend lắng nghe tại: http://localhost:3000
 ```
 
-#### 3. Cấu hình & Chạy Frontend
+#### Bước 4: Cài đặt & Khởi chạy Frontend (Mở Terminal thứ 2)
 ```bash
-cd ../frontend
+cd frontend
 # 1. Cài đặt dependencies
 npm install
 
-# 2. Tạo biến môi trường từ mẫu
-cp .env.example .env
-
-# 3. Khởi chạy Vite Dev Server
+# 2. Khởi chạy Vite Dev Server
 npm run dev
 # Ứng dụng web truy cập tại: http://localhost:5173
 ```
+
+---
+
+### 🛠️ Bảng Xử Lý Sự Cố Thường Gặp (Troubleshooting)
+
+| Lỗi thường gặp | Nguyên nhân | Cách khắc phục |
+| :--- | :--- | :--- |
+| `Bind for 0.0.0.0:5432 failed: port is already allocated` | Máy tính đã cài sẵn PostgreSQL chạy dịch vụ ngầm trên Windows | Mở **Services** (`services.msc`) $\rightarrow$ Tìm service `postgresql-x64-...` $\rightarrow$ Chuột phải chọn **Stop**. Sau đó chạy lại `docker compose up -d`. |
+| `error: open \\.\pipe\docker_engine: The system cannot find the file specified` | Ứng dụng Docker Desktop chưa được bật | Khởi động ứng dụng Docker Desktop trên máy và đợi biểu tượng chuyển sang màu xanh lá (*Engine running*) rồi thử lại. |
+| `❌ Invalid environment variables: DATABASE_URL is required...` | Chưa tạo file `backend/.env` hoặc chuỗi Secret quá ngắn | Đảm bảo đã sao chép từ `backend/.env.example` thành `backend/.env`. Các khóa `JWT_SECRET`, `BIOMETRIC_ENCRYPTION_KEY` bắt buộc phải $\ge 32$ ký tự. |
+| `extension "vector" is not available` | Đang kết nối tới PostgreSQL thông thường không có pgvector | Bắt buộc phải chạy PostgreSQL thông qua Docker Compose của dự án (`pgvector/pgvector:pg16`). |
+| Không lưu phiên đăng nhập hoặc bị đăng xuất ngay | Xung đột cổng kết nối hoặc chặn Cookie | Đảm bảo Frontend chạy đúng cổng `5173` và Backend chạy cổng `3000` để các cookie `HttpOnly; SameSite` hoạt động chuẩn xác theo cấu hình CORS. |
+
+---
 
 ---
 

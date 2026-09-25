@@ -33,6 +33,7 @@ if "%choice%"=="0" exit
 goto menu
 
 :run_all
+call :check_env
 echo.
 echo Dang khoi dong Docker Database...
 docker compose -f backend/docker-compose.yml up -d
@@ -45,6 +46,7 @@ pause
 goto menu
 
 :run_dev
+call :check_env
 echo.
 echo Dang khoi chay Backend va Frontend...
 start "SmartFace Backend" cmd /k "cd /d "%~dp0backend" && npm run dev"
@@ -54,6 +56,7 @@ pause
 goto menu
 
 :run_backend
+call :check_env
 echo.
 echo Dang khoi chay Backend Server...
 start "SmartFace Backend" cmd /k "cd /d "%~dp0backend" && npm run dev"
@@ -61,6 +64,7 @@ pause
 goto menu
 
 :run_frontend
+call :check_env
 echo.
 echo Dang khoi chay Frontend Web App...
 start "SmartFace Frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev"
@@ -75,6 +79,7 @@ pause
 goto menu
 
 :install_deps
+call :check_env
 echo.
 echo Dang cai dat dependencies cho Backend...
 cd /d "%~dp0backend"
@@ -89,6 +94,7 @@ pause
 goto menu
 
 :seed_db
+call :check_env
 echo.
 echo Dang tao Prisma Client, Migrate va Seed Database...
 cd /d "%~dp0backend"
@@ -99,4 +105,16 @@ cd /d "%~dp0"
 echo Database Migrate va Seed hoan tat!
 pause
 goto menu
+
+:check_env
+if not exist "%~dp0backend\.env" (
+    echo [THONG BAO] Dang tao backend\.env tu .env.example...
+    copy "%~dp0backend\.env.example" "%~dp0backend\.env" > nul
+)
+if not exist "%~dp0frontend\.env" (
+    echo [THONG BAO] Dang tao frontend\.env tu .env.example...
+    copy "%~dp0frontend\.env.example" "%~dp0frontend\.env" > nul
+)
+goto :eof
+
 

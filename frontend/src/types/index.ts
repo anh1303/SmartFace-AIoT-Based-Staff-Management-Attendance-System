@@ -30,14 +30,17 @@ export interface WorkShift {
 }
 
 export interface AttendanceRecord {
+  id?: string;
   attendance_id: string;
   employee_id: string;
   type: "CHECK_IN" | "CHECK_OUT" | "TAN_CA";
   timestamp: string;       // ISO datetime
-  method: "FACE" | "FINGERPRINT" | "MANUAL";
+  method: "FACE" | "FINGERPRINT" | "MANUAL" | "CARD";
   device_id: string;
   verification_score: number; // 0-1
-  status: "ON_TIME" | "LATE" | "EARLY_LEAVE" | "ABSENT";
+  status: "VALID" | "INVALID" | "FLAGGED";
+  punctuality?: "ON_TIME" | "LATE" | "EARLY_LEAVE";
+  raw_status?: string;
 }
 
 export interface DailyAttendanceSummary {
@@ -48,8 +51,8 @@ export interface DailyAttendanceSummary {
   first_check_in?: string | null;
   last_check_out?: string | null;
   total_working_hours?: number;
-  late_early: number;   // Số giây đi trễ / về sớm (làm tròn 30 phút)
-  overtime: number;     // Số giây tăng ca (làm tròn 30 phút)
+  late_early: number;   // Số giờ đi trễ / về sớm (đơn vị: giờ, làm tròn nấc 0.5h)
+  overtime: number;     // Số giờ tăng ca (đơn vị: giờ, làm tròn nấc 0.5h)
   attendance_status: string;
   updated_at?: string;
 }
@@ -84,6 +87,8 @@ export interface UserSession {
   full_name: string;
   email: string;
   role: Role;
+  role_name?: string;
+  is_manager?: boolean;
   position: string;
   department: string;
   avatar: string;

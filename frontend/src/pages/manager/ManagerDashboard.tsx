@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { formatVNTime } from '../../utils/dateUtils';
+import { formatVNTime, getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
 import {
   Users,
   Clock,
@@ -35,15 +35,18 @@ export const ManagerDashboard: React.FC = () => {
 
   // Latest date punches or today
   const latestDateStr = attendance.length > 0
-    ? attendance[0].timestamp.slice(0, 10)
-    : new Date().toISOString().slice(0, 10);
+    ? formatVNDateISO(attendance[0].timestamp)
+    : getTodayVNString();
 
-  const todayPunches = attendance.filter(a => a.timestamp.startsWith(latestDateStr));
-  const onTimeCount = todayPunches.filter(a => a.status === 'ON_TIME').length;
-  const lateCount = todayPunches.filter(a => a.status === 'LATE' || a.status === 'EARLY_LEAVE').length;
+  const getPunctuality = (a: { punctuality?: string; status: string }) =>
+    a.punctuality || (a.status === 'VALID' ? 'ON_TIME' : a.status);
+
+  const todayPunches = attendance.filter(a => formatVNDateISO(a.timestamp) === latestDateStr);
+  const onTimeCount = todayPunches.filter(a => getPunctuality(a) === 'ON_TIME').length;
+  const lateCount = todayPunches.filter(a => getPunctuality(a) === 'LATE' || getPunctuality(a) === 'EARLY_LEAVE').length;
   const onTimeRate = todayPunches.length > 0
     ? ((onTimeCount / todayPunches.length) * 100).toFixed(1)
-    : (attendance.length > 0 ? ((attendance.filter(a => a.status === 'ON_TIME').length / attendance.length) * 100).toFixed(1) : '100.0');
+    : (attendance.length > 0 ? ((attendance.filter(a => getPunctuality(a) === 'ON_TIME').length / attendance.length) * 100).toFixed(1) : '100.0');
 
   // Dynamic Weekly attendance bar chart data from attendance records
   const dayLabels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
@@ -61,7 +64,7 @@ export const ManagerDashboard: React.FC = () => {
     const d = new Date(a.timestamp);
     const dayLabel = dayLabels[d.getDay()];
     if (dayCounts[dayLabel]) {
-      if (a.status === 'ON_TIME') dayCounts[dayLabel].onTime += 1;
+      if (getPunctuality(a) === 'ON_TIME') dayCounts[dayLabel].onTime += 1;
       else dayCounts[dayLabel].late += 1;
     }
   });
@@ -80,7 +83,7 @@ export const ManagerDashboard: React.FC = () => {
   const deptColors = ['#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#06b6d4', '#64748b'];
   const deptCounts: Record<string, number> = {};
   employees.forEach(e => {
-    const d = e.department || 'Chưa phân ban';
+    const d = e.department || 'Chưa phân chức vụ';
     deptCounts[d] = (deptCounts[d] || 0) + 1;
   });
 
@@ -209,7 +212,7 @@ export const ManagerDashboard: React.FC = () => {
 
         {/* Right: Department Structure (col-span-4) */}
         <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col justify-between">
-          <h3 className="font-bold text-white text-base mb-4">Cấu trúc phòng ban</h3>
+          <h3 className="font-bold text-white text-base mb-4">Cấu trúc chức vụ</h3>
 
           <div className="flex-1 flex items-center justify-center py-2">
             <div className="relative w-36 h-36">
@@ -235,7 +238,7 @@ export const ManagerDashboard: React.FC = () => {
               </ResponsiveContainer>
               <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
                 <span className="text-xl font-bold font-mono text-white">{deptData.length}</span>
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Phòng ban</span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Chức vụ</span>
               </div>
             </div>
           </div>
@@ -312,14 +315,20 @@ export const ManagerDashboard: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-3 text-right">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${att.status === 'ON_TIME'
-                            ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
-                            : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
-                          }`}
-                      >
-                        {att.status === 'ON_TIME' ? 'Đúng giờ' : 'Muộn ca'}
-                      </span>
+                      {(() => {
+                        const punc = getPunctuality(att);
+                        return (
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${
+                              punc === 'ON_TIME'
+                                ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
+                                : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                            }`}
+                          >
+                            {punc === 'ON_TIME' ? 'Đúng giờ' : punc === 'EARLY_LEAVE' ? 'Về sớm' : 'Muộn ca'}
+                          </span>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );

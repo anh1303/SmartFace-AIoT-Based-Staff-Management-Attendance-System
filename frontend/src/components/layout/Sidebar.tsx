@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   ScanFace,
   LayoutDashboard,
@@ -26,7 +26,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { role, currentUser, logout } = useApp();
+  const { role, currentUser, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { label: 'Sắp xếp lịch làm', path: '/app/manager/schedule', icon: CalendarRange },
     { label: 'Theo dõi chấm công', path: '/app/manager/attendance', icon: Eye },
     { label: 'Báo cáo & Thống kê', path: '/app/manager/reports', icon: BarChart3 },
-    { label: 'Quản lý lương (Payroll)', path: '/app/manager/payroll', icon: Banknote },
+    { label: 'Quản lý lương', path: '/app/manager/payroll', icon: Banknote },
   ];
 
   const navItems = role === 'manager' ? managerNavItems : staffNavItems;

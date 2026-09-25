@@ -75,7 +75,7 @@ export const StaffSalaryHistory: React.FC = () => {
                 const net = Number(p.net_salary ?? 0);
 
                 return (
-                  <tr key={p.payroll_id || (p as any).id || idx} className="hover:bg-slate-800/40 transition-colors">
+                  <tr key={p.payroll_id || idx} className="hover:bg-slate-800/40 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-white">
                       {p.period || p.payroll_period}
                     </td>

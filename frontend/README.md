@@ -1,6 +1,6 @@
-# 🎨 SmartFace Frontend — React 19 + Vite + Tailwind CSS v4
+# 🎨 SmartFace Frontend — React 19 + Vite + Tailwind CSS v4 + TanStack Query v5
 
-> **SmartFace Frontend** là ứng dụng Web Quản trị và Cổng tự phục vụ dành cho Hệ thống SmartFace AIoT. Được xây dựng trên nền tảng **React 19**, **Vite**, **TypeScript**, **Tailwind CSS v4** cùng giao diện thiết kế hiện đại **Glassmorphism & Dark Mode**.
+> **SmartFace Frontend** là ứng dụng Web Quản trị và Cổng tự phục vụ dành cho Hệ thống SmartFace AIoT. Được xây dựng trên nền tảng **React 19**, **Vite**, **TypeScript**, **TanStack Query v5**, **Tailwind CSS v4** cùng giao diện thiết kế hiện đại **Glassmorphism & Dark Mode**.
 
 ---
 
@@ -10,10 +10,11 @@
 | :--- | :---: | :--- |
 | **React** | `v19.0` | Thư viện giao diện chính, render UI mượt mà |
 | **Vite** | `v6.2` | Công cụ Build tool siêu tốc & Development Server |
-| **TypeScript** | `v5.8` | Kiểm tra kiểu dữ liệu tĩnh nghiêm ngặt & tự động gợi ý code |
+| **TypeScript** | `v5.8` | Kiểm tra kiểu dữ liệu tĩnh nghiêm ngặt & loại bỏ hoàn toàn `any` |
+| **TanStack Query** | `v5.67` | Quản lý Async State, Server Cache, Invalidation & Automatic Retry |
 | **Tailwind CSS** | `v4.1` | Styling Framework thế hệ mới cho giao diện Glassmorphism |
 | **React Router DOM** | `v7.18` | Định tuyến Client-side routing, hỗ trợ Protected Routes & Layouts |
-| **Recharts** | `v3.10` | Biểu đồ trực quan hóa dữ liệu chấm công, tỉ lệ đi làm & lương |
+| **Recharts** | `v3.10` | Biểu đồ trực quan hóa chi phí lương & tỷ lệ đi làm theo tuần từ DB |
 | **Lucide React** | `v0.546` | Bộ icon chuẩn UI/UX sắc nét |
 | **Socket.IO Client** | `v4.8` | Nhận tín hiệu chấm công và cập nhật Dashboard thời gian thực |
 
@@ -28,11 +29,11 @@
 
 ## 🚀 Hướng Dẫn Khởi Chạy
 
-### 🟢 Cách 1: Sử dụng Script Tự Động (`run.bat` tại thư mục gốc)
+### 🟢 Cách 1: Sử dụng Script Tự Động (`run.bat` tại thư mục gốc dự án)
 
-Bạn có thể mở file `run.bat` ở thư mục gốc dự án và chọn các tùy chọn:
-- Choose `[1]`: Chạy toàn bộ (Docker DB + Backend + Frontend).
-- Choose `[4]`: Chỉ chạy riêng Web Frontend (`http://localhost:5173`).
+Mở Terminal tại thư mục gốc `SmartFace-AIoT-Based-Staff-Management-Attendance-System/` và chọn tùy chọn:
+- Select `[1]`: Chạy toàn bộ (Docker DB + Backend + Frontend).
+- Select `[4]`: Chỉ chạy riêng Web Frontend (`http://localhost:5173`).
 
 ---
 
@@ -95,19 +96,23 @@ Danh sách biến môi trường trong file `frontend/.env`:
 frontend/
 ├── public/                 # Tài nguyên tĩnh (Favicon, logo, hình ảnh)
 ├── src/
-│   ├── main.tsx            # Entry point chính của ứng dụng React
+│   ├── main.tsx            # Entry point chính của ứng dụng React & QueryClientProvider
 │   ├── App.tsx             # Định tuyến Router & Cấu hình phân luồng Layout
 │   ├── index.css           # Custom styles, Glassmorphism, Theme & Tailwind setup
+│   ├── api/                # API Client Layer (axios/fetch credentials, HttpOnly auth)
 │   ├── components/         # Các Reusable UI Components
 │   │   ├── common/         # Component dùng chung (Toast, Badge, Modal, StatCard)
 │   │   └── layout/         # Header, Topbar, Sidebar, AppLayout
-│   ├── context/            # Global State Management (AppContext & Authentication)
+│   ├── context/            # Modular Global State Management (AuthContext & ToastContext)
+│   ├── features/           # Feature Modules (Biển diễn mô hình Feature-based)
+│   │   └── attendance-monitor/ # Feature giám sát chấm công, khóa ca & xuất báo cáo CSV
+│   ├── hooks/              # Domain-specific React Query Hooks (useEmployees, useShifts, useAttendance, usePayroll)
 │   ├── pages/              # Màn hình chức năng ứng dụng
 │   │   ├── public/         # LandingPage, LoginPage
-│   │   ├── manager/        # Manager Dashboard, Employee Manager, Schedule, Attendance, Payroll...
-│   │   └── staff/          # Staff Dashboard, Personal Attendance, Profile, Salary...
-│   ├── types/              # Interfaces & TypeScript Definitions
-│   └── utils/              # Helper functions (Date format, Currency, Socket client)
+│   │   ├── manager/        # Manager Dashboard, Employee Manager, Schedule, Attendance, Payroll, Reports...
+│   │   └── staff/          # Staff Dashboard, Personal Attendance, Profile, Schedule, SalaryEstimate...
+│   ├── types/              # Interfaces & TypeScript Definitions chuẩn hóa
+│   └── utils/              # Helper functions (getTodayVNString, formatVNDateISO, Currency, Socket client)
 ├── index.html              # HTML Template entry point
 ├── vite.config.ts          # Cấu hình Vite Server, Port & Proxy API
 ├── package.json            # Thư viện & Scripts
@@ -116,12 +121,14 @@ frontend/
 
 ---
 
-## 💻 Giao Diện & Trải Nghiệm Người Dùng (UI/UX Highlights)
+## 💻 Kiến Trúc Quản Lý Trạng Thái & Trải Nghiệm Người Dùng (Architecture & UI Highlights)
 
-- 🎨 **Phong Cách Glassmorphism & Dark Mode**: Thiết kế giao diện hiện đại, chuyên nghiệp với hiệu ứng mờ nhòe kính (backdrop-blur) và tông màu tối sang trọng.
-- 📊 **Dashboard Trực Quan Hoạ Số Liệu**: Sử dụng Recharts để hiển thị biểu đồ tròn tỉ lệ đi làm, biểu đồ cột chấm công tuần/tháng và thống kê thu nhập.
-- ⚡ **Cập Nhật Real-time Bằng Socket.IO**: Màn hình quản lý nhận thông báo nổi (Toast Notification) tức thì khi có nhân viên điểm danh thành công tại thiết bị.
-- 📱 **Responsive Hoàn Hảo**: Tương thích tốt trên màn hình máy tính bàn, laptop và thiết bị di động.
+- ⚡ **TanStack Query v5 Cache Management**: Thay thế mô hình God Object cũ bằng các Custom Hooks tách biệt theo domain (`useEmployees`, `useShifts`, `useAttendance`, `usePayroll`). Tự động revalidate và hủy bỏ cache an toàn khi người dùng Đăng xuất/Đăng nhập (`queryClient.clear()`).
+- 🔐 **Bảo Mật Xác Thực**: Lưu giữ Token trong HttpOnly Cookie từ Backend, khóa tính năng chuyển vai trò `switchRole` chỉ cho phép trong môi trường Development (`import.meta.env.DEV`).
+- 🌐 **Xử Lý Múi Giờ Chuẩn Vietnam (+07:00)**: Hàm `getTodayVNString()` và `formatVNDateISO()` sử dụng `Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })` đảm bảo chuỗi ngày `YYYY-MM-DD` luôn chính xác theo giờ Việt Nam.
+- 📊 **Thống Kê Dữ Liệu Thực Tế**: Biểu đồ Recharts trong `ManagerReports.tsx` lấy dữ liệu trực tiếp từ bảng lương và lịch sử chấm công 4 tuần gần nhất. Khi CSDL trống, hệ thống hiển thị trạng thái "Chưa có dữ liệu" rõ ràng.
+- 🎨 **Phong Cách Glassmorphism & Dark Mode**: Thiết kế giao diện hiện đại, mượt mà với hiệu ứng mờ nhòe kính (backdrop-blur) và tông màu tối sang trọng.
+- 📱 **Responsive Hoàn Hảo**: Tương thích mượt mà trên màn hình máy tính bàn, laptop và thiết bị di động.
 
 ---
 

@@ -112,7 +112,7 @@ export const LandingPage: React.FC = () => {
       <section id="benefits" className="py-20 px-6 max-w-7xl mx-auto w-full">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl sm:text-4xl font-bold text-white font-heading tracking-tight">
-            Giải pháp chuyên biệt cho từng phòng ban
+            Giải pháp chuyên biệt cho từng chức vụ & vị trí
           </h2>
           <p className="text-slate-400 mt-3 text-sm sm:text-base">
             Tối ưu hoá quy trình từ nhân viên, trưởng nhóm nhân sự đến chủ doanh nghiệp.
@@ -149,7 +149,7 @@ export const LandingPage: React.FC = () => {
             <ul className="space-y-3 text-xs sm:text-sm text-slate-400">
               <li className="flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                <span>Bảng sắp xếp lịch làm việc trực quan theo tuần và phòng ban.</span>
+                <span>Bảng sắp xếp lịch làm việc trực quan theo tuần và chức vụ.</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />

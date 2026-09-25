@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { formatVNDateISO } from '../../utils/dateUtils';
 import {
   DollarSign,
   Calendar,
@@ -38,7 +39,7 @@ export const StaffSalaryEstimate: React.FC = () => {
 
   // Attended days count
   const myAttendance = attendance.filter(a => a.employee_id === empCode);
-  const distinctDays = Array.from(new Set(myAttendance.map(a => a.timestamp.slice(0, 10)))).length;
+  const distinctDays = Array.from(new Set(myAttendance.map(a => formatVNDateISO(a.timestamp)))).length;
   const workDaysCount = distinctDays > 0 ? distinctDays : 19;
   const progressPercent = Math.min(100, Math.round((workDaysCount / 22) * 100));
 

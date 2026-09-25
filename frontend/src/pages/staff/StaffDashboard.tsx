@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatVNTime } from '../../utils/dateUtils';
+import { formatVNTime, getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
 import {
   Clock,
   CheckCircle2,
@@ -19,7 +19,7 @@ export const StaffDashboard: React.FC = () => {
   const { currentUser, workShifts, attendance, payroll, employees, bonusPenalty, showToast } = useApp();
   const [explainModalOpen, setExplainModalOpen] = useState(false);
   const [explainReason, setExplainReason] = useState('');
-  const [explainDate, setExplainDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [explainDate, setExplainDate] = useState(() => getTodayVNString());
 
   const empCode = currentUser?.employee_id || 'NV-001';
   const currentEmp = employees.find(e => e.employee_id === empCode);
@@ -35,10 +35,10 @@ export const StaffDashboard: React.FC = () => {
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const latestPunch = myAttendance[0];
-  const todayShift = myShifts.find(s => s.date === new Date().toISOString().slice(0, 10)) || myShifts[0];
+  const todayShift = myShifts.find(s => s.date === getTodayVNString()) || myShifts[0];
 
   // Distinct attendance dates
-  const attendedDates = Array.from(new Set(myAttendance.map(a => a.timestamp.slice(0, 10))));
+  const attendedDates = Array.from(new Set(myAttendance.map(a => formatVNDateISO(a.timestamp))));
   const workDaysCount = attendedDates.length;
 
   // Current period payroll record
@@ -60,10 +60,10 @@ export const StaffDashboard: React.FC = () => {
   const weekRhythm = [0, 1, 2, 3, 4, 5, 6].map(offset => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + offset);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = formatVNDateISO(d);
     const dayLabel = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
     const dayShift = myShifts.find(s => s.date === dateStr);
-    const dayPunches = myAttendance.filter(a => a.timestamp.startsWith(dateStr));
+    const dayPunches = myAttendance.filter(a => formatVNDateISO(a.timestamp) === dateStr);
     const inPunch = dayPunches.find(a => a.type === 'CHECK_IN') || dayPunches[dayPunches.length - 1];
     const outPunch = dayPunches.find(a => a.type === 'CHECK_OUT');
 
@@ -74,9 +74,10 @@ export const StaffDashboard: React.FC = () => {
     if (dayShift?.shift_type === 'OFF') {
       status = 'OFF';
     } else if (inPunch) {
-      status = inPunch.status === 'ON_TIME' ? 'ON_TIME' : 'LATE';
+      const inPunc = inPunch.punctuality || (inPunch.status === 'VALID' ? 'ON_TIME' : inPunch.status);
+      status = inPunc === 'ON_TIME' ? 'ON_TIME' : 'LATE';
       inText = formatVNTime(inPunch.timestamp, false);
-      outText = outPunch ? formatVNTime(outPunch.timestamp, false) : (dateStr === new Date().toISOString().slice(0, 10) ? 'Đang ca...' : '--:--');
+      outText = outPunch ? formatVNTime(outPunch.timestamp, false) : (dateStr === getTodayVNString() ? 'Đang ca...' : '--:--');
     }
 
     return {
@@ -123,11 +124,11 @@ export const StaffDashboard: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-1 flex items-center gap-2">
-              <span>{currentUser?.department || currentEmp?.department || 'Kỹ thuật AI'}</span>
+              <span>{currentUser?.department || currentEmp?.department || 'Nhân viên'}</span>
               <span>•</span>
               <span className="text-green-500 font-medium flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                Mới nhất: {latestPunch ? `${latestPunch.type === 'CHECK_IN' ? 'Check-in' : 'Check-out'} ${formatVNTime(latestPunch.timestamp, false)} (${latestPunch.status === 'ON_TIME' ? 'Đúng giờ' : 'Trễ/Sớm'})` : 'Chưa có lượt quẹt hôm nay'}
+                Mới nhất: {latestPunch ? `${latestPunch.type === 'CHECK_IN' ? 'Check-in' : 'Check-out'} ${formatVNTime(latestPunch.timestamp, false)} (${(latestPunch.punctuality || (latestPunch.status === 'VALID' ? 'ON_TIME' : latestPunch.status)) === 'ON_TIME' ? 'Đúng giờ' : 'Trễ/Sớm'})` : 'Chưa có lượt quẹt hôm nay'}
               </span>
             </p>
             <p className="text-[11px] text-slate-500 font-mono mt-0.5">
@@ -204,7 +205,7 @@ export const StaffDashboard: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-500/10 text-green-500 uppercase font-mono">
-                {myAttendance.filter(a => a.status === 'ON_TIME').length} lượt chuẩn giờ
+                {myAttendance.filter(a => (a.punctuality || (a.status === 'VALID' ? 'ON_TIME' : a.status)) === 'ON_TIME').length} lượt chuẩn giờ
               </span>
             </div>
           </div>

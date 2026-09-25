@@ -20,7 +20,17 @@ build/
 *.tsbuildinfo
 coverage/
 
-# 3. IDE & Hệ điều hành
+# 3. Tests & Kiểm thử
+__tests__/
+**/__tests__/
+test/
+**/test/
+tests/
+**/tests/
+*.test.ts
+*.spec.ts
+
+# 4. IDE & Hệ điều hành
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
@@ -28,7 +38,7 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# 4. Logs & File tạm
+# 5. Logs & File tạm
 *.log
 npm-debug.log*
 yarn-debug.log*

@@ -38,6 +38,14 @@ export const ATTENDANCE_LOG_STATUS = {
 
 export type AttendanceLogStatus = (typeof ATTENDANCE_LOG_STATUS)[keyof typeof ATTENDANCE_LOG_STATUS]
 
+export const ATTENDANCE_PUNCTUALITY = {
+  ON_TIME: 'ON_TIME',
+  LATE: 'LATE',
+  EARLY_LEAVE: 'EARLY_LEAVE',
+} as const
+
+export type AttendancePunctuality = (typeof ATTENDANCE_PUNCTUALITY)[keyof typeof ATTENDANCE_PUNCTUALITY]
+
 export const DAILY_ATTENDANCE_STATUS = {
   PRESENT: 'PRESENT',
   ABSENT: 'ABSENT',

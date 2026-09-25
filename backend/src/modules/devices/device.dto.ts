@@ -9,3 +9,7 @@ export const createDeviceSchema = z.object({
 })
 
 export const updateDeviceSchema = createDeviceSchema.partial()
+
+export type CreateDeviceDto = z.infer<typeof createDeviceSchema>
+export type UpdateDeviceDto = z.infer<typeof updateDeviceSchema>
+

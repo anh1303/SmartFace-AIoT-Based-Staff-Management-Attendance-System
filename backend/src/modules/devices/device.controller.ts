@@ -1,17 +1,10 @@
 import { Router } from 'express'
-import { z } from 'zod'
 import { authenticate } from '../../middlewares/auth.middleware.js'
 import { authorize } from '../../middlewares/rbac.middleware.js'
 import { successResponse } from '../../common/response.js'
 import * as service from './device.service.js'
 import { emitDeviceEvent } from '../../sockets/device.gateway.js'
-
-const deviceSchema = z.object({
-  name: z.string().min(2),
-  location: z.string().min(2),
-  ip: z.string().ip().nullable().optional(),
-  status: z.enum(['ONLINE', 'OFFLINE', 'MAINTENANCE']).optional(),
-})
+import { createDeviceSchema, updateDeviceSchema } from './device.dto.js'
 
 export const deviceRouter = Router()
 deviceRouter.use(authenticate)
@@ -34,7 +27,7 @@ deviceRouter.get('/:id', async (req, res, next) => {
 
 deviceRouter.post('/', authorize('ADMIN', 'MANAGER'), async (req, res, next) => {
   try {
-    const device = await service.create(deviceSchema.parse(req.body))
+    const device = await service.create(createDeviceSchema.parse(req.body), req.user?.id)
     emitDeviceEvent('created', device)
     successResponse(res, device, 'Device created', 201)
   } catch (e) {
@@ -44,7 +37,7 @@ deviceRouter.post('/', authorize('ADMIN', 'MANAGER'), async (req, res, next) => 
 
 deviceRouter.put('/:id', authorize('ADMIN', 'MANAGER'), async (req, res, next) => {
   try {
-    const device = await service.update(String(req.params.id), deviceSchema.partial().parse(req.body))
+    const device = await service.update(String(req.params.id), updateDeviceSchema.parse(req.body), req.user?.id)
     emitDeviceEvent('updated', device)
     successResponse(res, device, 'Device updated')
   } catch (e) {
@@ -54,7 +47,7 @@ deviceRouter.put('/:id', authorize('ADMIN', 'MANAGER'), async (req, res, next) =
 
 deviceRouter.delete('/:id', authorize('ADMIN'), async (req, res, next) => {
   try {
-    await service.remove(String(req.params.id))
+    await service.remove(String(req.params.id), req.user?.id)
     successResponse(res, null, 'Device deleted')
   } catch (e) {
     next(e)

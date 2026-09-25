@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
 import {
   Calendar,
   Clock,
@@ -19,7 +20,7 @@ export const StaffSchedule: React.FC = () => {
   const { currentUser, workShifts, employees, attendance, showToast } = useApp();
   const [exchangeModalOpen, setExchangeModalOpen] = useState(false);
   const [exchangeTargetEmp, setExchangeTargetEmp] = useState('');
-  const [exchangeDate, setExchangeDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [exchangeDate, setExchangeDate] = useState(() => getTodayVNString());
   const [exchangeReason, setExchangeReason] = useState('');
 
   const getMonday = (d: Date) => {
@@ -65,7 +66,7 @@ export const StaffSchedule: React.FC = () => {
   const daysOfWeek = [0, 1, 2, 3, 4, 5, 6].map(offset => {
     const d = new Date(currentMonday);
     d.setDate(currentMonday.getDate() + offset);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = formatVNDateISO(d);
     const label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
     return {
       name: dayNames[offset],
@@ -74,7 +75,7 @@ export const StaffSchedule: React.FC = () => {
     };
   });
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getTodayVNString();
   const weekShifts = daysOfWeek.map(d => myShifts.find(s => s.date === d.date)).filter(Boolean);
   const totalHours = weekShifts.reduce((acc, s) => {
     if (!s || s.shift_type === 'OFF') return acc;
@@ -84,7 +85,7 @@ export const StaffSchedule: React.FC = () => {
   }, 0);
 
   const completedShifts = weekShifts.filter(s => s && s.date <= todayStr && s.shift_type !== 'OFF').length;
-  const onTimeCount = myAttendance.filter(a => a.status === 'ON_TIME').length;
+  const onTimeCount = myAttendance.filter(a => (a.punctuality || (a.status === 'VALID' ? 'ON_TIME' : a.status)) === 'ON_TIME').length;
   const onTimeRate = myAttendance.length > 0 ? ((onTimeCount / myAttendance.length) * 100).toFixed(0) : '100';
 
   return (

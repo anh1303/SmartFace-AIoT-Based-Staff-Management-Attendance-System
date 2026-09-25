@@ -9,6 +9,7 @@ export const createEmployeeSchema = z.object({
   position: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
   departmentId: z.number().int().positive().nullable().optional(),
+  department_id: z.number().int().positive().nullable().optional(),
   department: z.string().optional().nullable(),
   status: z.enum([EMPLOYEE_STATUS.ACTIVE, EMPLOYEE_STATUS.INACTIVE, EMPLOYEE_STATUS.TERMINATED]).optional(),
   hourly_rate: z.number().nonnegative().max(999999999999, 'Lương giờ tối đa 999 tỷ').optional(),
@@ -17,3 +18,7 @@ export const createEmployeeSchema = z.object({
 })
 
 export const updateEmployeeSchema = createEmployeeSchema.partial()
+
+export type CreateEmployeeDto = z.infer<typeof createEmployeeSchema>
+export type UpdateEmployeeDto = z.infer<typeof updateEmployeeSchema>
+

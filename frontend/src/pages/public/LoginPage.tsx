@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   ScanFace,
   ShieldCheck,
@@ -14,7 +14,7 @@ import {
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useApp();
+  const { login } = useAuth();
   const [emailOrId, setEmailOrId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

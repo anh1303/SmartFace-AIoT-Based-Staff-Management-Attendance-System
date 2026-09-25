@@ -160,16 +160,30 @@ export const StaffAttendance: React.FC = () => {
                         {(record.verification_score * 100).toFixed(1)}% Match
                       </td>
                       <td className="py-3.5 px-4">
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-semibold ${record.status === 'ON_TIME'
-                              ? 'bg-green-500/10 text-green-500 border border-green-500/20'
-                              : record.status === 'LATE'
-                                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                            }`}
-                        >
-                          {record.status === 'ON_TIME' ? 'ĐÚNG GIỜ' : record.status === 'LATE' ? 'ĐI MUỘN' : 'VẮNG MẶT'}
-                        </span>
+                        {(() => {
+                          const punctuality = record.punctuality || (record.status === 'VALID' ? 'ON_TIME' : record.status);
+                          return (
+                            <span
+                              className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-semibold ${
+                                punctuality === 'ON_TIME'
+                                  ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+                                  : punctuality === 'LATE'
+                                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                    : punctuality === 'EARLY_LEAVE'
+                                      ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                              }`}
+                            >
+                              {punctuality === 'ON_TIME'
+                                ? 'ĐÚNG GIỜ'
+                                : punctuality === 'LATE'
+                                  ? 'ĐI MUỘN'
+                                  : punctuality === 'EARLY_LEAVE'
+                                    ? 'VỀ SỚM'
+                                    : 'VẮNG MẶT'}
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );

@@ -45,8 +45,8 @@ export const ManagerEmployeeList: React.FC = () => {
   const [newEmp, setNewEmp] = useState({
     employee_id: `NV-${String(employees.length + 1).padStart(3, '0')}`,
     full_name: '',
-    department: 'Kỹ thuật AI',
-    position: 'Kỹ sư phần mềm',
+    department: 'Nhân viên',
+    position: 'Nhân viên bán hàng',
     phone: '',
     email: '',
     status: 'ACTIVE' as const,
@@ -85,8 +85,8 @@ export const ManagerEmployeeList: React.FC = () => {
     setNewEmp({
       employee_id: `NV-${String(employees.length + 2).padStart(3, '0')}`,
       full_name: '',
-      department: 'Kỹ thuật AI',
-      position: 'Kỹ sư phần mềm',
+      department: 'Nhân viên',
+      position: 'Nhân viên bán hàng',
       phone: '',
       email: '',
       status: 'ACTIVE',
@@ -175,18 +175,18 @@ export const ManagerEmployeeList: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <Filter className="w-3.5 h-3.5 text-blue-400" />
-            <span>Phòng ban:</span>
+            <span>Chức vụ:</span>
           </div>
           <select
             value={departmentFilter}
             onChange={e => setDepartmentFilter(e.target.value)}
             className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500"
           >
-            <option value="ALL">Tất cả phòng ban</option>
-            <option value="Kỹ thuật AI">Kỹ thuật AI</option>
-            <option value="Vận hành & IT">Vận hành & IT</option>
-            <option value="Nhân sự & HR">Nhân sự & HR</option>
-            <option value="Kinh doanh & Dự án">Kinh doanh & Dự án</option>
+            <option value="ALL">Tất cả chức vụ</option>
+            <option value="Bảo vệ">Bảo vệ</option>
+            <option value="Nhân viên">Nhân viên</option>
+            <option value="Thu ngân">Thu ngân</option>
+            <option value="Quản lý">Quản lý</option>
           </select>
 
           <div className="flex items-center gap-1.5 text-xs text-slate-400 ml-2">
@@ -212,7 +212,7 @@ export const ManagerEmployeeList: React.FC = () => {
               <tr>
                 <th className="py-3.5 px-4 font-medium">Nhân sự</th>
                 <th className="py-3.5 px-4 font-medium">Mã NV</th>
-                <th className="py-3.5 px-4 font-medium">Phòng ban & Vị trí</th>
+                <th className="py-3.5 px-4 font-medium">Chức vụ</th>
                 <th className="py-3.5 px-4 font-medium">Liên hệ</th>
                 <th className="py-3.5 px-4 font-medium">Sinh trắc AI</th>
                 <th className="py-3.5 px-4 font-medium">Lương theo giờ (VNĐ)</th>
@@ -360,16 +360,16 @@ export const ManagerEmployeeList: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Phòng ban</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Chức vụ</label>
               <select
                 value={newEmp.department}
                 onChange={e => setNewEmp({ ...newEmp, department: e.target.value })}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white"
               >
-                <option value="Kỹ thuật AI">Kỹ thuật AI</option>
-                <option value="Vận hành & IT">Vận hành & IT</option>
-                <option value="Nhân sự & HR">Nhân sự & HR</option>
-                <option value="Kinh doanh & Dự án">Kinh doanh & Dự án</option>
+                <option value="Bảo vệ">Bảo vệ</option>
+                <option value="Nhân viên">Nhân viên</option>
+                <option value="Thu ngân">Thu ngân</option>
+                <option value="Quản lý">Quản lý</option>
               </select>
             </div>
 
@@ -464,16 +464,16 @@ export const ManagerEmployeeList: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Phòng ban</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Chức vụ</label>
                 <select
                   value={editEmployee.department}
                   onChange={e => setEditEmployee({ ...editEmployee, department: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white"
                 >
-                  <option value="Kỹ thuật AI">Kỹ thuật AI</option>
-                  <option value="Vận hành & IT">Vận hành & IT</option>
-                  <option value="Nhân sự & HR">Nhân sự & HR</option>
-                  <option value="Kinh doanh & Dự án">Kinh doanh & Dự án</option>
+                  <option value="Bảo vệ">Bảo vệ</option>
+                  <option value="Nhân viên">Nhân viên</option>
+                  <option value="Thu ngân">Thu ngân</option>
+                  <option value="Quản lý">Quản lý</option>
                 </select>
               </div>
 

@@ -19,6 +19,29 @@ export function getTodayVNString(): string {
 }
 
 /**
+ * Formats a Date object, ISO string, or timestamp into YYYY-MM-DD in Vietnam timezone (en-CA locale).
+ */
+export function formatVNDateISO(
+  dateInput: Date | string | number | null | undefined
+): string {
+  if (!dateInput) return getTodayVNString();
+  try {
+    const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
+    if (isNaN(d.getTime())) return getTodayVNString();
+
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: VN_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return formatter.format(d);
+  } catch {
+    return getTodayVNString();
+  }
+}
+
+/**
  * Formats a Date object or ISO string to HH:mm:ss (or HH:mm if includeSeconds=false) in Vietnam timezone.
  */
 export function formatVNTime(

@@ -1,12 +1,14 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { calculateNetSalary } from '../src/common/utils.js'
 
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🌱 Bắt đầu seed toàn bộ dữ liệu mẫu chuẩn cho 12 bảng trong CSDL...')
+  console.log('🌱 Bắt đầu seed toàn bộ dữ liệu mẫu chuẩn cho 14 bảng trong CSDL...')
 
   // 1. Xóa sạch dữ liệu cũ theo thứ tự quan hệ khóa ngoại
+  await prisma.attendance_locks.deleteMany({})
   await prisma.bonusPenalty.deleteMany({})
   await prisma.payrollRecord.deleteMany({})
   await prisma.daily_attendance_summary.deleteMany({})
@@ -208,7 +210,8 @@ async function main() {
     })
     employeesMap[empData.employee_code] = emp
   }
-  console.log('✅ 5. Bảng employees (6 bản ghi)')
+  await prisma.$executeRawUnsafe(`SELECT setval('employee_code_seq', 7, false);`)
+  console.log('✅ 5. Bảng employees (6 bản ghi + thiết lập sequence employee_code_seq)')
 
   // 7. Bảng 6: Employee Shifts
   const rawShifts = [
@@ -301,8 +304,8 @@ async function main() {
           work_date: new Date(`${s.date}T00:00:00.000Z`),
           work_day: workDay,
           shift_type: s.type,
-          start_time: s.start,
-          end_time: s.end,
+          start_time: s.start ? new Date(`1970-01-01T${s.start}:00.000Z`) : null,
+          end_time: s.end ? new Date(`1970-01-01T${s.end}:00.000Z`) : null,
           note: s.note || '',
         },
       })
@@ -313,10 +316,10 @@ async function main() {
 
   // 8. Bảng 7: Devices
   const devicesData = [
-    { name: 'FaceCam-01', location: 'Cổng chính - Tầng 1', ip: '192.168.1.101', status: 'ONLINE' },
-    { name: 'FaceCam-02', location: 'Cổng phòng R&D - Tầng 2', ip: '192.168.1.102', status: 'ONLINE' },
-    { name: 'FP-Gate-02', location: 'Máy chấm công vân tay Cổng B', ip: '192.168.1.103', status: 'ONLINE' },
-    { name: 'CAM-04', location: 'Camera Giám sát Khu Xưởng', ip: '192.168.1.104', status: 'OFFLINE' },
+    { name: 'FaceCam-01', location: 'Máy chấm công Face_ID Vào ca', ip: '192.168.1.101', status: 'ONLINE' },
+    { name: 'FaceCam-02', location: 'Máy chấm công Face_ID Tan ca', ip: '192.168.1.102', status: 'ONLINE' },
+    { name: 'Fingerprint-01', location: 'Máy chấm công vân tay Vào ca', ip: '192.168.1.103', status: 'ONLINE' },
+    { name: 'Fingerprint-02', location: 'Máy chấm công vân tay Tan ca', ip: '192.168.1.104', status: 'ONLINE' },
   ]
   for (const d of devicesData) {
     await prisma.device.create({
@@ -329,89 +332,91 @@ async function main() {
       },
     })
   }
-  console.log('✅ 7. Bảng devices (4 bản ghi)')
+  console.log(`✅ 7. Bảng devices (${devicesData.length} bản ghi)`)
 
-  // 9. Bảng 8: Face Embeddings
+  // 9. Bảng 8: Face Embeddings (pgvector 512-D ArcFace)
+  function generateNormalizedEmbedding(dim = 512): number[] {
+    const vec = Array.from({ length: dim }, () => Math.random() * 2 - 1)
+    const norm = Math.sqrt(vec.reduce((sum, v) => sum + v * v, 0))
+    return vec.map(v => parseFloat((v / norm).toFixed(6)))
+  }
+
   for (const code of ['NV-001', 'NV-002', 'NV-003', 'NV-004', 'NV-005']) {
     const emp = employeesMap[code]
     if (emp) {
-      await prisma.face_embeddings.create({
-        data: {
-          employee_id: emp.id,
-          embedding: Array(128).fill(0).map(() => parseFloat(Math.random().toFixed(4))),
-          model_version: 'arcface_v1',
-          sample_tag: 'FRONTAL',
-          quality_score: 0.98,
-          is_active: true,
-        },
-      })
+      const emb = generateNormalizedEmbedding(512)
+      const vectorStr = `[${emb.join(',')}]`
+      await prisma.$executeRaw`
+        INSERT INTO "face_embeddings" ("id", "employee_id", "embedding", "model_version", "sample_tag", "quality_score", "is_active", "created_at")
+        VALUES (gen_random_uuid(), ${emp.id}::uuid, ${vectorStr}::vector, 'arcface_v1', 'FRONTAL', 0.98, true, CURRENT_TIMESTAMP)
+      `
     }
   }
-  console.log('✅ 8. Bảng face_embeddings (5 bản ghi)')
+  console.log('✅ 8. Bảng face_embeddings (5 bản ghi vector 512-D)')
 
   // 10. Bảng 9: Attendance Logs (Đảm bảo độ lệch checkin/checkout không quá 1h so với ca)
   // 10. Bảng 9: Attendance Logs (Đảm bảo độ lệch checkin/checkout không quá 1h so với ca, múi giờ +07:00 GMT+7)
   const initialAttendance = [
     // --- Ngày 19/09/2026 ---
     // NV-001 (Full time 08:00 - 18:00): Vào ca 08:01:00, hết ca 18:00:00
-    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-19T08:01:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-19T18:00:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
+    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-19T08:01:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-19T18:00:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
 
     // NV-002 (Full time 08:00 - 18:00): Vào ca 08:26:00, hết ca 17:35:00
-    { code: 'NV-002', type: 'CHECK_IN', time: '2026-09-19T08:26:00+07:00', method: 'FINGERPRINT', device: 'FP-Gate-02', score: 0.97, status: 'LATE' },
-    { code: 'NV-002', type: 'CHECK_OUT', time: '2026-09-19T17:35:00+07:00', method: 'FINGERPRINT', device: 'FP-Gate-02', score: 0.96, status: 'EARLY_LEAVE' },
+    { code: 'NV-002', type: 'CHECK_IN', time: '2026-09-19T08:26:00+07:00', method: 'FINGERPRINT', device: 'Fingerprint-02', score: 0.97, status: 'VALID' },
+    { code: 'NV-002', type: 'CHECK_OUT', time: '2026-09-19T17:35:00+07:00', method: 'FINGERPRINT', device: 'Fingerprint-02', score: 0.96, status: 'VALID' },
 
     // NV-003 (Full time 08:00 - 18:00): Vào ca 07:55:40, hết ca 17:02:10
-    { code: 'NV-003', type: 'CHECK_IN', time: '2026-09-19T07:55:40+07:00', method: 'FACE', device: 'FaceCam-01', score: 1.0, status: 'ON_TIME' },
-    { code: 'NV-003', type: 'CHECK_OUT', time: '2026-09-19T17:02:10+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.98, status: 'EARLY_LEAVE' },
+    { code: 'NV-003', type: 'CHECK_IN', time: '2026-09-19T07:55:40+07:00', method: 'FACE', device: 'FaceCam-01', score: 1.0, status: 'VALID' },
+    { code: 'NV-003', type: 'CHECK_OUT', time: '2026-09-19T17:02:10+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.98, status: 'VALID' },
 
     // NV-004 (Ca chiều 13:00 - 18:00): Vào ca 13:01:15, hết ca 18:30:00
-    { code: 'NV-004', type: 'CHECK_IN', time: '2026-09-19T13:01:15+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-004', type: 'CHECK_OUT', time: '2026-09-19T18:30:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'ON_TIME' },
+    { code: 'NV-004', type: 'CHECK_IN', time: '2026-09-19T13:01:15+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'VALID' },
+    { code: 'NV-004', type: 'CHECK_OUT', time: '2026-09-19T18:30:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'VALID' },
 
     // NV-005 (Full time 08:00 - 18:00): Vào ca 08:35:10, hết ca 18:40:00
-    { code: 'NV-005', type: 'CHECK_IN', time: '2026-09-19T08:35:10+07:00', method: 'FINGERPRINT', device: 'FP-Gate-02', score: 0.98, status: 'LATE' },
-    { code: 'NV-005', type: 'CHECK_OUT', time: '2026-09-19T18:40:00+07:00', method: 'FINGERPRINT', device: 'FP-Gate-02', score: 0.98, status: 'ON_TIME' },
+    { code: 'NV-005', type: 'CHECK_IN', time: '2026-09-19T08:35:10+07:00', method: 'FINGERPRINT', device: 'Fingerprint-02', score: 0.98, status: 'VALID' },
+    { code: 'NV-005', type: 'CHECK_OUT', time: '2026-09-19T18:40:00+07:00', method: 'FINGERPRINT', device: 'Fingerprint-02', score: 0.98, status: 'VALID' },
 
     // --- Quá khứ Tuần 37 ---
-    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-18T07:58:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-18T18:00:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-002', type: 'CHECK_IN', time: '2026-09-18T07:55:00+07:00', method: 'FACE', device: 'CAM-04', score: 0.98, status: 'ON_TIME' },
-    { code: 'NV-002', type: 'CHECK_OUT', time: '2026-09-18T12:05:00+07:00', method: 'FACE', device: 'CAM-04', score: 0.98, status: 'ON_TIME' },
-    { code: 'NV-003', type: 'CHECK_IN', time: '2026-09-18T07:57:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-003', type: 'CHECK_OUT', time: '2026-09-18T18:02:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-004', type: 'CHECK_IN', time: '2026-09-18T13:00:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-004', type: 'CHECK_OUT', time: '2026-09-18T18:45:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-005', type: 'CHECK_IN', time: '2026-09-18T07:59:00+07:00', method: 'FINGERPRINT', device: 'FP-Gate-02', score: 0.98, status: 'ON_TIME' },
-    { code: 'NV-005', type: 'CHECK_OUT', time: '2026-09-18T18:00:00+07:00', method: 'FINGERPRINT', device: 'FP-Gate-02', score: 0.98, status: 'ON_TIME' },
+    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-18T07:58:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-18T18:00:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-002', type: 'CHECK_IN', time: '2026-09-18T07:55:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.98, status: 'VALID' },
+    { code: 'NV-002', type: 'CHECK_OUT', time: '2026-09-18T12:05:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.98, status: 'VALID' },
+    { code: 'NV-003', type: 'CHECK_IN', time: '2026-09-18T07:57:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-003', type: 'CHECK_OUT', time: '2026-09-18T18:02:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-004', type: 'CHECK_IN', time: '2026-09-18T13:00:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'VALID' },
+    { code: 'NV-004', type: 'CHECK_OUT', time: '2026-09-18T18:45:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'VALID' },
+    { code: 'NV-005', type: 'CHECK_IN', time: '2026-09-18T07:59:00+07:00', method: 'FINGERPRINT', device: 'Fingerprint-02', score: 0.98, status: 'VALID' },
+    { code: 'NV-005', type: 'CHECK_OUT', time: '2026-09-18T18:00:00+07:00', method: 'FINGERPRINT', device: 'Fingerprint-02', score: 0.98, status: 'VALID' },
 
-    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-17T13:01:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-17T18:40:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-002', type: 'CHECK_IN', time: '2026-09-17T08:15:00+07:00', method: 'FACE', device: 'CAM-04', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-002', type: 'CHECK_OUT', time: '2026-09-17T12:05:00+07:00', method: 'FACE', device: 'CAM-04', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-003', type: 'CHECK_IN', time: '2026-09-17T08:00:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-003', type: 'CHECK_OUT', time: '2026-09-17T18:15:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-004', type: 'CHECK_IN', time: '2026-09-17T13:03:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.98, status: 'ON_TIME' },
-    { code: 'NV-004', type: 'CHECK_OUT', time: '2026-09-17T18:30:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.98, status: 'ON_TIME' },
-    { code: 'NV-005', type: 'CHECK_IN', time: '2026-09-17T08:20:00+07:00', method: 'FINGERPRINT', device: 'FP-Gate-02', score: 0.98, status: 'LATE' },
-    { code: 'NV-005', type: 'CHECK_OUT', time: '2026-09-17T18:40:00+07:00', method: 'FINGERPRINT', device: 'FP-Gate-02', score: 0.98, status: 'ON_TIME' },
+    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-17T13:01:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'VALID' },
+    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-17T18:40:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'VALID' },
+    { code: 'NV-002', type: 'CHECK_IN', time: '2026-09-17T08:15:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'VALID' },
+    { code: 'NV-002', type: 'CHECK_OUT', time: '2026-09-17T12:05:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'VALID' },
+    { code: 'NV-003', type: 'CHECK_IN', time: '2026-09-17T08:00:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-003', type: 'CHECK_OUT', time: '2026-09-17T18:15:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-004', type: 'CHECK_IN', time: '2026-09-17T13:03:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.98, status: 'VALID' },
+    { code: 'NV-004', type: 'CHECK_OUT', time: '2026-09-17T18:30:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.98, status: 'VALID' },
+    { code: 'NV-005', type: 'CHECK_IN', time: '2026-09-17T08:20:00+07:00', method: 'FINGERPRINT', device: 'Fingerprint-02', score: 0.98, status: 'VALID' },
+    { code: 'NV-005', type: 'CHECK_OUT', time: '2026-09-17T18:40:00+07:00', method: 'FINGERPRINT', device: 'Fingerprint-02', score: 0.98, status: 'VALID' },
 
-    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-16T08:15:20+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'LATE' },
-    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-16T18:01:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-002', type: 'CHECK_IN', time: '2026-09-16T08:10:00+07:00', method: 'FACE', device: 'CAM-04', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-002', type: 'CHECK_OUT', time: '2026-09-16T12:10:00+07:00', method: 'FACE', device: 'CAM-04', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-003', type: 'CHECK_IN', time: '2026-09-16T07:55:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-003', type: 'CHECK_OUT', time: '2026-09-16T18:00:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
+    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-16T08:15:20+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-16T18:01:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-002', type: 'CHECK_IN', time: '2026-09-16T08:10:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'VALID' },
+    { code: 'NV-002', type: 'CHECK_OUT', time: '2026-09-16T12:10:00+07:00', method: 'FACE', device: 'FaceCam-02', score: 0.99, status: 'VALID' },
+    { code: 'NV-003', type: 'CHECK_IN', time: '2026-09-16T07:55:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-003', type: 'CHECK_OUT', time: '2026-09-16T18:00:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
 
-    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-15T08:10:10+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-15T12:00:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-002', type: 'CHECK_IN', time: '2026-09-15T08:25:10+07:00', method: 'FINGERPRINT', device: 'FP-Gate-02', score: 0.97, status: 'LATE' },
-    { code: 'NV-002', type: 'CHECK_OUT', time: '2026-09-15T12:00:00+07:00', method: 'FINGERPRINT', device: 'FP-Gate-02', score: 0.97, status: 'ON_TIME' },
+    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-15T08:10:10+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-15T12:00:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-002', type: 'CHECK_IN', time: '2026-09-15T08:25:10+07:00', method: 'FINGERPRINT', device: 'Fingerprint-02', score: 0.97, status: 'VALID' },
+    { code: 'NV-002', type: 'CHECK_OUT', time: '2026-09-15T12:00:00+07:00', method: 'FINGERPRINT', device: 'Fingerprint-02', score: 0.97, status: 'VALID' },
 
-    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-14T08:01:15+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-14T18:02:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'ON_TIME' },
-    { code: 'NV-004', type: 'CHECK_IN', time: '2026-09-14T13:05:00+07:00', method: 'MANUAL', device: 'Kiosk-Lobby', score: 1.0, status: 'ON_TIME' },
-    { code: 'NV-004', type: 'CHECK_OUT', time: '2026-09-14T18:00:00+07:00', method: 'MANUAL', device: 'Kiosk-Lobby', score: 1.0, status: 'ON_TIME' },
+    { code: 'NV-001', type: 'CHECK_IN', time: '2026-09-14T08:01:15+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-001', type: 'CHECK_OUT', time: '2026-09-14T18:02:00+07:00', method: 'FACE', device: 'FaceCam-01', score: 0.99, status: 'VALID' },
+    { code: 'NV-004', type: 'CHECK_IN', time: '2026-09-14T13:05:00+07:00', method: 'MANUAL', device: 'Fingerprint-01', score: 1.0, status: 'VALID' },
+    { code: 'NV-004', type: 'CHECK_OUT', time: '2026-09-14T18:00:00+07:00', method: 'MANUAL', device: 'Fingerprint-01', score: 1.0, status: 'VALID' },
   ]
 
   let logCount = 0
@@ -435,18 +440,18 @@ async function main() {
   console.log(`✅ 9. Bảng attendance_logs (${logCount} bản ghi)`)
 
   // 11. Bảng 10: Daily Attendance Summary
-  // Tổng hợp tự động từ attendance_logs theo employee_id + work_date
-  function roundTo30Minutes(seconds: number): number {
-    if (seconds <= 0) return 0;
-    return Math.round(seconds / 1800) * 1800;
+  // Tổng hợp tự động từ attendance_logs theo employee_id + work_date (Đơn vị: GIỜ, làm tròn nấc 0.5h = 30 phút)
+  function roundToHalfHour(seconds: number): number {
+    if (seconds <= 0) return 0
+    return Math.round(seconds / 1800) * 0.5
   }
 
   function parseTimeToSeconds(timeIso: string | null): number | null {
-    if (!timeIso) return null;
-    const d = new Date(timeIso);
-    if (isNaN(d.getTime())) return null;
-    const parts = d.toLocaleTimeString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }).split(':');
-    return parseInt(parts[0] || '0', 10) * 3600 + parseInt(parts[1] || '0', 10) * 60 + parseInt(parts[2] || '0', 10);
+    if (!timeIso) return null
+    const d = new Date(timeIso)
+    if (isNaN(d.getTime())) return null
+    const parts = d.toLocaleTimeString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }).split(':')
+    return parseInt(parts[0] || '0', 10) * 3600 + parseInt(parts[1] || '0', 10) * 60 + parseInt(parts[2] || '0', 10)
   }
 
   function calculateSummaryMetrics(
@@ -455,42 +460,42 @@ async function main() {
     checkInIso: string | null,
     checkOutIso: string | null
   ) {
-    const [sH, sM] = shiftStartStr.split(':').map(Number);
-    const [eH, eM] = shiftEndStr.split(':').map(Number);
-    const startSec = sH * 3600 + (sM || 0) * 60;
-    const endSec = eH * 3600 + (eM || 0) * 60;
+    const [sH, sM] = shiftStartStr.split(':').map(Number)
+    const [eH, eM] = shiftEndStr.split(':').map(Number)
+    const startSec = sH * 3600 + (sM || 0) * 60
+    const endSec = eH * 3600 + (eM || 0) * 60
 
-    const inSec = parseTimeToSeconds(checkInIso);
-    const outSec = parseTimeToSeconds(checkOutIso);
+    const inSec = parseTimeToSeconds(checkInIso)
+    const outSec = parseTimeToSeconds(checkOutIso)
 
-    let lateSec = 0;
+    let lateSec = 0
     if (inSec !== null && inSec > startSec) {
-      lateSec = inSec - startSec;
+      lateSec = inSec - startSec
     }
 
-    let earlySec = 0;
+    let earlySec = 0
     if (outSec !== null && outSec < endSec) {
-      earlySec = endSec - outSec;
+      earlySec = endSec - outSec
     }
 
-    const rawLateEarly = lateSec + earlySec;
-    const late_early = rawLateEarly > 0 ? roundTo30Minutes(rawLateEarly) : 0;
+    const rawLateEarly = lateSec + earlySec
+    const late_early = rawLateEarly > 0 ? roundToHalfHour(rawLateEarly) : 0
 
-    let overtime = 0;
+    let overtime = 0
     if (inSec !== null && outSec !== null) {
-      let actualWorkSec = outSec - inSec;
-      if (actualWorkSec < 0) actualWorkSec += 86400;
+      let actualWorkSec = outSec - inSec
+      if (actualWorkSec < 0) actualWorkSec += 86400
 
-      let shiftWorkSec = endSec - startSec;
-      if (shiftWorkSec < 0) shiftWorkSec += 86400;
+      let shiftWorkSec = endSec - startSec
+      if (shiftWorkSec < 0) shiftWorkSec += 86400
 
-      const rawOTSec = actualWorkSec - shiftWorkSec;
+      const rawOTSec = actualWorkSec - shiftWorkSec
       if (rawOTSec > 0) {
-        overtime = roundTo30Minutes(rawOTSec);
+        overtime = roundToHalfHour(rawOTSec)
       }
     }
 
-    return { late_early, overtime };
+    return { late_early, overtime }
   }
 
   const summariesData = [
@@ -518,6 +523,11 @@ async function main() {
     const emp = employeesMap[sum.code]
     if (emp) {
       const metrics = calculateSummaryMetrics('08:00', '17:30', sum.checkIn, sum.checkOut);
+      let workingHours = 0;
+      if (sum.checkIn && sum.checkOut) {
+        const diffMs = new Date(sum.checkOut).getTime() - new Date(sum.checkIn).getTime();
+        workingHours = Math.max(0, parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2)));
+      }
       await prisma.daily_attendance_summary.create({
         data: {
           employee_id: emp.id,
@@ -525,6 +535,7 @@ async function main() {
           shift_id: shiftOffice.id,
           first_check_in: sum.checkIn ? new Date(sum.checkIn) : null,
           last_check_out: sum.checkOut ? new Date(sum.checkOut) : null,
+          total_working_hours: workingHours,
           late_early: metrics.late_early,
           overtime: metrics.overtime,
           attendance_status: sum.status,
@@ -533,7 +544,7 @@ async function main() {
       sumCount++
     }
   }
-  console.log(`✅ 10. Bảng daily_attendance_summary (${sumCount} bản ghi)`)
+  console.log(`✅ 10. Bảng daily_attendance_summary (${sumCount} bản ghi - đơn vị giờ)`)
 
   // 12. Bảng 11: Bonus Penalty
   await prisma.bonusPenalty.create({
@@ -548,50 +559,65 @@ async function main() {
   // 13. Bảng 12: Payroll Records
   const initialPayroll = [
     // Kỳ 2026-09 (Kỳ hiện tại)
-    { code: 'NV-001', period: '2026-09', hourly: 120000, ot: 4.0, late: 0, allowance: 2500000, net: 23900000, status: 'PENDING' },
-    { code: 'NV-002', period: '2026-09', hourly: 110000, ot: 1.5, late: 0.5, allowance: 1800000, net: 21100000, status: 'PENDING' },
-    { code: 'NV-003', period: '2026-09', hourly: 150000, ot: 6.0, late: 0, allowance: 3200000, net: 30200000, status: 'PENDING' },
-    { code: 'NV-004', period: '2026-09', hourly: 125000, ot: 2.0, late: 0, allowance: 2000000, net: 24200000, status: 'PENDING' },
-    { code: 'NV-005', period: '2026-09', hourly: 100000, ot: 3.5, late: 1.5, allowance: 1500000, net: 19275000, status: 'PENDING' },
+    { code: 'NV-001', period: '2026-09', hourly: 120000, ot: 4.0, late: 0, allowance: 2500000, status: 'PENDING' },
+    { code: 'NV-002', period: '2026-09', hourly: 110000, ot: 1.5, late: 0.5, allowance: 1800000, status: 'PENDING' },
+    { code: 'NV-003', period: '2026-09', hourly: 150000, ot: 6.0, late: 0, allowance: 3200000, status: 'PENDING' },
+    { code: 'NV-004', period: '2026-09', hourly: 125000, ot: 2.0, late: 0, allowance: 2000000, status: 'PENDING' },
+    { code: 'NV-005', period: '2026-09', hourly: 100000, ot: 3.5, late: 1.5, allowance: 1500000, status: 'PENDING' },
 
     // Kỳ 2026-08 (Đã chốt)
-    { code: 'NV-001', period: '2026-08', hourly: 120000, ot: 5.5, late: 0, allowance: 2500000, net: 24170000, status: 'FINALIZED' },
-    { code: 'NV-002', period: '2026-08', hourly: 110000, ot: 2.0, late: 1.0, allowance: 1800000, net: 21310000, status: 'FINALIZED' },
-    { code: 'NV-003', period: '2026-08', hourly: 150000, ot: 8.0, late: 0, allowance: 3200000, net: 30400000, status: 'FINALIZED' },
-    { code: 'NV-004', period: '2026-08', hourly: 125000, ot: 0, late: 0.5, allowance: 2000000, net: 23975000, status: 'FINALIZED' },
-    { code: 'NV-005', period: '2026-08', hourly: 100000, ot: 4.0, late: 2.5, allowance: 1500000, net: 19375000, status: 'FINALIZED' },
+    { code: 'NV-001', period: '2026-08', hourly: 120000, ot: 5.5, late: 0, allowance: 2500000, status: 'FINALIZED' },
+    { code: 'NV-002', period: '2026-08', hourly: 110000, ot: 2.0, late: 1.0, allowance: 1800000, status: 'FINALIZED' },
+    { code: 'NV-003', period: '2026-08', hourly: 150000, ot: 8.0, late: 0, allowance: 3200000, status: 'FINALIZED' },
+    { code: 'NV-004', period: '2026-08', hourly: 125000, ot: 0, late: 0.5, allowance: 2000000, status: 'FINALIZED' },
+    { code: 'NV-005', period: '2026-08', hourly: 100000, ot: 4.0, late: 2.5, allowance: 1500000, status: 'FINALIZED' },
 
     // Kỳ 2026-07 (Đã chốt)
-    { code: 'NV-001', period: '2026-07', hourly: 120000, ot: 3.0, late: 0, allowance: 2200000, net: 24580000, status: 'FINALIZED' },
-    { code: 'NV-002', period: '2026-07', hourly: 110000, ot: 0, late: 0, allowance: 1800000, net: 22040000, status: 'FINALIZED' },
-    { code: 'NV-003', period: '2026-07', hourly: 150000, ot: 6.5, late: 0, allowance: 3200000, net: 31450000, status: 'FINALIZED' },
-    { code: 'NV-004', period: '2026-07', hourly: 125000, ot: 1.0, late: 0, allowance: 2000000, net: 24100000, status: 'FINALIZED' },
-    { code: 'NV-005', period: '2026-07', hourly: 100000, ot: 2.0, late: 1.0, allowance: 1500000, net: 19150000, status: 'FINALIZED' },
+    { code: 'NV-001', period: '2026-07', hourly: 120000, ot: 3.0, late: 0, allowance: 2200000, status: 'FINALIZED' },
+    { code: 'NV-002', period: '2026-07', hourly: 110000, ot: 0, late: 0, allowance: 1800000, status: 'FINALIZED' },
+    { code: 'NV-003', period: '2026-07', hourly: 150000, ot: 6.5, late: 0, allowance: 3200000, status: 'FINALIZED' },
+    { code: 'NV-004', period: '2026-07', hourly: 125000, ot: 1.0, late: 0, allowance: 2000000, status: 'FINALIZED' },
+    { code: 'NV-005', period: '2026-07', hourly: 100000, ot: 2.0, late: 1.0, allowance: 1500000, status: 'FINALIZED' },
 
     // Kỳ 2026-06 (Đã chốt)
-    { code: 'NV-001', period: '2026-06', hourly: 120000, ot: 2.0, late: 0, allowance: 2200000, net: 24480000, status: 'FINALIZED' },
-    { code: 'NV-002', period: '2026-06', hourly: 110000, ot: 1.0, late: 0, allowance: 1800000, net: 22140000, status: 'FINALIZED' },
-    { code: 'NV-003', period: '2026-06', hourly: 150000, ot: 5.0, late: 0, allowance: 3200000, net: 31100000, status: 'FINALIZED' },
+    { code: 'NV-001', period: '2026-06', hourly: 120000, ot: 2.0, late: 0, allowance: 2200000, status: 'FINALIZED' },
+    { code: 'NV-002', period: '2026-06', hourly: 110000, ot: 1.0, late: 0, allowance: 1800000, status: 'FINALIZED' },
+    { code: 'NV-003', period: '2026-06', hourly: 150000, ot: 5.0, late: 0, allowance: 3200000, status: 'FINALIZED' },
 
     // Kỳ 2026-05 (Đã chốt)
-    { code: 'NV-001', period: '2026-05', hourly: 120000, ot: 1.0, late: 0, allowance: 2200000, net: 24380000, status: 'FINALIZED' },
-    { code: 'NV-002', period: '2026-05', hourly: 110000, ot: 0, late: 0.5, allowance: 1800000, net: 22015000, status: 'FINALIZED' },
-    { code: 'NV-003', period: '2026-05', hourly: 150000, ot: 4.0, late: 0, allowance: 3200000, net: 30800000, status: 'FINALIZED' },
+    { code: 'NV-001', period: '2026-05', hourly: 120000, ot: 1.0, late: 0, allowance: 2200000, status: 'FINALIZED' },
+    { code: 'NV-002', period: '2026-05', hourly: 110000, ot: 0, late: 0.5, allowance: 1800000, status: 'FINALIZED' },
+    { code: 'NV-003', period: '2026-05', hourly: 150000, ot: 4.0, late: 0, allowance: 3200000, status: 'FINALIZED' },
   ]
 
   let prCount = 0
   for (const pr of initialPayroll) {
     const emp = employeesMap[pr.code]
     if (emp) {
+      const working_hours = 176
+      const otRate = 100000
+      const lateRate = 50000
+
+      const net_salary = calculateNetSalary({
+        hourly_rate: pr.hourly,
+        total_working_hours: working_hours,
+        total_overtime: pr.ot,
+        total_late_early: pr.late,
+        allowance: pr.allowance,
+        overtime_rate: otRate,
+        late_early_penalty: lateRate,
+      })
+
       await prisma.payrollRecord.create({
         data: {
           employeeId: emp.id,
           payroll_period: pr.period,
           hourly_rate: pr.hourly,
+          total_working_hours: working_hours,
           total_overtime: pr.ot,
           total_late_early: pr.late,
           allowance: pr.allowance,
-          net_salary: pr.net,
+          net_salary: net_salary,
           status: pr.status,
         },
       })
@@ -600,7 +626,7 @@ async function main() {
   }
   console.log(`✅ 12. Bảng payroll_records (${prCount} bản ghi)`)
 
-  // 13. Bảng 12: Audit Logs
+  // 13. Bảng 13: Audit Logs
   await prisma.auditLog.create({
     data: {
       userId: adminUser.id,
@@ -619,9 +645,18 @@ async function main() {
       new_values: { message: 'Phân ca làm việc tuần 37 thành công' },
     },
   })
-  console.log('✅ 12. Bảng audit_logs (2 bản ghi)')
+  console.log('✅ 13. Bảng audit_logs (2 bản ghi)')
 
-  console.log('🎉 Hoàn tất seed dữ liệu cho 12/12 bảng thành công!')
+  // 14. Bảng 14: Attendance Locks
+  await prisma.attendance_locks.createMany({
+    data: [
+      { work_date: new Date('2026-09-10T00:00:00.000Z'), is_locked: true, locked_by: 'manager' },
+      { work_date: new Date('2026-09-15T00:00:00.000Z'), is_locked: true, locked_by: 'admin' },
+    ],
+  })
+  console.log('✅ 14. Bảng attendance_locks (2 bản ghi ngày bị khóa mẫu)')
+
+  console.log('🎉 Hoàn tất seed dữ liệu cho 14/14 bảng thành công!')
 }
 
 main()

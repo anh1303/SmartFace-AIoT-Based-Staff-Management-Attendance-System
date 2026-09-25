@@ -1,3 +1,6 @@
+-- CreateExtension
+CREATE EXTENSION IF NOT EXISTS "vector";
+
 -- CreateTable
 CREATE TABLE "users" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -98,8 +101,8 @@ CREATE TABLE "daily_attendance_summary" (
     "first_check_in" TIMESTAMPTZ(6),
     "last_check_out" TIMESTAMPTZ(6),
     "total_working_hours" DECIMAL(5,2) NOT NULL DEFAULT 0,
-    "late_early" INTEGER NOT NULL DEFAULT 0,
-    "overtime" INTEGER NOT NULL DEFAULT 0,
+    "late_early" DECIMAL(5,2) NOT NULL DEFAULT 0,
+    "overtime" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "attendance_status" VARCHAR(30) NOT NULL DEFAULT 'PRESENT',
     "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -114,8 +117,8 @@ CREATE TABLE "employee_shifts" (
     "work_date" DATE NOT NULL,
     "work_day" VARCHAR(50) DEFAULT 'Thứ Hai',
     "shift_type" VARCHAR(50) DEFAULT 'OFFICE_HOURS',
-    "start_time" VARCHAR(20) DEFAULT '08:00',
-    "end_time" VARCHAR(20) DEFAULT '17:30',
+    "start_time" TIME(6),
+    "end_time" TIME(6),
     "note" VARCHAR(255),
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -126,7 +129,7 @@ CREATE TABLE "employee_shifts" (
 CREATE TABLE "face_embeddings" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "employee_id" UUID NOT NULL,
-    "embedding" REAL[],
+    "embedding" vector(512),
     "model_version" VARCHAR(50) NOT NULL DEFAULT 'arcface_v1',
     "sample_tag" VARCHAR(50) DEFAULT 'FRONTAL',
     "quality_score" DOUBLE PRECISION,
@@ -179,6 +182,17 @@ CREATE TABLE "bonus_penalty" (
     "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "bonus_penalty_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "attendance_locks" (
+    "id" SERIAL NOT NULL,
+    "work_date" DATE NOT NULL,
+    "is_locked" BOOLEAN NOT NULL DEFAULT true,
+    "locked_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "locked_by" VARCHAR(100),
+
+    CONSTRAINT "attendance_locks_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -236,7 +250,13 @@ CREATE UNIQUE INDEX "uq_emp_shift_date" ON "employee_shifts"("employee_id", "wor
 CREATE INDEX "idx_face_embeddings_emp_id" ON "face_embeddings"("employee_id");
 
 -- CreateIndex
+CREATE INDEX IF NOT EXISTS "idx_face_embeddings_embedding_hnsw" ON "face_embeddings" USING hnsw ("embedding" vector_cosine_ops);
+
+-- CreateIndex
 CREATE UNIQUE INDEX "roles_role_name_key" ON "roles"("role_name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "attendance_locks_work_date_key" ON "attendance_locks"("work_date");
 
 -- AddForeignKey
 ALTER TABLE "users" ADD CONSTRAINT "users_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE NO ACTION;
@@ -270,3 +290,7 @@ ALTER TABLE "employee_shifts" ADD CONSTRAINT "employee_shifts_shift_id_fkey" FOR
 
 -- AddForeignKey
 ALTER TABLE "face_embeddings" ADD CONSTRAINT "face_embeddings_employee_id_fkey" FOREIGN KEY ("employee_id") REFERENCES "employees"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+-- CreateSequence
+CREATE SEQUENCE IF NOT EXISTS employee_code_seq START WITH 1000;
+

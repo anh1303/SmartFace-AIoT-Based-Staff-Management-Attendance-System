@@ -69,8 +69,14 @@ export const ManagerPayroll: React.FC = () => {
     allowance: number;
   } | null>(null);
 
+  // Dynamic periods generated from payroll records
+  const availablePeriods = Array.from(new Set([
+    ...payroll.map(p => p.period || p.payroll_period).filter(Boolean) as string[],
+    selectedPeriod
+  ])).sort().reverse();
+
   // Filter records by selected period
-  const currentRecords = payroll.filter(p => p.period === selectedPeriod);
+  const currentRecords = payroll.filter(p => p.period === selectedPeriod || p.payroll_period === selectedPeriod);
   const isFinalized = currentRecords.length > 0 && currentRecords.every(p => p.status === 'FINALIZED');
 
   // Compute metrics
@@ -96,24 +102,12 @@ export const ManagerPayroll: React.FC = () => {
     e.preventDefault();
     if (!editingItem) return;
 
-    const otPay = otRate <= 10
-      ? editingItem.total_overtime * editingItem.hourly_rate * otRate
-      : editingItem.total_overtime * otRate;
-
-    const lateDed = lateRate <= 10
-      ? editingItem.total_late_early * editingItem.hourly_rate * lateRate
-      : editingItem.total_late_early * lateRate;
-
-    const basePay = editingItem.hourly_rate * editingItem.working_hours;
-    const net = Math.max(0, Math.round(basePay + otPay - lateDed + editingItem.allowance));
-
     updatePayrollItem(editingItem.record.payroll_id, {
       hourly_rate: editingItem.hourly_rate,
       working_hours: editingItem.working_hours,
       total_overtime: editingItem.total_overtime,
       total_late_early: editingItem.total_late_early,
       allowance: editingItem.allowance,
-      net_salary: net,
     });
 
     showToast(`Đã lưu thay đổi bảng lương cho ${editingItem.empName}!`, 'success');
@@ -149,7 +143,7 @@ export const ManagerPayroll: React.FC = () => {
                 : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                 }`}
             >
-              {isFinalized ? 'ĐÃ CHỐT SỔ (FINALIZED)' : 'ĐANG SOẠN THẢO (PENDING)'}
+              {isFinalized ? 'ĐÃ CHỐT SỔ' : 'ĐANG SOẠN THẢO'}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
@@ -167,9 +161,14 @@ export const ManagerPayroll: React.FC = () => {
               onChange={e => setSelectedPeriod(e.target.value)}
               className="bg-transparent text-xs text-white font-mono font-bold focus:outline-none cursor-pointer"
             >
-              <option value="2026-08" className="bg-slate-900">Tháng 08/2026</option>
-              <option value="2026-07" className="bg-slate-900">Tháng 07/2026</option>
-              <option value="2026-06" className="bg-slate-900">Tháng 06/2026</option>
+              {availablePeriods.map(period => {
+                const [year, month] = period.split('-');
+                return (
+                  <option key={period} value={period} className="bg-slate-900">
+                    Tháng {month}/{year}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -208,7 +207,7 @@ export const ManagerPayroll: React.FC = () => {
                 onClick={handleOpenPolicyModal}
                 className="text-[11px] text-blue-400 hover:text-blue-300 underline font-medium"
               >
-                Cấu hình
+                Thay đổi
               </button>
               <Sparkles className="w-4 h-4 text-amber-400" />
             </div>
@@ -224,7 +223,6 @@ export const ManagerPayroll: React.FC = () => {
               <span>1.5x <span className="text-sm font-normal text-slate-400">lương giờ</span></span>
             )}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Hệ số OT từ bảng <span className="text-blue-400 font-mono">bonus_penalty</span></p>
         </div>
 
         {/* Card 2: Mức phạt đi trễ / về sớm (Lấy từ bảng bonus_penalty) */}
@@ -237,7 +235,7 @@ export const ManagerPayroll: React.FC = () => {
                 onClick={handleOpenPolicyModal}
                 className="text-[11px] text-blue-400 hover:text-blue-300 underline font-medium"
               >
-                Cấu hình
+                Thay đổi
               </button>
               <AlertCircle className="w-4 h-4 text-red-400" />
             </div>
@@ -253,7 +251,7 @@ export const ManagerPayroll: React.FC = () => {
               <span>50.000 <span className="text-sm font-normal text-slate-400">₫/h</span></span>
             )}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Khấu trừ vi phạm từ bảng <span className="text-blue-400 font-mono">bonus_penalty</span></p>
+
         </div>
 
 
@@ -287,9 +285,6 @@ export const ManagerPayroll: React.FC = () => {
             <h2 className="text-sm font-bold text-white font-heading">
               Chi tiết bảng lương từng nhân sự - Kỳ {selectedPeriod}
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Dữ liệu được tổng hợp tự động từ bảng <span className="text-blue-400 font-mono">payroll_records</span> và <span className="text-blue-400 font-mono">daily_attendance_summary</span>.
-            </p>
           </div>
           <button
             type="button"
@@ -593,7 +588,7 @@ export const ManagerPayroll: React.FC = () => {
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-300">
-            Bạn đang yêu cầu mở khóa bảng lương kỳ <strong>{selectedPeriod}</strong>. Trạng thái sẽ được chuyển về <strong>ĐANG SOẠN THẢO (PENDING)</strong> để cho phép chỉnh sửa số liệu.
+            Bạn đang yêu cầu mở khóa bảng lương kỳ <strong>{selectedPeriod}</strong>. Trạng thái sẽ được chuyển về <strong>ĐANG SOẠN THẢO</strong> để cho phép chỉnh sửa số liệu.
           </p>
 
           <div className="pt-2 flex justify-end gap-2">
@@ -619,7 +614,7 @@ export const ManagerPayroll: React.FC = () => {
       <Modal
         isOpen={isPolicyModalOpen}
         onClose={() => setIsPolicyModalOpen(false)}
-        title="Cấu hình quy định Thưởng / Phạt (bonus_penalty)"
+        title="Thay đổi quy định Thưởng / Phạt"
         subtitle="Thiết lập hệ số tăng ca (OT) và định mức vi phạm đi trễ / về sớm"
       >
         <form onSubmit={handleSavePolicy} className="space-y-4">
@@ -674,7 +669,7 @@ export const ManagerPayroll: React.FC = () => {
               type="submit"
               className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md"
             >
-              Lưu cấu hình quy định
+              Lưu thay đổi quy định
             </button>
           </div>
         </form>

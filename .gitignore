@@ -20,6 +20,8 @@ dist/
 build/
 **/build/
 .next/
+.nuxt/
+.turbo/
 .vite/
 .cache/
 *.tsbuildinfo
@@ -27,7 +29,25 @@ coverage/
 **/coverage/
 
 # ==============================================================================
-# 3. MÔI TRƯỜNG PHÁT TRIỂN & HỆ ĐIỀU HÀNH (IDE & OS)
+# 3. TESTS & KIỂM THỬ (Không đưa thư mục test lên Git)
+# ==============================================================================
+__tests__/
+**/__tests__/
+test/
+**/test/
+tests/
+**/tests/
+*.test.ts
+*.test.tsx
+*.test.js
+*.test.jsx
+*.spec.ts
+*.spec.tsx
+*.spec.js
+*.spec.jsx
+
+# ==============================================================================
+# 4. MÔI TRƯỜNG PHÁT TRIỂN & HỆ ĐIỀU HÀNH (IDE & OS)
 # ==============================================================================
 .vscode/*
 !.vscode/extensions.json
@@ -41,35 +61,33 @@ ehthumbs.db
 desktop.ini
 
 # ==============================================================================
-# 4. LOGS & TEMPORARY FILES
+# 5. LOGS & TEMPORARY FILES
 # ==============================================================================
 *.log
-<<<<<<< Updated upstream
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.pnpm-debug.log*
 lerna-debug.log*
 uploads/
 **/uploads/
 temp/
 tmp/
-=======
 benchmark_cache/
 *.npy
 *.npz
 
 # ==============================================================================
-# 6. NODE.JS / FRONTEND & BACKEND DEPENDENCIES
+# 6. PYTHON & MÔI TRƯỜNG ẢO
 # ==============================================================================
-node_modules/
-**/node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-.turbo/
-.next/
-.nuxt/
-
->>>>>>> Stashed changes
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+**/venv/
+env/
+ENV/
+.pytest_cache/

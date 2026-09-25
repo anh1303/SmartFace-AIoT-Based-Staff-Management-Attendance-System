@@ -104,7 +104,7 @@ export const ManagerSchedule: React.FC = () => {
   });
 
   const handleCellClick = (empId: string, empName: string, date: string, dayLabel: string) => {
-    const targetEmp = employees.find(e => e.employee_id === empId || (e as any).id === empId);
+    const targetEmp = employees.find(e => e.employee_id === empId);
     if (targetEmp?.status === 'INACTIVE') {
       showToast(`Nhân viên ${empName} đang ở trạng thái TẠM NGƯNG, không thể phân bổ hoặc chỉnh sửa ca làm việc!`, 'warning');
       return;
@@ -149,7 +149,7 @@ export const ManagerSchedule: React.FC = () => {
       start_time: modalShiftType === 'OFF' ? '00:00' : modalStartTime,
       end_time: modalShiftType === 'OFF' ? '00:00' : modalEndTime,
       shift_type: modalShiftType,
-      department: emp?.department || 'Kỹ thuật AI',
+      department: emp?.department || 'Nhân viên',
       note: modalNote,
     });
 
@@ -234,18 +234,18 @@ export const ManagerSchedule: React.FC = () => {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <Filter className="w-3.5 h-3.5 text-blue-400" />
-            <span>Phòng ban:</span>
+            <span>Chức vụ:</span>
           </div>
           <select
             value={departmentFilter}
             onChange={e => setDepartmentFilter(e.target.value)}
             className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500"
           >
-            <option value="ALL">Tất cả phòng ban</option>
-            <option value="Kỹ thuật AI">Kỹ thuật AI</option>
-            <option value="Vận hành & IT">Vận hành & IT</option>
-            <option value="Nhân sự & HR">Nhân sự & HR</option>
-            <option value="Kinh doanh & Dự án">Kinh doanh & Dự án</option>
+            <option value="ALL">Tất cả chức vụ</option>
+            <option value="Bảo vệ">Bảo vệ</option>
+            <option value="Nhân viên">Nhân viên</option>
+            <option value="Thu ngân">Thu ngân</option>
+            <option value="Quản lý">Quản lý</option>
           </select>
         </div>
       </div>

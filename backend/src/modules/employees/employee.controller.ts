@@ -1,31 +1,17 @@
 import { Router } from 'express'
-import { z } from 'zod'
 import { authenticate } from '../../middlewares/auth.middleware.js'
 import { authorize } from '../../middlewares/rbac.middleware.js'
 import { successResponse } from '../../common/response.js'
+import { AppError } from '../../common/AppError.js'
+import { prisma } from '../../config/database.js'
 import * as service from './employee.service.js'
-
-const createSchema = z.object({
-  employee_code: z.string().optional(),
-  employee_id: z.string().optional(),
-  full_name: z.string().min(1, 'Họ và tên không được để trống'),
-  email: z.string().email('Email không hợp lệ').optional().or(z.literal('')).nullable(),
-  position: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  departmentId: z.number().int().positive().nullable().optional(),
-  department: z.string().optional().nullable(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'TERMINATED']).optional(),
-  hourly_rate: z.number().nonnegative().max(999999999999, 'Lương giờ tối đa 999 tỷ').optional(),
-  avatar: z.string().optional().nullable(),
-  avatar_url: z.string().optional().nullable(),
-})
-
-const updateSchema = createSchema.partial()
+import { createEmployeeSchema, updateEmployeeSchema } from './employee.dto.js'
 
 export const employeeRouter = Router()
 employeeRouter.use(authenticate)
 
-employeeRouter.get('/', async (req, res, next) => {
+// 17. Chỉ ADMIN và MANAGER mới được phép xem danh sách toàn bộ nhân viên + thông tin lương
+employeeRouter.get('/', authorize('ADMIN', 'MANAGER'), async (req, res, next) => {
   try {
     successResponse(res, await service.list(req.query))
   } catch (e) {
@@ -33,9 +19,22 @@ employeeRouter.get('/', async (req, res, next) => {
   }
 })
 
+// Xem chi tiết nhân viên: ADMIN / MANAGER xem tất cả, EMPLOYEE chỉ xem được chính mình
 employeeRouter.get('/:id', async (req, res, next) => {
   try {
     const id = req.params.id as string
+    if (req.user?.role === 'EMPLOYEE') {
+      const emp = await prisma.employee.findFirst({
+        where: { user_id: req.user.id },
+      })
+      if (!emp) {
+        throw new AppError(404, 'Không tìm thấy thông tin hồ sơ nhân viên của bạn')
+      }
+      const isSelf = emp.id === id || emp.employee_code === id
+      if (!isSelf) {
+        throw new AppError(403, 'Bạn không có quyền xem thông tin của nhân viên khác')
+      }
+    }
     successResponse(res, await service.get(id))
   } catch (e) {
     next(e)
@@ -44,12 +43,13 @@ employeeRouter.get('/:id', async (req, res, next) => {
 
 employeeRouter.post('/', authorize('ADMIN', 'MANAGER'), async (req, res, next) => {
   try {
-    const body = createSchema.parse(req.body)
+    const body = createEmployeeSchema.parse(req.body)
     const empData = {
       ...body,
       employee_code: body.employee_code || body.employee_id,
+      departmentId: body.departmentId || body.department_id,
     }
-    successResponse(res, await service.create(empData), 'Employee created', 201)
+    successResponse(res, await service.create(empData, req.user?.id), 'Employee created', 201)
   } catch (e) {
     next(e)
   }
@@ -60,7 +60,7 @@ employeeRouter.put('/:id', authorize('ADMIN', 'MANAGER'), async (req, res, next)
     const id = req.params.id as string
     successResponse(
       res,
-      await service.update(id, updateSchema.parse(req.body)),
+      await service.update(id, updateEmployeeSchema.parse(req.body), req.user?.id),
       'Employee updated',
     )
   } catch (e) {
@@ -68,10 +68,10 @@ employeeRouter.put('/:id', authorize('ADMIN', 'MANAGER'), async (req, res, next)
   }
 })
 
-employeeRouter.delete('/:id', authorize('ADMIN', 'MANAGER'), async (req, res, next) => {
+employeeRouter.delete('/:id', authorize('ADMIN'), async (req, res, next) => {
   try {
     const id = req.params.id as string
-    await service.remove(id)
+    await service.remove(id, req.user?.id)
     successResponse(res, null, 'Employee deleted')
   } catch (e) {
     next(e)

@@ -1,9 +1,28 @@
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { buildIdOrCodeWhere } from '../../common/utils.js'
+import { buildIdOrCodeWhere, generateUniqueEmployeeCode } from '../../common/utils.js'
+import { logAction } from '../audit-logs/audit.service.js'
 import { employeeInclude } from './employee.model.js'
 
-export function formatEmployee(emp: any) {
+export interface RawEmployeeDb {
+  id: string
+  employee_code?: string | null
+  full_name: string
+  department?: { name?: string } | null
+  position?: string | null
+  phone?: string | null
+  email?: string | null
+  status?: string | null
+  createdAt?: Date | null
+  updatedAt?: Date | null
+  face_embeddings?: unknown[] | null
+  fingerprint_enrolled?: boolean | null
+  avatar_url?: string | null
+  hourly_rate?: { toString(): string } | number | string | bigint | null
+  departmentId?: number | null
+}
+
+export function formatEmployee(emp: RawEmployeeDb) {
   return {
     id: emp.id,
     employee_id: emp.employee_code || emp.id,
@@ -87,7 +106,7 @@ export async function create(data: {
   hourly_rate?: number
   avatar?: string | null
   avatar_url?: string | null
-}) {
+}, actorUserId?: string) {
   let deptId = data.departmentId
 
   if (!deptId && data.department) {
@@ -98,11 +117,13 @@ export async function create(data: {
   }
 
   const emailVal = data.email && data.email.trim() !== '' ? data.email.trim() : null
-  const codeCandidate = data.employee_code && data.employee_code.trim() !== '' ? data.employee_code.trim() : `EMP-${Date.now()}`
+  const codeCandidate = data.employee_code && data.employee_code.trim() !== ''
+    ? data.employee_code.trim()
+    : await generateUniqueEmployeeCode()
 
   // Ensure unique employee_code
   const existingCode = await prisma.employee.findFirst({ where: { employee_code: codeCandidate } })
-  const finalCode = existingCode ? `EMP-${Date.now()}` : codeCandidate
+  const finalCode = existingCode ? await generateUniqueEmployeeCode() : codeCandidate
 
   // Check email uniqueness if email provided
   if (emailVal) {
@@ -129,6 +150,21 @@ export async function create(data: {
     include: employeeInclude,
   })
 
+  await logAction({
+    userId: actorUserId,
+    action: 'CREATE_EMPLOYEE',
+    target_table: 'employees',
+    record_id: created.id,
+    new_values: {
+      employee_code: created.employee_code,
+      full_name: created.full_name,
+      email: created.email,
+      position: created.position,
+      departmentId: created.departmentId,
+      status: created.status,
+    },
+  })
+
   return formatEmployee(created)
 }
 
@@ -146,6 +182,7 @@ export async function update(
     avatar?: string | null
     hourly_rate?: number
   },
+  actorUserId?: string,
 ) {
   const existing = await prisma.employee.findFirst({
     where: buildIdOrCodeWhere(idOrCode),
@@ -186,17 +223,64 @@ export async function update(
     }).catch(() => { })
   }
 
+  await logAction({
+    userId: actorUserId,
+    action: 'UPDATE_EMPLOYEE',
+    target_table: 'employees',
+    record_id: existing.id,
+    old_values: {
+      full_name: existing.full_name,
+      email: existing.email,
+      position: existing.position,
+      departmentId: existing.departmentId,
+      status: existing.status,
+      hourly_rate: existing.hourly_rate ? Number(existing.hourly_rate) : 0,
+    },
+    new_values: {
+      full_name: updated.full_name,
+      email: updated.email,
+      position: updated.position,
+      departmentId: updated.departmentId,
+      status: updated.status,
+      hourly_rate: updated.hourly_rate ? Number(updated.hourly_rate) : 0,
+    },
+  })
+
   return formatEmployee(updated)
 }
 
-export async function remove(idOrCode: string) {
+/**
+ * 5. Soft-delete nhân viên: chuyển trạng thái sang TERMINATED và vô hiệu hóa tài khoản User trong transaction
+ */
+export async function terminate(idOrCode: string, actorUserId?: string) {
   const existing = await prisma.employee.findFirst({
     where: buildIdOrCodeWhere(idOrCode),
   })
   if (!existing) throw new AppError(404, 'Employee not found')
 
-  await prisma.employee.update({
-    where: { id: existing.id },
-    data: { status: 'TERMINATED' },
+  return prisma.$transaction(async (tx) => {
+    await tx.employee.update({
+      where: { id: existing.id },
+      data: { status: 'TERMINATED' },
+    })
+
+    if (existing.user_id) {
+      await tx.user.update({
+        where: { id: existing.user_id },
+        data: { is_active: false },
+      }).catch(() => { })
+    }
+
+    await logAction({
+      userId: actorUserId,
+      action: 'TERMINATE_EMPLOYEE',
+      target_table: 'employees',
+      record_id: existing.id,
+      old_values: { status: existing.status },
+      new_values: { status: 'TERMINATED', user_disabled: true },
+    })
   })
 }
+
+// Giữ alias remove để đảm bảo tương thích ngược toàn bộ router/controller
+export const remove = terminate

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatVNTime } from '../../utils/dateUtils';
 import {
@@ -13,7 +13,7 @@ interface TopbarProps {
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
-  const { role, currentUser, logout } = useApp();
+  const { role, currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const [timeStr, setTimeStr] = useState<string>('');
 
@@ -38,56 +38,48 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
+          className="lg:hidden p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
         >
           <Menu className="w-5 h-5" />
         </button>
+        <span className="text-xs font-mono text-cyan-400 bg-cyan-950/50 border border-cyan-800/50 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+          {timeStr || 'LIVE'}
+        </span>
       </div>
 
-      {/* Right section: System telemetry, live clock & user identity */}
-      <div className="flex items-center gap-3">
-        {/* Edge AI Telemetry Badge */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-500 text-xs">
-          <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          <span className="font-mono text-[11px] font-medium tracking-tight">
-            12/12 CAMS ONLINE • 24ms
-          </span>
-        </div>
-
-        {/* Live Clock */}
-        <div className="hidden xl:block font-mono text-xs text-slate-400 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-          {timeStr}
-        </div>
-
-        {/* Authenticated User Status */}
-        <div className="flex items-center gap-2.5 pl-2 border-l border-slate-800">
-          <div className="text-right hidden sm:block">
-            <p className="text-xs font-semibold text-white leading-tight">
-              {currentUser?.full_name || (role === 'manager' ? 'Nguyễn Minh Anh' : 'Nguyễn Văn A')}
+      {/* Right section: Profile & Logout */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {currentUser?.avatar ? (
+            <img
+              src={currentUser.avatar}
+              alt={currentUser.full_name}
+              className="w-9 h-9 rounded-full object-cover border border-slate-700"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold">
+              {currentUser?.full_name?.charAt(0) || 'U'}
+            </div>
+          )}
+          <div className="hidden sm:block text-left">
+            <p className="text-xs font-semibold text-white leading-none">
+              {currentUser?.full_name || 'Người dùng'}
             </p>
-            <span className={`text-[10px] font-mono uppercase font-bold ${role === 'manager' ? 'text-amber-400' : 'text-blue-400'
-              }`}>
-              {role === 'manager' ? 'Quản lý' : 'Nhân viên'}
-            </span>
+            <p className="text-[10px] text-slate-400 mt-1 capitalize leading-none">
+              {role === 'manager' ? 'Quản Lý (Manager)' : 'Nhân Viên (Employee)'}
+            </p>
           </div>
-
-          <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center">
-            {currentUser?.avatar ? (
-              <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              <User className="w-4 h-4 text-slate-400" />
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            title="Đăng xuất khỏi hệ thống"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
         </div>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          title="Đăng xuất khỏi hệ thống"
+          className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 border border-slate-700/60 hover:border-rose-500/30 transition-colors cursor-pointer"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
       </div>
     </header>
   );

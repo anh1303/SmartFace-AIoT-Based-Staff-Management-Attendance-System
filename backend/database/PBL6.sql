@@ -149,8 +149,8 @@ CREATE TABLE public.daily_attendance_summary (
     first_check_in timestamp(6) with time zone,
     last_check_out timestamp(6) with time zone,
     total_working_hours numeric(5,2) DEFAULT 0 NOT NULL,
-    late_minutes integer DEFAULT 0 NOT NULL,
-    early_leave_minutes integer DEFAULT 0 NOT NULL,
+    late_early integer DEFAULT 0 NOT NULL,
+    overtime integer DEFAULT 0 NOT NULL,
     attendance_status character varying(30) DEFAULT 'PRESENT'::character varying NOT NULL,
     updated_at timestamp(6) with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -214,6 +214,38 @@ ALTER SEQUENCE public.departments_id_seq OWNER TO postgres;
 
 ALTER SEQUENCE public.departments_id_seq OWNED BY public.departments.id;
 
+--
+-- Name: bonus_penalty; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.bonus_penalty (
+    id integer NOT NULL,
+    overtime_rate numeric(10,2) DEFAULT 1.50 NOT NULL,
+    late_early_penalty numeric(15,2) DEFAULT 0.00 NOT NULL,
+    description character varying(255),
+    created_at timestamp(6) with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp(6) with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+ALTER TABLE public.bonus_penalty OWNER TO postgres;
+
+--
+-- Name: bonus_penalty_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.bonus_penalty_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.bonus_penalty_id_seq OWNER TO postgres;
+
+ALTER SEQUENCE public.bonus_penalty_id_seq OWNED BY public.bonus_penalty.id;
+
+
 
 --
 -- Name: employee_shifts; Type: TABLE; Schema: public; Owner: postgres
@@ -222,9 +254,13 @@ ALTER SEQUENCE public.departments_id_seq OWNED BY public.departments.id;
 CREATE TABLE public.employee_shifts (
     id bigint NOT NULL,
     employee_id uuid NOT NULL,
-    shift_id integer NOT NULL,
-    effective_from date NOT NULL,
-    effective_to date,
+    shift_id integer DEFAULT 1 NOT NULL,
+    work_date date NOT NULL,
+    work_day character varying(50) DEFAULT 'Thứ Hai'::character varying,
+    shift_type character varying(50) DEFAULT 'OFFICE_HOURS'::character varying,
+    start_time character varying(20) DEFAULT '08:00'::character varying,
+    end_time character varying(20) DEFAULT '17:30'::character varying,
+    note character varying(255),
     created_at timestamp(6) with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
@@ -266,9 +302,8 @@ CREATE TABLE public.employees (
     phone character varying(20),
     email character varying(100),
     avatar_url text,
-    base_salary numeric(12,2) DEFAULT 0,
+    hourly_rate numeric(15,2) DEFAULT 0,
     status character varying(20) DEFAULT 'ACTIVE'::character varying NOT NULL,
-    deleted_at timestamp(6) with time zone,
     created_at timestamp(6) with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp(6) with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -302,16 +337,12 @@ CREATE TABLE public.payroll_records (
     id bigint NOT NULL,
     employee_id uuid NOT NULL,
     payroll_period character varying(7) NOT NULL,
-    base_salary numeric(12,2) DEFAULT 0 NOT NULL,
-    allowance numeric(12,2) DEFAULT 0 NOT NULL,
-    deduction numeric(12,2) DEFAULT 0 NOT NULL,
-    total_paid numeric(12,2) DEFAULT 0 NOT NULL,
-    standard_days numeric(4,1) DEFAULT 0 NOT NULL,
-    actual_working_days numeric(4,1) DEFAULT 0 NOT NULL,
+    hourly_rate numeric(15,2) DEFAULT 0 NOT NULL,
+    total_overtime numeric(10,2) DEFAULT 0 NOT NULL,
+    total_late_early numeric(10,2) DEFAULT 0 NOT NULL,
+    net_salary numeric(15,2) DEFAULT 0 NOT NULL,
     total_working_hours numeric(6,2) DEFAULT 0 NOT NULL,
-    total_late_minutes integer DEFAULT 0 NOT NULL,
-    total_early_leave_minutes integer DEFAULT 0 NOT NULL,
-    late_count integer DEFAULT 0 NOT NULL,
+    allowance numeric(15,2) DEFAULT 0 NOT NULL,
     status character varying(20) DEFAULT 'PENDING'::character varying NOT NULL,
     created_at timestamp(6) with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp(6) with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -544,7 +575,7 @@ COPY public.departments (id, department_code, name, created_at) FROM stdin;
 -- Data for Name: employee_shifts; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.employee_shifts (id, employee_id, shift_id, effective_from, effective_to, created_at) FROM stdin;
+COPY public.employee_shifts (id, employee_id, shift_id, work_date, work_day, shift_type, start_time, end_time, note, created_at) FROM stdin;
 \.
 
 
@@ -552,13 +583,13 @@ COPY public.employee_shifts (id, employee_id, shift_id, effective_from, effectiv
 -- Data for Name: employees; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.employees (id, employee_code, user_id, department_id, full_name, "position", phone, email, avatar_url, base_salary, status, deleted_at, created_at, updated_at) FROM stdin;
-53e05d36-1dcb-4e94-b410-1141a0e4c76e	NV-001	2cc60bd6-f2aa-4883-b8f6-4c4eb2e3d415	9	Nguyễn Văn A	AI Engineer Lead	0987.654.321	anv@aiot.corp	https://lh3.googleusercontent.com/aida-public/AB6AXuA0KS6nUhHdsndSeZ0LOeLkOfZAEfZAfm63Txsb3ryYsAUsiH0gLZ9VIT3CcW3uMw_MkVbDlsl53kBdUR8_KlS0J9tew5ToWiUd-q4Ct0wcosdejjVyvTptYjYHD0OY6LKozVPucFXEEHhfJqTf9_78zsEhE0xrMlMTYy2M9jxhP8ZrayoGhJz_E9WrMsLfaZlj-stHu3rWBibcwNnFos3o70DrOeSmxACoW5JdNeIoP3zwcbW4dK42	22000000.00	ACTIVE	\N	2024-01-15 15:00:00+07	2026-09-11 21:23:00.266+07
-6d83f62e-c2a3-4fa4-a625-415072e5fe70	NV-002	\N	10	Lê Hoàng Phúc	DevOps Engineer	0912.888.999	staff@company.com	https://lh3.googleusercontent.com/aida/AEtjO1WI3ysdLdr6Ya6JgC-p_9Nrkual12Y1Q6p9q4Ln5kqEpHlD50Rf1fcFfWprqeiBnI7yplufSIPIriJBm7cmqB9foAoNHZen3eTFSXz2qDN7q8YMY4rzBTWQDerqU9fyTBkbyV1XkqNLbr1gaEf5pNt4z-p2XSFW0goQoox1RfdhgeYyFDqdH1XwQLMvES4M7Jxu_utGWnqzMjF1b3SMgovKmeeN--rfL1vVW2BVhMloJ9HYKfXBJ81hcv8	19500000.00	ACTIVE	\N	2024-03-10 15:00:00+07	2026-09-11 21:23:00.267+07
-703c9ae2-1361-44a8-b4fe-987a5865b1b5	NV-003	967a19a9-cd06-4018-83ef-6f90e024231f	11	Nguyễn Minh Anh	HR Operations Manager	0934.567.890	manager@company.com	https://lh3.googleusercontent.com/aida/AEtjO1U0gZ8qJdE6oYqQ-R2V5d_h0b4VdCqX1_qZ_6M9=s256	26000000.00	ACTIVE	\N	2023-11-01 15:00:00+07	2026-09-11 21:23:00.269+07
-7f35b3d9-4e37-465a-8b66-848347a86ff3	NV-004	\N	9	Trần Thu Thảo	Computer Vision Researcher	0905.123.456	thao.tran@aiot.corp	https://lh3.googleusercontent.com/aida/AEtjO1Xw6tE-Kl6RJ0I4DImDsStSZc3dy2IU_ZbQk7wMhedEX9JhhFr0BZokHPz0wSZrZhqjYywULEMWtq5lPcL84X3aM6fdTnuWFHzAYO3Bq6xU57QOSfoPRD7TkdbT3C60GjGqI1SuN0moP_3u2hSYDZHJ_pViM0_ZPsVZizt9_RU5HK2yV0zXt5eWr5Un4rF1mMKbeZWwUieS7vg9zysgFJYqzQ9echXu2Lpdj6jcibnSkIeyv6bp8_gD3rg	21000000.00	ACTIVE	\N	2024-05-20 15:00:00+07	2026-09-11 21:23:00.269+07
-6aca9743-ff80-45a4-b20f-a4e51212d204	NV-005	\N	10	Nguyễn Hải Nam	IoT Hardware Specialist	0977.444.333	nam.nguyen@aiot.corp	https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80	18000000.00	ACTIVE	\N	2024-06-15 15:00:00+07	2026-09-11 21:23:00.27+07
-bebd7f11-6acb-4f8b-988d-2b31aee10617	NV-006	\N	12	Vũ Khánh Linh	Solutions Specialist	0944.555.666	linh.vu@aiot.corp	https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80	17000000.00	INACTIVE	\N	2024-02-01 15:00:00+07	2026-09-11 21:23:00.271+07
+COPY public.employees (id, employee_code, user_id, department_id, full_name, "position", phone, email, avatar_url, hourly_rate, status, created_at, updated_at) FROM stdin;
+53e05d36-1dcb-4e94-b410-1141a0e4c76e	NV-001	2cc60bd6-f2aa-4883-b8f6-4c4eb2e3d415	9	Nguyễn Văn A	AI Engineer Lead	0987.654.321	anv@aiot.corp	https://lh3.googleusercontent.com/aida-public/AB6AXuA0KS6nUhHdsndSeZ0LOeLkOfZAEfZAfm63Txsb3ryYsAUsiH0gLZ9VIT3CcW3uMw_MkVbDlsl53kBdUR8_KlS0J9tew5ToWiUd-q4Ct0wcosdejjVyvTptYjYHD0OY6LKozVPucFXEEHhfJqTf9_78zsEhE0xrMlMTYy2M9jxhP8ZrayoGhJz_E9WrMsLfaZlj-stHu3rWBibcwNnFos3o70DrOeSmxACoW5JdNeIoP3zwcbW4dK42	125000.00	ACTIVE	2024-01-15 15:00:00+07	2026-09-11 21:23:00.266+07
+6d83f62e-c2a3-4fa4-a625-415072e5fe70	NV-002	\N	10	Lê Hoàng Phúc	DevOps Engineer	0912.888.999	staff@company.com	https://lh3.googleusercontent.com/aida/AEtjO1WI3ysdLdr6Ya6JgC-p_9Nrkual12Y1Q6p9q4Ln5kqEpHlD50Rf1fcFfWprqeiBnI7yplufSIPIriJBm7cmqB9foAoNHZen3eTFSXz2qDN7q8YMY4rzBTWQDerqU9fyTBkbyV1XkqNLbr1gaEf5pNt4z-p2XSFW0goQoox1RfdhgeYyFDqdH1XwQLMvES4M7Jxu_utGWnqzMjF1b3SMgovKmeeN--rfL1vVW2BVhMloJ9HYKfXBJ81hcv8	110000.00	ACTIVE	2024-03-10 15:00:00+07	2026-09-11 21:23:00.267+07
+703c9ae2-1361-44a8-b4fe-987a5865b1b5	NV-003	967a19a9-cd06-4018-83ef-6f90e024231f	11	Nguyễn Minh Anh	HR Operations Manager	0934.567.890	manager@company.com	https://lh3.googleusercontent.com/aida/AEtjO1U0gZ8qJdE6oYqQ-R2V5d_h0b4VdCqX1_qZ_6M9=s256	150000.00	ACTIVE	2023-11-01 15:00:00+07	2026-09-11 21:23:00.269+07
+7f35b3d9-4e37-465a-8b66-848347a86ff3	NV-004	\N	9	Trần Thu Thảo	Computer Vision Researcher	0905.123.456	thao.tran@aiot.corp	https://lh3.googleusercontent.com/aida/AEtjO1Xw6tE-Kl6RJ0I4DImDsStSZc3dy2IU_ZbQk7wMhedEX9JhhFr0BZokHPz0wSZrZhqjYywULEMWtq5lPcL84X3aM6fdTnuWFHzAYO3Bq6xU57QOSfoPRD7TkdbT3C60GjGqI1SuN0moP_3u2hSYDZHJ_pViM0_ZPsVZizt9_RU5HK2yV0zXt5eWr5Un4rF1mMKbeZWwUieS7vg9zysgFJYqzQ9echXu2Lpdj6jcibnSkIeyv6bp8_gD3rg	120000.00	ACTIVE	2024-05-20 15:00:00+07	2026-09-11 21:23:00.269+07
+6aca9743-ff80-45a4-b20f-a4e51212d204	NV-005	\N	10	Nguyễn Hải Nam	IoT Hardware Specialist	0977.444.333	nam.nguyen@aiot.corp	https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80	100000.00	ACTIVE	2024-06-15 15:00:00+07	2026-09-11 21:23:00.27+07
+bebd7f11-6acb-4f8b-988d-2b31aee10617	NV-006	\N	12	Vũ Khánh Linh	Solutions Specialist	0944.555.666	linh.vu@aiot.corp	https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80	95000.00	INACTIVE	2024-02-01 15:00:00+07	2026-09-11 21:23:00.271+07
 \.
 
 
@@ -579,15 +610,15 @@ b6e42138-9cce-4567-9772-32fa3fcd1ae1	6aca9743-ff80-45a4-b20f-a4e51212d204	{0.984
 -- Data for Name: payroll_records; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.payroll_records (id, employee_id, payroll_period, base_salary, allowance, deduction, total_paid, standard_days, actual_working_days, total_working_hours, total_late_minutes, total_early_leave_minutes, late_count, status, created_at, updated_at) FROM stdin;
-1	53e05d36-1dcb-4e94-b410-1141a0e4c76e	2026-08	22000000.00	2500000.00	1050000.00	23450000.00	22.0	22.0	176.00	0	0	0	PENDING	2026-09-11 21:23:00.286+07	2026-09-11 21:23:00.286+07
-2	6d83f62e-c2a3-4fa4-a625-415072e5fe70	2026-08	19500000.00	1800000.00	950000.00	20350000.00	22.0	22.0	176.00	0	0	1	PENDING	2026-09-11 21:23:00.287+07	2026-09-11 21:23:00.287+07
-3	703c9ae2-1361-44a8-b4fe-987a5865b1b5	2026-08	26000000.00	3200000.00	1300000.00	27900000.00	22.0	22.0	176.00	0	0	0	PENDING	2026-09-11 21:23:00.288+07	2026-09-11 21:23:00.288+07
-4	7f35b3d9-4e37-465a-8b66-848347a86ff3	2026-08	21000000.00	2000000.00	1000000.00	22000000.00	21.0	21.0	168.00	0	0	0	PENDING	2026-09-11 21:23:00.289+07	2026-09-11 21:23:00.289+07
-5	6aca9743-ff80-45a4-b20f-a4e51212d204	2026-08	18000000.00	1500000.00	1200000.00	18300000.00	20.0	20.0	160.00	0	0	3	PENDING	2026-09-11 21:23:00.289+07	2026-09-11 21:23:00.289+07
-6	53e05d36-1dcb-4e94-b410-1141a0e4c76e	2026-07	22000000.00	2200000.00	1050000.00	23150000.00	23.0	23.0	184.00	0	0	0	FINALIZED	2026-09-11 21:23:00.29+07	2026-09-11 21:23:00.29+07
-7	6d83f62e-c2a3-4fa4-a625-415072e5fe70	2026-07	19500000.00	1800000.00	950000.00	20350000.00	23.0	23.0	184.00	0	0	0	FINALIZED	2026-09-11 21:23:00.29+07	2026-09-11 21:23:00.29+07
-8	703c9ae2-1361-44a8-b4fe-987a5865b1b5	2026-07	26000000.00	3200000.00	1300000.00	27900000.00	23.0	23.0	184.00	0	0	0	FINALIZED	2026-09-11 21:23:00.291+07	2026-09-11 21:23:00.291+07
+COPY public.payroll_records (id, employee_id, payroll_period, hourly_rate, total_overtime, total_late_early, net_salary, total_working_hours, allowance, status, created_at, updated_at) FROM stdin;
+1	53e05d36-1dcb-4e94-b410-1141a0e4c76e	2026-08	125000.00	0.00	0.00	24500000.00	176.00	2500000.00	PENDING	2026-09-11 21:23:00.286+07	2026-09-11 21:23:00.286+07
+2	6d83f62e-c2a3-4fa4-a625-415072e5fe70	2026-08	110000.00	0.00	50000.00	21110000.00	176.00	1800000.00	PENDING	2026-09-11 21:23:00.287+07	2026-09-11 21:23:00.287+07
+3	703c9ae2-1361-44a8-b4fe-987a5865b1b5	2026-08	150000.00	0.00	0.00	29600000.00	176.00	3200000.00	PENDING	2026-09-11 21:23:00.288+07	2026-09-11 21:23:00.288+07
+4	7f35b3d9-4e37-465a-8b66-848347a86ff3	2026-08	120000.00	0.00	0.00	22160000.00	168.00	2000000.00	PENDING	2026-09-11 21:23:00.289+07	2026-09-11 21:23:00.289+07
+5	6aca9743-ff80-45a4-b20f-a4e51212d204	2026-08	100000.00	0.00	150000.00	17350000.00	160.00	1500000.00	PENDING	2026-09-11 21:23:00.289+07	2026-09-11 21:23:00.289+07
+6	53e05d36-1dcb-4e94-b410-1141a0e4c76e	2026-07	125000.00	0.00	0.00	25200000.00	184.00	2200000.00	FINALIZED	2026-09-11 21:23:00.29+07	2026-09-11 21:23:00.29+07
+7	6d83f62e-c2a3-4fa4-a625-415072e5fe70	2026-07	110000.00	0.00	0.00	22040000.00	184.00	1800000.00	FINALIZED	2026-09-11 21:23:00.29+07	2026-09-11 21:23:00.29+07
+8	703c9ae2-1361-44a8-b4fe-987a5865b1b5	2026-07	150000.00	0.00	0.00	30800000.00	184.00	3200000.00	FINALIZED	2026-09-11 21:23:00.291+07	2026-09-11 21:23:00.291+07
 \.
 
 
@@ -692,6 +723,16 @@ ALTER TABLE ONLY public._prisma_migrations
 
 ALTER TABLE ONLY public.attendance_logs
     ADD CONSTRAINT attendance_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: bonus_penalty bonus_penalty_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bonus_penalty
+    ADD CONSTRAINT bonus_penalty_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.bonus_penalty ALTER COLUMN id SET DEFAULT nextval('public.bonus_penalty_id_seq'::regclass);
 
 
 --
@@ -827,7 +868,7 @@ CREATE INDEX idx_daily_summary_date ON public.daily_attendance_summary USING btr
 -- Name: idx_emp_shifts_lookup; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_emp_shifts_lookup ON public.employee_shifts USING btree (employee_id, effective_from);
+CREATE INDEX idx_emp_shifts_lookup ON public.employee_shifts USING btree (employee_id, work_date);
 
 
 --

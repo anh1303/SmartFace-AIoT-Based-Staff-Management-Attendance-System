@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 model User {
@@ -44,9 +46,8 @@ model Employee {
   phone                    String?                    @db.VarChar(20)
   email                    String?                    @unique @db.VarChar(100)
   avatar_url               String?                    @db.Text
-  base_salary              Decimal?                   @default(0) @db.Decimal(15, 2)
+  hourly_rate              Decimal?                   @default(0) @db.Decimal(15, 2)
   status                   String                     @default("ACTIVE") @db.VarChar(20)
-  deleted_at               DateTime?                  @db.Timestamptz(6)
   createdAt                DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   attendance_logs          attendance_logs[]
@@ -64,23 +65,19 @@ model Employee {
 }
 
 model PayrollRecord {
-  id                        BigInt   @id @default(autoincrement())
-  employeeId                String   @map("employee_id") @db.Uuid
-  payroll_period            String   @db.VarChar(7)
-  base_salary               Decimal  @default(0) @db.Decimal(15, 2)
-  allowance                 Decimal  @default(0) @db.Decimal(15, 2)
-  deduction                 Decimal  @default(0) @db.Decimal(15, 2)
-  total_paid                Decimal  @default(0) @db.Decimal(15, 2)
-  standard_days             Decimal  @default(0) @db.Decimal(4, 1)
-  actual_working_days       Decimal  @default(0) @db.Decimal(4, 1)
-  total_working_hours       Decimal  @default(0) @db.Decimal(6, 2)
-  total_late_minutes        Int      @default(0)
-  total_early_leave_minutes Int      @default(0)
-  late_count                Int      @default(0)
-  status                    String   @default("PENDING") @db.VarChar(20)
-  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updated_at                DateTime @default(now()) @db.Timestamptz(6)
-  employee                  Employee @relation(fields: [employeeId], references: [id], onUpdate: NoAction)
+  id                  BigInt   @id @default(autoincrement())
+  employeeId          String   @map("employee_id") @db.Uuid
+  payroll_period      String   @db.VarChar(7)
+  hourly_rate         Decimal  @default(0) @db.Decimal(15, 2)
+  total_working_hours Decimal  @default(0) @db.Decimal(6, 2)
+  total_overtime      Decimal  @default(0) @db.Decimal(10, 2)
+  total_late_early    Decimal  @default(0) @db.Decimal(10, 2)
+  allowance           Decimal  @default(0) @db.Decimal(15, 2)
+  net_salary          Decimal  @default(0) @db.Decimal(15, 2)
+  status              String   @default("PENDING") @db.VarChar(20)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  employee            Employee @relation(fields: [employeeId], references: [id], onUpdate: NoAction)
 
   @@unique([employeeId, payroll_period], map: "uq_emp_payroll_period")
   @@index([payroll_period], map: "idx_payroll_period")
@@ -120,7 +117,9 @@ model attendance_logs {
   @@index([employee_id, event_time(sort: Desc)], map: "idx_attendance_emp_time")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// Bảng tổng hợp dữ liệu chấm công hàng ngày của từng nhân viên.
+/// LƯU Ý QUAN TRỌNG: Tất cả các trường thời gian (total_working_hours, late_early, overtime)
+/// đều được chuẩn hóa và lưu trữ thống nhất toàn hệ thống theo đơn vị GIỜ (HOURS) dạng Decimal(5,2).
 model daily_attendance_summary {
   id                  BigInt       @id @default(autoincrement())
   employee_id         String       @db.Uuid
@@ -129,8 +128,8 @@ model daily_attendance_summary {
   first_check_in      DateTime?    @db.Timestamptz(6)
   last_check_out      DateTime?    @db.Timestamptz(6)
   total_working_hours Decimal      @default(0) @db.Decimal(5, 2)
-  late_minutes        Int          @default(0)
-  early_leave_minutes Int          @default(0)
+  late_early          Decimal      @default(0) @db.Decimal(5, 2)
+  overtime            Decimal      @default(0) @db.Decimal(5, 2)
   attendance_status   String       @default("PRESENT") @db.VarChar(30)
   updated_at          DateTime     @default(now()) @db.Timestamptz(6)
   employees           Employee     @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -141,33 +140,33 @@ model daily_attendance_summary {
 }
 
 model employee_shifts {
-  id             BigInt      @id @default(autoincrement())
-  employee_id    String      @db.Uuid
-  shift_id       Int         @default(1)
-  effective_from DateTime    @db.Date
-  effective_to   DateTime?   @db.Date
-  shift_type     String?     @default("OFFICE_HOURS") @db.VarChar(50)
-  start_time     String?     @default("08:00") @db.VarChar(20)
-  end_time       String?     @default("17:30") @db.VarChar(20)
-  note           String?     @db.VarChar(255)
-  created_at     DateTime    @default(now()) @db.Timestamptz(6)
-  employees      Employee    @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  work_shifts    work_shifts @relation(fields: [shift_id], references: [id], onUpdate: NoAction)
+  id          BigInt      @id @default(autoincrement())
+  employee_id String      @db.Uuid
+  shift_id    Int         @default(1)
+  work_date   DateTime    @db.Date
+  work_day    String?     @default("Thứ Hai") @db.VarChar(50)
+  shift_type  String?     @default("OFFICE_HOURS") @db.VarChar(50)
+  start_time  DateTime?   @db.Time(6)
+  end_time    DateTime?   @db.Time(6)
+  note        String?     @db.VarChar(255)
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+  employees   Employee    @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  work_shifts work_shifts @relation(fields: [shift_id], references: [id], onUpdate: NoAction)
 
-  @@unique([employee_id, effective_from], map: "uq_emp_shift_date")
-  @@index([employee_id, effective_from], map: "idx_emp_shifts_lookup")
+  @@unique([employee_id, work_date], map: "uq_emp_shift_date")
+  @@index([employee_id, work_date], map: "idx_emp_shifts_lookup")
 }
 
 model face_embeddings {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  employee_id   String   @db.Uuid
-  embedding     Float[]  @db.Real
-  model_version String   @default("arcface_v1") @db.VarChar(50)
-  sample_tag    String?  @default("FRONTAL") @db.VarChar(50)
+  id            String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id   String                      @db.Uuid
+  embedding     Unsupported("vector(512)")?
+  model_version String                      @default("arcface_v1") @db.VarChar(50)
+  sample_tag    String?                     @default("FRONTAL") @db.VarChar(50)
   quality_score Float?
-  is_active     Boolean  @default(true)
-  created_at    DateTime @default(now()) @db.Timestamptz(6)
-  employees     Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  is_active     Boolean                     @default(true)
+  created_at    DateTime                    @default(now()) @db.Timestamptz(6)
+  employees     Employee                    @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([employee_id], map: "idx_face_embeddings_emp_id")
 }
@@ -184,7 +183,6 @@ model work_shifts {
   shift_name               String                     @db.VarChar(50)
   start_time               DateTime                   @db.Time(6)
   end_time                 DateTime                   @db.Time(6)
-  grace_period_minutes     Int                        @default(15)
   created_at               DateTime                   @default(now()) @db.Timestamptz(6)
   daily_attendance_summary daily_attendance_summary[]
   employee_shifts          employee_shifts[]
@@ -201,3 +199,25 @@ model Device {
 
   @@map("devices")
 }
+
+model BonusPenalty {
+  id                 Int      @id @default(autoincrement())
+  overtime_rate      Decimal  @default(1.5) @db.Decimal(10, 2)
+  late_early_penalty Decimal  @default(0) @db.Decimal(15, 2)
+  description        String?  @db.VarChar(255)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@map("bonus_penalty")
+}
+
+model attendance_locks {
+  id        Int      @id @default(autoincrement())
+  work_date DateTime @unique @db.Date
+  is_locked Boolean  @default(true)
+  locked_at DateTime @default(now()) @db.Timestamptz(6)
+  locked_by String?  @db.VarChar(100)
+
+  @@map("attendance_locks")
+}
+

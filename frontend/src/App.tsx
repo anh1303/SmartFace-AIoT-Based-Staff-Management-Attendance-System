@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppProvider } from './context/AppContext';
 import { AppLayout } from './components/layout/AppLayout';
 
@@ -24,42 +25,54 @@ import { ManagerReports } from './pages/manager/ManagerReports';
 import { ManagerPayroll } from './pages/manager/ManagerPayroll';
 import { ManagerBiometrics } from './pages/manager/ManagerBiometrics';
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 1000 * 60 * 5, // 5 minutes default
+      retry: 1,
+    },
+  },
+});
+
 export default function App() {
   return (
-    <AppProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
+    <QueryClientProvider client={queryClient}>
+      <AppProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
 
-          {/* Staff Area */}
-          <Route path="/app/staff" element={<AppLayout />}>
-            <Route index element={<Navigate to="/app/staff/dashboard" replace />} />
-            <Route path="dashboard" element={<StaffDashboard />} />
-            <Route path="profile" element={<StaffProfile />} />
-            <Route path="schedule" element={<StaffSchedule />} />
-            <Route path="attendance" element={<StaffAttendance />} />
-            <Route path="salary-estimate" element={<StaffSalaryEstimate />} />
-            <Route path="salary-history" element={<StaffSalaryHistory />} />
-          </Route>
+            {/* Staff Area */}
+            <Route path="/app/staff" element={<AppLayout />}>
+              <Route index element={<Navigate to="/app/staff/dashboard" replace />} />
+              <Route path="dashboard" element={<StaffDashboard />} />
+              <Route path="profile" element={<StaffProfile />} />
+              <Route path="schedule" element={<StaffSchedule />} />
+              <Route path="attendance" element={<StaffAttendance />} />
+              <Route path="salary-estimate" element={<StaffSalaryEstimate />} />
+              <Route path="salary-history" element={<StaffSalaryHistory />} />
+            </Route>
 
-          {/* Manager Area */}
-          <Route path="/app/manager" element={<AppLayout />}>
-            <Route index element={<Navigate to="/app/manager/dashboard" replace />} />
-            <Route path="dashboard" element={<ManagerDashboard />} />
-            <Route path="employees" element={<ManagerEmployeeList />} />
-            <Route path="schedule" element={<ManagerSchedule />} />
-            <Route path="attendance" element={<ManagerAttendanceMonitor />} />
-            <Route path="biometrics" element={<ManagerBiometrics />} />
-            <Route path="reports" element={<ManagerReports />} />
-            <Route path="payroll" element={<ManagerPayroll />} />
-          </Route>
+            {/* Manager Area */}
+            <Route path="/app/manager" element={<AppLayout />}>
+              <Route index element={<Navigate to="/app/manager/dashboard" replace />} />
+              <Route path="dashboard" element={<ManagerDashboard />} />
+              <Route path="employees" element={<ManagerEmployeeList />} />
+              <Route path="schedule" element={<ManagerSchedule />} />
+              <Route path="attendance" element={<ManagerAttendanceMonitor />} />
+              <Route path="biometrics" element={<ManagerBiometrics />} />
+              <Route path="reports" element={<ManagerReports />} />
+              <Route path="payroll" element={<ManagerPayroll />} />
+            </Route>
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AppProvider>
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AppProvider>
+    </QueryClientProvider>
   );
 }

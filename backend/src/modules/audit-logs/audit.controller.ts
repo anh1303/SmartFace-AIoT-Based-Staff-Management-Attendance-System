@@ -7,8 +7,8 @@ import { listLogs } from './audit.service.js'
 export const auditRouter = Router()
 auditRouter.use(authenticate)
 
-// Audit logs — ADMIN hoặc MANAGER mới được xem
-auditRouter.get('/', authorize('ADMIN', 'MANAGER'), async (req, res, next) => {
+// Audit logs — Chỉ ADMIN mới có quyền xem kiểm toán hệ thống
+auditRouter.get('/', authorize('ADMIN'), async (req, res, next) => {
   try {
     const limit = Number(req.query.limit) || 100
     successResponse(res, await listLogs(limit))

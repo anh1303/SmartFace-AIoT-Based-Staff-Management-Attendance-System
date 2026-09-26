@@ -1,36 +1,95 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  Clock, 
-  CheckCircle2, 
-  Calendar, 
-  TrendingUp, 
-  ScanFace, 
-  Fingerprint, 
-  ArrowUpRight, 
-  FileText, 
+import { formatVNTime, getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
+import {
+  Clock,
+  CheckCircle2,
+  Calendar,
+  TrendingUp,
+  ScanFace,
+  Fingerprint,
+  ArrowUpRight,
+  FileText,
   Briefcase,
   ShieldCheck
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 
 export const StaffDashboard: React.FC = () => {
-  const { currentUser, workShifts, attendance, showToast } = useApp();
+  const { currentUser, workShifts, attendance, payroll, employees, bonusPenalty, showToast } = useApp();
   const [explainModalOpen, setExplainModalOpen] = useState(false);
   const [explainReason, setExplainReason] = useState('');
-  const [explainDate, setExplainDate] = useState('2026-09-10');
+  const [explainDate, setExplainDate] = useState(() => getTodayVNString());
+
+  const empCode = currentUser?.employee_id || 'NV-001';
+  const currentEmp = employees.find(e => e.employee_id === empCode);
 
   // Staff's upcoming shifts
   const myShifts = workShifts
-    .filter(s => s.employee_id === (currentUser?.employee_id || 'NV-001'))
+    .filter(s => s.employee_id === empCode)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   // Staff's recent attendance
   const myAttendance = attendance
-    .filter(a => a.employee_id === (currentUser?.employee_id || 'NV-001'))
+    .filter(a => a.employee_id === empCode)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const latestPunch = myAttendance[0];
+  const todayShift = myShifts.find(s => s.date === getTodayVNString()) || myShifts[0];
+
+  // Distinct attendance dates
+  const attendedDates = Array.from(new Set(myAttendance.map(a => formatVNDateISO(a.timestamp))));
+  const workDaysCount = attendedDates.length;
+
+  // Current period payroll record
+  const currentPayroll = payroll.find(p => p.employee_id === empCode) || payroll[0];
+  const netSalaryFormatted = currentPayroll
+    ? Number(currentPayroll.net_salary || 0).toLocaleString('vi-VN') + '₫'
+    : ((currentEmp?.hourly_rate || 120000) * 160).toLocaleString('vi-VN') + '₫';
+
+  // Dynamic 7-day week rhythm
+  const getMonday = (d: Date) => {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+  };
+  const monday = getMonday(new Date());
+  const dayNames = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
+
+  const weekRhythm = [0, 1, 2, 3, 4, 5, 6].map(offset => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + offset);
+    const dateStr = formatVNDateISO(d);
+    const dayLabel = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const dayShift = myShifts.find(s => s.date === dateStr);
+    const dayPunches = myAttendance.filter(a => formatVNDateISO(a.timestamp) === dateStr);
+    const inPunch = dayPunches.find(a => a.type === 'CHECK_IN') || dayPunches[dayPunches.length - 1];
+    const outPunch = dayPunches.find(a => a.type === 'CHECK_OUT');
+
+    let status = 'UPCOMING';
+    let inText = '--:--';
+    let outText = '--:--';
+
+    if (dayShift?.shift_type === 'OFF') {
+      status = 'OFF';
+    } else if (inPunch) {
+      const inPunc = inPunch.punctuality || (inPunch.status === 'VALID' ? 'ON_TIME' : inPunch.status);
+      status = inPunc === 'ON_TIME' ? 'ON_TIME' : 'LATE';
+      inText = formatVNTime(inPunch.timestamp, false);
+      outText = outPunch ? formatVNTime(outPunch.timestamp, false) : (dateStr === getTodayVNString() ? 'Đang ca...' : '--:--');
+    }
+
+    return {
+      day: dayNames[offset],
+      date: dayLabel,
+      fullDate: dateStr,
+      in: inText,
+      out: outText,
+      status,
+      type: dayShift?.shift_type === 'OFFICE_HOURS' ? 'Ca Chuẩn' : dayShift?.shift_type === 'MORNING' ? 'Ca Sáng' : dayShift?.shift_type === 'AFTERNOON' ? 'Ca Chiều' : 'Nghỉ ca',
+    };
+  });
 
   const handleExplainSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +105,7 @@ export const StaffDashboard: React.FC = () => {
         <div className="flex items-center gap-4">
           <div className="relative">
             <img
-              src={currentUser?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"}
+              src={currentUser?.avatar || currentEmp?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"}
               alt={currentUser?.full_name}
               className="w-16 h-16 rounded-2xl object-cover border border-slate-700"
             />
@@ -58,22 +117,22 @@ export const StaffDashboard: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
-                Xin chào, {currentUser?.full_name || 'Nguyễn Văn A'}
+                Xin chào, {currentUser?.full_name || currentEmp?.full_name || 'Nguyễn Văn A'}
               </h1>
               <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                {currentUser?.employee_id || 'NV-001'}
+                {empCode}
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-1 flex items-center gap-2">
-              <span>{currentUser?.department || 'Kỹ thuật AI'}</span>
+              <span>{currentUser?.department || currentEmp?.department || 'Nhân viên'}</span>
               <span>•</span>
               <span className="text-green-500 font-medium flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                Hôm nay: Check-in {latestPunch ? new Date(latestPunch.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '08:02'} (Đúng giờ)
+                Mới nhất: {latestPunch ? `${latestPunch.type === 'CHECK_IN' ? 'Check-in' : 'Check-out'} ${formatVNTime(latestPunch.timestamp, false)} (${(latestPunch.punctuality || (latestPunch.status === 'VALID' ? 'ON_TIME' : latestPunch.status)) === 'ON_TIME' ? 'Đúng giờ' : 'Trễ/Sớm'})` : 'Chưa có lượt quẹt hôm nay'}
               </span>
             </p>
             <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-              Xác thực: 99.8% Match • Main Lobby - AI Cam 01
+              Xác thực: {latestPunch ? `${(latestPunch.verification_score * 100).toFixed(1)}% Match • ${latestPunch.device_id}` : 'AI Face Recognition Node 01'}
             </p>
           </div>
         </div>
@@ -90,7 +149,7 @@ export const StaffDashboard: React.FC = () => {
           </button>
           <div className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-blue-400 flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
-            <span>Đã làm: 05h 24m</span>
+            <span>Đã ghi nhận: {myAttendance.length} lượt</span>
           </div>
         </div>
       </div>
@@ -100,15 +159,17 @@ export const StaffDashboard: React.FC = () => {
         {/* Card 1: Hôm nay */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
           <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            Hôm nay (Ca hành chính)
+            Hôm nay ({todayShift ? todayShift.shift_type : 'Hành chính'})
           </span>
           <div className="mt-3">
-            <div className="text-2xl font-bold font-mono text-white">08:02 - 17:30</div>
+            <div className="text-2xl font-bold font-mono text-white">
+              {todayShift ? `${todayShift.start_time} - ${todayShift.end_time}` : '08:00 - 18:00'}
+            </div>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 uppercase font-mono">
-                Đúng giờ
+                {todayShift?.work_day || 'Thứ Hai'}
               </span>
-              <span className="text-xs text-slate-500">0 trễ • 0 sớm</span>
+              <span className="text-xs text-slate-400 truncate max-w-[130px]">{todayShift?.note || 'Đúng tiến độ'}</span>
             </div>
           </div>
         </div>
@@ -116,18 +177,18 @@ export const StaffDashboard: React.FC = () => {
         {/* Card 2: Tuần này */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
           <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            Tổng giờ tuần này
+            Lịch phân ca tuần
           </span>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-white">32.5</span>
-              <span className="text-xs text-slate-500 font-mono">/ 40.0h (81%)</span>
+              <span className="text-2xl font-bold font-mono text-white">{myShifts.length}</span>
+              <span className="text-xs text-slate-500 font-mono">ca đã đăng ký</span>
             </div>
             <div className="w-full bg-slate-950 h-2 rounded-full mt-2.5 overflow-hidden border border-slate-800">
-              <div className="bg-blue-500 h-full rounded-full" style={{ width: '81%' }} />
+              <div className="bg-blue-500 h-full rounded-full" style={{ width: `${Math.min(100, (myShifts.length / 7) * 100)}%` }} />
             </div>
             <p className="text-[11px] text-green-500 mt-2 flex items-center gap-1 font-medium">
-              <ArrowUpRight className="w-3 h-3" /> +3.2h so với tuần trước
+              <ArrowUpRight className="w-3 h-3" /> Đầy đủ phân bổ
             </p>
           </div>
         </div>
@@ -135,18 +196,17 @@ export const StaffDashboard: React.FC = () => {
         {/* Card 3: Công tháng */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
           <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            Ngày công tháng 09
+            Ngày công tích lũy
           </span>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-white">19</span>
-              <span className="text-xs text-slate-500 font-mono">/ 22 ngày</span>
+              <span className="text-2xl font-bold font-mono text-white">{workDaysCount}</span>
+              <span className="text-xs text-slate-500 font-mono">ngày có điểm danh</span>
             </div>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-500/10 text-green-500 uppercase font-mono">
-                100% Chuyên cần
+                {myAttendance.filter(a => (a.punctuality || (a.status === 'VALID' ? 'ON_TIME' : a.status)) === 'ON_TIME').length} lượt chuẩn giờ
               </span>
-              <span className="text-xs text-slate-500">0 vắng mặt</span>
             </div>
           </div>
         </div>
@@ -158,10 +218,10 @@ export const StaffDashboard: React.FC = () => {
           </span>
           <div className="mt-3">
             <div className="text-2xl font-bold font-mono text-white">
-              18.450.000₫
+              {netSalaryFormatted}
             </div>
             <p className="text-[11px] text-orange-400 mt-2 font-medium">
-              Đã bao gồm +2.5h OT được duyệt
+              Lương/giờ: {Number(currentEmp?.hourly_rate || 120000).toLocaleString('vi-VN')} ₫/h
             </p>
           </div>
         </div>
@@ -172,36 +232,27 @@ export const StaffDashboard: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-base font-bold text-white font-heading">
-              Nhịp điệu chấm công tuần này (Tuần 37)
+              Nhịp điệu chấm công tuần này
             </h2>
-            <p className="text-xs text-slate-400">Tự động ghi nhận qua camera nhận diện khuôn mặt</p>
+            <p className="text-xs text-slate-400">Tự động ghi nhận qua camera nhận diện khuôn mặt & vân tay</p>
           </div>
           <span className="text-xs font-mono text-slate-400 bg-slate-950 px-3 py-1 rounded-lg border border-slate-800">
-            07/09 - 13/09/2026
+            {weekRhythm[0]?.date} - {weekRhythm[6]?.date}
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          {[
-            { day: 'Thứ 2', date: '07/09', in: '08:04', out: '17:35', status: 'ON_TIME', type: 'Chuẩn ca' },
-            { day: 'Thứ 3', date: '08/09', in: '08:00', out: '19:30', status: 'ON_TIME', type: 'Ca + OT 2h' },
-            { day: 'Thứ 4', date: '09/09', in: '08:01', out: '17:32', status: 'ON_TIME', type: 'Chuẩn ca' },
-            { day: 'Thứ 5 (Nay)', date: '10/09', in: '08:02', out: 'Đang làm...', status: 'ACTIVE', type: 'Chuẩn ca' },
-            { day: 'Thứ 6', date: '11/09', in: '--:--', out: '--:--', status: 'UPCOMING', type: 'Chuẩn ca' },
-            { day: 'Thứ 7', date: '12/09', in: '--:--', out: '--:--', status: 'UPCOMING', type: 'OT Tự chọn' },
-            { day: 'Chủ Nhật', date: '13/09', in: '--:--', out: '--:--', status: 'OFF', type: 'Nghỉ tuần' },
-          ].map((item, idx) => (
+          {weekRhythm.map((item, idx) => (
             <div
               key={idx}
-              className={`p-3.5 rounded-2xl border text-xs transition-all ${
-                item.status === 'ACTIVE'
-                  ? 'bg-blue-600/10 border-blue-500'
-                  : item.status === 'ON_TIME'
-                  ? 'bg-slate-950 border-slate-800'
-                  : item.status === 'OFF'
-                  ? 'bg-slate-950 border-slate-800/40 opacity-40'
-                  : 'bg-slate-950 border-slate-800/70'
-              }`}
+              className={`p-3.5 rounded-2xl border text-xs transition-all ${item.status === 'ON_TIME'
+                  ? 'bg-slate-950 border-slate-800 hover:border-blue-500/50'
+                  : item.status === 'LATE'
+                    ? 'bg-orange-950/20 border-orange-500/40'
+                    : item.status === 'OFF'
+                      ? 'bg-slate-950 border-slate-800/40 opacity-50'
+                      : 'bg-slate-950 border-slate-800/70'
+                }`}
             >
               <div className="flex justify-between items-center text-slate-500 text-[11px] mb-1">
                 <span>{item.day}</span>
@@ -218,8 +269,11 @@ export const StaffDashboard: React.FC = () => {
                 {item.status === 'ON_TIME' && (
                   <span className="text-[10px] text-green-500 font-semibold font-mono">Đúng giờ</span>
                 )}
-                {item.status === 'ACTIVE' && (
-                  <span className="text-[10px] text-blue-400 font-semibold animate-pulse font-mono">Đang ca</span>
+                {item.status === 'LATE' && (
+                  <span className="text-[10px] text-orange-400 font-semibold font-mono">Lệch ca</span>
+                )}
+                {item.status === 'OFF' && (
+                  <span className="text-[10px] text-slate-500 font-mono">Nghỉ ca</span>
                 )}
               </div>
             </div>
@@ -300,10 +354,10 @@ export const StaffDashboard: React.FC = () => {
                         {shift.shift_type === 'OFFICE_HOURS'
                           ? 'Ca Hành Chính'
                           : shift.shift_type === 'MORNING'
-                          ? 'Ca Sáng'
-                          : shift.shift_type === 'AFTERNOON'
-                          ? 'Ca Chiều'
-                          : 'Nghỉ ca'}
+                            ? 'Ca Sáng'
+                            : shift.shift_type === 'AFTERNOON'
+                              ? 'Ca Chiều'
+                              : 'Nghỉ ca'}
                         {shift.note ? ` • ${shift.note}` : ''}
                       </p>
                       <p className="text-[11px] font-mono text-slate-400">

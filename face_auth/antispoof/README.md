@@ -1,9 +1,7 @@
 # 🛡️ Anti-Spoofing Module — SmartFace AIoT
 
-> **Runtime note:** This document contains legacy MiniFASNet examples. The current
-> E1 runtime contract is `mnv3_e1_preliminary_v5_1_best.onnx` (224×224, 3-class,
-> RGB, gamma off, CelebA mean/std). Use `config.py`, `app.py` and
-> `realtime_pad_inference_audit.md` as the source of truth for the active pipeline.
+> **Runtime note:** Tài liệu này có chứa ví dụ mô hình legacy MiniFASNet. Mô hình chính thức đang chạy trên Edge là **E1 v5.3 MobileNetV3-Small** (`1.11M` tham số) và nhánh thực nghiệm tần số **E2 2D-DCT** (`17.2K` tham số).
+> 👉 Bảng thống kê chi tiết số lượng tham số (weights) và dung lượng các mô hình xem tại: [Model Parameter Benchmark](models/smartface_pad_artifacts/README.md#bảng-thống-kê-số-lượng-trọng-số--kích-thước-mô-hình-model-parameter-benchmark).
 
 Module **Anti-Spoofing (Chống giả mạo khuôn mặt)** được tích hợp trong hệ thống SmartFace AIoT, giúp phân biệt khuôn mặt THẬT (Real) và khuôn mặt GIẢ MẠO (Spoof - ảnh in giấy, video/ảnh phát qua màn hình điện thoại, máy tính, mặt nạ...).
 
@@ -35,15 +33,25 @@ Module **Anti-Spoofing (Chống giả mạo khuôn mặt)** được tích hợp
 
 ```text
 face_auth/antispoof/
-├── README.md                      # Tài liệu hướng dẫn này
-├── requirements.txt               # Các thư viện phụ thuộc siêu nhẹ
+├── README.md                      # Tài liệu tổng quan
+├── compare_model.md               # Bảng so sánh MiniFASNet vs MobileNetV3 / YuNet vs SCRFD
+├── requirements.txt               # Các thư viện phụ thuộc
 ├── __init__.py                    # Export các lớp và hàm API chính
 ├── predictor.py                   # Class AntiSpoofPredictor chính
-├── preprocess.py                  # Hàm crop 1.55x và tiền xử lý ảnh 128x128
+├── preprocess.py                  # Hàm crop 1.55x và tiền xử lý ảnh cho PAD
 ├── loader.py                      # Hàm load ONNX Runtime Session (GPU/CPU)
 ├── system.py                      # Tiện ích đọc thông tin phần cứng (CPU/GPU)
-└── models/
-    └── best_model_quantized.onnx  # File trọng số mô hình INT8 (600 KB)
+├── models/                        # Chứa model ONNX runtime và kho lưu trữ Artifacts
+│   ├── smartface_pad_artifacts/   # Kho lưu trữ dài hạn E1/E2/E3 (weights, data protocol, metadata)
+│   └── v3 -> ...                  # Symlink model đang chạy trong production
+└── notebooks/                     # Toàn bộ Jupyter Notebook và tài liệu thực nghiệm E1/E2
+    ├── eda/                       # Phân tích dữ liệu CelebA-Spoof & khảo sát SCRFD
+    ├── e1_spatial_v0/             # Kiểm thử nhanh E1 v0 Baseline (10K mẫu sơ bộ)
+    ├── e1_spatial_v5_1/           # Huấn luyện và đánh giá sâu E1 v5.1
+    ├── e1_spatial_v5_2/           # Thử nghiệm E1 v5.2 Detector-aligned
+    ├── e1_spatial_v5_3/           # Huấn luyện & Held-out Test E1 v5.3 (Edge Model)
+    ├── e2_frequency_dct/          # Huấn luyện E2 (2D-DCT) và Held-out Test E1/E2
+    └── diagnostics/               # Script chẩn đoán độ trễ và camera thực tế
 ```
 
 ---

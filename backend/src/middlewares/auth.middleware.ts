@@ -4,7 +4,16 @@ import { env } from '../config/env.js'
 import { AppError } from '../common/AppError.js'
 
 // role là role_name (string) từ bảng roles: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
-export type AuthUser = { id: string; employeeId?: string | null; role: string; email?: string | null; username: string }
+export type AuthUser = {
+  id: string
+  employeeId?: string | null
+  employee_id?: string | null
+  role: string
+  role_name?: string
+  is_manager?: boolean
+  email?: string | null
+  username: string
+}
 
 declare global {
   namespace Express {
@@ -15,7 +24,7 @@ declare global {
 }
 
 export function authenticate(req: Request, _res: Response, next: NextFunction) {
-  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+  const token = req.cookies?.token || req.headers.authorization?.replace(/^Bearer\s+/i, '')
   if (!token) return next(new AppError(401, 'Authentication token is required'))
   try {
     req.user = jwt.verify(token, env.JWT_SECRET) as AuthUser

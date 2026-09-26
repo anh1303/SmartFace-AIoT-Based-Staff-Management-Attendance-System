@@ -79,11 +79,11 @@ class Track:
         if (
             self._pad_stale_timeout is not None
             and self.last_pad_time is not None
-            and (time.time() - self.last_pad_time) > self._pad_stale_timeout
+            and (time.monotonic() - self.last_pad_time) > self._pad_stale_timeout
         ):
             self._pad_window.clear()
         self._pad_window.append(bool(is_real))
-        self.last_pad_time = time.time()
+        self.last_pad_time = time.monotonic()
         if pad_score is not None:
             self.last_pad_score = float(pad_score)
 
@@ -93,11 +93,27 @@ class Track:
         self.last_pad_time = None
         self.last_pad_score = None
 
+    def invalidate_recognition(self, retry_delay: bool = False) -> None:
+        """Discard an unverified identity; failed attempts retry at normal cadence."""
+        self.employee_id = None
+        self.name = "UNKNOWN"
+        self.score = 0.0
+        self.recognized_once = False
+        self.stable_recognitions = 0
+        self._unknown_streak = 0
+        self.last_attendance_time = None
+        self.last_recognition_time = time.monotonic() if retry_delay else None
+
+    def invalidate_verification(self) -> None:
+        """Lost continuity or failed PAD requires fresh PAD and recognition."""
+        self.reset_pad()
+        self.invalidate_recognition()
+
     def needs_pad(self, interval_seconds: float = 0.2) -> bool:
         """Kiểm tra xem track có cần chạy PAD inference lại hay không (tính theo giây)."""
         if self.last_pad_time is None:
             return True
-        return (time.time() - self.last_pad_time) >= interval_seconds
+        return (time.monotonic() - self.last_pad_time) >= interval_seconds
 
     @property
     def pad_ready(self) -> bool:
@@ -108,7 +124,7 @@ class Track:
         if (
             self._pad_stale_timeout is not None
             and self.last_pad_time is not None
-            and (time.time() - self.last_pad_time) > self._pad_stale_timeout
+            and (time.monotonic() - self.last_pad_time) > self._pad_stale_timeout
         ):
             return False
         return True
@@ -150,7 +166,7 @@ class Track:
             return False
         if self.last_recognition_time is None:
             return True
-        return (time.time() - self.last_recognition_time) >= interval_seconds
+        return (time.monotonic() - self.last_recognition_time) >= interval_seconds
 
     @property
     def is_pending(self) -> bool:
@@ -186,7 +202,7 @@ class Track:
 
         self.name = name
         self.score = score
-        self.last_recognition_time = time.time()
+        self.last_recognition_time = time.monotonic()
         self.recognized_once = True
 
 
@@ -270,6 +286,7 @@ class FaceTracker:
 
     def _mark_all_lost(self) -> None:
         for track in self.tracks:
+            track.invalidate_verification()
             track.tracker_status = "lost"
             track.tracker_confidence = 0.0
             track.missing_frames += 1
@@ -305,14 +322,17 @@ class FaceTracker:
                 next_points, status = None, None
 
             if next_points is None or status is None:
+                track.invalidate_verification()
                 track.tracker_status = "lost"
                 track.tracker_confidence = 0.0
                 track.missing_frames += 1
                 continue
 
             valid = status.reshape(-1).astype(bool)
+            valid &= np.isfinite(next_points.reshape(-1, 2)).all(axis=1)
             valid_count = int(valid.sum())
             if valid_count < 3:
+                track.invalidate_verification()
                 track.tracker_status = "lost"
                 track.tracker_confidence = valid_count / len(points)
                 track.missing_frames += 1
@@ -337,6 +357,7 @@ class FaceTracker:
 
             frame_shape = gray.shape
             if not self._valid_bbox(candidate, frame_shape):
+                track.invalidate_verification()
                 track.tracker_status = "lost"
                 track.tracker_confidence = valid_count / len(points)
                 track.missing_frames += 1
@@ -348,6 +369,7 @@ class FaceTracker:
                 or candidate[2] > frame_w or candidate[3] > frame_h
             ):
                 # Không giữ bbox stale/partial ngoài ảnh: detector phải sửa lại.
+                track.invalidate_verification()
                 track.tracker_status = "needs_redetection"
                 track.tracker_confidence = valid_count / len(points)
                 track.missing_frames += 1
@@ -361,6 +383,7 @@ class FaceTracker:
                 or width > old_width * 2.5
                 or height > old_height * 2.5
             ):
+                track.invalidate_verification()
                 track.tracker_status = "lost"
                 track.tracker_confidence = valid_count / len(points)
                 track.missing_frames += 1
@@ -375,14 +398,26 @@ class FaceTracker:
 
             track.bbox = candidate
             if track.landmarks is not None:
-                track.landmarks = [
-                    [float(pt[0] + dx), float(pt[1] + dy)]
-                    for pt in track.landmarks
-                ]
+                # Apply the same motion (including scale/rotation), rather than
+                # translating detector landmarks while the bbox changes scale.
+                matrix, _ = cv2.estimateAffinePartial2D(
+                    old_points[valid], new_points[valid], method=cv2.LMEDS
+                )
+                if matrix is None or not np.isfinite(matrix).all():
+                    track.invalidate_verification()
+                    track.tracker_status = "lost"
+                    track.tracker_confidence = 0.0
+                    track.missing_frames += 1
+                    continue
+                landmarks = np.asarray(track.landmarks, dtype=np.float64)
+                track.landmarks = (landmarks @ matrix[:, :2].T + matrix[:, 2]).tolist()
             track.bbox_source = "TRACKER"
-            track.tracker_status = "needs_redetection" if scale_changed or valid_count < 4 else "tracking"
+            track.tracker_status = "needs_redetection" if scale_changed or not valid[:4].all() else "tracking"
             track.tracker_confidence = valid_count / len(points)
             track.missing_frames = 0
+            if track.tracker_status == "needs_redetection":
+                track.invalidate_verification()
+                continue
             results.append((self._tracker_detection(track), track))
 
         self._previous_gray = gray
@@ -470,7 +505,7 @@ class FaceTracker:
 
         # Reset chuỗi ổn định nếu track bị mất dấu ở frame này (mất focus / quay mặt)
         for t_idx in unmatched_tracks:
-            self.tracks[t_idx].stable_recognitions = 0
+            self.tracks[t_idx].invalidate_verification()
             self.tracks[t_idx].tracker_status = "lost"
             self.tracks[t_idx].tracker_confidence = 0.0
 

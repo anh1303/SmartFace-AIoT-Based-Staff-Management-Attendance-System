@@ -1,12 +1,87 @@
 """Unit tests for Track PAD gating and recognition permission."""
 
 import unittest
+from unittest.mock import patch
 import numpy as np
 from tracking.tracker import Track
 from tracking.tracker import FaceTracker
 
 
 class TestTrackerAndGating(unittest.TestCase):
+
+    def test_reacquisition_requires_fresh_verification(self):
+        tracker = FaceTracker(pad_stale_timeout=3.0)
+        det = {"bbox": (30, 30, 130, 130), "score": 0.99, "landmarks": None}
+        track = tracker.update([det])[0][1]
+        for _ in range(5):
+            track.update_pad(True, 2.0)
+        track.update_result("A", "Alice", 0.9)
+        tracker.update([])
+        reacquired = tracker.update([det])[0][1]
+        self.assertEqual(reacquired.track_id, track.track_id)
+        self.assertEqual(reacquired.pad_status, "PAD_PENDING")
+        self.assertIsNone(reacquired.employee_id)
+        self.assertTrue(reacquired.is_pending)
+        self.assertFalse(reacquired.needs_recognition(pad_enabled=True))
+
+    def test_flow_loss_invalidates_pad_identity_and_stability(self):
+        for flow in [(None, None, None),
+                     (np.zeros((5, 1, 2), np.float32), np.zeros((5, 1), np.uint8), None)]:
+            with self.subTest(flow=flow[0] is None):
+                frame = np.zeros((180, 180, 3), np.uint8)
+                tracker = FaceTracker()
+                track = tracker.update([{"bbox": (30, 30, 130, 130)}], frame=frame)[0][1]
+                for _ in range(5):
+                    track.update_pad(True, 2.0)
+                for _ in range(3):
+                    track.update_result("A", "Alice", 0.9)
+                with patch("tracking.tracker.cv2.calcOpticalFlowPyrLK", return_value=flow):
+                    self.assertEqual(tracker.update([], frame=frame, detector_called=False), [])
+                self.assertEqual(track.stable_recognitions, 0)
+                self.assertIsNone(track.employee_id)
+                self.assertFalse(track.pad_ready)
+                self.assertTrue(tracker.needs_redetection())
+
+    def test_flow_scale_transforms_landmarks(self):
+        frame = np.zeros((180, 180, 3), np.uint8)
+        points = np.array([[30, 30], [130, 30], [130, 130], [30, 130], [80, 80]], np.float32)
+        landmarks = np.array([[55, 60], [105, 60], [80, 85], [60, 105], [100, 105]])
+        tracker = FaceTracker()
+        tracker.update([{"bbox": (30, 30, 130, 130), "landmarks": landmarks.tolist()}], frame=frame)
+        moved = (points - 80) * 1.2 + 80
+        with patch("tracking.tracker.cv2.calcOpticalFlowPyrLK", return_value=(
+            moved.reshape(-1, 1, 2), np.ones((5, 1), np.uint8), None
+        )):
+            track = tracker.update([], frame=frame, detector_called=False)[0][1]
+        self.assertEqual(track.bbox, (20, 20, 140, 140))
+        np.testing.assert_allclose(track.landmarks, (landmarks - 80) * 1.2 + 80, atol=1e-5)
+
+    def test_unsafe_flow_is_not_returned_for_inference(self):
+        frame = np.zeros((180, 180, 3), np.uint8)
+        points = np.array([[30, 30], [130, 30], [130, 130], [30, 130], [80, 80]], np.float32)
+        tracker = FaceTracker()
+        tracker.update([{"bbox": (30, 30, 130, 130)}], frame=frame)
+        with patch("tracking.tracker.cv2.calcOpticalFlowPyrLK", return_value=(
+            points.reshape(-1, 1, 2), np.array([[1], [1], [1], [0], [1]], np.uint8), None
+        )):
+            self.assertEqual(tracker.update([], frame=frame, detector_called=False), [])
+        self.assertTrue(tracker.needs_redetection())
+
+    def test_pad_and_recognition_cadence_ignore_wall_clock_changes(self):
+        track = Track(1, (10, 10, 50, 50), pad_stale_timeout=3)
+        with patch("tracking.tracker.time.monotonic", return_value=100):
+            for _ in range(5):
+                track.update_pad(True, 2.0)
+            track.update_result("A", "Alice", 0.9)
+        for wall_time in [-10000, 100000]:
+            with patch("tracking.tracker.time.time", return_value=wall_time), patch(
+                "tracking.tracker.time.monotonic", return_value=100.2
+            ):
+                self.assertTrue(track.pad_ready)
+                self.assertTrue(track.needs_pad(0.1))
+                self.assertFalse(track.needs_recognition(0.5))
+        with patch("tracking.tracker.time.monotonic", return_value=104):
+            self.assertFalse(track.pad_ready)
 
     def test_pad_pending_blocks_recognition(self):
         """PAD chưa đủ vote thì recognition bị chặn."""

@@ -63,6 +63,8 @@ class Track:
         self._pad_stale_timeout: Optional[float] = pad_stale_timeout
         self.last_pad_time: Optional[float] = None  # None = chưa chạy PAD lần nào
         self.last_pad_score: Optional[float] = None
+        self._pad_crop_geometry = None
+        self._pad_crop_time = None
 
         # Attendance tracking
         self.employee_id: Optional[str] = None
@@ -92,6 +94,44 @@ class Track:
         self._pad_window.clear()
         self.last_pad_time = None
         self.last_pad_score = None
+        self._pad_crop_geometry = None
+        self._pad_crop_time = None
+
+    def pad_crop_bbox(self, bbox, frame_shape, expansion_factor):
+        """Time-based smoothing of small crop jitter; large motion snaps immediately.
+
+        Experimental constants: tau 0.12s, max jitter 5% of crop base side,
+        reset after a 0.5s gap. Border crops bypass smoothing to preserve padding.
+        Does not modify tracking geometry or PAD votes.
+        """
+        x1, y1, x2, y2 = map(float, bbox)
+        side = max(x2 - x1, y2 - y1)
+        if not np.isfinite([x1, y1, x2, y2]).all() or x2 <= x1 or y2 <= y1:
+            raise ValueError("Invalid PAD crop bbox")
+        current = np.array([(x1 + x2) / 2, (y1 + y2) / 2, side])
+        now = time.monotonic()
+        previous = self._pad_crop_geometry
+
+        def touches_border(geometry):
+            cx, cy, size = geometry
+            half = size * expansion_factor / 2
+            h, w = frame_shape[:2]
+            return cx - half < 0 or cy - half < 0 or cx + half > w or cy + half > h
+
+        if previous is not None:
+            dt = now - self._pad_crop_time
+            center_delta = np.linalg.norm(current[:2] - previous[:2]) / side
+            size_delta = abs(side - previous[2]) / side
+            if (0 < dt <= 0.5 and center_delta <= 0.05 and size_delta <= 0.05
+                    and not touches_border(current) and not touches_border(previous)):
+                alpha = -np.expm1(-dt / 0.12)
+                candidate = previous + alpha * (current - previous)
+                if not touches_border(candidate):
+                    current = candidate
+        self._pad_crop_geometry = current
+        self._pad_crop_time = now
+        cx, cy, side = current
+        return (cx - side / 2, cy - side / 2, cx + side / 2, cy + side / 2)
 
     def invalidate_recognition(self, retry_delay: bool = False) -> None:
         """Discard an unverified identity; failed attempts retry at normal cadence."""
@@ -368,11 +408,11 @@ class FaceTracker:
                 candidate[0] < 0 or candidate[1] < 0
                 or candidate[2] > frame_w or candidate[3] > frame_h
             ):
-                # Không giữ bbox stale/partial ngoài ảnh: detector phải sửa lại.
-                track.invalidate_verification()
+                # Request a detector refresh, not a loss of continuity. The
+                # caller must redetect before inference; an unmatched detector
+                # result will invalidate verification in update().
                 track.tracker_status = "needs_redetection"
                 track.tracker_confidence = valid_count / len(points)
-                track.missing_frames += 1
                 continue
 
             candidate = self._clamp_bbox(candidate, frame_shape)
@@ -396,6 +436,13 @@ class FaceTracker:
                 or scale_y < 0.8 or scale_y > 1.25
             )
 
+            if scale_changed or not valid[:4].all():
+                # Keep the last detector/valid-flow geometry for association.
+                # A same-frame detector match can preserve the existing votes.
+                track.tracker_status = "needs_redetection"
+                track.tracker_confidence = valid_count / len(points)
+                continue
+
             track.bbox = candidate
             if track.landmarks is not None:
                 # Apply the same motion (including scale/rotation), rather than
@@ -412,12 +459,9 @@ class FaceTracker:
                 landmarks = np.asarray(track.landmarks, dtype=np.float64)
                 track.landmarks = (landmarks @ matrix[:, :2].T + matrix[:, 2]).tolist()
             track.bbox_source = "TRACKER"
-            track.tracker_status = "needs_redetection" if scale_changed or not valid[:4].all() else "tracking"
+            track.tracker_status = "tracking"
             track.tracker_confidence = valid_count / len(points)
             track.missing_frames = 0
-            if track.tracker_status == "needs_redetection":
-                track.invalidate_verification()
-                continue
             results.append((self._tracker_detection(track), track))
 
         self._previous_gray = gray

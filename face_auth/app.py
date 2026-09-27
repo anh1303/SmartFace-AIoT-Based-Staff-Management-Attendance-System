@@ -214,6 +214,7 @@ def orchestrate_track_step(
 def update_track_pad(
     tracked, frame, predictor, interval_seconds,
     frame_id=0, detector_called=False, diagnostic_log=False,
+    crop_smoothing=False,
 ) -> int:
     """Update due tracks atomically; inference errors invalidate cached verdicts."""
     from antispoof.preprocess import crop as pad_crop
@@ -229,8 +230,13 @@ def update_track_pad(
         if not track.needs_pad(interval_seconds):
             continue
         try:
-            crops.append(pad_crop(frame, detection["bbox"], predictor.bbox_expansion_factor))
-            due.append((detection, track))
+            crop_bbox = detection["bbox"]
+            if crop_smoothing:
+                crop_bbox = track.pad_crop_bbox(
+                    crop_bbox, frame.shape, predictor.bbox_expansion_factor,
+                )
+            crops.append(pad_crop(frame, crop_bbox, predictor.bbox_expansion_factor))
+            due.append((detection, track, crop_bbox))
         except Exception as exc:
             fail(track)
             print(f"[PAD crop error] track_id={track.track_id}: {exc}")
@@ -248,12 +254,12 @@ def update_track_pad(
             if not math.isfinite(score):
                 raise ValueError("PAD result has a non-finite score")
     except Exception as exc:
-        for _, track in due:
+        for _, track, _ in due:
             fail(track)
         print(f"[PAD error] {exc}")
         return 0
 
-    for (detection, track), res in zip(due, results):
+    for (detection, track, crop_bbox), res in zip(due, results):
         score = float(res.get("pad_score", res.get("logit_diff")))
         track.update_pad(res["is_real"], score)
         if diagnostic_log:
@@ -265,6 +271,7 @@ def update_track_pad(
                 f"bbox_source={detection.get('bbox_source', 'UNKNOWN')} "
                 f"bbox={track.bbox} face_width={track.bbox[2]-track.bbox[0]} "
                 f"face_height={track.bbox[3]-track.bbox[1]} "
+                f"crop_smoothing={crop_smoothing} pad_crop_bbox={tuple(round(float(v), 3) for v in crop_bbox)} "
                 f"logits=({res.get('real_logit')},{res.get('spoof_logit')}) "
                 f"d={score:.6f} p_real={p_real:.6f} "
                 f"threshold_logit={res.get('threshold_logit', predictor.logit_threshold):.6f} "
@@ -425,8 +432,9 @@ def main():
     # thực tế được in ra ngay sau đây để chẩn đoán thay vì giả định cap.set() đã thành công.
     if config.CAMERA_BUFFER_SIZE > 0:
         cap.set(cv2.CAP_PROP_BUFFERSIZE, config.CAMERA_BUFFER_SIZE)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  config.CAMERA_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
+    if config.CAMERA_FORCE_RESOLUTION:
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  config.CAMERA_WIDTH)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
     cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
 
     try:
@@ -439,9 +447,14 @@ def main():
     actual_buffer = cap.get(cv2.CAP_PROP_BUFFERSIZE)
 
     print("Starting face authentication system...")
+    resolution_request = (
+        f"{config.CAMERA_WIDTH}x{config.CAMERA_HEIGHT}"
+        if config.CAMERA_FORCE_RESOLUTION else "backend-default"
+    )
     print(
         f"  CAMERA          = backend={camera_backend} "
-        f"requested={config.CAMERA_WIDTH}x{config.CAMERA_HEIGHT}@{config.CAMERA_FPS} "
+        f"force_resolution={config.CAMERA_FORCE_RESOLUTION} "
+        f"requested={resolution_request}@{config.CAMERA_FPS} "
         f"actual={actual_width}x{actual_height}@{actual_fps:.2f} "
         f"buffer={actual_buffer:.2f}"
     )
@@ -449,6 +462,7 @@ def main():
     print(f"  MATCH_THRESHOLD  = {config.MATCH_THRESHOLD}")
     print(f"  RECOGNIZE_EVERY  = {config.RECOGNIZE_INTERVAL_SECONDS}s")
     print(f"  PAD_EVERY        = {config.PAD_INTERVAL_SECONDS}s")
+    print(f"  PAD_CROP_SMOOTHING = {config.PAD_CROP_SMOOTHING}")
     print(f"  DETECT_EVERY     = {config.DETECTION_INTERVAL_SECONDS}s (0 = every frame)")
     print(f"  MIN_FACE_SIZE    = {config.DETECTOR_MIN_FACE_SIZE}px")
     print(f"  APP_MODE         = {args.mode.upper()}")
@@ -541,6 +555,7 @@ def main():
                 counters["pad_calls"] += update_track_pad(
                     tracked, frame, pad_predictor, config.PAD_INTERVAL_SECONDS,
                     frame_id, detection_called, config.PAD_DIAGNOSTIC_LOG,
+                    crop_smoothing=config.PAD_CROP_SMOOTHING,
                 )
                 counters["pad_ms"] += (time.perf_counter() - pad_t0) * 1000.0
 

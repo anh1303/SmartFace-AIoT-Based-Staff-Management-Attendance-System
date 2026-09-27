@@ -7,6 +7,43 @@ from tracking.tracker import Track
 from tracking.tracker import FaceTracker
 
 
+class TestPADCropSmoothing(unittest.TestCase):
+    def test_small_jitter_is_reduced_without_changing_track_bbox(self):
+        track = Track(1, (100, 100, 200, 200))
+        with patch("tracking.tracker.time.monotonic", return_value=100):
+            self.assertEqual(track.pad_crop_bbox(track.bbox, (400, 400), 1.55), track.bbox)
+        with patch("tracking.tracker.time.monotonic", return_value=100.1):
+            result = track.pad_crop_bbox((102, 100, 202, 200), (400, 400), 1.55)
+        self.assertGreater(result[0], 100)
+        self.assertLess(result[0], 102)
+        self.assertEqual(track.bbox, (100, 100, 200, 200))
+        self.assertIsNone(track.last_pad_time)
+        self.assertEqual(len(track._pad_window), 0)
+
+    def test_large_motion_scale_border_and_gap_snap_to_input(self):
+        for bbox, shape, dt in [
+            ((120, 100, 220, 200), (400, 400), .1),
+            ((94, 94, 206, 206), (400, 400), .1),
+            ((102, 100, 202, 200), (225, 225), .1),
+            ((102, 100, 202, 200), (400, 400), .6),
+        ]:
+            with self.subTest(bbox=bbox, shape=shape, dt=dt):
+                track = Track(1, (100, 100, 200, 200))
+                with patch("tracking.tracker.time.monotonic", return_value=100):
+                    track.pad_crop_bbox(track.bbox, (400, 400), 1.55)
+                with patch("tracking.tracker.time.monotonic", return_value=100 + dt):
+                    self.assertEqual(track.pad_crop_bbox(bbox, shape, 1.55), bbox)
+
+    def test_invalidation_clears_crop_history(self):
+        track = Track(1, (100, 100, 200, 200))
+        track.pad_crop_bbox(track.bbox, (400, 400), 1.55)
+        track.invalidate_verification()
+        self.assertIsNone(track._pad_crop_geometry)
+        self.assertIsNone(track._pad_crop_time)
+        bbox = (102, 100, 202, 200)
+        self.assertEqual(track.pad_crop_bbox(bbox, (400, 400), 1.55), bbox)
+
+
 class TestTrackerAndGating(unittest.TestCase):
 
     def test_reacquisition_requires_fresh_verification(self):
@@ -82,6 +119,39 @@ class TestTrackerAndGating(unittest.TestCase):
                 self.assertFalse(track.needs_recognition(0.5))
         with patch("tracking.tracker.time.monotonic", return_value=104):
             self.assertFalse(track.pad_ready)
+
+    def test_detector_refresh_preserves_votes_only_when_detection_matches(self):
+        frame = np.zeros((180, 180, 3), np.uint8)
+        points = np.array([[30, 30], [130, 30], [130, 130], [30, 130], [80, 80]], np.float32)
+        refresh_cases = [
+            (points, np.array([[1], [1], [1], [0], [1]], np.uint8)),
+            ((points - 80) * 1.3 + 80, np.ones((5, 1), np.uint8)),
+            (points + [70, 0], np.ones((5, 1), np.uint8)),
+        ]
+        for moved, status in refresh_cases:
+            for matched in [True, False]:
+                with self.subTest(matched=matched, moved=moved.tolist()):
+                    tracker = FaceTracker()
+                    det = {"bbox": (30, 30, 130, 130)}
+                    track = tracker.update([det], frame=frame)[0][1]
+                    for _ in range(5):
+                        track.update_pad(True, 2.0)
+                    track.update_result("A", "Alice", 0.9)
+                    pad_time = track.last_pad_time
+                    with patch("tracking.tracker.cv2.calcOpticalFlowPyrLK", return_value=(
+                        moved.astype(np.float32).reshape(-1, 1, 2), status, None
+                    )):
+                        self.assertEqual(tracker.update([], frame=frame, detector_called=False), [])
+                    self.assertTrue(tracker.needs_redetection())
+                    self.assertEqual(track.bbox, det["bbox"])
+                    tracker.update([det] if matched else [], frame=frame)
+                    if matched:
+                        self.assertTrue(track.pad_ready)
+                        self.assertEqual(track.employee_id, "A")
+                        self.assertEqual(track.last_pad_time, pad_time)
+                    else:
+                        self.assertFalse(track.pad_ready)
+                        self.assertIsNone(track.employee_id)
 
     def test_pad_pending_blocks_recognition(self):
         """PAD chưa đủ vote thì recognition bị chặn."""

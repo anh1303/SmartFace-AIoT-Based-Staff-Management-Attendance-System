@@ -132,7 +132,7 @@ Sau khi bổ sung instrumentation và replay input, thu: p50/p95 loop/capture/de
 
 ## Bản sửa sau audit
 
-- Mất detector match hoặc optical flow không an toàn: reset PAD, identity và stability; reacquire phải xác minh lại. Bật lại PAD cũng yêu cầu xác minh mới.
+- Mất detector match hoặc optical flow mất dấu: reset PAD, identity và stability; reacquire phải xác minh lại. Bật lại PAD cũng yêu cầu xác minh mới. Nếu flow chỉ yêu cầu chỉnh geometry, app redetect trước inference; detector match ngay cùng frame giữ votes, detector không match vẫn reset.
 - Propagate landmark bằng similarity transform từ optical flow để giữ scale/rotation; flow thiếu góc hoặc geometry không an toàn không được đưa vào inference. App redetect ngay cùng frame.
 - Crop/PAD batch lỗi, thiếu kết quả hoặc score không hữu hạn: đưa track liên quan về pending; recognition lỗi/không có embedding cũng bỏ identity cũ. Retry theo interval hiện có để tránh chạy lỗi mỗi frame.
 - PAD/recognition/stale dùng monotonic clock; timestamp DB/cooldown tiếp tục dùng wall clock.
@@ -142,3 +142,7 @@ Sau khi bổ sung instrumentation và replay input, thu: p50/p95 loop/capture/de
 - Validation sau patch: 29/29 tests pass (12 regression tests mới); syntax và git diff --check pass. Smoke với E1 ONNX thật trên 2 crops CPU trả đủ 2 kết quả và cả hai track vẫn PAD_PENDING sau vote đầu, đúng policy 5 votes. Không mở camera hoặc DB thật.
 
 Các phát hiện phía trên mô tả trạng thái trước patch. Những giới hạn về camera/provider, temporal policy phụ thuộc tốc độ lấy mẫu, chất lượng model và benchmark thiết bị vẫn cần đo thực tế; patch không khẳng định đã giải quyết chúng.
+
+### Điều chỉnh sau diagnostic camera
+
+Log người dùng cung cấp: 554 PAD results trong 54,63s, cùng track_id=1; 303 PAD_PENDING, 141 SPOOF, 110 REAL; 13 lần từ verdict sang pending. Log chưa ghi reset reason nên không quy mọi transition cho cùng nguyên nhân. Có nhiều bbox vượt mép dưới 480px, phù hợp đường flow yêu cầu detector refresh. Patch đầu reset votes cả khi cần refresh geometry; đã sửa để detector xác nhận lại ngay cùng frame có thể giữ votes. Không thay PAD interval 0.1s, vote threshold hay model threshold. Regression test bao phủ thiếu góc flow, scale lớn, bbox vượt mép và cả detector match/unmatched; 30/30 tests pass. Cần chạy camera lại để đo mức giảm pending thực tế.

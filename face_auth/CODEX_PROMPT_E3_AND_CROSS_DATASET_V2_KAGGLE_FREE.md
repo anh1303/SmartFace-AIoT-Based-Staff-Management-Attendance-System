@@ -45,8 +45,8 @@ E2:
 - E1_E2_heldout_test_kaggle_guide.md
 
 Research design:
-- pad_spatial_frequency_architecture_v2.md
-- pad_frequency_domain_references_v2.md
+- md/research/pad_spatial_frequency_architecture_v2.md
+- md/research/pad_frequency_domain_references_v2.md
 ```
 
 If the executed E2 notebook differs from an older design document, the **executed/frozen E2 implementation wins** for architecture and preprocessing.

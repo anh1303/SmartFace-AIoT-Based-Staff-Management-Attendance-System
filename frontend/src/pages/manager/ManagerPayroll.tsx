@@ -23,6 +23,7 @@ export const ManagerPayroll: React.FC = () => {
     bonusPenalty,
     selectedPeriod,
     setSelectedPeriod,
+    generatePayroll,
     updatePayrollItem,
     finalizePayrollPeriod,
     unlockPayrollPeriod,
@@ -33,6 +34,7 @@ export const ManagerPayroll: React.FC = () => {
 
   const [confirmFinalizeOpen, setConfirmFinalizeOpen] = useState(false);
   const [confirmUnlockOpen, setConfirmUnlockOpen] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
 
   // Modal state for Bonus Penalty Policy
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
@@ -124,7 +126,66 @@ export const ManagerPayroll: React.FC = () => {
     setConfirmUnlockOpen(false);
   };
 
+  const handleCalculatePayroll = async () => {
+    try {
+      setIsCalculating(true);
+      await generatePayroll(selectedPeriod);
+    } catch (error: any) {
+      console.error('Lỗi khi tính toán bảng lương:', error);
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
   const handleExportCSV = () => {
+    if (currentRecords.length === 0) {
+      showToast(`Kỳ ${selectedPeriod} chưa có dữ liệu bảng lương để xuất CSV!`, 'warning');
+      return;
+    }
+
+    const headers = [
+      'Mã NV',
+      'Họ và Tên',
+      'Kỳ Lương',
+      'Lương Theo Giờ (VNĐ)',
+      'Tổng Giờ Làm (h)',
+      'Số Giờ Tăng Ca (h)',
+      'Số Giờ Đi Trễ / Về Sớm (h)',
+      'Phụ Cấp (VNĐ)',
+      'Thực Lĩnh Net (VNĐ)',
+      'Trạng Thái'
+    ];
+
+    const rows = currentRecords.map(r => {
+      const emp = employees.find(e => e.employee_id === r.employee_id);
+      const name = emp?.full_name || r.employee_name || r.employee_id;
+      const statusStr = r.status === 'FINALIZED' ? 'Đã Chốt' : 'Đang Soạn Thảo';
+
+      return [
+        r.employee_id,
+        `"${name}"`,
+        r.period || r.payroll_period || selectedPeriod,
+        r.hourly_rate || 0,
+        r.total_working_hours || 0,
+        r.total_overtime ?? 0,
+        r.total_late_early ?? 0,
+        r.allowance || 0,
+        r.net_salary || 0,
+        `"${statusStr}"`
+      ];
+    });
+
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Bang_luong_chi_tiet_ky_${selectedPeriod}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
     showToast(`Đã xuất báo cáo bảng lương kỳ ${selectedPeriod} định dạng CSV!`, 'success');
   };
 
@@ -139,7 +200,7 @@ export const ManagerPayroll: React.FC = () => {
             </h1>
             <span
               className={`text-xs px-2.5 py-0.5 rounded-full font-mono font-medium border ${isFinalized
-                ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                 : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                 }`}
             >
@@ -172,6 +233,18 @@ export const ManagerPayroll: React.FC = () => {
             </select>
           </div>
 
+          {/* Calculate / Generate Payroll Button */}
+          <button
+            type="button"
+            disabled={isCalculating || isFinalized}
+            onClick={handleCalculatePayroll}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all active:scale-95"
+            title={isFinalized ? 'Bảng lương đã chốt sổ, hãy mở khóa để tính toán lại' : 'Tự động tính toán lại bảng lương từ dữ liệu chấm công mới nhất'}
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : 'text-amber-300'}`} />
+            <span>{isCalculating ? 'Đang tổng hợp...' : '⚡ Tự động tính lương kỳ này'}</span>
+          </button>
+
           {/* Action Button: Finalize or Unlock */}
           {isFinalized ? (
             <button
@@ -195,10 +268,10 @@ export const ManagerPayroll: React.FC = () => {
         </div>
       </div>
 
-      {/* 3 Bento Metric Cards (Mức thưởng tăng ca, Mức phạt đi trễ/về sớm, Trạng thái kỳ lương) */}
+      {/* 3 Bento Metric Cards with Equal Height (min-h-[140px] flex flex-col justify-between) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Card 1: Mức thưởng tăng ca (Lấy từ bảng bonus_penalty) */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors group relative">
+        {/* Card 1: Mức thưởng tăng ca */}
+        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col justify-between min-h-[140px] group relative">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Mức thưởng tăng ca</span>
             <div className="flex items-center gap-2">
@@ -212,7 +285,7 @@ export const ManagerPayroll: React.FC = () => {
               <Sparkles className="w-4 h-4 text-amber-400" />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-bold font-mono text-amber-400">
+          <div className="my-auto py-1 text-2xl font-bold font-mono text-amber-400">
             {bonusPenalty?.overtime_rate ? (
               Number(bonusPenalty.overtime_rate) <= 10 ? (
                 <span>{bonusPenalty.overtime_rate}x <span className="text-sm font-normal text-slate-400">lương giờ</span></span>
@@ -223,10 +296,11 @@ export const ManagerPayroll: React.FC = () => {
               <span>1.5x <span className="text-sm font-normal text-slate-400">lương giờ</span></span>
             )}
           </div>
+          <p className="text-[11px] text-slate-500">Áp dụng cho giờ làm ngoài khung ca chính</p>
         </div>
 
-        {/* Card 2: Mức phạt đi trễ / về sớm (Lấy từ bảng bonus_penalty) */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors group relative">
+        {/* Card 2: Mức phạt đi trễ / về sớm */}
+        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col justify-between min-h-[140px] group relative">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Mức phạt đi trễ / về sớm</span>
             <div className="flex items-center gap-2">
@@ -237,10 +311,10 @@ export const ManagerPayroll: React.FC = () => {
               >
                 Thay đổi
               </button>
-              <AlertCircle className="w-4 h-4 text-red-400" />
+              <AlertCircle className="w-4 h-4 text-rose-400" />
             </div>
           </div>
-          <div className="mt-2 text-2xl font-bold font-mono text-red-400">
+          <div className="my-auto py-1 text-2xl font-bold font-mono text-rose-400">
             {bonusPenalty?.late_early_penalty ? (
               Number(bonusPenalty.late_early_penalty) <= 10 ? (
                 <span>{bonusPenalty.late_early_penalty}x <span className="text-sm font-normal text-slate-400">lương giờ</span></span>
@@ -251,28 +325,27 @@ export const ManagerPayroll: React.FC = () => {
               <span>50.000 <span className="text-sm font-normal text-slate-400">₫/h</span></span>
             )}
           </div>
-
+          <p className="text-[11px] text-slate-500">Khấu trừ tự động vào bảng lương cuối kỳ</p>
         </div>
 
-
         {/* Card 3: Trạng thái kỳ lương */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors">
+        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col justify-between min-h-[140px]">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Trạng thái kỳ lương</span>
             {isFinalized ? (
-              <Lock className="w-4 h-4 text-green-500" />
+              <Lock className="w-4 h-4 text-emerald-400" />
             ) : (
               <Unlock className="w-4 h-4 text-amber-400" />
             )}
           </div>
-          <div className="mt-2 text-xl font-bold font-mono flex items-center gap-2 text-white">
+          <div className="my-auto py-1 text-xl font-bold font-mono flex items-center gap-2 text-white">
             {isFinalized ? (
-              <span className="text-green-500">Đã niêm phong (Khóa)</span>
+              <span className="text-emerald-400">Đã niêm phong (Khóa)</span>
             ) : (
               <span className="text-amber-400">Đang soạn thảo (Mở)</span>
             )}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-400">
             {currentRecords.length} nhân sự • Quỹ lương: <span className="font-mono text-white font-medium">{totalExpense.toLocaleString('vi-VN')} ₫</span>
           </p>
         </div>
@@ -359,14 +432,14 @@ export const ManagerPayroll: React.FC = () => {
                     {/* 5. Số giờ đi trễ/về sớm */}
                     <td className="py-3.5 px-3 font-mono">
                       {totalLateEarly > 0 ? (
-                        <span className="text-red-400 font-semibold font-mono">-{totalLateEarly}h</span>
+                        <span className="text-rose-400 font-semibold font-mono">-{totalLateEarly}h</span>
                       ) : (
-                        <span className="text-green-400 font-medium">0h</span>
+                        <span className="text-emerald-400 font-medium">0h</span>
                       )}
                     </td>
 
                     {/* 6. Phụ cấp */}
-                    <td className="py-3.5 px-3 font-mono text-green-400 font-medium">
+                    <td className="py-3.5 px-3 font-mono text-emerald-400 font-medium">
                       {allowance > 0 ? `+${allowance.toLocaleString('vi-VN')} ₫` : '0 ₫'}
                     </td>
 
@@ -465,7 +538,7 @@ export const ManagerPayroll: React.FC = () => {
                   min="0"
                   value={editingItem.total_late_early}
                   onChange={e => setEditingItem({ ...editingItem, total_late_early: Number(e.target.value) })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-red-400 font-mono focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-rose-400 font-mono focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
@@ -480,7 +553,7 @@ export const ManagerPayroll: React.FC = () => {
                 min="0"
                 value={editingItem.allowance}
                 onChange={e => setEditingItem({ ...editingItem, allowance: Number(e.target.value) })}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-green-400 font-mono focus:outline-none focus:border-blue-500"
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-emerald-400 font-mono focus:outline-none focus:border-blue-500"
               />
             </div>
 

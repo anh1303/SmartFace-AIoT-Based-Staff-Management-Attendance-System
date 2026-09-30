@@ -3,6 +3,7 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, calculateNetSalary } from '../../common/utils.js'
 import { logAction } from '../audit-logs/audit.service.js'
+import { aggregateDailyAttendance } from '../attendance/attendance.service.js'
 import type { PayrollStatus } from '../../common/constants.js'
 
 
@@ -310,6 +311,10 @@ export async function generate(payroll_period: string, employeeId?: string, acto
   const [yearStr, monthStr] = payroll_period.split('-')
   const year = parseInt(yearStr, 10)
   const month = parseInt(monthStr, 10)
+
+  // 1. Tự động tổng hợp dữ liệu chấm công từ attendance_logs và employee_shifts
+  // sang daily_attendance_summary cho tháng cần tính lương trước khi chạy tính toán
+  await aggregateDailyAttendance(month, year, employeeId)
 
   // 4. Khắc phục lỗi Timezone khi so sánh với work_date (@db.Date không lưu timezone):
   // Khởi tạo mốc UTC 00:00:00 đầu tháng và đầu tháng tiếp theo chuẩn xác

@@ -9,6 +9,7 @@ import { socketAuthMiddleware } from './sockets/socket.auth.js'
 import { initializeAttendanceGateway } from './sockets/attendance.gateway.js'
 import { initializeDeviceGateway } from './sockets/device.gateway.js'
 import { registerDeviceMqttHandlers } from './modules/devices/device.mqtt.handler.js'
+import { startAttendanceCron, stopAttendanceCron } from './modules/attendance/attendance.cron.js'
 
 const httpServer = createServer(app)
 const io = new Server(httpServer, {
@@ -30,6 +31,9 @@ async function start() {
 
   connectMqtt()
   registerDeviceMqttHandlers()
+
+  // Khởi động dịch vụ tự động tổng hợp chấm công định kỳ
+  startAttendanceCron()
 
   httpServer.listen(env.PORT, () => console.log(`API listening on http://localhost:${env.PORT}`))
 }
@@ -63,7 +67,8 @@ async function gracefulShutdown(signal: string) {
       })
     })
 
-    // 2. Disconnect MQTT client cleanly
+    // 2. Disconnect MQTT client & Stop CronJobs cleanly
+    stopAttendanceCron()
     await disconnectMqtt()
 
     // 3. Terminate idle keep-alive connections & close HTTP server

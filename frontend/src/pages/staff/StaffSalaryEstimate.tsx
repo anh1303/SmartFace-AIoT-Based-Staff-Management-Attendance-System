@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatVNDateISO } from '../../utils/dateUtils';
 import {
@@ -18,7 +18,25 @@ export const StaffSalaryEstimate: React.FC = () => {
 
   const empCode = currentUser?.employee_id || 'NV-001';
   const currentEmp = employees.find(e => e.employee_id === empCode);
-  const currentPayroll = payroll.find(p => p.employee_id === empCode && (p.period === '2026-09' || !p.period))
+
+  // Dynamic periods available for this staff member
+  const myPayrolls = payroll.filter(p => p.employee_id === empCode);
+  const availablePeriods = Array.from(
+    new Set(myPayrolls.map(p => p.period || p.payroll_period).filter(Boolean) as string[])
+  ).sort().reverse();
+
+  const [selectedStaffPeriod, setSelectedStaffPeriod] = useState<string>(() => {
+    return availablePeriods[0] || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  useEffect(() => {
+    if (availablePeriods.length > 0 && !availablePeriods.includes(selectedStaffPeriod)) {
+      setSelectedStaffPeriod(availablePeriods[0]);
+    }
+  }, [availablePeriods, selectedStaffPeriod]);
+
+  const currentPayroll = myPayrolls.find(p => (p.period || p.payroll_period) === selectedStaffPeriod)
+    || myPayrolls[0]
     || payroll.find(p => p.employee_id === empCode)
     || payroll[0];
 
@@ -26,22 +44,37 @@ export const StaffSalaryEstimate: React.FC = () => {
   const overtimeHours = currentPayroll?.total_overtime ?? 4.0;
   const lateEarlyHours = currentPayroll?.total_late_early ?? 0;
   const allowance = currentPayroll?.allowance ?? 2500000;
-  const otRate = bonusPenalty?.overtime_rate || 100000;
-  const penaltyRate = bonusPenalty?.late_early_penalty || 50000;
+  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5;
+  const penaltyRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
 
-  const otAmount = overtimeHours * otRate;
-  const penaltyAmount = lateEarlyHours * penaltyRate;
-  const standardHours = 160; // 20 ngày x 8h
+  // Bug 1 Fix: Handle multiplier vs fixed amount correctly
+  const otAmount = otRate <= 10
+    ? overtimeHours * hourlyRate * otRate
+    : overtimeHours * otRate;
+
+  const penaltyAmount = penaltyRate <= 10
+    ? lateEarlyHours * hourlyRate * penaltyRate
+    : lateEarlyHours * penaltyRate;
+
+  const standardHours = currentPayroll?.total_working_hours || 160;
   const baseSalary = standardHours * hourlyRate;
   const netSalary = currentPayroll?.net_salary
     ? Number(currentPayroll.net_salary)
-    : (baseSalary + otAmount - penaltyAmount + allowance);
+    : Math.max(0, Math.round(baseSalary + otAmount - penaltyAmount + allowance));
 
   // Attended days count
   const myAttendance = attendance.filter(a => a.employee_id === empCode);
   const distinctDays = Array.from(new Set(myAttendance.map(a => formatVNDateISO(a.timestamp)))).length;
   const workDaysCount = distinctDays > 0 ? distinctDays : 19;
   const progressPercent = Math.min(100, Math.round((workDaysCount / 22) * 100));
+
+  const otRateLabel = otRate <= 10
+    ? `${otRate}x lương giờ (${(otRate * hourlyRate).toLocaleString('vi-VN')} ₫/h)`
+    : `${otRate.toLocaleString('vi-VN')} ₫/h`;
+
+  const penaltyRateLabel = penaltyRate <= 10
+    ? `${penaltyRate}x lương giờ (${(penaltyRate * hourlyRate).toLocaleString('vi-VN')} ₫/h)`
+    : `${penaltyRate.toLocaleString('vi-VN')} ₫/h`;
 
   return (
     <div className="space-y-6">
@@ -50,7 +83,7 @@ export const StaffSalaryEstimate: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
-              Lương Tạm Tính ({currentPayroll?.period ? `Kỳ ${currentPayroll.period}` : 'Tháng 09/2026'})
+              Lương Tạm Tính ({selectedStaffPeriod ? `Kỳ ${selectedStaffPeriod}` : 'Kỳ hiện tại'})
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-mono font-medium border border-amber-500/20">
               {currentPayroll?.status === 'FINALIZED' ? 'ĐÃ CHỐT' : 'ĐANG TÍCH LŨY CÔNG'}
@@ -61,9 +94,32 @@ export const StaffSalaryEstimate: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-blue-400 text-xs font-mono">
-          <ShieldCheck className="w-4 h-4 text-green-500" />
-          <span>CHỈ ĐỌC • MINH BẠCH CSDL</span>
+        <div className="flex flex-wrap items-center gap-3">
+          {availablePeriods.length > 0 && (
+            <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+              <Calendar className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-xs text-slate-400">Kỳ lương:</span>
+              <select
+                value={selectedStaffPeriod}
+                onChange={e => setSelectedStaffPeriod(e.target.value)}
+                className="bg-transparent text-xs text-white font-mono font-bold focus:outline-none cursor-pointer"
+              >
+                {availablePeriods.map(period => {
+                  const [year, month] = period.split('-');
+                  return (
+                    <option key={period} value={period} className="bg-slate-900">
+                      Tháng {month}/{year}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-blue-400 text-xs font-mono">
+            <ShieldCheck className="w-4 h-4 text-green-500" />
+            <span>CHỈ ĐỌC • MINH BẠCH CSDL</span>
+          </div>
         </div>
       </div>
 
@@ -78,7 +134,7 @@ export const StaffSalaryEstimate: React.FC = () => {
               {netSalary.toLocaleString('vi-VN')} <span className="text-2xl text-blue-400 font-normal">₫</span>
             </div>
             <p className="text-xs text-slate-400">
-              Mức lương theo giờ: <strong>{hourlyRate.toLocaleString('vi-VN')} ₫/h</strong> • Đã tích lũy <strong>{overtimeHours}h OT</strong>.
+              Mức lương theo giờ: <strong>{hourlyRate.toLocaleString('vi-VN')} ₫/h</strong> • Đã tích lũy <strong>{overtimeHours}h OT</strong> • Tổng giờ làm: <strong>{standardHours}h</strong>.
             </p>
           </div>
 
@@ -94,8 +150,8 @@ export const StaffSalaryEstimate: React.FC = () => {
               />
             </div>
             <div className="flex justify-between text-[11px] text-slate-500 font-mono">
-              <span>Đơn giá OT: {otRate.toLocaleString('vi-VN')} ₫/h</span>
-              <span>Đơn giá phạt: {penaltyRate.toLocaleString('vi-VN')} ₫/h</span>
+              <span>Đơn giá OT: {otRate <= 10 ? `${otRate}x (${(otRate * hourlyRate).toLocaleString('vi-VN')} ₫/h)` : `${otRate.toLocaleString('vi-VN')} ₫/h`}</span>
+              <span>Đơn giá phạt: {penaltyRate <= 10 ? `${penaltyRate}x` : `${penaltyRate.toLocaleString('vi-VN')} ₫/h`}</span>
             </div>
           </div>
         </div>
@@ -113,7 +169,7 @@ export const StaffSalaryEstimate: React.FC = () => {
             <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-white">Lương theo giờ tiêu chuẩn ca</p>
-                <p className="text-[11px] text-slate-400">{hourlyRate.toLocaleString('vi-VN')} ₫/h × 160h định mức</p>
+                <p className="text-[11px] text-slate-400">{hourlyRate.toLocaleString('vi-VN')} ₫/h × {standardHours}h định mức</p>
               </div>
               <span className="font-mono text-xs font-bold text-white">{baseSalary.toLocaleString('vi-VN')} ₫</span>
             </div>
@@ -121,7 +177,7 @@ export const StaffSalaryEstimate: React.FC = () => {
             <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-white">Thưởng tăng ca (Overtime)</p>
-                <p className="text-[11px] text-slate-400">{overtimeHours}h OT × {otRate.toLocaleString('vi-VN')} ₫/h</p>
+                <p className="text-[11px] text-slate-400">{overtimeHours}h OT × {otRateLabel}</p>
               </div>
               <span className="font-mono text-xs font-bold text-green-400">+ {otAmount.toLocaleString('vi-VN')} ₫</span>
             </div>
@@ -146,7 +202,7 @@ export const StaffSalaryEstimate: React.FC = () => {
             <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-white">Phạt đi muộn / về sớm</p>
-                <p className="text-[11px] text-slate-400">{lateEarlyHours}h vi phạm × {penaltyRate.toLocaleString('vi-VN')} ₫/h</p>
+                <p className="text-[11px] text-slate-400">{lateEarlyHours}h vi phạm × {penaltyRateLabel}</p>
               </div>
               <span className={`font-mono text-xs font-bold ${penaltyAmount > 0 ? 'text-red-400' : 'text-slate-400'}`}>
                 {penaltyAmount > 0 ? `- ${penaltyAmount.toLocaleString('vi-VN')} ₫` : '0 ₫'}

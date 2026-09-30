@@ -46,6 +46,10 @@ tests/
 *.spec.js
 *.spec.jsx
 
+# Ngoại lệ: Cho phép lưu trữ kết quả kiểm thử mô hình trong smartface_pad_artifacts
+!**/smartface_pad_artifacts/**/test/
+!**/smartface_pad_artifacts/**/test/**
+
 # ==============================================================================
 # 4. MÔI TRƯỜNG PHÁT TRIỂN & HỆ ĐIỀU HÀNH (IDE & OS)
 # ==============================================================================

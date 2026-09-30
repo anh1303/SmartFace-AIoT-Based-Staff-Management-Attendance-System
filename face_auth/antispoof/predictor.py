@@ -7,17 +7,19 @@ Chức năng chính:
     - Tính toán giá trị logit (real_logit vs spoof_logit) để phân loại khuôn mặt THẬT (real) hay GIẢ (spoof).
 """
 
+import hashlib
 import sys
 import numpy as np
 import onnxruntime as ort
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 
+import config as _cfg
 from .loader import load_model
-from .preprocess import preprocess_batch, crop
+from .preprocess import preprocess_batch, preprocess_dct_batch, crop_for_runtime
 
 # Đường dẫn mặc định tới checkpoint PAD của runtime hiện tại.
-DEFAULT_MODEL_PATH = Path(__file__).parent / "models" / "mnv3_e1_preliminary_v5_1_best.onnx"
+DEFAULT_MODEL_PATH = Path(_cfg.PAD_MODEL_PATH)
 
 
 def _stable_logsumexp(a: np.ndarray) -> float:
@@ -46,13 +48,14 @@ class AntiSpoofPredictor:
         self,
         model_path: Optional[str] = None,
         threshold: Optional[float] = None,
-        model_img_size: int = 128,
-        bbox_expansion_factor: float = 1.55,
+        model_img_size: Optional[int] = None,
+        bbox_expansion_factor: Optional[float] = None,
         mean: Optional[List[float]] = None,
         std: Optional[List[float]] = None,
         apply_gamma: Optional[bool] = None,
         color_order: Optional[str] = None,
         threshold_logit: Optional[float] = None,
+        crop_mode: Optional[str] = None,
     ):
         """
         Khởi tạo Predictor:
@@ -60,31 +63,55 @@ class AntiSpoofPredictor:
         Tham số:
             model_path (Optional[str]): Đường dẫn tới file .onnx.
             threshold (float): Ngưỡng xác suất P(REAL). Không phải logit difference.
-            model_img_size (int): Kích thước ảnh vuông đầu vào của mô hình (mặc định 128x128).
-            bbox_expansion_factor (float): Tỷ lệ mở rộng khung bao bbox khi crop mặt (mặc định 1.55x).
+            model_img_size (Optional[int]): Kích thước đầu vào; None dùng config runtime
+                                             hoặc phát hiện từ ONNX.
+            bbox_expansion_factor (Optional[float]): Tỷ lệ mở rộng bbox; None dùng config.
             mean (Optional[List[float]]): Giá trị mean chuẩn hóa kênh màu [R, G, B].
             std (Optional[List[float]]): Giá trị std chuẩn hóa kênh màu [R, G, B].
             apply_gamma (Optional[bool]): Bật/tắt adaptive gamma correction. Khi None,
-                                          E1/MNV profiles mặc định tắt gamma còn legacy
-                                          128px profiles giữ hành vi cũ.
-            color_order (Optional[str]): Thứ tự kênh màu mong muốn của model ("BGR" hoặc "RGB").
-                                         Nếu None, tự động nhận diện dựa trên tên model/kích thước.
+                                          runtime đã chọn dùng cấu hình; model khác dùng
+                                          heuristic theo profile.
+            color_order (Optional[str]): Thứ tự kênh màu mong muốn ("BGR" hoặc "RGB").
+                                         Nếu None, dùng runtime config hoặc tự nhận diện.
             threshold_logit (Optional[float]): Nếu có, dùng trực tiếp ngưỡng d thay cho
                                                ``threshold``. Dùng để tránh nhầm đơn vị.
+            crop_mode (Optional[str]): Hình học crop; None dùng runtime config đã chọn.
         """
         self.model_path = (
             Path(model_path).expanduser().resolve()
             if model_path
             else DEFAULT_MODEL_PATH.resolve()
         )
+        uses_default_runtime = self.model_path == DEFAULT_MODEL_PATH.resolve()
 
         if not self.model_path.exists():
             raise FileNotFoundError(
                 f"Không tìm thấy file trọng số Anti-Spoofing tại: '{self.model_path}'"
             )
+        if (
+            uses_default_runtime
+            and _cfg.PAD_CROP_MODE == "minifasnet_train_v1"
+            and _cfg.PAD_RUNTIME_MODEL_SHA256 is not None
+        ):
+            digest = hashlib.sha256()
+            with self.model_path.open("rb") as model_file:
+                for chunk in iter(lambda: model_file.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            if digest.hexdigest() != _cfg.PAD_RUNTIME_MODEL_SHA256.lower():
+                raise ValueError(
+                    "MiniFASNet ONNX SHA256 differs from runtime_config.json: "
+                    f"{self.model_path}"
+                )
 
-        self.model_img_size = model_img_size
-        self.bbox_expansion_factor = bbox_expansion_factor
+        self.model_img_size = (
+            _cfg.PAD_MODEL_IMG_SIZE if model_img_size is None else model_img_size
+        )
+        self.bbox_expansion_factor = (
+            _cfg.PAD_BBOX_EXPANSION_FACTOR
+            if bbox_expansion_factor is None
+            else bbox_expansion_factor
+        )
+        self.crop_mode = _cfg.PAD_CROP_MODE if crop_mode is None else crop_mode
 
         # Nạp mô hình ONNX qua hàm load_model
         self.session, self.input_name = load_model(str(self.model_path))
@@ -95,23 +122,34 @@ class AntiSpoofPredictor:
         self.input_metadata = self.session.get_inputs()[0]
         self.output_metadata = self.session.get_outputs()[0]
 
-        # Tự động phát hiện kích thước ảnh đầu vào (model_img_size) trực tiếp từ đồ thị mô hình ONNX
+        # Tự động phát hiện kích thước ảnh đầu vào và loại mô hình (Spatial vs Frequency)
+        self.is_frequency_model = False
         try:
             input_shape = self.session.get_inputs()[0].shape
             # input_shape thường có dạng (batch_size, 3, height, width) hoặc [None, 3, H, W]
-            if len(input_shape) == 4 and isinstance(input_shape[2], int) and input_shape[2] > 0:
-                self.model_img_size = input_shape[2]    # mặc định W = H -> lấy vuông
+            # Với mô hình E2 DCT frequency-only: (batch_size, 1, 224, 224)
+            if len(input_shape) == 4:
+                if isinstance(input_shape[2], int) and input_shape[2] > 0:
+                    self.model_img_size = input_shape[2]    # mặc định W = H -> lấy vuông
+                if input_shape[1] == 1:
+                    self.is_frequency_model = True
         except Exception:
             pass
 
         # Cấu hình mean/std chuẩn hóa và color order contract
         model_name_lower = str(self.model_path).lower()
+        if "freq" in model_name_lower or "dct" in model_name_lower:
+            self.is_frequency_model = True
         if threshold_logit is None and threshold is None:
-            threshold = (
-                0.3356796703127529
-                if "mnv" in model_name_lower or self.model_img_size == 224
-                else 0.5
-            )
+            if uses_default_runtime:
+                threshold = _cfg.PAD_THRESHOLD
+                threshold_logit = _cfg.PAD_THRESHOLD_LOGIT
+            else:
+                threshold = (
+                    0.38579509526467753
+                    if "mnv" in model_name_lower or self.model_img_size == 224
+                    else 0.5
+                )
         if threshold_logit is not None:
             self.threshold = None if threshold is None else float(threshold)
             self.logit_threshold = float(threshold_logit)
@@ -124,11 +162,17 @@ class AntiSpoofPredictor:
             self.threshold_probability = float(p)
             self.threshold_input_type = "probability"
         if apply_gamma is None:
-            self.apply_gamma = not ("mnv" in model_name_lower or self.model_img_size == 224)
+            self.apply_gamma = (
+                _cfg.PAD_GAMMA_ENABLED
+                if uses_default_runtime
+                else not ("mnv" in model_name_lower or self.model_img_size == 224)
+            )
         else:
             self.apply_gamma = bool(apply_gamma)
         if color_order is not None:
             self.color_order = color_order.upper()
+        elif uses_default_runtime and _cfg.PAD_COLOR_ORDER is not None:
+            self.color_order = _cfg.PAD_COLOR_ORDER
         elif "mnv" in model_name_lower or self.model_img_size == 224:
             self.color_order = "RGB"
         else:
@@ -139,6 +183,12 @@ class AntiSpoofPredictor:
         if mean is not None and std is not None:
             self.mean = mean
             self.std = std
+        elif uses_default_runtime and _cfg.PAD_MEAN is not None and _cfg.PAD_STD is not None:
+            self.mean = _cfg.PAD_MEAN
+            self.std = _cfg.PAD_STD
+        elif uses_default_runtime and self.crop_mode == "minifasnet_train_v1":
+            self.mean = None
+            self.std = None
         elif "mnv" in model_name_lower or self.model_img_size == 224:
             self.mean = [0.5931, 0.4690, 0.4229]
             self.std = [0.2471, 0.2214, 0.2157]
@@ -249,15 +299,18 @@ class AntiSpoofPredictor:
             return []
 
         try:
-            # 1. Chạy tiền xử lý hình ảnh thành Tensor đầu vào (Batch, 3, H, W)
-            batch_input = preprocess_batch(
-                face_crops,
-                self.model_img_size,
-                mean=self.mean,
-                std=self.std,
-                apply_gamma=self.apply_gamma,
-                convert_rgb=self.convert_rgb,
-            )
+            # 1. Chạy tiền xử lý hình ảnh thành Tensor đầu vào
+            if self.is_frequency_model:
+                batch_input = preprocess_dct_batch(face_crops, self.model_img_size)
+            else:
+                batch_input = preprocess_batch(
+                    face_crops,
+                    self.model_img_size,
+                    mean=self.mean,
+                    std=self.std,
+                    apply_gamma=self.apply_gamma,
+                    convert_rgb=self.convert_rgb,
+                )
 
             # 2. Suy luận bằng ONNX Runtime Session
             logits = self.session.run([], {self.input_name: batch_input})[0]
@@ -285,6 +338,12 @@ class AntiSpoofPredictor:
         Trả về:
             Dict: Từ điển kết quả phân loại khuôn mặt.
         """
-        face_crop = crop(frame, bbox, self.bbox_expansion_factor)
+        face_crop = crop_for_runtime(
+            frame,
+            bbox,
+            self.bbox_expansion_factor,
+            self.model_img_size,
+            self.crop_mode,
+        )
         results = self.predict_crops([face_crop])
         return results[0] if results else {}

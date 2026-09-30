@@ -43,16 +43,21 @@ COLOR_UNKNOWN   = (0, 40, 220)      # Đỏ     — UNKNOWN
 # Màu cho trạng thái PAD
 COLOR_REAL      = (0, 210, 80)      # Xanh   — mặt thật
 COLOR_SPOOF     = (0, 0, 220)       # Đỏ     — giả mạo
+COLOR_INVALID   = (0, 165, 255)     # Cam    — đầu vào mặt không hợp lệ
 
 
 # ── Hàm vẽ ──────────────────────────────────────────────────────────────────
 
-def draw_track(frame, bbox, name, score, is_pending, is_reverifying, is_spoof=False, is_pad_pending=False):
+def draw_track(
+    frame, bbox, name, score, is_pending, is_reverifying,
+    is_spoof=False, is_pad_pending=False, pad_invalid_reason=None,
+):
     """
     Vẽ bounding box và label lên frame theo trạng thái track.
 
     Trạng thái:
         - SPOOF (đỏ)         : PAD phát hiện giả mạo — ưu tiên cao nhất.
+        - Invalid face (cam) : đầu vào chưa đủ điều kiện để chạy PAD.
         - PAD Pending (xám)  : đang tích lũy vote PAD, chưa cho phép nhận diện.
         - Pending (xám)      : track vừa tạo, chưa nhận diện.
         - Locked (xanh)      : đã nhận diện, đang trong thời gian locked.
@@ -64,6 +69,17 @@ def draw_track(frame, bbox, name, score, is_pending, is_reverifying, is_spoof=Fa
     if is_spoof:
         color = COLOR_SPOOF
         label = "⚠ SPOOF"
+    elif pad_invalid_reason:
+        invalid_detail = {
+            "low_detector_confidence": "LOW CONF",
+            "face_too_close_to_frame_edge": "EDGE",
+            "incomplete_landmarks": "LANDMARKS",
+            "invalid_landmarks": "LANDMARKS",
+            "landmark_outside_face": "LANDMARKS",
+            "landmark_at_face_edge": "LANDMARKS",
+        }.get(pad_invalid_reason, "INPUT")
+        color = COLOR_INVALID
+        label = f"INVALID FACE: {invalid_detail}"
     elif is_pad_pending:
         color = COLOR_PENDING
         label = "Kiem tra PAD..."
@@ -158,6 +174,8 @@ def orchestrate_track_step(
                 recognized = True
         except Exception as e:
             print(f"[Pipeline error] {e}")
+        if not recognized:
+            track.invalidate_recognition(retry_delay=True)
 
     attendance_attempted = False
     attendance_success = None
@@ -200,6 +218,9 @@ def orchestrate_track_step(
         "should_recognize": should_recognize,
         "is_spoof": is_spoof,
         "is_pad_pending": is_pad_pending,
+        "pad_invalid_reason": (
+            track.pad_invalid_reason if pad_enabled_rt else None
+        ),
         "recognized": recognized,
         "recognition_called": recognition_called,
         "attendance_attempted": attendance_attempted,
@@ -207,6 +228,164 @@ def orchestrate_track_step(
         "attendance_reason": attendance_reason,
         "last_ts": last_ts,
     }
+
+
+def _pad_face_skip_reason(detection, frame_shape):
+    """Reject low-confidence or incomplete faces near the camera-frame edge."""
+    try:
+        frame_h, frame_w = frame_shape[:2]
+        bbox = detection["bbox"]
+        if len(bbox) != 4:
+            return "invalid_bbox"
+        x1, y1, x2, y2 = (float(value) for value in bbox)
+        score = float(detection.get("score"))
+    except (KeyError, TypeError, ValueError):
+        return "missing_geometry_or_score"
+
+    if not all(math.isfinite(value) for value in (x1, y1, x2, y2, score)):
+        return "non_finite_geometry_or_score"
+    if x2 <= x1 or y2 <= y1:
+        return "invalid_bbox"
+    if score < config.PAD_MIN_DETECTOR_CONFIDENCE:
+        return "low_detector_confidence"
+
+    landmarks = detection.get("landmarks")
+    try:
+        if landmarks is None or len(landmarks) != 5:
+            return "incomplete_landmarks"
+        points = [(float(point[0]), float(point[1])) for point in landmarks]
+    except (TypeError, ValueError, IndexError):
+        return "invalid_landmarks"
+    if len(points) != 5:
+        return "incomplete_landmarks"
+    box_w, box_h = x2 - x1, y2 - y1
+    landmark_margin = max(1.0, min(box_w, box_h) * 0.02)
+    if any(
+        not math.isfinite(x) or not math.isfinite(y)
+        or x <= x1 + landmark_margin or x >= x2 - landmark_margin
+        or y <= y1 + landmark_margin or y >= y2 - landmark_margin
+        for x, y in points
+    ):
+        return "landmark_at_face_edge"
+
+    edge_margin = max(4.0, min(box_w, box_h) * 0.04)
+    if (
+        x1 <= edge_margin or y1 <= edge_margin
+        or x2 >= frame_w - edge_margin
+        or y2 >= frame_h - edge_margin
+    ):
+        return "face_too_close_to_frame_edge"
+    return None
+
+
+def update_track_pad(
+    tracked, frame, predictor, interval_seconds,
+    frame_id=0, detector_called=False, diagnostic_log=False,
+    crop_smoothing=False,
+) -> int:
+    """Update due tracks atomically; inference errors invalidate cached verdicts."""
+    from antispoof.preprocess import crop_for_runtime as pad_crop
+
+    crops, due = [], []
+    crop_mode = getattr(predictor, "crop_mode", config.PAD_CROP_MODE)
+    if not isinstance(crop_mode, str):
+        crop_mode = config.PAD_CROP_MODE
+    model_img_size = getattr(predictor, "model_img_size", config.PAD_MODEL_IMG_SIZE)
+    if not isinstance(model_img_size, int):
+        model_img_size = config.PAD_MODEL_IMG_SIZE
+
+    def fail(track):
+        track.invalidate_verification()
+        # Pace failed attempts too, while keeping the empty vote window pending.
+        track.last_pad_time = time.monotonic()
+
+    for detection, track in tracked:
+        skip_reason = _pad_face_skip_reason(detection, frame.shape)
+        if skip_reason is not None:
+            track.invalidate_verification()
+            track.pad_invalid_reason = skip_reason
+            if diagnostic_log:
+                print(
+                    f"[PAD skip] frame_id={frame_id} track_id={track.track_id} "
+                    f"reason={skip_reason} score={detection.get('score')} "
+                    f"bbox={detection.get('bbox')}"
+                )
+            continue
+        track.pad_invalid_reason = None
+        if not track.needs_pad(interval_seconds):
+            continue
+        try:
+            crop_bbox = detection["bbox"]
+            if crop_smoothing:
+                crop_bbox = track.pad_crop_bbox(
+                    crop_bbox, frame.shape, predictor.bbox_expansion_factor,
+                )
+            crops.append(
+                pad_crop(
+                    frame,
+                    crop_bbox,
+                    predictor.bbox_expansion_factor,
+                    model_img_size,
+                    crop_mode,
+                )
+            )
+            due.append((detection, track, crop_bbox))
+        except Exception as exc:
+            fail(track)
+            print(f"[PAD crop error] track_id={track.track_id}: {exc}")
+    if not crops:
+        return 0
+    try:
+        results = predictor.predict_crops(crops)
+        if len(results) != len(due):
+            raise ValueError("PAD batch result count does not match input count")
+        # Validate the entire batch before accepting any vote.
+        for res in results:
+            if not isinstance(res.get("is_real"), bool):
+                raise ValueError("PAD result has no boolean is_real verdict")
+            score = float(res.get("pad_score", res.get("logit_diff", float("nan"))))
+            if not math.isfinite(score):
+                raise ValueError("PAD result has a non-finite score")
+    except Exception as exc:
+        for _, track, _ in due:
+            fail(track)
+        print(f"[PAD error] {exc}")
+        return 0
+
+    for (detection, track, crop_bbox), res in zip(due, results):
+        score = float(res.get("pad_score", res.get("logit_diff")))
+        track.update_pad(res["is_real"], score)
+        if diagnostic_log:
+            exp_score = math.exp(-abs(score))
+            p_real = 1.0 / (1.0 + exp_score) if score >= 0 else exp_score / (1.0 + exp_score)
+            print(
+                f"[PAD] frame_id={frame_id} timestamp={time.time():.6f} "
+                f"track_id={track.track_id} detector_called={detector_called} "
+                f"bbox_source={detection.get('bbox_source', 'UNKNOWN')} "
+                f"bbox={track.bbox} face_width={track.bbox[2]-track.bbox[0]} "
+                f"face_height={track.bbox[3]-track.bbox[1]} "
+                f"crop_smoothing={crop_smoothing} pad_crop_bbox={tuple(round(float(v), 3) for v in crop_bbox)} "
+                f"logits=({res.get('real_logit')},{res.get('spoof_logit')}) "
+                f"d={score:.6f} p_real={p_real:.6f} "
+                f"threshold_logit={res.get('threshold_logit', predictor.logit_threshold):.6f} "
+                f"raw={'REAL' if res['is_real'] else 'SPOOF'} smoothed={track.pad_status}"
+            )
+    return len(results)
+
+
+def resolve_pad_model_path(model_path):
+    """A CLI model override must use the currently selected runtime contract."""
+    path = Path(model_path).expanduser()
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parent / "antispoof" / "models" / path
+    path = path.resolve()
+    if path != Path(config.PAD_MODEL_PATH).resolve():
+        raise ValueError(
+            "--pad-model khác model của cấu hình runtime hiện tại. "
+            "Hãy chọn PAD_RUNTIME_CONFIG_PATH và model tương ứng trước khi chạy; "
+            "không thể dùng threshold/preprocessing của model hiện tại cho model khác."
+        )
+    return path
 
 
 # ── Hàm parse CLI ────────────────────────────────────────────────────────────
@@ -226,8 +405,8 @@ def parse_args():
         help="Tắt module PAD anti-spoofing"
     )
     parser.add_argument(
-        "--pad-model", type=str, default=config.PAD_MODEL_FILENAME,
-        help=f"Tên file model PAD trong antispoof/models/ (mặc định: {config.PAD_MODEL_FILENAME})"
+        "--pad-model", type=str, default=config.PAD_MODEL_PATH,
+        help=f"Đường dẫn model khớp cấu hình PAD runtime đã chọn (mặc định: {config.PAD_MODEL_PATH})"
     )
     parser.add_argument(
         "--pad-threshold", type=float, default=config.PAD_THRESHOLD,
@@ -308,14 +487,15 @@ def main():
     if args.pad_enabled:
         try:
             from antispoof import AntiSpoofPredictor
-            _pad_model_path = Path(args.pad_model).expanduser()
-            if not _pad_model_path.is_absolute():
-                _pad_model_path = Path(__file__).resolve().parent / "antispoof" / "models" / _pad_model_path
+            _pad_model_path = resolve_pad_model_path(args.pad_model)
             pad_predictor = AntiSpoofPredictor(
                 model_path=str(_pad_model_path.resolve()),
                 threshold=args.pad_threshold,
                 threshold_logit=effective_pad_threshold_logit,
+                model_img_size=config.PAD_MODEL_IMG_SIZE,
                 bbox_expansion_factor=config.PAD_BBOX_EXPANSION_FACTOR,
+                mean=config.PAD_MEAN,
+                std=config.PAD_STD,
                 apply_gamma=config.PAD_GAMMA_ENABLED,
                 color_order=config.PAD_COLOR_ORDER,
             )
@@ -345,8 +525,9 @@ def main():
     # thực tế được in ra ngay sau đây để chẩn đoán thay vì giả định cap.set() đã thành công.
     if config.CAMERA_BUFFER_SIZE > 0:
         cap.set(cv2.CAP_PROP_BUFFERSIZE, config.CAMERA_BUFFER_SIZE)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  config.CAMERA_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
+    if config.CAMERA_FORCE_RESOLUTION:
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  config.CAMERA_WIDTH)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
     cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
 
     try:
@@ -359,9 +540,14 @@ def main():
     actual_buffer = cap.get(cv2.CAP_PROP_BUFFERSIZE)
 
     print("Starting face authentication system...")
+    resolution_request = (
+        f"{config.CAMERA_WIDTH}x{config.CAMERA_HEIGHT}"
+        if config.CAMERA_FORCE_RESOLUTION else "backend-default"
+    )
     print(
         f"  CAMERA          = backend={camera_backend} "
-        f"requested={config.CAMERA_WIDTH}x{config.CAMERA_HEIGHT}@{config.CAMERA_FPS} "
+        f"force_resolution={config.CAMERA_FORCE_RESOLUTION} "
+        f"requested={resolution_request}@{config.CAMERA_FPS} "
         f"actual={actual_width}x{actual_height}@{actual_fps:.2f} "
         f"buffer={actual_buffer:.2f}"
     )
@@ -369,6 +555,8 @@ def main():
     print(f"  MATCH_THRESHOLD  = {config.MATCH_THRESHOLD}")
     print(f"  RECOGNIZE_EVERY  = {config.RECOGNIZE_INTERVAL_SECONDS}s")
     print(f"  PAD_EVERY        = {config.PAD_INTERVAL_SECONDS}s")
+    print(f"  PAD_CROP_SMOOTHING = {config.PAD_CROP_SMOOTHING}")
+    print(f"  PAD_CROP_MODE = {config.PAD_CROP_MODE}")
     print(f"  DETECT_EVERY     = {config.DETECTION_INTERVAL_SECONDS}s (0 = every frame)")
     print(f"  MIN_FACE_SIZE    = {config.DETECTOR_MIN_FACE_SIZE}px")
     print(f"  APP_MODE         = {args.mode.upper()}")
@@ -434,7 +622,12 @@ def main():
                 or tracker.needs_redetection()
             )
             detection_called = False
-            if detector_due:
+            if not detector_due:
+                tracker_t0 = time.perf_counter()
+                tracked = tracker.update([], frame=frame, detector_called=False)
+                counters["tracker_ms"] += (time.perf_counter() - tracker_t0) * 1000.0
+                counters["tracker_updates"] += 1
+            if detector_due or tracker.needs_redetection():
                 detector_t0 = time.perf_counter()
                 try:
                     detections = detector.detect(frame)
@@ -447,62 +640,21 @@ def main():
                 detection_called = True
                 tracker_t0 = time.perf_counter()
                 tracked = tracker.update(detections, frame=frame, detector_called=True)
-            else:
-                tracker_t0 = time.perf_counter()
-                tracked = tracker.update([], frame=frame, detector_called=False)
-            counters["tracker_ms"] += (time.perf_counter() - tracker_t0) * 1000.0
-            counters["tracker_updates"] += 1
+                counters["tracker_ms"] += (time.perf_counter() - tracker_t0) * 1000.0
+                counters["tracker_updates"] += 1
 
-            # ── PAD batch — chỉ chạy cho các track đến hạn PAD_INTERVAL_SECONDS ─────
+            # ── PAD batch ────────────────────────────────────────────────
             if pad_enabled_rt and pad_predictor is not None and tracked:
-                face_crops = []
-                track_ids  = []
-                for detection, track in tracked:
-                    # Bỏ qua track chưa đến hạn chạy PAD lại
-                    if not track.needs_pad(config.PAD_INTERVAL_SECONDS):
-                        continue
-                    bbox = detection["bbox"]
-                    try:
-                        from antispoof.preprocess import crop as pad_crop
-                        fc = pad_crop(frame, bbox, pad_predictor.bbox_expansion_factor)
-                        face_crops.append(fc)
-                        track_ids.append(track.track_id)
-                    except Exception:
-                        pass
-                if face_crops:
-                    pad_t0 = time.perf_counter()
-                    try:
-                        pad_batch = pad_predictor.predict_crops(face_crops)
-                        counters["pad_calls"] += len(pad_batch)
-                        # Đẩy verdict vào rolling window của từng track
-                        if pad_batch:
-                            tid_to_track = {t.track_id: t for _, t in tracked}
-                            for tid, res in zip(track_ids, pad_batch):
-                                if tid in tid_to_track and "is_real" in res:
-                                    pad_track = tid_to_track[tid]
-                                    pad_track.update_pad(
-                                        is_real=res["is_real"],
-                                        pad_score=res.get("pad_score", res.get("logit_diff", None)),
-                                    )
-                                    if config.PAD_DIAGNOSTIC_LOG:
-                                        score = float(res.get("pad_score", res.get("logit_diff", 0.0)))
-                                        p_real = 1.0 / (1.0 + math.exp(-score))
-                                        print(
-                                            f"[PAD] frame_id={frame_id} timestamp={time.time():.6f} "
-                                            f"track_id={tid} detector_called={detection_called} "
-                                            f"bbox_source={detection.get('bbox_source', 'UNKNOWN')} "
-                                            f"bbox={pad_track.bbox} face_width={pad_track.bbox[2]-pad_track.bbox[0]} "
-                                            f"face_height={pad_track.bbox[3]-pad_track.bbox[1]} "
-                                            f"logits=({res.get('real_logit')},{res.get('spoof_logit')}) "
-                                            f"d={score:.6f} p_real={p_real:.6f} "
-                                            f"threshold_logit={res.get('threshold_logit', pad_predictor.logit_threshold):.6f} "
-                                            f"raw={'REAL' if res['is_real'] else 'SPOOF'} "
-                                            f"smoothed={pad_track.pad_status}"
-                                        )
-                    except Exception as e:
-                        print(f"[PAD error] {e}")
-                    finally:
-                        counters["pad_ms"] += (time.perf_counter() - pad_t0) * 1000.0
+                pad_t0 = time.perf_counter()
+                counters["pad_calls"] += update_track_pad(
+                    tracked, frame, pad_predictor, config.PAD_INTERVAL_SECONDS,
+                    frame_id, detection_called, config.PAD_DIAGNOSTIC_LOG,
+                    crop_smoothing=config.PAD_CROP_SMOOTHING,
+                )
+                counters["pad_ms"] += (time.perf_counter() - pad_t0) * 1000.0
+
+            # Keep model input free of annotations from earlier tracks.
+            display_frame = frame.copy()
 
             # ── Recognition + Attendance + Display ───────────────────────────
             for detection, track in tracked:
@@ -553,27 +705,28 @@ def main():
                         print(f"[ATTENDANCE BLOCKED] {name}: {reason}{ts_str}")
 
                 draw_track(
-                    frame, bbox, name, score,
+                    display_frame, bbox, name, score,
                     is_pending=is_pending,
                     is_reverifying=is_reverifying,
                     is_spoof=orch_res["is_spoof"],
                     is_pad_pending=orch_res["is_pad_pending"],
+                    pad_invalid_reason=orch_res["pad_invalid_reason"],
                 )
 
 
             # ── Overlay FPS & PAD badge ───────────────────────────────────────
             if show_fps_rt:
-                draw_fps(frame, avg_fps)
-            draw_pad_badge(frame, pad_enabled_rt)
+                draw_fps(display_frame, avg_fps)
+            draw_pad_badge(display_frame, pad_enabled_rt)
             
             # ── Draw mode & attendance message ────────────────────────────────
-            cv2.putText(frame, f"MODE: {app_mode}", (10, 84), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 200, 0), 2, cv2.LINE_AA)
+            cv2.putText(display_frame, f"MODE: {app_mode}", (10, 84), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 200, 0), 2, cv2.LINE_AA)
             if attendance_msg and (time.time() - attendance_msg_time < 3.0):
                 # Hiển thị thông báo (thành công hoặc cảnh báo) trong 3 giây
-                cv2.putText(frame, attendance_msg, (10, frame.shape[0] - 30), 
+                cv2.putText(display_frame, attendance_msg, (10, frame.shape[0] - 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, attendance_msg_color, 2, cv2.LINE_AA)
 
-            cv2.imshow("SmartFace — Face Auth", frame)
+            cv2.imshow("SmartFace — Face Auth", display_frame)
 
             # ── Key handling ─────────────────────────────────────────────────
             key = cv2.waitKey(1) & 0xFF
@@ -591,14 +744,15 @@ def main():
                 if pad_predictor is None:
                     try:
                         from antispoof import AntiSpoofPredictor
-                        _pad_model_path = Path(args.pad_model).expanduser()
-                        if not _pad_model_path.is_absolute():
-                            _pad_model_path = Path(__file__).resolve().parent / "antispoof" / "models" / _pad_model_path
+                        _pad_model_path = resolve_pad_model_path(args.pad_model)
                         pad_predictor = AntiSpoofPredictor(
                             model_path=str(_pad_model_path.resolve()),
                             threshold=args.pad_threshold,
                             threshold_logit=effective_pad_threshold_logit,
+                            model_img_size=config.PAD_MODEL_IMG_SIZE,
                             bbox_expansion_factor=config.PAD_BBOX_EXPANSION_FACTOR,
+                            mean=config.PAD_MEAN,
+                            std=config.PAD_STD,
                             apply_gamma=config.PAD_GAMMA_ENABLED,
                             color_order=config.PAD_COLOR_ORDER,
                         )
@@ -610,7 +764,7 @@ def main():
                     pad_enabled_rt = not pad_enabled_rt
                     if pad_enabled_rt:
                         for t in tracker.tracks:
-                            t.reset_pad()
+                            t.invalidate_verification()
                     print(f"[PAD] {'ON' if pad_enabled_rt else 'OFF'}")
                 else:
                     print("[PAD] Không thể bật — model PAD chưa sẵn sàng.")

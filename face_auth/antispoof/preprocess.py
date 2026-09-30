@@ -192,6 +192,98 @@ def preprocess_batch(
     return batch
 
 
+def preprocess_dct(
+    img: np.ndarray,
+    model_img_size: int = 224,
+    eps: float = 1e-6,
+) -> np.ndarray:
+    """
+    Tiền xử lý trích xuất miền tần số 2D-DCT cho mô hình E2 Frequency-Only PAD.
+    Pipeline đồng bộ 100% với e2_frequency_only_dct_train.ipynb:
+        1. BGR sang RGB
+        2. Letterbox resize về model_img_size x model_img_size với đệm BORDER_REFLECT_101
+        3. Tính luminance: 0.299 * R + 0.587 * G + 0.114 * B trong dải [0, 1]
+        4. Biến đổi 2D DCT (cv2.dct)
+        5. Nén động học có dấu: sign(C) * log1p(|C|)
+        6. Chuẩn hóa z-score theo từng mẫu (per-sample standardisation)
+
+    Trả về:
+        np.ndarray: Mảng 3D float32 kích thước (1, model_img_size, model_img_size).
+    """
+    if img is None or img.size == 0:
+        return np.zeros((1, model_img_size, model_img_size), dtype=np.float32)
+
+    # 1. Chuyển sang RGB
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    # 2. Resize với giữ tỷ lệ và đệm BORDER_REFLECT_101
+    old_h, old_w = img_rgb.shape[:2]
+    ratio = float(model_img_size) / max(old_h, old_w)
+    scaled_h = max(1, int(old_h * ratio))
+    scaled_w = max(1, int(old_w * ratio))
+    interpolation = cv2.INTER_LANCZOS4 if ratio > 1.0 else cv2.INTER_AREA
+
+    resized = cv2.resize(
+        img_rgb,
+        (scaled_w, scaled_h),
+        interpolation=interpolation,
+    )
+
+    delta_w = model_img_size - scaled_w
+    delta_h = model_img_size - scaled_h
+    top, bottom = delta_h // 2, delta_h - (delta_h // 2)
+    left, right = delta_w // 2, delta_w - (delta_w // 2)
+
+    padded = cv2.copyMakeBorder(
+        resized,
+        top,
+        bottom,
+        left,
+        right,
+        cv2.BORDER_REFLECT_101,
+    )
+
+    # 3. Tính luminance float32 [0, 1]
+    rgb_f = padded.astype(np.float32) / 255.0
+    luma = (
+        0.299 * rgb_f[..., 0]
+        + 0.587 * rgb_f[..., 1]
+        + 0.114 * rgb_f[..., 2]
+    ).astype(np.float32)
+
+    # 4. Biến đổi 2D DCT
+    coeff = cv2.dct(np.ascontiguousarray(luma, dtype=np.float32))
+
+    # 5. Signed-log1p compression
+    coeff = np.sign(coeff) * np.log1p(np.abs(coeff))
+
+    # 6. Per-sample standardisation (z-score)
+    mean = float(coeff.mean())
+    std = float(coeff.std())
+    coeff = (coeff - mean) / max(std, eps)
+
+    return coeff[None, ...].astype(np.float32)
+
+
+def preprocess_dct_batch(
+    face_crops: List[np.ndarray],
+    model_img_size: int = 224,
+) -> np.ndarray:
+    """
+    Tiền xử lý DCT hàng loạt cho danh sách crop khuôn mặt.
+    Trả về mảng 4D float32 (batch_size, 1, model_img_size, model_img_size).
+    """
+    if not face_crops:
+        raise ValueError("Danh sách face_crops không được rỗng!")
+
+    batch = np.zeros(
+        (len(face_crops), 1, model_img_size, model_img_size), dtype=np.float32
+    )
+    for i, face_crop in enumerate(face_crops):
+        batch[i] = preprocess_dct(face_crop, model_img_size)
+    return batch
+
+
 def crop(img: np.ndarray, bbox: Tuple[int, int, int, int], bbox_expansion_factor: float = 1.55) -> np.ndarray:
     """
     Cắt vùng khuôn mặt từ khung hình gốc dựa theo Bounding Box (bbox),
@@ -259,3 +351,64 @@ def crop(img: np.ndarray, bbox: Tuple[int, int, int, int], bbox_expansion_factor
         result = cv2.resize(result, (crop_size, crop_size), interpolation=cv2.INTER_AREA)
 
     return result
+
+
+def crop_minifasnet_train_v1(
+    img: np.ndarray,
+    bbox: Tuple[int, int, int, int],
+    bbox_expansion_factor: float = 2.7,
+    model_img_size: int = 80,
+) -> np.ndarray:
+    """Reproduce the MiniFASNet final notebooks' ``mini_crop_bgr`` exactly."""
+    src_h, src_w = img.shape[:2]
+    x1, y1, x2, y2 = map(float, bbox)
+    box_w, box_h = x2 - x1, y2 - y1
+    if box_w <= 0 or box_h <= 0 or src_w < 2 or src_h < 2:
+        raise ValueError("Invalid MiniFASNet image/bbox geometry")
+
+    used_scale = min(
+        (src_h - 1) / box_h,
+        (src_w - 1) / box_w,
+        float(bbox_expansion_factor),
+    )
+    new_w, new_h = box_w * used_scale, box_h * used_scale
+    center_x, center_y = box_w / 2 + x1, box_h / 2 + y1
+    left, top = center_x - new_w / 2, center_y - new_h / 2
+    right, bottom = center_x + new_w / 2, center_y + new_h / 2
+    if left < 0:
+        right -= left
+        left = 0
+    if top < 0:
+        bottom -= top
+        top = 0
+    if right > src_w - 1:
+        left -= right - src_w + 1
+        right = src_w - 1
+    if bottom > src_h - 1:
+        top -= bottom - src_h + 1
+        bottom = src_h - 1
+
+    lx, ty, rx, by = map(int, (left, top, right, bottom))
+    if lx < 0 or ty < 0 or rx >= src_w or by >= src_h or rx < lx or by < ty:
+        raise RuntimeError(f"MiniFASNet crop escaped image: {(lx, ty, rx, by)}")
+    patch = img[ty : by + 1, lx : rx + 1]
+    if patch.size == 0:
+        raise RuntimeError("Empty MiniFASNet crop")
+    return cv2.resize(patch, (model_img_size, model_img_size))
+
+
+def crop_for_runtime(
+    img: np.ndarray,
+    bbox: Tuple[int, int, int, int],
+    bbox_expansion_factor: float,
+    model_img_size: int,
+    crop_mode: str,
+) -> np.ndarray:
+    """Select the model-specific crop while preserving the legacy default."""
+    if crop_mode == "square_reflect_v1":
+        return crop(img, bbox, bbox_expansion_factor)
+    if crop_mode == "minifasnet_train_v1":
+        return crop_minifasnet_train_v1(
+            img, bbox, bbox_expansion_factor, model_img_size
+        )
+    raise ValueError(f"Unsupported PAD crop mode: {crop_mode!r}")

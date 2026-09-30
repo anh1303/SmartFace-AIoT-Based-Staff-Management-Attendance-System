@@ -21,6 +21,18 @@ import {
 import { Modal } from '../../components/common/Modal';
 import { Employee } from '../../types';
 
+function getNextEmployeeId(employeesList: Employee[]): string {
+  const maxNum = employeesList.reduce((max, emp) => {
+    const match = emp.employee_id.match(/NV-(\d+)/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      return num > max ? num : max;
+    }
+    return max;
+  }, 0);
+  return `NV-${String(maxNum + 1).padStart(3, '0')}`;
+}
+
 export const ManagerEmployeeList: React.FC = () => {
   const { employees, addEmployee, updateEmployee, toggleEmployeeStatus, showToast } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -42,8 +54,8 @@ export const ManagerEmployeeList: React.FC = () => {
   const [confirmStatusEmployee, setConfirmStatusEmployee] = useState<Employee | null>(null);
 
   // Form state for Add
-  const [newEmp, setNewEmp] = useState({
-    employee_id: `NV-${String(employees.length + 1).padStart(3, '0')}`,
+  const [newEmp, setNewEmp] = useState(() => ({
+    employee_id: getNextEmployeeId(employees),
     full_name: '',
     department: 'Nhân viên',
     position: 'Nhân viên bán hàng',
@@ -54,7 +66,15 @@ export const ManagerEmployeeList: React.FC = () => {
     fingerprint_enrolled: false,
     hourly_rate: 50000,
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-  });
+  }));
+
+  const handleOpenAddModal = () => {
+    setNewEmp(prev => ({
+      ...prev,
+      employee_id: getNextEmployeeId(employees)
+    }));
+    setAddModalOpen(true);
+  };
 
   const filteredEmployees = employees.filter(emp => {
     const term = searchTerm.trim().toLowerCase();
@@ -81,9 +101,10 @@ export const ManagerEmployeeList: React.FC = () => {
 
     addEmployee(newEmp);
     setAddModalOpen(false);
-    // Reset form
+    // Reset form with next ID
+    const updatedEmployees = [...employees, { ...newEmp, id: newEmp.employee_id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }];
     setNewEmp({
-      employee_id: `NV-${String(employees.length + 2).padStart(3, '0')}`,
+      employee_id: getNextEmployeeId(updatedEmployees),
       full_name: '',
       department: 'Nhân viên',
       position: 'Nhân viên bán hàng',
@@ -134,7 +155,7 @@ export const ManagerEmployeeList: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setAddModalOpen(true)}
+          onClick={handleOpenAddModal}
           className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md transition-all"
         >
           <Plus className="w-4 h-4" />

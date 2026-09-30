@@ -166,12 +166,12 @@ export const StaffAttendance: React.FC = () => {
                             <span
                               className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-semibold ${
                                 punctuality === 'ON_TIME'
-                                  ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                   : punctuality === 'LATE'
                                     ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                                     : punctuality === 'EARLY_LEAVE'
-                                      ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
-                                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                      : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                               }`}
                             >
                               {punctuality === 'ON_TIME'

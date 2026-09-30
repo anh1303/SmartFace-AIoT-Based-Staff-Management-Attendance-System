@@ -170,10 +170,10 @@ export const ManagerDashboard: React.FC = () => {
             Cảnh báo trễ / sớm
           </span>
           <div className="flex items-end justify-between mt-3">
-            <span className="text-3xl font-bold text-orange-400 font-mono">
+            <span className="text-3xl font-bold text-amber-400 font-mono">
               {String(lateCount).padStart(2, '0')}
             </span>
-            <span className="text-orange-500 text-xs pb-1 font-medium">Lượt vi phạm</span>
+            <span className="text-amber-500 text-xs pb-1 font-medium">Lượt vi phạm</span>
           </div>
         </div>
       </div>
@@ -189,7 +189,7 @@ export const ManagerDashboard: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-blue-500"></span> Đúng giờ
               </span>
               <span className="flex items-center gap-1.5 text-xs text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-orange-500"></span> Đi muộn / về sớm
+                <span className="w-2 h-2 rounded-full bg-amber-400"></span> Đi muộn / về sớm
               </span>
             </div>
           </div>
@@ -321,8 +321,8 @@ export const ManagerDashboard: React.FC = () => {
                           <span
                             className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${
                               punc === 'ON_TIME'
-                                ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
-                                : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                             }`}
                           >
                             {punc === 'ON_TIME' ? 'Đúng giờ' : punc === 'EARLY_LEAVE' ? 'Về sớm' : 'Muộn ca'}

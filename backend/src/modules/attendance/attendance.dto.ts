@@ -24,7 +24,14 @@ export const checkOutSchema = z.object({
   device_info: z.string().optional(),
 })
 
+export const aggregateAttendanceSchema = z.object({
+  month: z.number().int().min(1).max(12),
+  year: z.number().int().min(2000).max(2100),
+  employeeId: z.string().optional(),
+})
+
 export type CheckInDto = z.infer<typeof checkInSchema>
 export type AdjustAttendanceDto = z.infer<typeof adjustAttendanceSchema>
 export type CheckOutDto = z.infer<typeof checkOutSchema>
+export type AggregateAttendanceDto = z.infer<typeof aggregateAttendanceSchema>
 

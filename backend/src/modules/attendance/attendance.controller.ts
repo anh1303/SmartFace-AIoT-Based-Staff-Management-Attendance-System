@@ -7,7 +7,7 @@ import { prisma } from '../../config/database.js'
 import { buildIdOrCodeWhere } from '../../common/utils.js'
 import * as service from './attendance.service.js'
 import { emitAttendanceEvent } from '../../sockets/attendance.gateway.js'
-import { checkInSchema, adjustAttendanceSchema, checkOutSchema } from './attendance.dto.js'
+import { checkInSchema, adjustAttendanceSchema, checkOutSchema, aggregateAttendanceSchema } from './attendance.dto.js'
 
 export const attendanceRouter = Router()
 attendanceRouter.use(authenticate)
@@ -151,6 +151,16 @@ attendanceRouter.post('/locks/unlock', authorize('ADMIN', 'MANAGER'), async (req
     const { date } = req.body
     if (!date) throw new AppError(400, 'Date is required')
     successResponse(res, await service.toggleLock(date, false, req.user?.id), 'Date unlocked')
+  } catch (e) {
+    next(e)
+  }
+})
+
+attendanceRouter.post('/aggregate', authorize('ADMIN', 'MANAGER'), async (req, res, next) => {
+  try {
+    const body = aggregateAttendanceSchema.parse(req.body)
+    const result = await service.aggregateDailyAttendance(body.month, body.year, body.employeeId)
+    successResponse(res, result, 'Dữ liệu chấm công đã được tổng hợp thành công')
   } catch (e) {
     next(e)
   }

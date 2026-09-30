@@ -18,6 +18,38 @@ const startOfToday = () => {
   return new Date(`${vnStr}T00:00:00+07:00`)
 }
 
+export function extractTimeString(val?: string | Date | null, fallback: string = '08:00'): string {
+  if (!val) return fallback
+  if (val instanceof Date) {
+    const hours = String(val.getUTCHours()).padStart(2, '0')
+    const minutes = String(val.getUTCMinutes()).padStart(2, '0')
+    return `${hours}:${minutes}`
+  }
+  if (typeof val === 'string') {
+    if (val.includes('T')) {
+      const d = new Date(val)
+      const hours = String(d.getUTCHours()).padStart(2, '0')
+      const minutes = String(d.getUTCMinutes()).padStart(2, '0')
+      return `${hours}:${minutes}`
+    }
+    return val.slice(0, 5)
+  }
+  return fallback
+}
+
+export function roundToHalfHour(seconds: number): number {
+  if (seconds <= 0) return 0
+  return Math.round(seconds / 1800) * 0.5
+}
+
+export function parseTimeToSecondsInVN(d?: Date | string | null): number | null {
+  if (!d) return null
+  const dateObj = typeof d === 'string' ? new Date(d) : d
+  if (isNaN(dateObj.getTime())) return null
+  const parts = dateObj.toLocaleTimeString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }).split(':')
+  return parseInt(parts[0] || '0', 10) * 3600 + parseInt(parts[1] || '0', 10) * 60 + parseInt(parts[2] || '0', 10)
+}
+
 export function determinePunctuality(
   type: string,
   eventTime: Date | string,
@@ -31,25 +63,6 @@ export function determinePunctuality(
     const shiftDateStr = formatVNDateISO(s.work_date)
     return shiftDateStr === vnDateStr
   })
-
-  const extractTimeString = (val?: string | Date | null, fallback: string = '08:00'): string => {
-    if (!val) return fallback
-    if (val instanceof Date) {
-      const hours = String(val.getUTCHours()).padStart(2, '0')
-      const minutes = String(val.getUTCMinutes()).padStart(2, '0')
-      return `${hours}:${minutes}`
-    }
-    if (typeof val === 'string') {
-      if (val.includes('T')) {
-        const d = new Date(val)
-        const hours = String(d.getUTCHours()).padStart(2, '0')
-        const minutes = String(d.getUTCMinutes()).padStart(2, '0')
-        return `${hours}:${minutes}`
-      }
-      return val.slice(0, 5)
-    }
-    return fallback
-  }
 
   const shiftStartStr = extractTimeString(shift?.start_time, '08:00')
   const shiftEndStr = extractTimeString(shift?.end_time, '17:30')
@@ -163,25 +176,6 @@ export async function list(query: Record<string, unknown>) {
 }
 
 function calcShiftWorkingHours(startTimeVal?: string | Date | null, endTimeVal?: string | Date | null): number {
-  const extractTimeString = (val?: string | Date | null, fallback: string = '08:00'): string => {
-    if (!val) return fallback
-    if (val instanceof Date) {
-      const hours = String(val.getUTCHours()).padStart(2, '0')
-      const minutes = String(val.getUTCMinutes()).padStart(2, '0')
-      return `${hours}:${minutes}`
-    }
-    if (typeof val === 'string') {
-      if (val.includes('T')) {
-        const d = new Date(val)
-        const hours = String(d.getUTCHours()).padStart(2, '0')
-        const minutes = String(d.getUTCMinutes()).padStart(2, '0')
-        return `${hours}:${minutes}`
-      }
-      return val.slice(0, 5)
-    }
-    return fallback
-  }
-
   const startTimeStr = extractTimeString(startTimeVal, '08:00')
   const endTimeStr = extractTimeString(endTimeVal, '17:30')
   const [sh, sm] = startTimeStr.split(':').map(Number)
@@ -467,3 +461,288 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
     locked_by: lock.locked_by,
   }
 }
+
+/**
+ * Tự động tổng hợp dữ liệu chấm công từ attendance_logs và employee_shifts
+ * sang bảng daily_attendance_summary cho một tháng cụ thể (month: 1-12, year: e.g. 2026).
+ * Đảm bảo luồng tính lương thông suốt: Sắp lịch -> Quẹt thẻ Checkin/out -> Tổng hợp ngày -> Tính lương cuối tháng.
+ */
+export async function aggregateDailyAttendance(
+  month: number,
+  year: number,
+  employeeId?: string
+) {
+  const monthStr = String(month).padStart(2, '0')
+  const nextMonth = month === 12 ? 1 : month + 1
+  const nextYear = month === 12 ? year + 1 : year
+  const nextMonthStr = String(nextMonth).padStart(2, '0')
+
+  // Mốc thời gian UTC dùng cho work_date (@db.Date)
+  const periodStart = new Date(`${year}-${monthStr}-01T00:00:00.000Z`)
+  const periodEnd = new Date(`${nextYear}-${nextMonthStr}-01T00:00:00.000Z`)
+
+  // Mốc thời gian theo múi giờ Việt Nam (+07:00) cho attendance_logs (Timestamptz)
+  const logStart = new Date(`${year}-${monthStr}-01T00:00:00+07:00`)
+  const logEnd = new Date(`${nextYear}-${nextMonthStr}-01T00:00:00+07:00`)
+
+  // 1. Lọc danh sách nhân viên cần tổng hợp
+  const targetEmployees = employeeId
+    ? await prisma.employee.findMany({
+        where: buildIdOrCodeWhere(employeeId),
+        select: { id: true, employee_code: true, full_name: true },
+      })
+    : await prisma.employee.findMany({
+        where: { status: 'ACTIVE' },
+        select: { id: true, employee_code: true, full_name: true },
+      })
+
+  if (targetEmployees.length === 0) {
+    return {
+      month,
+      year,
+      totalSummaries: 0,
+      details: [],
+    }
+  }
+
+  const empIds = targetEmployees.map((e) => e.id)
+  const empMap = new Map(targetEmployees.map((e) => [e.id, e]))
+
+  // 2. Lấy toàn bộ ca làm việc (employee_shifts) trong tháng
+  const empShifts = await prisma.employee_shifts.findMany({
+    where: {
+      employee_id: { in: empIds },
+      work_date: { gte: periodStart, lt: periodEnd },
+    },
+    include: {
+      work_shifts: true,
+    },
+    orderBy: { work_date: 'asc' },
+  })
+
+  // 3. Lấy toàn bộ lịch sử quẹt thẻ (attendance_logs) trong tháng
+  const attLogs = await prisma.attendance_logs.findMany({
+    where: {
+      employee_id: { in: empIds },
+      event_time: { gte: logStart, lt: logEnd },
+      status: { not: 'INVALID' },
+    },
+    orderBy: { event_time: 'asc' },
+  })
+
+  // 4. Lấy ca làm việc mặc định dự phòng (nếu ngày đó nhân viên chưa được xếp ca mà vẫn quẹt thẻ)
+  const defaultShift =
+    (await prisma.work_shifts.findFirst({ where: { shift_name: 'Full time' } })) ||
+    (await prisma.work_shifts.findFirst())
+
+  // 5. Gom nhóm theo cặp (employee_id, dateStr)
+  interface DayGroup {
+    employee_id: string
+    dateStr: string
+    shift: (typeof empShifts)[0] | null
+    logs: typeof attLogs
+  }
+  const dayGroups = new Map<string, DayGroup>()
+
+  for (const s of empShifts) {
+    const dateStr = formatVNDateISO(s.work_date)
+    const key = `${s.employee_id}_${dateStr}`
+    dayGroups.set(key, {
+      employee_id: s.employee_id,
+      dateStr,
+      shift: s,
+      logs: [],
+    })
+  }
+
+  for (const log of attLogs) {
+    const dateStr = formatVNDateISO(log.event_time)
+    const key = `${log.employee_id}_${dateStr}`
+    const existing = dayGroups.get(key)
+    if (existing) {
+      existing.logs.push(log)
+    } else {
+      dayGroups.set(key, {
+        employee_id: log.employee_id,
+        dateStr,
+        shift: null,
+        logs: [log],
+      })
+    }
+  }
+
+  // 6. Kiểm tra các bản ghi đã được Quản lý chỉnh sửa thủ công để bảo vệ (preserve manual adjustments)
+  const existingSummaries = await prisma.daily_attendance_summary.findMany({
+    where: {
+      employee_id: { in: empIds },
+      work_date: { gte: periodStart, lt: periodEnd },
+    },
+  })
+  const existingSummaryMap = new Map(
+    existingSummaries.map((s) => [`${s.employee_id}_${formatVNDateISO(s.work_date)}`, s])
+  )
+
+  // Lấy các audit log ADJUST_ATTENDANCE để biết bản ghi nào đã bị sửa tay
+  const adjustedAuditLogs = await prisma.auditLog.findMany({
+    where: {
+      target_table: 'daily_attendance_summary',
+      action: 'ADJUST_ATTENDANCE',
+    },
+    select: { record_id: true },
+  })
+  const adjustedRecordIds = new Set(adjustedAuditLogs.map((a) => a.record_id))
+
+  let summaryCount = 0
+  const details: Array<{
+    employee_code: string
+    employee_name: string
+    date: string
+    total_working_hours: number
+    late_early: number
+    overtime: number
+    status: string
+  }> = []
+
+  // 7. Xử lý tính toán từng ngày
+  for (const group of dayGroups.values()) {
+    const { employee_id, dateStr, shift, logs } = group
+    const workDate = new Date(`${dateStr}T00:00:00.000Z`)
+    const summaryKey = `${employee_id}_${dateStr}`
+    const existingSummary = existingSummaryMap.get(summaryKey)
+
+    // Nếu bản ghi này đã được quản lý can thiệp chỉnh sửa thủ công, bảo lưu giá trị chỉnh sửa
+    const wasManuallyAdjusted = existingSummary && adjustedRecordIds.has(String(existingSummary.id))
+
+    // Giờ bắt đầu và kết thúc ca chuẩn
+    const shiftStartStr = extractTimeString(shift?.start_time || shift?.work_shifts?.start_time, '08:00')
+    const shiftEndStr = extractTimeString(shift?.end_time || shift?.work_shifts?.end_time, '18:00')
+    const [sH, sM] = shiftStartStr.split(':').map(Number)
+    const [eH, eM] = shiftEndStr.split(':').map(Number)
+    const startSec = (sH || 8) * 3600 + (sM || 0) * 60
+    const endSec = (eH || 18) * 3600 + (eM || 0) * 60
+
+    // Phân loại các lượt quẹt thẻ trong ngày
+    logs.sort((a, b) => new Date(a.event_time).getTime() - new Date(b.event_time).getTime())
+    const checkInLogs = logs.filter((l) => l.type === 'CHECK_IN')
+    const checkOutLogs = logs.filter((l) => l.type === 'CHECK_OUT' || l.type === 'TAN_CA')
+
+    const firstCheckInLog = checkInLogs[0] || (logs.length > 0 ? logs[0] : null)
+    const lastCheckOutLog =
+      checkOutLogs[checkOutLogs.length - 1] ||
+      (logs.length > 1 && logs[logs.length - 1].id !== firstCheckInLog?.id
+        ? logs[logs.length - 1]
+        : null)
+
+    const firstCheckIn = firstCheckInLog ? new Date(firstCheckInLog.event_time) : null
+    const lastCheckOut = lastCheckOutLog ? new Date(lastCheckOutLog.event_time) : null
+
+    const inSec = parseTimeToSecondsInVN(firstCheckIn)
+    const outSec = parseTimeToSecondsInVN(lastCheckOut)
+
+    // Tính toán số giờ làm việc thực tế
+    let workingHours = 0
+    if (firstCheckIn && lastCheckOut && lastCheckOut.getTime() > firstCheckIn.getTime()) {
+      const diffMs = lastCheckOut.getTime() - firstCheckIn.getTime()
+      workingHours = Math.max(0, parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2)))
+    }
+
+    // Tính toán đi trễ và về sớm (làm tròn nấc 0.5 giờ)
+    let lateSec = 0
+    if (inSec !== null && inSec > startSec) {
+      lateSec = inSec - startSec
+    }
+    let earlySec = 0
+    if (outSec !== null && outSec < endSec) {
+      earlySec = endSec - outSec
+    }
+    const rawLateEarly = lateSec + earlySec
+    const lateEarlyHours = rawLateEarly > 0 ? roundToHalfHour(rawLateEarly) : 0
+
+    // Tính toán giờ tăng ca (OT): thời gian làm SAU giờ kết thúc ca
+    let overtimeHours = 0
+    if (outSec !== null && outSec > endSec) {
+      const rawOTSec = outSec - endSec
+      overtimeHours = roundToHalfHour(rawOTSec)
+    }
+
+    // Xác định trạng thái chuyên cần
+    const GRACE_PERIOD_SEC = 15 * 60 // 15 phút ân hạn
+    let status = 'PRESENT'
+    if (!firstCheckIn && !lastCheckOut) {
+      status = 'ABSENT'
+    } else if (lateSec > GRACE_PERIOD_SEC && earlySec > 0) {
+      status = 'LATE_AND_EARLY'
+    } else if (lateSec > GRACE_PERIOD_SEC) {
+      status = 'LATE'
+    } else if (earlySec > 0) {
+      status = 'EARLY_LEAVE'
+    } else {
+      status = 'PRESENT'
+    }
+
+    // Nếu đã được Quản lý chỉnh sửa thủ công trước đó thì giữ nguyên các con số giờ
+    const finalWorkingHours = wasManuallyAdjusted
+      ? Number(existingSummary.total_working_hours)
+      : workingHours
+    const finalLateEarly = wasManuallyAdjusted
+      ? Number(existingSummary.late_early)
+      : lateEarlyHours
+    const finalOvertime = wasManuallyAdjusted
+      ? Number(existingSummary.overtime)
+      : overtimeHours
+    const finalStatus = wasManuallyAdjusted
+      ? existingSummary.attendance_status
+      : status
+
+    const shiftId = shift?.shift_id || shift?.work_shifts?.id || defaultShift?.id || 1
+
+    await prisma.daily_attendance_summary.upsert({
+      where: {
+        employee_id_work_date: {
+          employee_id,
+          work_date: workDate,
+        },
+      },
+      update: {
+        shift_id: shiftId,
+        first_check_in: firstCheckIn || existingSummary?.first_check_in,
+        last_check_out: lastCheckOut || existingSummary?.last_check_out,
+        total_working_hours: finalWorkingHours,
+        late_early: finalLateEarly,
+        overtime: finalOvertime,
+        attendance_status: finalStatus,
+        updated_at: new Date(),
+      },
+      create: {
+        employee_id,
+        work_date: workDate,
+        shift_id: shiftId,
+        first_check_in: firstCheckIn,
+        last_check_out: lastCheckOut,
+        total_working_hours: finalWorkingHours,
+        late_early: finalLateEarly,
+        overtime: finalOvertime,
+        attendance_status: finalStatus,
+      },
+    })
+
+    summaryCount++
+    const empInfo = empMap.get(employee_id)
+    details.push({
+      employee_code: empInfo?.employee_code || '',
+      employee_name: empInfo?.full_name || '',
+      date: dateStr,
+      total_working_hours: finalWorkingHours,
+      late_early: finalLateEarly,
+      overtime: finalOvertime,
+      status: finalStatus,
+    })
+  }
+
+  return {
+    month,
+    year,
+    totalSummaries: summaryCount,
+    details,
+  }
+}

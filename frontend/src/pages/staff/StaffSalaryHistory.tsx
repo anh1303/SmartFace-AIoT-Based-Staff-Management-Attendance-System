@@ -24,8 +24,16 @@ export const StaffSalaryHistory: React.FC = () => {
     .filter(p => p.employee_id === empCode)
     .sort((a, b) => (b.period || '').localeCompare(a.period || ''));
 
-  const otRate = bonusPenalty?.overtime_rate || 100000;
-  const penaltyRate = bonusPenalty?.late_early_penalty || 50000;
+  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5;
+  const penaltyRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
+
+  const getOTAmount = (otHours: number, hourly: number) => {
+    return otRate <= 10 ? otHours * hourly * otRate : otHours * otRate;
+  };
+
+  const getLateAmount = (lateHours: number, hourly: number) => {
+    return penaltyRate <= 10 ? lateHours * hourly * penaltyRate : lateHours * penaltyRate;
+  };
 
   return (
     <div className="space-y-6">
@@ -73,6 +81,8 @@ export const StaffSalaryHistory: React.FC = () => {
                 const late = Number(p.total_late_early ?? 0);
                 const allw = Number(p.allowance ?? 0);
                 const net = Number(p.net_salary ?? 0);
+                const otAmount = getOTAmount(ot, hourly);
+                const lateAmount = getLateAmount(late, hourly);
 
                 return (
                   <tr key={p.payroll_id || idx} className="hover:bg-slate-800/40 transition-colors">
@@ -83,10 +93,10 @@ export const StaffSalaryHistory: React.FC = () => {
                       {hourly.toLocaleString('vi-VN')} ₫/h
                     </td>
                     <td className="py-3.5 px-4 font-mono text-green-400">
-                      +{ot}h ({((ot * otRate)).toLocaleString('vi-VN')} ₫)
+                      +{ot}h ({otAmount.toLocaleString('vi-VN')} ₫)
                     </td>
                     <td className="py-3.5 px-4 font-mono text-red-400">
-                      -{late}h ({((late * penaltyRate)).toLocaleString('vi-VN')} ₫)
+                      -{late}h ({lateAmount.toLocaleString('vi-VN')} ₫)
                     </td>
                     <td className="py-3.5 px-4 font-mono text-green-500">
                       +{allw.toLocaleString('vi-VN')} ₫
@@ -130,73 +140,81 @@ export const StaffSalaryHistory: React.FC = () => {
         subtitle="Hệ thống tự động tính lương theo CSDL"
         maxWidth="lg"
       >
-        {selectedSlip && (
-          <div className="space-y-4">
-            {/* Header info */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-white">
-                  {currentUser?.full_name} ({empCode})
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  {currentUser?.department} • {currentUser?.position}
-                </p>
-              </div>
-              <span className="text-xs font-mono text-green-500 bg-green-500/10 px-3 py-1 rounded-lg border border-green-500/20 font-medium">
-                {selectedSlip.status === 'FINALIZED' ? 'ĐÃ THANH TOÁN' : 'TẠM TÍNH'}
-              </span>
-            </div>
+        {selectedSlip && (() => {
+          const slipHourly = Number(selectedSlip.hourly_rate || 120000);
+          const slipOT = Number(selectedSlip.total_overtime ?? 0);
+          const slipLate = Number(selectedSlip.total_late_early ?? 0);
+          const slipOTAmount = getOTAmount(slipOT, slipHourly);
+          const slipLateAmount = getLateAmount(slipLate, slipHourly);
 
-            {/* Detailed table */}
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-2 border-b border-slate-800/80">
-                <span className="text-slate-400">Lương theo giờ (Hourly rate):</span>
-                <span className="font-mono text-white font-semibold">
-                  {Number(selectedSlip.hourly_rate || 120000).toLocaleString('vi-VN')} ₫/h
+          return (
+            <div className="space-y-4">
+              {/* Header info */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-white">
+                    {currentUser?.full_name} ({empCode})
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    {currentUser?.department} • {currentUser?.position}
+                  </p>
+                </div>
+                <span className="text-xs font-mono text-green-500 bg-green-500/10 px-3 py-1 rounded-lg border border-green-500/20 font-medium">
+                  {selectedSlip.status === 'FINALIZED' ? 'ĐÃ THANH TOÁN' : 'TẠM TÍNH'}
                 </span>
               </div>
-              <div className="flex justify-between py-2 border-b border-slate-800/80">
-                <span className="text-slate-400">Thưởng tăng ca ({selectedSlip.total_overtime ?? 0} giờ OT):</span>
-                <span className="font-mono text-green-400 font-semibold">
-                  + {((Number(selectedSlip.total_overtime ?? 0)) * otRate).toLocaleString('vi-VN')} ₫
-                </span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-800/80">
-                <span className="text-slate-400">Phạt trễ/sớm ({selectedSlip.total_late_early ?? 0} giờ):</span>
-                <span className="font-mono text-red-400 font-semibold">
-                  - {((Number(selectedSlip.total_late_early ?? 0)) * penaltyRate).toLocaleString('vi-VN')} ₫
-                </span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-800/80">
-                <span className="text-slate-400">Phụ cấp (Allowance):</span>
-                <span className="font-mono text-green-500 font-semibold">
-                  + {Number(selectedSlip.allowance ?? 0).toLocaleString('vi-VN')} ₫
-                </span>
-              </div>
-              <div className="flex justify-between py-3 border-t border-slate-800 text-sm">
-                <span className="font-bold text-white">THỰC LĨNH (NET SALARY):</span>
-                <span className="font-mono font-extrabold text-blue-400 text-base">
-                  {Number(selectedSlip.net_salary ?? 0).toLocaleString('vi-VN')} ₫
-                </span>
-              </div>
-            </div>
 
-            <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl text-[11px] text-slate-400 flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-blue-400 shrink-0" />
-              <span>Tiền lương được chuyển khoản vào ngày 05 hàng tháng.</span>
-            </div>
+              {/* Detailed table */}
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between py-2 border-b border-slate-800/80">
+                  <span className="text-slate-400">Lương theo giờ (Hourly rate):</span>
+                  <span className="font-mono text-white font-semibold">
+                    {slipHourly.toLocaleString('vi-VN')} ₫/h
+                  </span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-slate-800/80">
+                  <span className="text-slate-400">Thưởng tăng ca ({slipOT} giờ OT):</span>
+                  <span className="font-mono text-green-400 font-semibold">
+                    + {slipOTAmount.toLocaleString('vi-VN')} ₫
+                  </span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-slate-800/80">
+                  <span className="text-slate-400">Phạt trễ/sớm ({slipLate} giờ):</span>
+                  <span className="font-mono text-red-400 font-semibold">
+                    - {slipLateAmount.toLocaleString('vi-VN')} ₫
+                  </span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-slate-800/80">
+                  <span className="text-slate-400">Phụ cấp (Allowance):</span>
+                  <span className="font-mono text-green-500 font-semibold">
+                    + {Number(selectedSlip.allowance ?? 0).toLocaleString('vi-VN')} ₫
+                  </span>
+                </div>
+                <div className="flex justify-between py-3 border-t border-slate-800 text-sm">
+                  <span className="font-bold text-white">THỰC LĨNH (NET SALARY):</span>
+                  <span className="font-mono font-extrabold text-blue-400 text-base">
+                    {Number(selectedSlip.net_salary ?? 0).toLocaleString('vi-VN')} ₫
+                  </span>
+                </div>
+              </div>
 
-            <div className="pt-2 flex justify-end border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setSelectedSlip(null)}
-                className="px-4 py-2 rounded-xl text-xs bg-slate-800 hover:bg-slate-700 text-white"
-              >
-                Đóng
-              </button>
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl text-[11px] text-slate-400 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-blue-400 shrink-0" />
+                <span>Tiền lương được chuyển khoản vào ngày 05 hàng tháng.</span>
+              </div>
+
+              <div className="pt-2 flex justify-end border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSlip(null)}
+                  className="px-4 py-2 rounded-xl text-xs bg-slate-800 hover:bg-slate-700 text-white"
+                >
+                  Đóng
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </Modal>
     </div>
   );

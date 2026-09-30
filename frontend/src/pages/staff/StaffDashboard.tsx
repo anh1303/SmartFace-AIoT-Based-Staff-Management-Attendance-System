@@ -220,7 +220,7 @@ export const StaffDashboard: React.FC = () => {
             <div className="text-2xl font-bold font-mono text-white">
               {netSalaryFormatted}
             </div>
-            <p className="text-[11px] text-orange-400 mt-2 font-medium">
+            <p className="text-[11px] text-blue-400 mt-2 font-medium">
               Lương/giờ: {Number(currentEmp?.hourly_rate || 120000).toLocaleString('vi-VN')} ₫/h
             </p>
           </div>
@@ -248,7 +248,7 @@ export const StaffDashboard: React.FC = () => {
               className={`p-3.5 rounded-2xl border text-xs transition-all ${item.status === 'ON_TIME'
                   ? 'bg-slate-950 border-slate-800 hover:border-blue-500/50'
                   : item.status === 'LATE'
-                    ? 'bg-orange-950/20 border-orange-500/40'
+                    ? 'bg-amber-950/20 border-amber-500/40'
                     : item.status === 'OFF'
                       ? 'bg-slate-950 border-slate-800/40 opacity-50'
                       : 'bg-slate-950 border-slate-800/70'
@@ -267,10 +267,10 @@ export const StaffDashboard: React.FC = () => {
               <div className="mt-2 pt-2 border-t border-slate-800 flex items-center justify-between">
                 <span className="text-[10px] text-slate-500">{item.type}</span>
                 {item.status === 'ON_TIME' && (
-                  <span className="text-[10px] text-green-500 font-semibold font-mono">Đúng giờ</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold font-mono">Đúng giờ</span>
                 )}
                 {item.status === 'LATE' && (
-                  <span className="text-[10px] text-orange-400 font-semibold font-mono">Lệch ca</span>
+                  <span className="text-[10px] text-amber-400 font-semibold font-mono">Lệch ca</span>
                 )}
                 {item.status === 'OFF' && (
                   <span className="text-[10px] text-slate-500 font-mono">Nghỉ ca</span>

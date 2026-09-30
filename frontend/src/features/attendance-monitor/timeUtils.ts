@@ -71,18 +71,18 @@ export const calculateRawInitialOTSec = (
 export const getStatusBadge = (status: string) => {
   switch (status) {
     case 'ON_TIME':
-      return { label: 'Đúng giờ', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+      return { label: 'Đúng giờ', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
     case 'LATE':
-      return { label: 'Đi trễ', color: 'bg-amber-100 text-amber-700 border-amber-200' };
+      return { label: 'Đi trễ', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
     case 'EARLY_LEAVE':
-      return { label: 'Về sớm', color: 'bg-orange-100 text-orange-700 border-orange-200' };
+      return { label: 'Về sớm', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
     case 'LATE_AND_EARLY':
-      return { label: 'Trễ & Sớm', color: 'bg-rose-100 text-rose-700 border-rose-200' };
+      return { label: 'Trễ & Sớm', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' };
     case 'ABSENT':
-      return { label: 'Vắng mặt', color: 'bg-red-100 text-red-700 border-red-200' };
+      return { label: 'Vắng mặt', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' };
     case 'NO_SHIFT':
-      return { label: 'Không có ca', color: 'bg-gray-100 text-gray-600 border-gray-200' };
+      return { label: 'Không có ca', color: 'bg-slate-800 text-slate-400 border-slate-700' };
     default:
-      return { label: status, color: 'bg-gray-100 text-gray-600 border-gray-200' };
+      return { label: status, color: 'bg-slate-800 text-slate-400 border-slate-700' };
   }
 };

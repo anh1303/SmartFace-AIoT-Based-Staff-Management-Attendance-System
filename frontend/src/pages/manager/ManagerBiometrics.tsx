@@ -17,10 +17,24 @@ import {
   Send,
   Sliders,
   HardDrive,
-  CheckCheck
+  CheckCheck,
+  Trash2,
+  Plus,
+  Layers,
+  Video,
+  Info
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
+import { CameraEkycModal, CapturedFaceSample } from '../../components/biometrics/CameraEkycModal';
 import { Employee } from '../../types';
+
+export interface FacePhotoItem {
+  id: string;
+  url: string;
+  name: string;
+  tag: string;
+  qualityScore?: number;
+}
 
 export const ManagerBiometrics: React.FC = () => {
   const { employees, updateEmployee, showToast } = useApp();
@@ -29,11 +43,12 @@ export const ManagerBiometrics: React.FC = () => {
   const [selectedEmpId, setSelectedEmpId] = useState<string>(employees[0]?.employee_id || 'NV-001');
   const [activeTab, setActiveTab] = useState<'FACE' | 'FINGERPRINT'>('FACE');
 
-  // Face Enrollment State
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  // Face Enrollment State (Requires at least 3 photos)
+  const [uploadedPhotos, setUploadedPhotos] = useState<FacePhotoItem[]>([]);
   const [analyzingFace, setAnalyzingFace] = useState<boolean>(false);
   const [faceQualityScore, setFaceQualityScore] = useState<number | null>(null);
   const [faceConfirmModal, setFaceConfirmModal] = useState<boolean>(false);
+  const [isEkycModalOpen, setIsEkycModalOpen] = useState<boolean>(false);
 
   // Fingerprint Device Trigger State
   const [selectedDevice, setSelectedDevice] = useState<string>('FaceCam-01 (Cổng chính - Tầng 1)');
@@ -48,33 +63,85 @@ export const ManagerBiometrics: React.FC = () => {
 
   const currentEmp = employees.find(e => e.employee_id === selectedEmpId) || employees[0];
 
-  // Handle Photo Upload
+  // Handle Photo Upload (Multiple files allowed)
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileList = Array.from(files);
+    const newPhotos: FacePhotoItem[] = [];
+    let loadedCount = 0;
+
+    fileList.forEach((file, idx) => {
       const reader = new FileReader();
       reader.onload = () => {
-        setUploadedImage(reader.result as string);
-        setAnalyzingFace(true);
-        // Simulate AI landmark & liveness vector extraction
-        setTimeout(() => {
-          setAnalyzingFace(false);
-          setFaceQualityScore(99.4);
-        }, 1400);
+        const overallIndex = uploadedPhotos.length + newPhotos.length;
+        let defaultTag = 'Chính diện';
+        if (overallIndex === 1) defaultTag = 'Quay trái (~25°)';
+        else if (overallIndex === 2) defaultTag = 'Quay phải (~25°)';
+        else if (overallIndex > 2) defaultTag = `Góc phụ ${overallIndex + 1}`;
+
+        newPhotos.push({
+          id: `upload_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
+          url: reader.result as string,
+          name: file.name,
+          tag: defaultTag,
+          qualityScore: Math.floor(96 + Math.random() * 3.8 * 10) / 10
+        });
+        loadedCount++;
+
+        if (loadedCount === fileList.length) {
+          setUploadedPhotos(prev => {
+            const merged = [...prev, ...newPhotos];
+            return merged;
+          });
+          setAnalyzingFace(true);
+          setTimeout(() => {
+            setAnalyzingFace(false);
+            setFaceQualityScore(99.4);
+          }, 1200);
+        }
       };
       reader.readAsDataURL(file);
-    }
+    });
+
+    e.target.value = '';
   };
 
-  // Confirm Face Update (requires explicit confirm button)
+  // Remove photo from list
+  const handleRemovePhoto = (id: string) => {
+    setUploadedPhotos(prev => prev.filter(p => p.id !== id));
+  };
+
+  // Handle completion from Camera eKYC 3-angle modal
+  const handleEkycComplete = (samples: CapturedFaceSample[]) => {
+    const newItems: FacePhotoItem[] = samples.map(s => ({
+      id: s.id,
+      url: s.dataUrl,
+      name: `${s.label} (Camera eKYC)`,
+      tag: s.label,
+      qualityScore: s.qualityScore
+    }));
+
+    setUploadedPhotos(newItems);
+    setAnalyzingFace(true);
+    setTimeout(() => {
+      setAnalyzingFace(false);
+      setFaceQualityScore(99.6);
+    }, 1200);
+    showToast(`Đã thu thập đủ 3 góc khuôn mặt chuẩn eKYC cho ${currentEmp?.full_name}!`, 'success');
+  };
+
+  // Confirm Face Update (requires explicit confirm button and >= 3 photos)
   const handleConfirmFaceSave = () => {
-    if (!currentEmp) return;
+    if (!currentEmp || uploadedPhotos.length < 3) return;
+    const frontalPhoto = uploadedPhotos[0]?.url || currentEmp.avatar;
     updateEmployee(currentEmp.employee_id, {
       face_enrolled: true,
-      avatar: uploadedImage || currentEmp.avatar
+      avatar: frontalPhoto
     });
     setFaceConfirmModal(false);
-    showToast(`Đã cập nhật vector khuôn mặt 512-D cho nhân viên ${currentEmp.full_name} (${currentEmp.employee_id})!`, 'success');
+    showToast(`Đã cập nhật vector khuôn mặt 512-D (${uploadedPhotos.length} ảnh mẫu) cho nhân viên ${currentEmp.full_name} (${currentEmp.employee_id})!`, 'success');
   };
 
   // IoT Signal Trigger for Fingerprint Device
@@ -198,7 +265,7 @@ export const ManagerBiometrics: React.FC = () => {
                 value={selectedEmpId}
                 onChange={e => {
                   setSelectedEmpId(e.target.value);
-                  setUploadedImage(null);
+                  setUploadedPhotos([]);
                   setFaceQualityScore(null);
                   setFingerprintStep('IDLE');
                 }}
@@ -292,94 +359,149 @@ export const ManagerBiometrics: React.FC = () => {
               </div>
             </div>
 
-            {/* TAB 1: Face ID Upload & Landmark extraction */}
+            {/* TAB 1: Face ID Multi-Photo Upload & Camera eKYC (Min 3 Photos) */}
             {activeTab === 'FACE' && (
-              <div className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6 items-start">
-                  {/* Upload Dropzone */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-2">
-                      Ảnh chân dung chính diện (Face Image):
-                    </label>
-                    <div className="relative border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-2xl p-6 text-center cursor-pointer transition-colors bg-slate-950">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handlePhotoUpload}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                      />
-                      <Upload className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                      <p className="text-xs font-semibold text-white">Kéo thả ảnh hoặc bấm để chọn tệp</p>
-                      <p className="text-[11px] text-slate-500 mt-1">Định dạng JPG, PNG • Độ phân giải khuyến nghị &gt; 720p</p>
+              <div className="space-y-5">
+                {/* Header Action Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-950 border border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                      <ScanFace className="w-5 h-5" />
                     </div>
-
-                    <div className="mt-4 p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 space-y-1">
-                      <p className="font-semibold text-slate-300">Yêu cầu chất lượng ảnh:</p>
-                      <p>• Nhìn thẳng camera, không đeo kính râm hoặc khẩu trang.</p>
-                      <p>• Ánh sáng đồng đều, rõ nét các góc cạnh khuôn mặt.</p>
-                    </div>
-                  </div>
-
-                  {/* AI Scan HUD Preview */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-2">
-                      Mô phỏng Trích xuất Vector AI (512-D Landmark):
-                    </label>
-                    <div className="relative aspect-square max-w-[260px] mx-auto rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center shadow-lg">
-                      {uploadedImage ? (
-                        <>
-                          <img
-                            src={uploadedImage}
-                            alt="Uploaded preview"
-                            className="w-full h-full object-cover"
-                          />
-                          {analyzingFace && (
-                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-center p-4">
-                              <RefreshCw className="w-8 h-8 text-blue-400 animate-spin mb-2" />
-                              <p className="text-xs text-white font-semibold">Đang phân tích 512 điểm Landmark...</p>
-                            </div>
-                          )}
-                          {!analyzingFace && (
-                            <div className="absolute inset-3 border-2 border-dashed border-blue-400/80 rounded-2xl pointer-events-none flex flex-col justify-between p-2">
-                              <div className="flex justify-between text-[9px] font-mono text-blue-400">
-                                <span>[LANDMARK: OK]</span>
-                                <span className="text-green-400">LIVENESS 99.4%</span>
-                              </div>
-                              <div className="text-center font-mono text-[10px] text-green-400 bg-slate-950/80 border border-slate-800 py-0.5 rounded">
-                                Vector 512-D Hợp lệ
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="text-center p-6 text-slate-500">
-                          <Camera className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                          <p className="text-xs">Chưa có ảnh tải lên</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {faceQualityScore && (
-                      <div className="mt-4 p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-xs flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 font-medium">
-                          <CheckCircle2 className="w-4 h-4 text-green-500" />
-                          Mẫu khuôn mặt đạt chuẩn chất lượng
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-white font-heading">
+                          Cập Nhật Dữ Liệu Khuôn Mặt
+                        </h3>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${uploadedPhotos.length >= 3
+                            ? 'bg-green-500/10 text-green-400 border-green-500/30'
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                          }`}>
+                          {uploadedPhotos.length >= 3 ? `Đã đủ ${uploadedPhotos.length} ảnh` : `${uploadedPhotos.length}/3 ảnh (Tối thiểu 3)`}
                         </span>
-                        <span className="font-mono font-bold">{faceQualityScore}%</span>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Explicit Confirm Button */}
-                <div className="pt-4 border-t border-slate-800 flex justify-end">
                   <button
                     type="button"
-                    disabled={!uploadedImage || analyzingFace}
+                    onClick={() => setIsEkycModalOpen(true)}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    <Camera className="w-4 h-4 text-cyan-200" />
+                    <span>Chụp bằng Camera</span>
+                  </button>
+                </div>
+
+                {/* Upload Area / Photos Gallery */}
+                {uploadedPhotos.length === 0 ? (
+                  <div className="relative border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-slate-950 group">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handlePhotoUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                    />
+                    <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 mx-auto flex items-center justify-center text-blue-400 mb-3 group-hover:scale-110 transition-transform">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <p className="text-sm font-bold text-white">
+                      Kéo thả ảnh vào đây hoặc bấm để chọn tệp
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Tối thiểu 3 ảnh các góc (Chính diện, Quay trái, Quay phải)
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-blue-400" />
+                        Danh sách ảnh mẫu ({uploadedPhotos.length} ảnh):
+                      </span>
+                      <label className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors">
+                        <Plus className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Thêm ảnh</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {uploadedPhotos.map((photo, idx) => (
+                        <div
+                          key={photo.id}
+                          className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 group shadow-md"
+                        >
+                          <div className="aspect-[4/3] bg-slate-900 relative">
+                            <img
+                              src={photo.url}
+                              alt={photo.name}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/75 text-[10px] font-mono font-bold text-white">
+                              #{idx + 1}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePhoto(photo.id)}
+                              className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-600/90 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
+                              title="Xóa ảnh này"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="p-2 text-center bg-slate-950 border-t border-slate-800/80">
+                            <p className="text-xs font-medium text-slate-300 truncate">
+                              {photo.tag || `Ảnh ${idx + 1}`}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Add more photo card */}
+                      <label className="border-2 border-dashed border-slate-800 hover:border-slate-700 rounded-2xl flex flex-col items-center justify-center p-4 text-center cursor-pointer transition-colors bg-slate-950/40 hover:bg-slate-950 text-slate-500 hover:text-slate-400 min-h-[130px]">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                        <Plus className="w-6 h-6 mb-1 text-slate-400" />
+                        <span className="text-xs font-medium">Thêm ảnh</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Footer */}
+                <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-xs text-slate-400">
+                    {uploadedPhotos.length < 3 ? (
+                      <span className="text-amber-400 font-medium">
+                        Cần tối thiểu 3 ảnh để cập nhật ({uploadedPhotos.length}/3)
+                      </span>
+                    ) : (
+                      <span className="text-green-400 font-medium">
+                        Đã đủ {uploadedPhotos.length} ảnh hợp lệ
+                      </span>
+                    )}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={uploadedPhotos.length < 3 || analyzingFace}
                     onClick={() => setFaceConfirmModal(true)}
-                    className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all ${uploadedImage && !analyzingFace
-                      ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer ${uploadedPhotos.length >= 3 && !analyzingFace
+                        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       }`}
                   >
                     <Check className="w-4 h-4" />
@@ -613,6 +735,15 @@ export const ManagerBiometrics: React.FC = () => {
         </div>
       </div>
 
+      {/* Camera eKYC 3-Angle Modal */}
+      <CameraEkycModal
+        isOpen={isEkycModalOpen}
+        onClose={() => setIsEkycModalOpen(false)}
+        onComplete={handleEkycComplete}
+        employeeName={currentEmp?.full_name || ''}
+        employeeCode={currentEmp?.employee_id || ''}
+      />
+
       {/* CONFIRMATION MODAL: Face ID Update */}
       <Modal
         isOpen={faceConfirmModal}
@@ -623,24 +754,30 @@ export const ManagerBiometrics: React.FC = () => {
       >
         <div className="space-y-4">
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-2">
-            <p className="font-semibold text-white">Bạn có chắc chắn muốn cập nhật mẫu khuôn mặt này?</p>
-            <p className="text-slate-400 leading-relaxed">
-              Dữ liệu vector 512-D trích xuất từ ảnh mới sẽ được mã hóa chuẩn AES-256 và tự động đẩy tới bộ nhớ đệm của 12 Edge Cameras tại các cổng ra vào.
+            <p className="font-semibold text-white">
+              Xác nhận ghi nhận {uploadedPhotos.length} ảnh mẫu sinh trắc học?
             </p>
+            <p className="text-slate-400 leading-relaxed">
+              Dữ liệu vector 512-D trích xuất từ <strong>{uploadedPhotos.length} ảnh mẫu</strong> (bao gồm các góc chính diện, quay trái, quay phải) sẽ được tổng hợp thành Mean Centroid Vector theo chuẩn InsightFace ArcFace, mã hóa AES-256 và tự động đồng bộ tới 12 Edge Cameras tại các cửa.
+            </p>
+            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-green-400 font-mono">
+              <span>ĐIỀU KIỆN MẪU: ĐẠT (≥ 3 ẢNH)</span>
+              <span>LIVENESS: 99.4% REAL</span>
+            </div>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={() => setFaceConfirmModal(false)}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
             >
               Hủy bỏ
             </button>
             <button
               type="button"
               onClick={handleConfirmFaceSave}
-              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md"
+              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md cursor-pointer"
             >
               Xác nhận lưu thay đổi
             </button>

@@ -2,6 +2,9 @@
 REM Cau hinh hien thi tieng Viet (UTF-8)
 chcp 65001 > nul
 title SmartFace AIoT - System Manager
+cd /d "%~dp0"
+set "FACE_AUTH_PYTHON=python"
+if exist "%~dp0face_auth\.venv\Scripts\python.exe" set "FACE_AUTH_PYTHON=%~dp0face_auth\.venv\Scripts\python.exe"
 
 :menu
 cls
@@ -9,13 +12,13 @@ echo ======================================================================
 echo   SMARTFACE AIoT - STAFF MANAGEMENT AND ATTENDANCE SYSTEM
 echo ======================================================================
 echo.
-echo   [1] Chay toan bo he thong - Docker DB, Backend va Frontend
-echo   [2] Chay Backend va Frontend - Khong dung Docker
+echo   [1] Chay Docker DB, Face Auth API, Backend va Frontend
+echo   [2] Chay Face Auth API, Backend va Frontend - DB da chay
 echo   [3] Chi chay Backend - Port 3000
 echo   [4] Chi chay Frontend - Port 5173
 echo   [5] Khoi dong Docker Database - PostgreSQL va pgAdmin
 echo   [6] Cai dat dependencies cho Backend va Frontend
-echo   [7] Chay Prisma Migrate va Seed Data
+echo   [7] Chay Prisma Generate va Migrate (khong Seed)
 echo   [0] Thoat
 echo.
 echo ======================================================================
@@ -28,7 +31,7 @@ if "%choice%"=="3" goto run_backend
 if "%choice%"=="4" goto run_frontend
 if "%choice%"=="5" goto run_docker
 if "%choice%"=="6" goto install_deps
-if "%choice%"=="7" goto seed_db
+if "%choice%"=="7" goto migrate_db
 if "%choice%"=="0" exit
 goto menu
 
@@ -36,12 +39,18 @@ goto menu
 call :check_env
 echo.
 echo Dang khoi dong Docker Database...
-docker compose -f backend/docker-compose.yml up -d
+docker compose --env-file .env.compose --profile tools -f docker-compose.yml up -d
+if errorlevel 1 (
+    echo Khong khoi dong duoc PostgreSQL. Kiem tra volume va mat khau trong .env.compose.
+    pause
+    goto menu
+)
 echo.
 echo Dang khoi chay Backend va Frontend...
 start "SmartFace Backend" cmd /k "cd /d "%~dp0backend" && npm run dev"
 start "SmartFace Frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev"
-echo Da khoi chay cac dich vu thanh cong!
+start "SmartFace Face Auth API" cmd /k "cd /d "%~dp0face_auth" && "%FACE_AUTH_PYTHON%" -m uvicorn api_service:app --host 0.0.0.0 --port 5000"
+echo Da mo cac terminal. Kiem tra log va /health de xac nhan ready.
 pause
 goto menu
 
@@ -51,7 +60,8 @@ echo.
 echo Dang khoi chay Backend va Frontend...
 start "SmartFace Backend" cmd /k "cd /d "%~dp0backend" && npm run dev"
 start "SmartFace Frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev"
-echo Da mo 2 cua so chay Backend va Frontend!
+start "SmartFace Face Auth API" cmd /k "cd /d "%~dp0face_auth" && "%FACE_AUTH_PYTHON%" -m uvicorn api_service:app --host 0.0.0.0 --port 5000"
+echo Da mo terminal Face Auth API, Backend va Frontend.
 pause
 goto menu
 
@@ -72,9 +82,11 @@ pause
 goto menu
 
 :run_docker
+call :check_env
 echo.
 echo Dang khoi dong PostgreSQL va pgAdmin qua Docker...
-docker compose -f backend/docker-compose.yml up -d
+docker compose --env-file .env.compose --profile tools -f docker-compose.yml up -d
+if errorlevel 1 echo Khong khoi dong duoc PostgreSQL. Kiem tra volume va mat khau trong .env.compose.
 pause
 goto menu
 
@@ -93,20 +105,29 @@ echo Cai dat hoan tat!
 pause
 goto menu
 
-:seed_db
+:migrate_db
 call :check_env
 echo.
-echo Dang tao Prisma Client, Migrate va Seed Database...
+echo Dang tao Prisma Client va Migrate Database (khong seed)...
 cd /d "%~dp0backend"
 call npm run prisma:generate
+if errorlevel 1 goto migration_failed
 call npm run prisma:migrate
-call npm run prisma:seed
+if errorlevel 1 goto migration_failed
 cd /d "%~dp0"
-echo Database Migrate va Seed hoan tat!
+echo Database migration hoan tat!
+goto migration_done
+:migration_failed
+cd /d "%~dp0"
+echo Migration that bai. Kiem tra loi phia tren.
+:migration_done
 pause
 goto menu
 
 :check_env
+if not exist "%~dp0face_auth\.env" (
+    copy "%~dp0face_auth\.env.example" "%~dp0face_auth\.env" > nul
+)
 if not exist "%~dp0backend\.env" (
     echo [THONG BAO] Dang tao backend\.env tu .env.example...
     copy "%~dp0backend\.env.example" "%~dp0backend\.env" > nul
@@ -115,6 +136,8 @@ if not exist "%~dp0frontend\.env" (
     echo [THONG BAO] Dang tao frontend\.env tu .env.example...
     copy "%~dp0frontend\.env.example" "%~dp0frontend\.env" > nul
 )
+if not exist "%~dp0.env.compose" (
+    echo [THONG BAO] Tao .env.compose va dien ten volume PostgreSQL PBL6 hien co.
+    copy "%~dp0.env.compose.example" "%~dp0.env.compose" > nul
+)
 goto :eof
-
-

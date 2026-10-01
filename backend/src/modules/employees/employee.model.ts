@@ -1,4 +1,5 @@
 import { prisma } from '../../config/database.js'
+import { env } from '../../config/env.js'
 
 export const employeeModel = prisma.employee
 
@@ -15,7 +16,11 @@ export const employeeInclude = {
     take: 1,
   },
   face_embeddings: {
-    where: { is_active: true },
+    where: {
+      is_active: true,
+      embedding_type: 'CENTROID',
+      model_version: env.FACE_AUTH_MODEL_VERSION,
+    },
     select: { id: true, model_version: true, sample_tag: true, quality_score: true, created_at: true },
   },
 } as const

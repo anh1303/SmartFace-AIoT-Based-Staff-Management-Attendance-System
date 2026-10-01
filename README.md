@@ -36,7 +36,7 @@
 │  - RESTful API Gateway (Express.js + Zod DTO Validation)                      │
 │  - Real-time Gateway (Socket.IO với JWT Cookie Handshake Auth & MQTT Client)   │
 │  - Security Layer (HttpOnly JWT Cookie Auth, RBAC: ADMIN/MANAGER/EMPLOYEE)    │
-│  - Biometric Engine (pgvector 512-D ArcFace Cosine Index, AES-256 Encryption)  │
+│  - Biometric Engine (pgvector 512-D ArcFace Cosine Index)                     │
 │  - Business Services (Attendance, Employee, Shift Scheduling, Payroll, Audit) │
 └───────────────────────┬─────────────────────────────────┬─────────────────────┘
                         │                                 │
@@ -61,7 +61,6 @@ SmartFace-AIoT-Based-Staff-Management-Attendance-System/
 ├── run.sh                    # ⚡ Script tự động khởi chạy 1-click cho macOS (và Linux)
 ├── .gitignore                # Cấu hình GitIgnore (loại trừ node_modules, build, cache, dataset)
 ├── backend/                  # Phân hệ Máy chủ REST API & CSDL (Node.js, Express, Prisma)
-│   ├── docker-compose.yml    # Docker Compose khởi chạy PostgreSQL 16 & pgAdmin4
 │   ├── prisma/               # Quản lý Database Schema, Migrations & Dữ liệu Seed
 │   │   ├── schema.prisma     # 14 Models CSDL chuẩn hóa (kèm attendance_locks, pgvector)
 │   │   ├── seed.ts           # Dữ liệu mẫu ban đầu (nhân viên, chức vụ, ca làm, 4 thiết bị)
@@ -154,9 +153,13 @@ Trước khi khởi chạy dự án, máy tính cần cài đặt sẵn:
 
 ## ⚡ Hướng Dẫn Cài Đặt & Khởi Chạy
 
+Hướng dẫn đầy đủ Docker profile `app`, Prisma migration/seed, enroll gallery và
+xóa danh tính test: [docs/run_full_stack.md](docs/run_full_stack.md).
+Kết quả kiểm chứng tích hợp: [docs/face_auth_verification_2026-10-01.md](docs/face_auth_verification_2026-10-01.md).
+
 ### 🟢 Cách 1: Tự động khởi chạy bằng 1-Click Script (Khuyên dùng)
 
-Dự án cung cấp sẵn script menu tự động hóa toàn bộ quy trình (tự động kiểm tra và tạo file `.env` mẫu nếu máy chưa có, cài đặt thư viện, khởi chạy Docker và chạy song song Backend + Frontend trong các cửa sổ riêng):
+Dự án cung cấp script menu để tạo file `.env` mẫu nếu thiếu, cài dependencies Node, khởi chạy Docker database và mở Face Auth API, Backend, Frontend trong các cửa sổ riêng. Cài requirements Python trước khi dùng launcher.
 
 - **Trên Windows (`run.bat`)**:
   ```cmd
@@ -167,13 +170,15 @@ Dự án cung cấp sẵn script menu tự động hóa toàn bộ quy trình (t
   chmod +x run.sh
   ./run.sh
   ```
-  *(Trên macOS, `run.sh` sử dụng AppleScript để tự động mở 2 tab/cửa sổ Terminal.app riêng biệt chạy song song Backend: `3000` và Frontend: `5173` giống hệt `run.bat` trên Windows).*
+  *(Trên macOS, `run.sh` sử dụng AppleScript để mở 3 cửa sổ Terminal.app: Face Auth API `5000`, Backend `3000` và Frontend `5173`; `run.bat` mở 3 cửa sổ trên Windows.)*
 
 #### Quy trình thao tác lần đầu tiên sau khi clone:
 1. **Nhập `[6]`**: Tự động tạo `.env` nếu thiếu và chạy `npm install` cho cả Backend và Frontend.
-2. **Nhập `[5]`**: Khởi động Docker Database (`PBL6_db` và `pbl6_pgadmin`).
-3. **Nhập `[7]`**: Tự động chạy `prisma:generate`, `prisma:migrate` và nạp dữ liệu mẫu `prisma:seed`.
-4. **Nhập `[1]`**: Khởi chạy toàn bộ hệ thống (tự động mở 2 cửa sổ chạy song song Backend và Frontend).
+   Cài Python dependencies: `cd face_auth` rồi `python3 -m pip install -r requirements.txt` (Windows dùng `python`). Có thể dùng virtualenv `face_auth/.venv`.
+2. **Cấu hình `.env.compose`**: Điền đúng tên volume PostgreSQL PBL6 hiện có và mật khẩu đang dùng; script không tự tạo volume database mới.
+3. **Nhập `[5]`**: Khởi động PostgreSQL + pgAdmin bằng cấu hình Docker Compose chung.
+4. **Nhập `[7]`**: Chạy `prisma:generate` và `prisma:migrate`, không seed dữ liệu.
+5. **Nhập `[1]`**: Mở Face Auth API, Backend và Frontend; camera realtime chạy riêng bằng `python3 app.py` trong `face_auth`.
 > 💡 *Các lần tiếp theo, bạn chỉ cần mở script và nhập **`[1]`** để khởi động toàn bộ!*
 
 ---
@@ -194,12 +199,17 @@ Dự án cung cấp sẵn script menu tự động hóa toàn bộ quy trình (t
   - Windows CMD: `copy frontend\.env.example frontend\.env`
   - Linux / macOS / Git Bash: `cp frontend/.env.example frontend/.env`
 
+- **Cho Docker**: Sao chép `.env.compose.example` thành `.env.compose`; đặt
+  đúng tên volume PostgreSQL PBL6 hiện có và mật khẩu hiện tại. Nếu Face Auth
+  chạy trên máy khác, cấu hình bind IP trong `.env.compose` và `POSTGRES_HOST`
+  theo địa chỉ LAN của máy chủ DB, đồng thời giới hạn port bằng firewall.
+
 #### Bước 2: Khởi động Cơ sở dữ liệu qua Docker
 ```bash
-cd backend
-docker compose up -d
+docker compose --env-file .env.compose --profile tools up -d
 ```
-*PostgreSQL khởi chạy tại port `5432`, pgAdmin4 khởi chạy tại port `5050`.*
+*Một PostgreSQL + pgvector dùng chung khởi chạy tại port `5432`; pgAdmin tại port `5050`.*
+*Trước khi chạy, `.env.compose` phải trỏ đến volume PBL6 hiện có và dùng mật khẩu đúng với database đó. Migration xóa embeddings khuôn mặt cũ nhưng giữ các bảng nghiệp vụ khác. Không chạy `npm run prisma:seed` trên database đang sử dụng vì seed xóa dữ liệu trước khi nạp lại.*
 
 #### Bước 3: Cấu hình, Migrate & Khởi chạy Backend
 ```bash
@@ -210,13 +220,12 @@ npm install
 # 2. Sinh Prisma Client
 npm run prisma:generate
 
-# 3. Đồng bộ cấu trúc Database & Kích hoạt extension pgvector
+# 3. Áp dụng các migration đã commit & Kích hoạt extension pgvector
 npm run prisma:migrate
 
-# 4. Nạp bộ dữ liệu mẫu ban đầu (seed)
-npm run prisma:seed
+# Không chạy seed trên database đang sử dụng; seed xóa dữ liệu trước khi nạp mẫu.
 
-# 5. Khởi chạy Backend server
+# 4. Khởi chạy Backend server
 npm run dev
 # Backend lắng nghe tại: http://localhost:3000
 ```

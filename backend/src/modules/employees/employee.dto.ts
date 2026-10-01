@@ -15,15 +15,12 @@ export const createEmployeeSchema = z.object({
   hourly_rate: z.number().nonnegative().max(999999999999, 'Lương giờ tối đa 999 tỷ').optional(),
   avatar: z.string().optional().nullable(),
   avatar_url: z.string().optional().nullable(),
-  face_enrolled: z.boolean().optional(),
   fingerprint_enrolled: z.boolean().optional(),
 })
 
 export const updateEmployeeSchema = createEmployeeSchema.partial().extend({
-  face_enrolled: z.boolean().optional(),
   fingerprint_enrolled: z.boolean().optional(),
 })
 
 export type CreateEmployeeDto = z.infer<typeof createEmployeeSchema>
 export type UpdateEmployeeDto = z.infer<typeof updateEmployeeSchema>
-

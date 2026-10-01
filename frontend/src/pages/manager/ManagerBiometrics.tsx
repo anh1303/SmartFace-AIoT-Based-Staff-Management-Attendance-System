@@ -10,20 +10,15 @@ import {
   RefreshCw,
   ShieldCheck,
   AlertTriangle,
-  Cpu,
   Camera,
   Check,
   Sparkles,
   ArrowRight,
   Send,
-  Sliders,
-  HardDrive,
   CheckCheck,
   Trash2,
   Plus,
   Layers,
-  Video,
-  Info
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { CameraEkycModal, CapturedFaceSample } from '../../components/biometrics/CameraEkycModal';
@@ -35,7 +30,6 @@ export interface FacePhotoItem {
   url: string;
   name: string;
   tag: string;
-  qualityScore?: number;
 }
 
 export const ManagerBiometrics: React.FC = () => {
@@ -59,7 +53,6 @@ export const ManagerBiometrics: React.FC = () => {
   // Face Enrollment State (Requires at least 3 photos)
   const [uploadedPhotos, setUploadedPhotos] = useState<FacePhotoItem[]>([]);
   const [analyzingFace, setAnalyzingFace] = useState<boolean>(false);
-  const [faceQualityScore, setFaceQualityScore] = useState<number | null>(null);
   const [faceConfirmModal, setFaceConfirmModal] = useState<boolean>(false);
   const [isEkycModalOpen, setIsEkycModalOpen] = useState<boolean>(false);
   const [enrollResult, setEnrollResult] = useState<EnrollFaceResult | null>(null);
@@ -72,15 +65,10 @@ export const ManagerBiometrics: React.FC = () => {
   const [fingerQualityScore, setFingerQualityScore] = useState<number | null>(null);
   const [fingerConfirmModal, setFingerConfirmModal] = useState<boolean>(false);
 
-  // Device sync modal
-  const [syncAllModal, setSyncAllModal] = useState<boolean>(false);
-  const [syncingDevices, setSyncingDevices] = useState<boolean>(false);
-
   // Reset photos & biometric state whenever selected employee changes
   useEffect(() => {
     setUploadedPhotos([]);
     setAnalyzingFace(false);
-    setFaceQualityScore(null);
     setFingerprintStep('IDLE');
     setFingerQualityScore(null);
   }, [selectedEmpId]);
@@ -110,7 +98,6 @@ export const ManagerBiometrics: React.FC = () => {
           url: reader.result as string,
           name: file.name,
           tag: defaultTag,
-          qualityScore: Math.floor(96 + Math.random() * 3.8 * 10) / 10
         });
         loadedCount++;
 
@@ -119,11 +106,7 @@ export const ManagerBiometrics: React.FC = () => {
             const merged = [...prev, ...newPhotos];
             return merged;
           });
-          setAnalyzingFace(true);
-          setTimeout(() => {
-            setAnalyzingFace(false);
-            setFaceQualityScore(99.4);
-          }, 1200);
+          setAnalyzingFace(false);
         }
       };
       reader.readAsDataURL(file);
@@ -143,16 +126,10 @@ export const ManagerBiometrics: React.FC = () => {
       id: s.id,
       url: s.dataUrl,
       name: `${s.label} (Camera eKYC)`,
-      tag: s.label,
-      qualityScore: s.qualityScore
+      tag: s.label
     }));
 
     setUploadedPhotos(newItems);
-    setAnalyzingFace(true);
-    setTimeout(() => {
-      setAnalyzingFace(false);
-      setFaceQualityScore(99.6);
-    }, 1200);
     showToast(`Đã thu thập đủ 3 góc khuôn mặt chuẩn eKYC cho ${currentEmp?.full_name}!`, 'success');
   };
 
@@ -167,9 +144,8 @@ export const ManagerBiometrics: React.FC = () => {
       // 1. Gọi API enroll khuôn mặt để trích xuất vector 512-D và lưu vào PostgreSQL
       const result = await enrollFaceImagesApi(currentEmp.employee_id, imagesBase64);
 
-      // 2. Cập nhật avatar ảnh đại diện và trạng thái face_enrolled vào state & DB
+      // 2. Cập nhật avatar; face_enrolled được suy ra từ centroid lưu trong DB.
       updateEmployee(currentEmp.employee_id, {
-        face_enrolled: true,
         avatar: frontalPhoto
       });
 
@@ -223,16 +199,6 @@ export const ManagerBiometrics: React.FC = () => {
     showToast(`Đã lưu mẫu vân tay ${selectedFinger} cho ${currentEmp.full_name} từ ${selectedDevice}!`, 'success');
   };
 
-  // Sync all devices
-  const handleConfirmSyncAll = () => {
-    setSyncingDevices(true);
-    setTimeout(() => {
-      setSyncingDevices(false);
-      setSyncAllModal(false);
-      showToast('Đã phát tín hiệu đồng bộ cơ sở dữ liệu sinh trắc học tới 12/12 Edge Cams!', 'success');
-    }, 1500);
-  };
-
   // Metrics
   const totalEmployees = employees.length;
   const faceEnrolledCount = employees.filter(e => e.face_enrolled).length;
@@ -253,20 +219,10 @@ export const ManagerBiometrics: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setSyncAllModal(true)}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
-            <span>Đồng bộ 12/12 Edge Devices</span>
-          </button>
-        </div>
       </div>
 
       {/* 3 Bento Telemetry Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors">
           <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Đã đăng ký Face ID</span>
           <div className="mt-3 flex items-baseline gap-2">
@@ -274,7 +230,7 @@ export const ManagerBiometrics: React.FC = () => {
               {faceEnrolledCount}/{totalEmployees}
             </span>
             <span className="text-xs font-mono text-slate-500">
-              ({Math.round((faceEnrolledCount / totalEmployees) * 100)}%)
+              ({totalEmployees ? Math.round((faceEnrolledCount / totalEmployees) * 100) : 0}%)
             </span>
           </div>
         </div>
@@ -286,18 +242,11 @@ export const ManagerBiometrics: React.FC = () => {
               {fingerEnrolledCount}/{totalEmployees}
             </span>
             <span className="text-xs font-mono text-slate-500">
-              ({Math.round((fingerEnrolledCount / totalEmployees) * 100)}%)
+              ({totalEmployees ? Math.round((fingerEnrolledCount / totalEmployees) * 100) : 0}%)
             </span>
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors">
-          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Trạng thái Edge Devices</span>
-          <div className="mt-3 flex items-center gap-2.5">
-            <span className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-2xl font-bold font-mono text-white">12/12 Online</span>
-          </div>
-        </div>
       </div>
 
       {/* Main Enrollment Workspace */}
@@ -722,8 +671,6 @@ export const ManagerBiometrics: React.FC = () => {
                 <th className="py-3.5 px-4 font-medium">Chức vụ</th>
                 <th className="py-3.5 px-4 font-medium">Khuôn mặt (Face ID)</th>
                 <th className="py-3.5 px-4 font-medium">Vân tay (FAP30)</th>
-                <th className="py-3.5 px-4 font-medium">Độ tin cậy mẫu</th>
-                <th className="py-3.5 px-4 font-medium">Đồng bộ Edge Cams</th>
                 <th className="py-3.5 px-4 text-right font-medium">Thao tác</th>
               </tr>
             </thead>
@@ -757,12 +704,6 @@ export const ManagerBiometrics: React.FC = () => {
                       }`}>
                       {emp.fingerprint_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
                     </span>
-                  </td>
-                  <td className="py-3 px-4 font-mono text-green-400 font-bold">
-                    {emp.face_enrolled ? '99.4% Match' : '—'}
-                  </td>
-                  <td className="py-3 px-4 font-mono text-slate-400">
-                    {emp.face_enrolled || emp.fingerprint_enrolled ? '12/12 Cams' : '0/12 Cams'}
                   </td>
                   <td className="py-3 px-4 text-right">
                     <button
@@ -807,11 +748,10 @@ export const ManagerBiometrics: React.FC = () => {
               Xác nhận ghi nhận {uploadedPhotos.length} ảnh mẫu sinh trắc học?
             </p>
             <p className="text-slate-400 leading-relaxed">
-              Dữ liệu vector 512-D trích xuất từ <strong>{uploadedPhotos.length} ảnh mẫu</strong> (bao gồm các góc chính diện, quay trái, quay phải) sẽ được tổng hợp thành Mean Centroid Vector theo chuẩn InsightFace ArcFace, mã hóa AES-256 và tự động đồng bộ tới 12 Edge Cameras tại các cửa.
+              Ảnh sẽ được gửi đến Face Auth để phát hiện khuôn mặt, trích xuất vector 512-D và tạo centroid. Các vector được lưu trong bảng <code>face_embeddings</code> của database PBL6. Luồng đăng ký này chưa kiểm tra liveness hoặc đồng bộ đến thiết bị Edge.
             </p>
             <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-green-400 font-mono">
-              <span>ĐIỀU KIỆN MẪU: ĐẠT (≥ 3 ẢNH)</span>
-              <span>LIVENESS: 99.4% REAL</span>
+              <span>ĐIỀU KIỆN: ĐỦ 3 ẢNH</span>
             </div>
           </div>
 
@@ -914,7 +854,7 @@ export const ManagerBiometrics: React.FC = () => {
             )}
 
             <p className="text-[11px] text-slate-400 pt-1 leading-relaxed">
-              Dữ liệu vector Mean Centroid đã được mã hóa AES-256, lưu vào cơ sở dữ liệu PostgreSQL và tự động đồng bộ tới <strong>12 Edge Cameras</strong> tại các cửa.
+              Các mẫu khuôn mặt đã được lưu vào bảng <code>face_embeddings</code> trong database PBL6. Việc đăng ký không tự đồng bộ dữ liệu sang thiết bị Edge.
             </p>
           </div>
 
@@ -971,46 +911,6 @@ export const ManagerBiometrics: React.FC = () => {
         </div>
       </Modal>
 
-      {/* CONFIRMATION MODAL: Sync All Devices */}
-      <Modal
-        isOpen={syncAllModal}
-        onClose={() => setSyncAllModal(false)}
-        title="Xác nhận đồng bộ cơ sở dữ liệu sinh trắc học"
-        subtitle="Gửi gói tin Broadcast đồng bộ tới toàn bộ Edge Cams"
-        maxWidth="md"
-      >
-        <div className="space-y-4">
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Hành động này sẽ gửi lệnh đồng bộ toàn bộ cơ sở dữ liệu vector khuôn mặt và mẫu vân tay của <strong className="text-white">{employees.length} nhân sự</strong> tới 12 thiết bị Edge AI Cams và đầu đọc tại các cửa.
-          </p>
-
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              type="button"
-              disabled={syncingDevices}
-              onClick={() => setSyncAllModal(false)}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              type="button"
-              disabled={syncingDevices}
-              onClick={handleConfirmSyncAll}
-              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md flex items-center gap-2"
-            >
-              {syncingDevices ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Đang đồng bộ...</span>
-                </>
-              ) : (
-                <span>Xác nhận phát lệnh đồng bộ</span>
-              )}
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };

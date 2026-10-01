@@ -130,7 +130,6 @@ export const ManagerEmployeeList: React.FC = () => {
       email: editEmployee.email,
       phone: editEmployee.phone,
       hourly_rate: editEmployee.hourly_rate,
-      face_enrolled: editEmployee.face_enrolled,
       fingerprint_enrolled: editEmployee.fingerprint_enrolled,
     });
     setEditEmployee(null);
@@ -562,15 +561,6 @@ export const ManagerEmployeeList: React.FC = () => {
             </div>
 
             <div className="pt-2 p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center gap-6">
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={editEmployee.face_enrolled}
-                  onChange={e => setEditEmployee({ ...editEmployee, face_enrolled: e.target.checked })}
-                  className="rounded bg-slate-900 border-slate-700 text-blue-600"
-                />
-                <span>Kích hoạt Face ID 512-D</span>
-              </label>
               <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
                 <input
                   type="checkbox"

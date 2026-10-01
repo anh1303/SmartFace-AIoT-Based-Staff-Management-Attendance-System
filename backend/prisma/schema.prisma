@@ -160,8 +160,8 @@ model employee_shifts {
 model face_embeddings {
   id             String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   employee_id    String                      @db.Uuid
-  embedding      Unsupported("vector(512)")?
-  model_version  String                      @default("arcface_v1") @db.VarChar(50)
+  embedding      Unsupported("vector(512)")
+  model_version  String                      @db.VarChar(50)
   sample_tag     String?                     @default("FRONTAL") @db.VarChar(50)
   quality_score  Float?
   is_active      Boolean                     @default(true)
@@ -224,4 +224,3 @@ model attendance_locks {
 
   @@map("attendance_locks")
 }
-

@@ -1,0 +1,132 @@
+name: pbl6
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: PBL6
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${PBL6_POSTGRES_PASSWORD:?Set PBL6_POSTGRES_PASSWORD in .env.compose}
+    ports:
+      - "${PBL6_POSTGRES_BIND_IP:-127.0.0.1}:${PBL6_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  migrate:
+    profiles: ["app"]
+    image: pbl6-backend:local
+    build: ./backend
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: ${PBL6_DOCKER_DATABASE_URL:-postgresql://postgres:${PBL6_POSTGRES_PASSWORD}@postgres:5432/PBL6?schema=public}
+    command: ["npm", "run", "prisma:migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  face-auth:
+    profiles: ["app"]
+    build: ./face_auth
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ""
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: PBL6
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${PBL6_POSTGRES_PASSWORD}
+      MODEL_PACK_NAME: ${PBL6_FACE_MODEL_PACK:-buffalo_s}
+      EMBEDDING_MODEL_VERSION: ${PBL6_FACE_MODEL_PACK:-buffalo_s}
+      MODEL_CTX_ID: -1
+      PAD_RUNTIME_CONFIG_PATH: ""
+    ports:
+      - "127.0.0.1:${PBL6_FACE_API_PORT:-5000}:5000"
+    volumes:
+      - ${PBL6_INSIGHTFACE_CACHE:-insightface_models}:/root/.insightface
+      - ./face_auth/gallery:/app/gallery:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=5)"]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 120s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  mqtt:
+    profiles: ["app"]
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    volumes:
+      - ./docker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  backend:
+    profiles: ["app"]
+    image: pbl6-backend:local
+    build: ./backend
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: ${PBL6_NODE_ENV:-development}
+      PORT: 3000
+      DATABASE_URL: ${PBL6_DOCKER_DATABASE_URL:-postgresql://postgres:${PBL6_POSTGRES_PASSWORD}@postgres:5432/PBL6?schema=public}
+      FACE_AUTH_URL: http://face-auth:5000
+      FACE_AUTH_MODEL_VERSION: ${PBL6_FACE_MODEL_PACK:-buffalo_s}
+      MQTT_URL: mqtt://mqtt:1883
+      MQTT_USERNAME: ""
+      MQTT_PASSWORD: ""
+      CORS_ORIGIN: ${PBL6_CORS_ORIGIN:-http://localhost:8080,http://127.0.0.1:8080}
+    ports:
+      - "127.0.0.1:${PBL6_BACKEND_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      face-auth:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+
+  frontend:
+    profiles: ["app"]
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${PBL6_WEB_BIND_IP:-127.0.0.1}:${PBL6_WEB_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  pgadmin:
+    image: dpage/pgadmin4
+    profiles: ["tools"]
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PBL6_PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PBL6_PGADMIN_PASSWORD:?Set PBL6_PGADMIN_PASSWORD in .env.compose}
+    ports:
+      - "127.0.0.1:${PBL6_PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    external: true
+    name: ${PBL6_POSTGRES_VOLUME:?Set the verified existing PBL6 volume in .env.compose}
+  pgadmin_data:
+  insightface_models:

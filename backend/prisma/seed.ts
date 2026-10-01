@@ -334,46 +334,8 @@ async function main() {
   }
   console.log(`✅ 7. Bảng devices (${devicesData.length} bản ghi)`)
 
-  // 9. Bảng 8: Face Embeddings (pgvector 512-D ArcFace)
-  function generateNormalizedEmbedding(dim = 512): number[] {
-    const vec = Array.from({ length: dim }, () => Math.random() * 2 - 1)
-    const norm = Math.sqrt(vec.reduce((sum, v) => sum + v * v, 0))
-    return vec.map(v => parseFloat((v / norm).toFixed(6)))
-  }
-
-  const sampleTags = ['FRONTAL', 'LEFT_30', 'RIGHT_30', 'UP_15', 'DOWN_15']
-  let feCount = 0
-  for (const code of ['NV-001', 'NV-002', 'NV-003', 'NV-004', 'NV-005']) {
-    const emp = employeesMap[code]
-    if (emp) {
-      // 5 SAMPLE vectors (vector gốc từng ảnh)
-      const sampleVectors: number[][] = []
-      for (let i = 0; i < 5; i++) {
-        const emb = generateNormalizedEmbedding(512)
-        sampleVectors.push(emb)
-        const vectorStr = `[${emb.join(',')}]`
-        await prisma.$executeRaw`
-          INSERT INTO "face_embeddings" ("id", "employee_id", "embedding", "model_version", "sample_tag", "quality_score", "is_active", "created_at", "embedding_type")
-          VALUES (gen_random_uuid(), ${emp.id}::uuid, ${vectorStr}::vector, 'arcface_v1', ${sampleTags[i]}, 0.98, true, CURRENT_TIMESTAMP, 'SAMPLE')
-        `
-        feCount++
-      }
-      // 1 CENTROID vector (vector trung bình đại diện danh tính)
-      const centroid = Array.from({ length: 512 }, (_, dim) => {
-        const avg = sampleVectors.reduce((sum, v) => sum + v[dim], 0) / sampleVectors.length
-        return avg
-      })
-      const norm = Math.sqrt(centroid.reduce((sum, v) => sum + v * v, 0))
-      const normalizedCentroid = centroid.map(v => parseFloat((v / norm).toFixed(6)))
-      const centroidStr = `[${normalizedCentroid.join(',')}]`
-      await prisma.$executeRaw`
-        INSERT INTO "face_embeddings" ("id", "employee_id", "embedding", "model_version", "sample_tag", "quality_score", "is_active", "created_at", "embedding_type")
-        VALUES (gen_random_uuid(), ${emp.id}::uuid, ${centroidStr}::vector, 'arcface_v1', 'CENTROID', 0.99, true, CURRENT_TIMESTAMP, 'CENTROID')
-      `
-      feCount++
-    }
-  }
-  console.log(`✅ 8. Bảng face_embeddings (${feCount} bản ghi: 5 SAMPLE + 1 CENTROID × 5 nhân viên)`)
+  // Face embeddings must come from the real image enrollment API.
+  // Seed employees without pretending they have registered face data.
 
   // 10. Bảng 9: Attendance Logs (Đảm bảo độ lệch checkin/checkout không quá 1h so với ca)
   // 10. Bảng 9: Attendance Logs (Đảm bảo độ lệch checkin/checkout không quá 1h so với ca, múi giờ +07:00 GMT+7)

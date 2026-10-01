@@ -84,6 +84,6 @@ export const SHIFT_TYPE = {
 export type ShiftType = (typeof SHIFT_TYPE)[keyof typeof SHIFT_TYPE]
 
 export const BIOMETRIC_DEFAULTS = {
-  MODEL_VERSION: 'arcface_v1',
+  MODEL_VERSION: 'buffalo_s',
   SAMPLE_TAG: 'FRONTAL',
 } as const

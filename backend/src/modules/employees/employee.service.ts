@@ -181,7 +181,6 @@ export async function update(
     avatar_url?: string | null
     avatar?: string | null
     hourly_rate?: number
-    face_enrolled?: boolean
     fingerprint_enrolled?: boolean
   },
   actorUserId?: string,
@@ -201,35 +200,6 @@ export async function update(
   }
 
   const rateVal = data.hourly_rate
-
-  // Đồng bộ dữ liệu khuôn mặt face_embeddings nếu có gửi face_enrolled
-  if (data.face_enrolled !== undefined) {
-    if (data.face_enrolled === true) {
-      const activeCount = await prisma.face_embeddings.count({
-        where: { employee_id: existing.id, is_active: true }
-      })
-      if (activeCount === 0) {
-        // Sinh vector 512 chiều chuẩn hóa để kích hoạt Face ID
-        const vec = Array.from({ length: 512 }, () => (Math.random() - 0.5) * 2)
-        const norm = Math.sqrt(vec.reduce((sum, v) => sum + v * v, 0))
-        const normalizedVec = vec.map(v => parseFloat((v / norm).toFixed(6)))
-        const vectorStr = `[${normalizedVec.join(',')}]`
-
-        await prisma.$executeRaw`
-          INSERT INTO "face_embeddings" (
-            "id", "employee_id", "embedding", "model_version", "sample_tag", "quality_score", "is_active", "created_at", "embedding_type"
-          )
-          VALUES (
-            gen_random_uuid(), ${existing.id}::uuid, ${vectorStr}::vector, 'arcface_v1', 'CENTROID', 0.99, true, CURRENT_TIMESTAMP, 'CENTROID'
-          )
-        `
-      }
-    } else if (data.face_enrolled === false) {
-      await prisma.face_embeddings.deleteMany({
-        where: { employee_id: existing.id }
-      })
-    }
-  }
 
   const updated = await prisma.employee.update({
     where: { id: existing.id },

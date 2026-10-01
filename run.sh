@@ -7,6 +7,10 @@
 
 # Xac dinh thu muc goc cua du an
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FACE_AUTH_PYTHON="python3"
+if [ -x "$DIR/face_auth/.venv/bin/python" ]; then
+  FACE_AUTH_PYTHON="$DIR/face_auth/.venv/bin/python"
+fi
 
 # Ham dung man hinh cho nguoi dung nhan phim
 pause() {
@@ -24,6 +28,13 @@ check_env() {
   if [ ! -f "$DIR/frontend/.env" ]; then
     echo "[THONG BAO] Dang tao frontend/.env tu .env.example..."
     cp "$DIR/frontend/.env.example" "$DIR/frontend/.env"
+  fi
+  if [ ! -f "$DIR/face_auth/.env" ]; then
+    cp "$DIR/face_auth/.env.example" "$DIR/face_auth/.env"
+  fi
+  if [ ! -f "$DIR/.env.compose" ]; then
+    echo "[THONG BAO] Tao .env.compose; dien ten volume PBL6 hien co truoc khi chay Docker."
+    cp "$DIR/.env.compose.example" "$DIR/.env.compose"
   fi
 }
 
@@ -49,13 +60,13 @@ menu() {
     echo "  SMARTFACE AIoT - STAFF MANAGEMENT AND ATTENDANCE SYSTEM"
     echo "======================================================================"
     echo ""
-    echo "  [1] Chay toan bo he thong - Docker DB, Backend va Frontend"
-    echo "  [2] Chay Backend va Frontend - Khong dung Docker"
+    echo "  [1] Chay Docker DB, Face Auth API, Backend va Frontend"
+    echo "  [2] Chay Face Auth API, Backend va Frontend - DB da chay"
     echo "  [3] Chi chay Backend - Port 3000"
     echo "  [4] Chi chay Frontend - Port 5173"
     echo "  [5] Khoi dong Docker Database - PostgreSQL va pgAdmin"
     echo "  [6] Cai dat dependencies cho Backend va Frontend"
-    echo "  [7] Chay Prisma Migrate va Seed Data"
+    echo "  [7] Chay Prisma Generate va Migrate (khong Seed)"
     echo "  [0] Thoat"
     echo ""
     echo "======================================================================"
@@ -67,21 +78,27 @@ menu() {
         check_env
         echo ""
         echo "Dang khoi dong Docker Database..."
-        docker compose -f "$DIR/backend/docker-compose.yml" up -d
+        if ! docker compose --env-file "$DIR/.env.compose" --profile tools -f "$DIR/docker-compose.yml" up -d; then
+          echo "Khong khoi dong duoc PostgreSQL. Kiem tra volume va mat khau trong .env.compose."
+          pause
+          continue
+        fi
         echo ""
-        echo "Dang khoi chay Backend va Frontend trong cua so Terminal moi..."
+        echo "Dang khoi chay Face Auth API, Backend va Frontend trong cua so Terminal moi..."
         open_terminal "SmartFace Backend" "cd '$DIR/backend' && npm run dev"
         open_terminal "SmartFace Frontend" "cd '$DIR/frontend' && npm run dev"
-        echo "Da khoi chay cac dich vu thanh cong!"
+        open_terminal "SmartFace Face Auth API" "cd '$DIR/face_auth' && '$FACE_AUTH_PYTHON' -m uvicorn api_service:app --host 0.0.0.0 --port 5000"
+        echo "Da mo cac terminal. Kiem tra log va /health de xac nhan ready."
         pause
         ;;
       2)
         check_env
         echo ""
-        echo "Dang khoi chay Backend va Frontend trong cua so Terminal moi..."
+        echo "Dang khoi chay Face Auth API, Backend va Frontend trong cua so Terminal moi..."
         open_terminal "SmartFace Backend" "cd '$DIR/backend' && npm run dev"
         open_terminal "SmartFace Frontend" "cd '$DIR/frontend' && npm run dev"
-        echo "Da mo 2 cua so Terminal chay Backend va Frontend!"
+        open_terminal "SmartFace Face Auth API" "cd '$DIR/face_auth' && '$FACE_AUTH_PYTHON' -m uvicorn api_service:app --host 0.0.0.0 --port 5000"
+        echo "Da mo terminal Face Auth API, Backend va Frontend."
         pause
         ;;
       3)
@@ -99,9 +116,14 @@ menu() {
         pause
         ;;
       5)
+        check_env
         echo ""
         echo "Dang khoi dong PostgreSQL va pgAdmin qua Docker..."
-        docker compose -f "$DIR/backend/docker-compose.yml" up -d
+        if ! docker compose --env-file "$DIR/.env.compose" --profile tools -f "$DIR/docker-compose.yml" up -d; then
+          echo "Khong khoi dong duoc PostgreSQL. Kiem tra volume va mat khau trong .env.compose."
+          pause
+          continue
+        fi
         pause
         ;;
       6)
@@ -118,14 +140,16 @@ menu() {
       7)
         check_env
         echo ""
-        echo "Dang tao Prisma Client, Migrate va Seed Database..."
-        (
+        echo "Dang tao Prisma Client va Migrate Database (khong seed)..."
+        if (
           cd "$DIR/backend" && \
           npm run prisma:generate && \
-          npm run prisma:migrate && \
-          npm run prisma:seed
-        )
-        echo "Database Migrate va Seed hoan tat!"
+          npm run prisma:migrate
+        ); then
+          echo "Database migration hoan tat."
+        else
+          echo "Migration that bai; kiem tra loi phia tren."
+        fi
         pause
         ;;
       0)

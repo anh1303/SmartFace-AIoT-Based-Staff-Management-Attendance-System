@@ -64,7 +64,7 @@ backend/prisma/
 | :--- | :--- | :--- |
 | **Generate Client** | `npx prisma generate` | Biên dịch lại `@prisma/client` SDK sau khi sửa `schema.prisma` |
 | **Create Migration** | `npx prisma migrate dev --name <migration_name>` | Tạo và áp dụng bản migration SQL mới lên DB |
-| **Run Seed Data** | `npx prisma db seed` *(hoặc `npm run prisma:seed`)* | Thực thi file `prisma/seed.ts` để nạp dữ liệu mẫu |
+| **Run Seed Data** | `npx prisma db seed` *(hoặc `npm run prisma:seed`)* | Xóa dữ liệu hiện có rồi nạp bộ dữ liệu mẫu; chỉ dùng trên DB development có thể reset |
 | **Open Studio GUI** | `npx prisma studio` *(hoặc `npm run prisma:studio`)* | Bật giao diện web đồ họa truy vấn dữ liệu trực quan tại `localhost:5555` |
 | **Format Schema** | `npx prisma format` | Tự động căn chỉnh & format lại syntax file `schema.prisma` |
 | **Push Schema DB** | `npx prisma db push` | Đẩy trực tiếp schema lên DB không tạo file migration history (dành cho thử nghiệm) |
@@ -85,10 +85,12 @@ File [seed.ts](file:///e:/PBL6/SmartFace-AIoT-Based-Staff-Management-Attendance-
    - `Thu ngân` (Code: `Cashier`)
    - `Nhân viên` (Code: `Staff`)
    - `Bảo vệ` (Code: `Security`)
-4. **6 Hồ sơ nhân viên mẫu** kèm theo lịch ca làm việc và dữ liệu vector đặc trưng gương mặt.
+4. **6 Hồ sơ nhân viên mẫu** kèm lịch ca; face embeddings chỉ được tạo từ ảnh thật qua Face Auth API.
 5. **Dữ liệu chấm công lịch sử & Bảng lương mẫu**.
 
-Khởi chạy seed bất cứ lúc nào bằng lệnh:
+Seed xóa dữ liệu cũ trong nhiều bảng, gồm nhân viên, chấm công, lương và embeddings.
+Không chạy lệnh này trên database PBL6 đang sử dụng. Chỉ dùng trên DB development
+có thể xóa hoàn toàn:
 ```bash
 npm run prisma:seed
 ```
@@ -99,5 +101,5 @@ npm run prisma:seed
 
 1. Luôn chỉnh sửa cấu trúc bảng trong file [`schema.prisma`](file:///e:/PBL6/SmartFace-AIoT-Based-Staff-Management-Attendance-System/backend/prisma/schema.prisma).
 2. Chạy `npx prisma format` để đảm bảo định dạng file chuẩn xác.
-3. Chạy `npx prisma migrate dev --name update_feature_name` để tạo bản migration mới.
+3. Tạo migration trong môi trường development bằng `npx prisma migrate dev --name update_feature_name`; triển khai các migration đã commit bằng `npm run prisma:migrate` (`prisma migrate deploy`).
 4. Kiểm tra mã nguồn TypeScript để đảm bảo không bị lỗi sai kiểu dữ liệu khi gọi `prisma.<model>`.

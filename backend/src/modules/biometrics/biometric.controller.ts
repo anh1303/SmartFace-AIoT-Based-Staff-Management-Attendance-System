@@ -4,7 +4,7 @@ import { authorize } from '../../middlewares/rbac.middleware.js'
 import { successResponse } from '../../common/response.js'
 import { AppError } from '../../common/AppError.js'
 import * as service from './biometric.service.js'
-import { registerBiometricSchema, enrollImagesSchema } from './biometric.dto.js'
+import { enrollImagesSchema } from './biometric.dto.js'
 
 export const biometricRouter = Router()
 biometricRouter.use(authenticate)
@@ -22,35 +22,6 @@ biometricRouter.get(['/:employeeId', '/face/:employeeId'], async (req, res, next
     }
 
     successResponse(res, await service.getByEmployee(employeeId))
-  } catch (e) {
-    next(e)
-  }
-})
-
-biometricRouter.post(['/:employeeId', '/face/:employeeId', '/face/enroll'], authorize('ADMIN', 'MANAGER'), async (req, res, next) => {
-  try {
-    const body = registerBiometricSchema.parse(req.body)
-
-    const employeeId = (req.params.employeeId || body.employeeId) as string
-    if (!employeeId) {
-      throw new AppError(400, 'Employee ID is required in URL or request body')
-    }
-
-    successResponse(
-      res,
-      await service.register(
-        employeeId,
-        body.embedding,
-        {
-          model_version: body.model_version,
-          sample_tag: body.sample_tag,
-          quality_score: body.quality_score,
-        },
-        req.user?.id,
-      ),
-      'Biometric sample registered',
-      201,
-    )
   } catch (e) {
     next(e)
   }

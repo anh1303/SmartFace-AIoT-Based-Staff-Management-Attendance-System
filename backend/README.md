@@ -15,7 +15,7 @@
 | **IoT Protocol** | MQTT Client (`mqtt` v5.10) | Nhận dữ liệu chấm công và trạng thái từ Edge AI Camera / ESP32 Nodes |
 | **Authentication** | JSON Web Tokens (`jsonwebtoken`), `bcryptjs`, Cookies | Xác thực người dùng qua JWT cookie `HttpOnly; Secure; SameSite=Strict` & Bearer Header |
 | **Data Validation** | Zod (v3.24) | Validate dữ liệu đầu vào DTO ở middleware layer trước khi tới Controller |
-| **Security Layer** | Helmet, CORS, Biometric AES Encryption | Cấu hình HTTP Headers an toàn, phân quyền CORS & mã hóa vector đặc trưng AES-256 |
+| **Security Layer** | Helmet, CORS, Biometric API Authorization | Cấu hình HTTP Headers an toàn, phân quyền CORS và kiểm soát quyền truy cập API sinh trắc học |
 
 ---
 
@@ -44,10 +44,10 @@ Mở Terminal tại thư mục gốc `SmartFace-AIoT-Based-Staff-Management-Atte
 
 #### Bước 1: Khởi động Database với Docker
 ```bash
-# Trong thư mục backend/
-docker compose up -d
+# Chạy từ thư mục gốc repo
+docker compose --env-file .env.compose --profile tools up -d
 ```
-*Lệnh này sẽ bật PostgreSQL tại port `5432` và pgAdmin tại port `5050`.*
+*Lệnh này dùng chung PostgreSQL + pgvector PBL6 tại port `5432` và pgAdmin tại port `5050`.*
 
 #### Bước 2: Cài đặt Dependencies
 ```bash
@@ -61,14 +61,12 @@ Tạo file `.env` từ file mẫu `.env.example`:
 cp .env.example .env
 ```
 
-#### Bước 4: Thực thi Prisma Migration & Seed Data
+#### Bước 4: Thực thi Prisma Migration
 ```bash
-# Tạo các bảng trong Database theo schema.prisma
+# Áp dụng các migration đã commit, không reset database
 npm run prisma:migrate
-
-# Nạp dữ liệu mẫu ban đầu (Roles, Admin, Employees, Shifts, Policy...)
-npm run prisma:seed
 ```
+Không chạy `npm run prisma:seed` trên database đang sử dụng: seed xóa dữ liệu hiện có trước khi nạp lại dữ liệu mẫu.
 
 #### Bước 5: Khởi chạy Server Development
 ```bash
@@ -80,7 +78,7 @@ npm run dev
 
 ## 🔑 Biến Môi Trường (Environment Variables)
 
-Danh sách 13 biến môi trường cấu hình trong file `backend/.env`:
+Các biến môi trường cấu hình trong file `backend/.env`:
 
 | Tên biến | Mô tả chi tiết | Giá trị mẫu | Bắt buộc? |
 | :--- | :--- | :--- | :---: |
@@ -93,16 +91,17 @@ Danh sách 13 biến môi trường cấu hình trong file `backend/.env`:
 | `MQTT_USERNAME` | Tài khoản đăng nhập MQTT Broker | `device_user` | 🟠 Tùy chọn |
 | `MQTT_PASSWORD` | Mật khẩu đăng nhập MQTT Broker | `device_pass` | 🟠 Tùy chọn |
 | `MQTT_DEVICE_SECRET` | Khóa bí mật xác thực gói tin từ Edge Device (≥32 ký tự) | `pbl6_device_shared_secret_key_12345678` | 🔴 Có |
-| `BIOMETRIC_ENCRYPTION_KEY` | Hex Key 64 ký tự (AES-256) mã hóa sinh trắc học | `0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef` | 🔴 Có |
+| `BIOMETRIC_ENCRYPTION_KEY` | Biến cấu hình tương thích; luồng lưu face vector hiện ghi trực tiếp vào pgvector | `0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef` | 🔴 Có |
 | `CORS_ORIGIN` | URL Frontend được phép gọi API (CORS) | `http://localhost:5173` | 🔴 Có |
 | `FACE_AUTH_URL` | Địa chỉ Service Python Face Authentication nội bộ | `http://localhost:5000` | 🔴 Có |
 | `FACE_AUTH_TIMEOUT_MS` | Thời gian chờ tối đa kết nối tới Face Auth Service (ms) | `30000` | 🟠 Tùy chọn |
+| `FACE_AUTH_MODEL_VERSION` | Phiên bản gallery khớp model pack Python | `buffalo_s` | 🟠 Tùy chọn |
 
 ---
 
 ## 🔒 Tạo Khóa Bí Mật Mã Hóa (Secret Generation)
 
-Để tạo mã ngẫu nhiên bảo mật 64 ký tự hex cho `JWT_SECRET` hoặc `BIOMETRIC_ENCRYPTION_KEY`, thực thi câu lệnh Node.js sau:
+Để tạo mã ngẫu nhiên bảo mật 64 ký tự hex cho `JWT_SECRET`, thực thi câu lệnh Node.js sau:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -120,7 +119,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | `npm run test` | Khởi chạy bộ kiểm thử Unit Test với `vitest` |
 | `npm run prisma:generate` | Biên dịch tạo mới lại bộ TypeScript Client SDK cho Prisma |
 | `npm run prisma:migrate` | Chạy bản SQL Migration cập nhật cấu trúc Database Schema |
-| `npm run prisma:seed` | Nạp dữ liệu mặc định ban đầu vào các bảng |
+| `npm run prisma:seed` | Xóa dữ liệu hiện có rồi nạp mẫu; chỉ dùng trên DB development có thể reset |
 | `npm run prisma:studio` | Mở giao diện đồ họa Web Prisma Studio quản lý dữ liệu Database |
 
 ---
@@ -129,7 +128,6 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ```text
 backend/
-├── docker-compose.yml       # Docker container PostgreSQL 16 & pgAdmin4
 ├── prisma/
 │   ├── schema.prisma        # Cấu hình 14 Models Database Schema (kèm attendance_locks)
 │   ├── seed.ts              # Script nạp dữ liệu mẫu khởi tạo hệ thống
@@ -290,7 +288,7 @@ const socket = io('http://localhost:3000/attendance', {
 3. **Lỗi `EADDRINUSE: address already in use :::3000`**:
    - Port 3000 đang bị chiếm dụng. Thay đổi giá trị `PORT=3001` trong `.env` hoặc tắt ứng dụng đang dùng port 3000.
 4. **Lỗi `./run.bat command not found` trong PowerShell/CMD**:
-   - File `run.bat` nằm tại thư mục gốc của dự án. Hãy quay lại thư mục gốc bằng `cd ..` và gõ `.\run.bat`.
+   - File `run.bat` nằm tại thư mục gốc của dự án. Hãy quay lại thư mục gốc bằng `cd ..` rồi gõ `.\run.bat`.
 
 ---
 

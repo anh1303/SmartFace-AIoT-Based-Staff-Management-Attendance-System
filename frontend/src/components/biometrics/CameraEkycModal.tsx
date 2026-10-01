@@ -17,7 +17,6 @@ export interface CapturedFaceSample {
   label: string;
   instruction: string;
   dataUrl: string;
-  qualityScore: number;
 }
 
 interface CameraEkycModalProps {
@@ -193,7 +192,6 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
         label: activeStep.shortLabel,
         instruction: activeStep.instruction,
         dataUrl,
-        qualityScore: Math.floor(96 + Math.random() * 3.8 * 10) / 10
       };
 
       setSamples(prev => ({
@@ -512,7 +510,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-semibold text-white truncate">{step.shortLabel}</p>
                       <p className={`text-[10px] font-mono mt-0.5 ${sample ? 'text-green-400' : 'text-slate-500'}`}>
-                        {sample ? `${sample.qualityScore}% (Đạt)` : 'Chờ chụp'}
+                        {sample ? 'Đã chụp' : 'Chờ chụp'}
                       </p>
                     </div>
 

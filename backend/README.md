@@ -10,7 +10,7 @@
 | :--- | :--- | :--- |
 | **Runtime & Language** | Node.js (≥20), TypeScript (v5.8) | Đảm bảo an toàn kiểu dữ liệu nghiêm ngặt & hiệu năng xử lý bất đồng bộ cao |
 | **Web Framework** | Express.js (v4.21) | Xây dựng REST API Router, Middleware Pipeline và Response Handlers |
-| **ORM & Database** | Prisma ORM (v6.4), PostgreSQL 16 | Quản lý Database Schema (14 models), Type-safe Query Builder và Migrations |
+| **ORM & Database** | Prisma ORM (v5.20), PostgreSQL 16 | Quản lý Database Schema (14 models), Type-safe Query Builder và Migrations |
 | **Real-time Web** | Socket.IO (v4.8) | Broadcast sự kiện chấm công và trạng thái thiết bị tới Web Frontend qua WebSocket |
 | **IoT Protocol** | MQTT Client (`mqtt` v5.10) | Nhận dữ liệu chấm công và trạng thái từ Edge AI Camera / ESP32 Nodes |
 | **Authentication** | JSON Web Tokens (`jsonwebtoken`), `bcryptjs`, Cookies | Xác thực người dùng qua JWT cookie `HttpOnly; Secure; SameSite=Strict` & Bearer Header |
@@ -80,21 +80,23 @@ npm run dev
 
 ## 🔑 Biến Môi Trường (Environment Variables)
 
-Danh sách 11 biến môi trường cấu hình trong file `backend/.env`:
+Danh sách 13 biến môi trường cấu hình trong file `backend/.env`:
 
 | Tên biến | Mô tả chi tiết | Giá trị mẫu | Bắt buộc? |
 | :--- | :--- | :--- | :---: |
-| `NODE_ENV` | Môi trường ứng dụng (`development` / `production`) | `development` | 🔴 Có |
+| `NODE_ENV` | Môi trường ứng dụng (`development` / `production` / `test`) | `development` | 🔴 Có |
 | `PORT` | Cổng kết nối HTTP Server | `3000` | 🔴 Có |
-| `DATABASE_URL` | Chuỗi kết nối Database PostgreSQL | `postgresql://postgres:postgres@localhost:5432/PBL6` | 🔴 Có |
-| `JWT_SECRET` | Chìa khóa bí mật dùng mã hóa & ký token JWT | `super_secret_jwt_key_random_pbl6_2026` | 🔴 Có |
-| `JWT_EXPIRES_IN` | Thời gian hết hạn của Access Token | `1d` | 🟠 Tùy chọn |
+| `DATABASE_URL` | Chuỗi kết nối Database PostgreSQL | `postgresql://postgres:postgres@localhost:5432/PBL6?schema=public` | 🔴 Có |
+| `JWT_SECRET` | Chìa khóa bí mật dùng mã hóa & ký token JWT (≥32 ký tự) | `super_secret_jwt_key_random_string_pbl6_2026_backend` | 🔴 Có |
+| `JWT_EXPIRES_IN` | Thời gian hết hạn của Access Token (Mặc định: `7d`) | `7d` | 🟠 Tùy chọn |
 | `MQTT_URL` | Địa chỉ kết nối Broker MQTT cho AIoT Devices | `mqtt://localhost:1883` | 🔴 Có |
 | `MQTT_USERNAME` | Tài khoản đăng nhập MQTT Broker | `device_user` | 🟠 Tùy chọn |
 | `MQTT_PASSWORD` | Mật khẩu đăng nhập MQTT Broker | `device_pass` | 🟠 Tùy chọn |
-| `MQTT_DEVICE_SECRET` | Khóa bí mật xác thực gói tin từ Edge Device | `pbl6_device_shared_secret_key_12345678` | 🔴 Có |
+| `MQTT_DEVICE_SECRET` | Khóa bí mật xác thực gói tin từ Edge Device (≥32 ký tự) | `pbl6_device_shared_secret_key_12345678` | 🔴 Có |
 | `BIOMETRIC_ENCRYPTION_KEY` | Hex Key 64 ký tự (AES-256) mã hóa sinh trắc học | `0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef` | 🔴 Có |
 | `CORS_ORIGIN` | URL Frontend được phép gọi API (CORS) | `http://localhost:5173` | 🔴 Có |
+| `FACE_AUTH_URL` | Địa chỉ Service Python Face Authentication nội bộ | `http://localhost:5000` | 🔴 Có |
+| `FACE_AUTH_TIMEOUT_MS` | Thời gian chờ tối đa kết nối tới Face Auth Service (ms) | `30000` | 🟠 Tùy chọn |
 
 ---
 

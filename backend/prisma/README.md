@@ -7,7 +7,7 @@
 ## 🛠 Tổng Quan Công Nghệ
 
 - **Database Engine**: PostgreSQL 16 (Hỗ trợ `UUID`, `pgvector` cho 512-D face embeddings, `Timestamptz`).
-- **ORM**: Prisma ORM (v6.4).
+- **ORM**: Prisma ORM (v5.20).
 - **Driver**: `prisma-client-js`.
 - **Database URL format**: `postgresql://<user>:<password>@<host>:<port>/<database_name>`
 

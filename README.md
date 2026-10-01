@@ -59,8 +59,8 @@
 SmartFace-AIoT-Based-Staff-Management-Attendance-System/
 ├── run.bat                   # ⚡ Script tự động khởi chạy 1-click cho Windows
 ├── run.sh                    # ⚡ Script tự động khởi chạy 1-click cho macOS (và Linux)
-├── .gitignore                # Cấu hình GitIgnore (đã loại trừ node_modules, build, __tests__/)
-├── backend/                  # Phân hệ Máy chủ & CSDL (Node.js, Express, Prisma)
+├── .gitignore                # Cấu hình GitIgnore (loại trừ node_modules, build, cache, dataset)
+├── backend/                  # Phân hệ Máy chủ REST API & CSDL (Node.js, Express, Prisma)
 │   ├── docker-compose.yml    # Docker Compose khởi chạy PostgreSQL 16 & pgAdmin4
 │   ├── prisma/               # Quản lý Database Schema, Migrations & Dữ liệu Seed
 │   │   ├── schema.prisma     # 14 Models CSDL chuẩn hóa (kèm attendance_locks, pgvector)
@@ -90,6 +90,18 @@ SmartFace-AIoT-Based-Staff-Management-Attendance-System/
 │   │   ├── types/            # Khai báo kiểu TypeScript toàn dự án
 │   │   └── utils/            # Chuẩn hóa múi giờ Việt Nam (+07:00), định dạng tiền tệ VND
 │   └── README.md             # 📖 Tài liệu chi tiết phân hệ Frontend
+├── face_auth/                # Phân hệ AI Sinh trắc học & Edge Camera (Python, InsightFace, PAD)
+│   ├── api_service.py        # Dịch vụ FastAPI nội bộ (:5000) trích xuất 512-D Embeddings & DB sync
+│   ├── app.py                # Ứng dụng Camera Edge AIoT nhận diện & chống giả mạo thời gian thực
+│   ├── config.py             # Cấu hình ngưỡng nhận diện, ArcFace, SCRFD/YunNet, PAD models
+│   ├── alignment/            # Căn chỉnh khuôn mặt 5 điểm chuẩn (Similarity Transform)
+│   ├── antispoof/            # Mô hình PAD chống giả mạo (MobileNetV3-Small E1 v5.3, 2D-DCT, E3)
+│   ├── database/             # Kết nối PostgreSQL pgvector (Connection Pool, Cosine Distance)
+│   ├── detection/            # Bộ phát hiện khuôn mặt (SCRFD / YunNet)
+│   ├── enrollment/           # Thuật toán tính Centroid embedding đại diện & lọc outlier
+│   ├── evaluation/           # Benchmarks, đánh giá độ chính xác nhận diện & LFW calibration
+│   ├── tracking/             # Bộ theo dõi khuôn mặt IOU Tracker đa mục tiêu
+│   └── README.md             # 📖 Tài liệu chi tiết phân hệ Face Authentication & AIoT Biometrics
 └── README.md                 # Tài liệu tổng quan toàn hệ thống (File này)
 ```
 
@@ -287,29 +299,54 @@ npm run dev
 
 ## 📡 API Reference Tóm Tắt
 
+### 1. Phân Hệ Backend REST API (`http://localhost:3000`)
+
 | Phương thức | Đường dẫn API | Mô tả chức năng | Quyền yêu cầu |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/auth/login` | Đăng nhập tài khoản, thiết lập HttpOnly Cookie | Public |
-| `POST` | `/api/v1/auth/logout` | Đăng xuất và hủy Cookie phiên làm việc | Authenticated |
-| `GET` | `/api/v1/auth/me` | Lấy thông tin tài khoản đang đăng nhập | Authenticated |
-| `GET` | `/api/v1/employees` | Lấy danh sách nhân viên (phân trang, lọc chức vụ, tìm kiếm) | Authenticated |
-| `POST` | `/api/v1/employees` | Thêm mới hồ sơ nhân viên | `MANAGER`, `ADMIN` |
-| `PUT` | `/api/v1/employees/:id` | Cập nhật thông tin nhân viên | `MANAGER`, `ADMIN` |
-| `DELETE` | `/api/v1/employees/:id` | Xóa nhân viên khỏi hệ thống | `MANAGER`, `ADMIN` |
-| `GET` | `/api/v1/attendance/logs` | Lấy danh sách sự kiện quẹt thẻ chấm công | Authenticated |
-| `POST` | `/api/v1/attendance/check-in` | Ghi nhận sự kiện chấm công từ Edge Device | Device / System |
-| `GET` | `/api/v1/attendance/summaries` | Lấy dữ liệu tổng hợp chấm công ngày (`daily_attendance_summary`) | Authenticated |
-| `POST` | `/api/v1/attendance/adjust` | Hiệu chỉnh thủ công giờ trễ/sớm và OT của nhân viên | `MANAGER`, `ADMIN` |
-| `GET` | `/api/v1/attendance/lock-status` | Tra cứu trạng thái chốt ca theo ngày | Authenticated |
-| `POST` | `/api/v1/attendance/toggle-lock` | Bật / tắt chốt số liệu ca làm việc theo ngày | `MANAGER`, `ADMIN` |
-| `GET` | `/api/v1/shifts` | Danh sách ca làm việc định nghĩa sẵn | Authenticated |
-| `GET` | `/api/v1/shifts/assignments` | Lấy lịch phân ca của nhân viên theo tuần | Authenticated |
-| `POST` | `/api/v1/shifts/assign` | Phân công ca làm việc cho nhân viên | `MANAGER`, `ADMIN` |
-| `GET` | `/api/v1/payroll/records` | Lấy bảng lương theo kỳ (`payroll_period: YYYY-MM`) | Authenticated |
-| `POST` | `/api/v1/payroll/generate` | Chốt và tự động tính bảng lương tháng theo giờ công | `MANAGER`, `ADMIN` |
-| `PUT` | `/api/v1/payroll/records/:id/status` | Cập nhật trạng thái chi trả lương (`PENDING`/`PAID`) | `MANAGER`, `ADMIN` |
-| `GET` | `/api/v1/devices` | Danh sách và trạng thái 4 thiết bị AIoT | Authenticated |
-| `GET` | `/api/v1/audit-logs` | Xem nhật ký kiểm toán thao tác hệ thống | `MANAGER`, `ADMIN` |
+| `POST` | `/api/auth/login` | Đăng nhập tài khoản, thiết lập HttpOnly Cookie | Public |
+| `POST` | `/api/auth/logout` | Đăng xuất và hủy Cookie phiên làm việc | Authenticated |
+| `GET` | `/api/auth/me` | Lấy thông tin tài khoản đang đăng nhập | Authenticated |
+| `POST` | `/api/auth/register` | Đăng ký tài khoản người dùng mới | `ADMIN` |
+| `GET` | `/api/employees` | Lấy danh sách nhân viên (phân trang, lọc chức vụ, tìm kiếm) | `MANAGER`, `ADMIN` |
+| `POST` | `/api/employees` | Thêm mới hồ sơ nhân viên | `MANAGER`, `ADMIN` |
+| `PUT` | `/api/employees/:id` | Cập nhật thông tin nhân viên | `MANAGER`, `ADMIN` |
+| `DELETE` | `/api/employees/:id` | Xóa nhân viên khỏi hệ thống | `ADMIN` |
+| `GET` | `/api/attendance` | Lấy danh sách nhật ký chấm công (nhân viên xem của mình) | Authenticated |
+| `GET` | `/api/attendance/statistics` | Thống kê số lượt check-in hôm nay, thiết bị active | Authenticated |
+| `POST` | `/api/attendance/check-in` | Ghi nhận sự kiện chấm công vào (gương mặt / vân tay) | Authenticated |
+| `POST` | `/api/attendance/check-out` | Ghi nhận sự kiện chấm công ra | Authenticated |
+| `GET` | `/api/attendance/summaries` | Lấy dữ liệu tổng hợp chấm công ngày (`daily_attendance_summary`) | Authenticated |
+| `PATCH` | `/api/attendance/adjust` | Hiệu chỉnh thủ công giờ trễ/sớm và OT của nhân viên | `MANAGER`, `ADMIN` |
+| `GET` | `/api/attendance/locks` | Tra cứu danh sách trạng thái chốt ca theo ngày | Authenticated |
+| `POST` | `/api/attendance/locks/lock` | Khóa chốt dữ liệu chấm công của ngày được chọn | `MANAGER`, `ADMIN` |
+| `POST` | `/api/attendance/locks/unlock` | Mở khóa chỉnh sửa dữ liệu chấm công | `MANAGER`, `ADMIN` |
+| `POST` | `/api/attendance/aggregate` | Tổng hợp công ngày theo tháng/năm (`Decimal(5,2)` giờ) | `MANAGER`, `ADMIN` |
+| `GET` | `/api/shifts` | Danh sách ca làm việc và lịch phân ca | Authenticated |
+| `POST` | `/api/shifts` | Phân công ca làm việc cho nhân viên | `MANAGER`, `ADMIN` |
+| `GET` | `/api/payroll` | Lấy bảng lương theo kỳ (`payroll_period: YYYY-MM`) | Authenticated |
+| `POST` | `/api/payroll/generate` | Tự động tính toán bảng lương tháng theo giờ công | `MANAGER`, `ADMIN` |
+| `PUT` | `/api/payroll/:id` | Cập nhật thông số phiếu lương cá nhân | `MANAGER`, `ADMIN` |
+| `POST` | `/api/payroll/period/:period/finalize` | Chốt sổ bảng lương kỳ được chọn | `MANAGER`, `ADMIN` |
+| `POST` | `/api/payroll/period/:period/unlock` | Mở khóa lại bảng lương đã chốt | `ADMIN` |
+| `GET` | `/api/payroll/bonus-penalty` | Lấy quy định chính sách thưởng/phạt | Authenticated |
+| `PUT` | `/api/payroll/bonus-penalty` | Cập nhật chính sách thưởng OT & phạt đi trễ | `MANAGER`, `ADMIN` |
+| `GET` | `/api/biometrics/:employeeId` | Lấy thông tin vector gương mặt đã đăng ký | Authenticated |
+| `POST` | `/api/biometrics/:employeeId` | Đăng ký vector khuôn mặt 512-D sinh trắc mới | `MANAGER`, `ADMIN` |
+| `POST` | `/api/biometrics/:employeeId/enroll-images` | Gửi ảnh base64 qua Face Auth service để trích xuất vector | `MANAGER`, `ADMIN` |
+| `DELETE` | `/api/biometrics/:employeeId` | Xóa dữ liệu sinh trắc học của nhân viên | `MANAGER`, `ADMIN` |
+| `GET` | `/api/devices` | Danh sách và trạng thái các thiết bị AIoT | Authenticated |
+| `POST` | `/api/devices` | Thêm mới thiết bị AIoT | `MANAGER`, `ADMIN` |
+| `PUT` | `/api/devices/:id` | Cập nhật thông tin thiết bị AIoT | `MANAGER`, `ADMIN` |
+| `DELETE` | `/api/devices/:id` | Xóa thiết bị AIoT | `ADMIN` |
+| `GET` | `/api/audit-logs` | Xem nhật ký kiểm toán thao tác hệ thống | `ADMIN` |
+
+### 2. Phân Hệ Face Auth Internal API (`http://localhost:5000`)
+
+| Phương thức | Đường dẫn API | Mô tả chức năng | Quyền yêu cầu |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/health` | Kiểm tra trạng thái hoạt động & phiên bản embedding | Nội bộ / Backend |
+| `POST` | `/internal/enroll` | Trích xuất 512-D ArcFace embedding từ ảnh base64, tính Centroid & lưu pgvector | Nội bộ / Backend |
+| `DELETE` | `/internal/enroll/:employee_code` | Xóa toàn bộ vector khuôn mặt trong CSDL theo mã nhân viên | Nội bộ / Backend |
 
 ---
 

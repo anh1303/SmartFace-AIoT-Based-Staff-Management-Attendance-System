@@ -13,6 +13,8 @@ const envSchema = z.object({
   MQTT_DEVICE_SECRET: z.string().min(32, 'MQTT_DEVICE_SECRET must be at least 32 characters'),
   BIOMETRIC_ENCRYPTION_KEY: z.string().min(32, 'BIOMETRIC_ENCRYPTION_KEY must be at least 32 characters'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  FACE_AUTH_URL: z.string().default('http://localhost:5000'),
+  FACE_AUTH_TIMEOUT_MS: z.string().default('30000').transform(Number),
 })
 
 const parsed = envSchema.safeParse(process.env)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
   Users,
@@ -35,6 +35,7 @@ function getNextEmployeeId(employeesList: Employee[]): string {
 
 export const ManagerEmployeeList: React.FC = () => {
   const { employees, addEmployee, updateEmployee, toggleEmployeeStatus, showToast } = useApp();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const querySearch = searchParams.get('search') || '';
 
@@ -288,24 +289,28 @@ export const ManagerEmployeeList: React.FC = () => {
                     {/* Biometrics */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
-                        <span
-                          title={emp.face_enrolled ? "Face ID: Đã đăng ký" : "Chưa đăng ký Face ID"}
-                          className={`p-1.5 rounded-lg border ${emp.face_enrolled
-                              ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                              : 'bg-slate-800 text-slate-600 border-slate-700/50'
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/app/manager/biometrics?employee_id=${emp.employee_id}`)}
+                          title={emp.face_enrolled ? "Face ID: Đã đăng ký (Bấm để cập nhật)" : "Face ID: Chưa đăng ký (Bấm để đăng ký)"}
+                          className={`p-1.5 rounded-lg border transition-all cursor-pointer hover:scale-105 ${emp.face_enrolled
+                              ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20 shadow-sm shadow-blue-500/10'
+                              : 'bg-slate-800 text-slate-500 border-slate-700/50 hover:bg-slate-700 hover:text-slate-300'
                             }`}
                         >
                           <ScanFace className="w-4 h-4" />
-                        </span>
-                        <span
-                          title={emp.fingerprint_enrolled ? "Vân tay: Đã đăng ký" : "Chưa đăng ký Vân tay"}
-                          className={`p-1.5 rounded-lg border ${emp.fingerprint_enrolled
-                              ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                              : 'bg-slate-800 text-slate-600 border-slate-700/50'
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/app/manager/biometrics?employee_id=${emp.employee_id}`)}
+                          title={emp.fingerprint_enrolled ? "Vân tay: Đã đăng ký (Bấm để cập nhật)" : "Vân tay: Chưa đăng ký (Bấm để đăng ký)"}
+                          className={`p-1.5 rounded-lg border transition-all cursor-pointer hover:scale-105 ${emp.fingerprint_enrolled
+                              ? 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/20 shadow-sm shadow-green-500/10'
+                              : 'bg-slate-800 text-slate-500 border-slate-700/50 hover:bg-slate-700 hover:text-slate-300'
                             }`}
                         >
                           <Fingerprint className="w-4 h-4" />
-                        </span>
+                        </button>
                       </div>
                     </td>
 
@@ -330,14 +335,25 @@ export const ManagerEmployeeList: React.FC = () => {
 
                     {/* Action */}
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setEditEmployee(emp)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs flex items-center gap-1.5 ml-auto transition-colors"
-                      >
-                        <Edit className="w-3.5 h-3.5 text-blue-400" />
-                        <span>Sửa</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/app/manager/biometrics?employee_id=${emp.employee_id}`)}
+                          title="Cập nhật sinh trắc học Face ID / Vân tay"
+                          className="px-2.5 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <ScanFace className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Sinh trắc</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditEmployee(emp)}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Edit className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Sửa</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

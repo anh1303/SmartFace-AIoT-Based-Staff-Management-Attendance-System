@@ -158,17 +158,21 @@ model employee_shifts {
 }
 
 model face_embeddings {
-  id            String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  employee_id   String                      @db.Uuid
-  embedding     Unsupported("vector(512)")?
-  model_version String                      @default("arcface_v1") @db.VarChar(50)
-  sample_tag    String?                     @default("FRONTAL") @db.VarChar(50)
-  quality_score Float?
-  is_active     Boolean                     @default(true)
-  created_at    DateTime                    @default(now()) @db.Timestamptz(6)
-  employees     Employee                    @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id             String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id    String                      @db.Uuid
+  embedding      Unsupported("vector(512)")?
+  model_version  String                      @default("arcface_v1") @db.VarChar(50)
+  sample_tag     String?                     @default("FRONTAL") @db.VarChar(50)
+  quality_score  Float?
+  is_active      Boolean                     @default(true)
+  created_at     DateTime                    @default(now()) @db.Timestamptz(6)
+  /// SAMPLE = vector gốc từng ảnh, CENTROID = vector trung bình đại diện danh tính
+  embedding_type String                      @default("SAMPLE") @db.VarChar(20)
+  employees      Employee                    @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([employee_id], map: "idx_face_embeddings_emp_id")
+  @@index([embedding_type], map: "idx_face_embeddings_type")
+  @@index([embedding], map: "idx_face_embeddings_embedding_hnsw")
 }
 
 model roles {

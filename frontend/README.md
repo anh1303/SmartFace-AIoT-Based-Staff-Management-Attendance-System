@@ -11,7 +11,7 @@
 | **React** | `v19.0` | Thư viện giao diện chính, render UI mượt mà |
 | **Vite** | `v6.2` | Công cụ Build tool siêu tốc & Development Server |
 | **TypeScript** | `v5.8` | Kiểm tra kiểu dữ liệu tĩnh nghiêm ngặt & loại bỏ hoàn toàn `any` |
-| **TanStack Query** | `v5.67` | Quản lý Async State, Server Cache, Invalidation & Automatic Retry |
+| **TanStack Query** | `v5.103` | Quản lý Async State, Server Cache, Invalidation & Automatic Retry |
 | **Tailwind CSS** | `v4.1` | Styling Framework thế hệ mới cho giao diện Glassmorphism |
 | **React Router DOM** | `v7.18` | Định tuyến Client-side routing, hỗ trợ Protected Routes & Layouts |
 | **Recharts** | `v3.10` | Biểu đồ trực quan hóa chi phí lương & tỷ lệ đi làm theo tuần từ DB |

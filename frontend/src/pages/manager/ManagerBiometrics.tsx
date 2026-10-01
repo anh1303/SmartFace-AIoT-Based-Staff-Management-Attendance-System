@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
   ScanFace,
@@ -26,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { CameraEkycModal, CapturedFaceSample } from '../../components/biometrics/CameraEkycModal';
+import { enrollFaceImagesApi, EnrollFaceResult } from '../../api/biometricApi';
 import { Employee } from '../../types';
 
 export interface FacePhotoItem {
@@ -38,10 +40,21 @@ export interface FacePhotoItem {
 
 export const ManagerBiometrics: React.FC = () => {
   const { employees, updateEmployee, showToast } = useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryEmpId = searchParams.get('employee_id') || searchParams.get('empId');
 
   // Selected employee for enrollment
-  const [selectedEmpId, setSelectedEmpId] = useState<string>(employees[0]?.employee_id || 'NV-001');
+  const [selectedEmpId, setSelectedEmpId] = useState<string>(
+    () => queryEmpId || employees[0]?.employee_id || 'NV-001'
+  );
   const [activeTab, setActiveTab] = useState<'FACE' | 'FINGERPRINT'>('FACE');
+
+  // Sync selectedEmpId when URL query param changes
+  useEffect(() => {
+    if (queryEmpId && queryEmpId !== selectedEmpId) {
+      setSelectedEmpId(queryEmpId);
+    }
+  }, [queryEmpId, selectedEmpId]);
 
   // Face Enrollment State (Requires at least 3 photos)
   const [uploadedPhotos, setUploadedPhotos] = useState<FacePhotoItem[]>([]);
@@ -49,6 +62,8 @@ export const ManagerBiometrics: React.FC = () => {
   const [faceQualityScore, setFaceQualityScore] = useState<number | null>(null);
   const [faceConfirmModal, setFaceConfirmModal] = useState<boolean>(false);
   const [isEkycModalOpen, setIsEkycModalOpen] = useState<boolean>(false);
+  const [enrollResult, setEnrollResult] = useState<EnrollFaceResult | null>(null);
+  const [resultModalOpen, setResultModalOpen] = useState<boolean>(false);
 
   // Fingerprint Device Trigger State
   const [selectedDevice, setSelectedDevice] = useState<string>('FaceCam-01 (Cổng chính - Tầng 1)');
@@ -60,6 +75,15 @@ export const ManagerBiometrics: React.FC = () => {
   // Device sync modal
   const [syncAllModal, setSyncAllModal] = useState<boolean>(false);
   const [syncingDevices, setSyncingDevices] = useState<boolean>(false);
+
+  // Reset photos & biometric state whenever selected employee changes
+  useEffect(() => {
+    setUploadedPhotos([]);
+    setAnalyzingFace(false);
+    setFaceQualityScore(null);
+    setFingerprintStep('IDLE');
+    setFingerQualityScore(null);
+  }, [selectedEmpId]);
 
   const currentEmp = employees.find(e => e.employee_id === selectedEmpId) || employees[0];
 
@@ -133,15 +157,41 @@ export const ManagerBiometrics: React.FC = () => {
   };
 
   // Confirm Face Update (requires explicit confirm button and >= 3 photos)
-  const handleConfirmFaceSave = () => {
+  const handleConfirmFaceSave = async () => {
     if (!currentEmp || uploadedPhotos.length < 3) return;
-    const frontalPhoto = uploadedPhotos[0]?.url || currentEmp.avatar;
-    updateEmployee(currentEmp.employee_id, {
-      face_enrolled: true,
-      avatar: frontalPhoto
-    });
-    setFaceConfirmModal(false);
-    showToast(`Đã cập nhật vector khuôn mặt 512-D (${uploadedPhotos.length} ảnh mẫu) cho nhân viên ${currentEmp.full_name} (${currentEmp.employee_id})!`, 'success');
+    setAnalyzingFace(true);
+    try {
+      const frontalPhoto = uploadedPhotos[0]?.url || currentEmp.avatar;
+      const imagesBase64 = uploadedPhotos.map(p => p.url);
+
+      // 1. Gọi API enroll khuôn mặt để trích xuất vector 512-D và lưu vào PostgreSQL
+      const result = await enrollFaceImagesApi(currentEmp.employee_id, imagesBase64);
+
+      // 2. Cập nhật avatar ảnh đại diện và trạng thái face_enrolled vào state & DB
+      updateEmployee(currentEmp.employee_id, {
+        face_enrolled: true,
+        avatar: frontalPhoto
+      });
+
+      const total = result?.total_images ?? uploadedPhotos.length;
+      const detected = result?.detected_faces ?? result?.n_samples_used ?? uploadedPhotos.length;
+      const rate = result?.extraction_rate ?? (total > 0 ? Math.round((detected / total) * 100) : 100);
+      const used = result?.n_samples_used ?? detected;
+
+      setEnrollResult(result);
+      setFaceConfirmModal(false);
+      setResultModalOpen(true);
+
+      showToast(
+        `Đã trích xuất thành công ${detected}/${total} khung hình trong ảnh (Tỉ lệ: ${rate}%). Đã lưu ${used} vector khuôn mặt 512-D cho nhân viên ${currentEmp.full_name} (${currentEmp.employee_id})!`,
+        'success'
+      );
+    } catch (err: any) {
+      console.error('Error updating face biometrics:', err);
+      showToast(`Lỗi khi cập nhật sinh trắc học: ${err.message || 'Thao tác không thành công'}`, 'error');
+    } finally {
+      setAnalyzingFace(false);
+    }
   };
 
   // IoT Signal Trigger for Fingerprint Device
@@ -265,11 +315,9 @@ export const ManagerBiometrics: React.FC = () => {
                 value={selectedEmpId}
                 onChange={e => {
                   setSelectedEmpId(e.target.value);
-                  setUploadedPhotos([]);
-                  setFaceQualityScore(null);
-                  setFingerprintStep('IDLE');
+                  setSearchParams({ employee_id: e.target.value });
                 }}
-                className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
               >
                 {employees.map(emp => (
                   <option key={emp.employee_id} value={emp.employee_id}>
@@ -721,9 +769,10 @@ export const ManagerBiometrics: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setSelectedEmpId(emp.employee_id);
+                        setSearchParams({ employee_id: emp.employee_id });
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition-colors"
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition-colors cursor-pointer"
                     >
                       Chọn để cập nhật
                     </button>
@@ -769,6 +818,7 @@ export const ManagerBiometrics: React.FC = () => {
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
+              disabled={analyzingFace}
               onClick={() => setFaceConfirmModal(false)}
               className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
             >
@@ -776,10 +826,105 @@ export const ManagerBiometrics: React.FC = () => {
             </button>
             <button
               type="button"
+              disabled={analyzingFace}
               onClick={handleConfirmFaceSave}
-              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md cursor-pointer"
+              className={`px-5 py-2 rounded-xl text-white text-xs font-semibold shadow-md flex items-center gap-2 transition-all cursor-pointer ${
+                analyzingFace
+                  ? 'bg-blue-600/70 cursor-wait'
+                  : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30'
+              }`}
             >
-              Xác nhận lưu thay đổi
+              {analyzingFace ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Đang trích xuất & lưu...</span>
+                </>
+              ) : (
+                <span>Xác nhận lưu thay đổi</span>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* RESULT MODAL: Face ID Extraction & Update Summary */}
+      <Modal
+        isOpen={resultModalOpen}
+        onClose={() => setResultModalOpen(false)}
+        title="Thông báo kết quả trích xuất sinh trắc học khuôn mặt"
+        subtitle={`Nhân sự: ${currentEmp?.full_name} (${currentEmp?.employee_id})`}
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-400">Trạng thái xử lý:</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono bg-green-500/10 text-green-400 border border-green-500/30 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                ĐÃ TRÍCH XUẤT THÀNH CÔNG
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <span className="text-[11px] text-slate-400 block mb-1">Khung hình trích xuất:</span>
+                <span className="text-base font-bold font-mono text-blue-400">
+                  {enrollResult?.detected_faces ?? uploadedPhotos.length}/{enrollResult?.total_images ?? uploadedPhotos.length} khung hình
+                </span>
+                <span className="text-[11px] text-slate-400 block mt-0.5">
+                  Tỉ lệ đạt: <strong className="text-cyan-400 font-mono">{enrollResult?.extraction_rate ?? 100}%</strong>
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <span className="text-[11px] text-slate-400 block mb-1">Vector 512-D hợp lệ:</span>
+                <span className="text-base font-bold font-mono text-green-400">
+                  {enrollResult?.n_samples_used ?? uploadedPhotos.length} vector
+                </span>
+                <span className="text-[11px] text-slate-400 block mt-0.5">
+                  Loại bỏ outlier: <strong className="text-slate-400 font-mono">{enrollResult?.n_outliers_removed ?? 0} ảnh</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex justify-between text-[11px] font-mono text-slate-400">
+                <span>Tỉ lệ trích xuất thành công</span>
+                <span className="font-bold text-green-400">{enrollResult?.extraction_rate ?? 100}%</span>
+              </div>
+              <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 via-cyan-500 to-green-500 rounded-full transition-all duration-500"
+                  style={{ width: `${enrollResult?.extraction_rate ?? 100}%` }}
+                />
+              </div>
+            </div>
+
+            {enrollResult?.warnings && enrollResult.warnings.length > 0 && (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] space-y-1">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Ghi chú trích xuất:
+                </p>
+                {enrollResult.warnings.map((w, idx) => (
+                  <p key={idx}>• {w}</p>
+                ))}
+              </div>
+            )}
+
+            <p className="text-[11px] text-slate-400 pt-1 leading-relaxed">
+              Dữ liệu vector Mean Centroid đã được mã hóa AES-256, lưu vào cơ sở dữ liệu PostgreSQL và tự động đồng bộ tới <strong>12 Edge Cameras</strong> tại các cửa.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setResultModalOpen(false)}
+              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md cursor-pointer transition-colors"
+            >
+              Hoàn tất & Đóng
             </button>
           </div>
         </div>

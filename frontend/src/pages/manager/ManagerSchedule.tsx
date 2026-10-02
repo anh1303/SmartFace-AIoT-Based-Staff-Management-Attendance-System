@@ -6,6 +6,7 @@ import {
   Users,
   CheckCircle2,
   Filter,
+  Search,
   ChevronLeft,
   ChevronRight,
   Sparkles,
@@ -43,6 +44,7 @@ function getISOWeekNumber(d: Date): number {
 export const ManagerSchedule: React.FC = () => {
   const { employees, workShifts, assignOrUpdateShift, showToast } = useApp();
   const [departmentFilter, setDepartmentFilter] = useState('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
   const [editingShift, setEditingShift] = useState<{
     employeeId: string;
     employeeName: string;
@@ -120,6 +122,14 @@ export const ManagerSchedule: React.FC = () => {
 
   const filteredEmployees = employees.filter(e => {
     if (departmentFilter !== 'ALL' && e.department !== departmentFilter) return false;
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      const matchName = e.full_name?.toLowerCase().includes(term);
+      const matchId = e.employee_id?.toLowerCase().includes(term);
+      const matchDept = e.department?.toLowerCase().includes(term);
+      const matchPos = e.position?.toLowerCase().includes(term);
+      if (!matchName && !matchId && !matchDept && !matchPos) return false;
+    }
     return true;
   });
 
@@ -302,63 +312,29 @@ export const ManagerSchedule: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Bento Header Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* Thanh 1: Bento Header Banner */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
-              Sắp Xếp & Phân Bổ Ca Làm Việc
-            </h1>
-
-            {/* Solar Calendar Week Selector + Today shortcut */}
-            <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-2xl border border-slate-800 shadow-inner">
-              <button
-                type="button"
-                onClick={handlePrevWeek}
-                title="Tuần trước"
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-
-              <div className="relative flex items-center gap-1.5 font-mono text-xs text-blue-400 font-semibold px-2 cursor-pointer group" title="Bấm để chọn tuần theo lịch dương">
-                <CalendarRange className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
-                <span>TUẦN {weekNumber} ({startLabel} - {endLabel})</span>
-                <input
-                  type="date"
-                  value={formatDateToYYYYMMDD(currentMonday)}
-                  onChange={e => handleDateSelect(e.target.value)}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleNextWeek}
-                title="Tuần sau"
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Shortcut Today Button */}
-            <button
-              type="button"
-              onClick={handleGoCurrentWeek}
-              className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1 border border-slate-700 transition-colors"
-              title="Nhảy nhanh về tuần hiện tại"
-            >
-              <Calendar className="w-3.5 h-3.5 text-blue-400" />
-              <span>Hôm nay</span>
-            </button>
-          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
+            Sắp Xếp & Phân Bổ Ca Làm Việc
+          </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Bấm vào bất kỳ ô ca trực nào để phân bổ hoặc điều chỉnh giờ làm cho nhân viên.
+            Bấm vào bất kỳ ô ca trực để phân bổ hoặc điều chỉnh.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {/* Copy from previous week */}
+          <button
+            type="button"
+            onClick={handleCopyPreviousWeek}
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors shadow-sm cursor-pointer"
+            title="Sao chép toàn bộ ca từ tuần trước sang tuần này"
+          >
+            <Copy className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Sao chép tuần trước</span>
+          </button>
+
           {/* Bulk Assign Button */}
           <button
             type="button"
@@ -368,25 +344,78 @@ export const ManagerSchedule: React.FC = () => {
             <Layers className="w-3.5 h-3.5" />
             <span>⚡ Phân ca nhanh hàng loạt</span>
           </button>
+        </div>
+      </div>
 
-          {/* Copy from previous week */}
+      {/* Thanh 2: Week Navigator & Filters Toolbar */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        {/* Week Selector + Today shortcut */}
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+          {/* Solar Calendar Week Selector */}
+          <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl shadow-inner">
+            <button
+              type="button"
+              onClick={handlePrevWeek}
+              title="Tuần trước"
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <div className="relative flex items-center gap-1.5 font-mono text-xs text-blue-400 font-semibold px-2 cursor-pointer group" title="Bấm để chọn tuần theo lịch dương">
+              <CalendarRange className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+              <span>TUẦN {weekNumber} ({startLabel} - {endLabel})</span>
+              <input
+                type="date"
+                value={formatDateToYYYYMMDD(currentMonday)}
+                onChange={e => handleDateSelect(e.target.value)}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handleNextWeek}
+              title="Tuần sau"
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Shortcut Today Button */}
           <button
             type="button"
-            onClick={handleCopyPreviousWeek}
-            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
-            title="Sao chép toàn bộ ca từ tuần trước sang tuần này"
+            onClick={handleGoCurrentWeek}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
+            title="Nhảy nhanh về tuần hiện tại"
           >
-            <Copy className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Sao chép tuần trước</span>
+            <Calendar className="w-3.5 h-3.5 text-blue-400" />
+            <span>Hôm nay</span>
           </button>
+        </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-400 pl-2 border-l border-slate-800">
-            <Filter className="w-3.5 h-3.5 text-blue-400" />
-            <span>Chức vụ:</span>
+        {/* Search & Position Filters */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* Search by Employee */}
+          <div className="relative flex-1 md:w-64">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Tìm tên, mã NV, chức vụ..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+            />
+          </div>
+
+          {/* Position / Department Filter */}
+          <div className="relative">
+            <Filter className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <select
               value={departmentFilter}
               onChange={e => setDepartmentFilter(e.target.value)}
-              className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+              className="bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-blue-500/50 appearance-none cursor-pointer"
             >
               <option value="ALL">Tất cả ({employees.length})</option>
               <option value="Bảo vệ">Bảo vệ</option>

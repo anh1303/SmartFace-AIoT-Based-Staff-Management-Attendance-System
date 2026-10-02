@@ -46,7 +46,8 @@ export function useAttendancePairs(
   employees: Employee[],
   workShifts: WorkShift[],
   attendance: AttendanceRecord[],
-  selectedDate: string,
+  startDate: string,
+  endDate: string,
   searchTerm: string,
   statusFilter: string,
   customOvertimeMap: Record<string, number>,
@@ -55,7 +56,8 @@ export function useAttendancePairs(
   return useMemo(() => {
     const targetShifts = workShifts.filter(shift => {
       if (shift.shift_type === 'OFF') return false;
-      if (selectedDate !== '' && shift.date !== selectedDate) return false;
+      if (startDate && shift.date < startDate) return false;
+      if (endDate && shift.date > endDate) return false;
       return true;
     });
 
@@ -222,7 +224,8 @@ export function useAttendancePairs(
     employees,
     workShifts,
     attendance,
-    selectedDate,
+    startDate,
+    endDate,
     searchTerm,
     statusFilter,
     customOvertimeMap,

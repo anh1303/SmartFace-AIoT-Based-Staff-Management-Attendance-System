@@ -2,6 +2,9 @@ import type { ErrorRequestHandler, RequestHandler } from 'express'
 import { ZodError } from 'zod'
 import { AppError } from '../common/AppError.js'
 import { errorResponse } from '../common/response.js'
+import { logger } from '../common/logger.js'
+
+const errorLogger = logger.child('ErrorHandler')
 export const notFound: RequestHandler = (req, _res, next) => next(new AppError(404, `Route ${req.method} ${req.originalUrl} was not found`))
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   if (error instanceof ZodError) {
@@ -36,6 +39,6 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     return errorResponse(res, 'Không tìm thấy bản ghi tương ứng trong CSDL', 404)
   }
 
-  console.error(error)
+  errorLogger.error('Unhandled internal server error:', error)
   return errorResponse(res, 'Internal server error', 500)
 }

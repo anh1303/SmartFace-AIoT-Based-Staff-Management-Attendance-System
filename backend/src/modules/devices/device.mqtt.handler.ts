@@ -5,6 +5,10 @@ import { emitDeviceEvent } from '../../sockets/device.gateway.js'
 import { emitAttendanceEvent } from '../../sockets/attendance.gateway.js'
 import * as deviceService from './device.service.js'
 import * as attendance from '../attendance/attendance.service.js'
+import { logger } from '../../common/logger.js'
+
+const mqttSecLogger = logger.child('MQTT:Security')
+const mqttHandlerLogger = logger.child('MQTT:Handler')
 
 export function createMqttDeviceSignature(deviceId: string, employeeId: string, timestamp: number): string {
   const message = `${deviceId}:${employeeId}:${timestamp}`
@@ -23,7 +27,7 @@ export function verifyMqttDeviceSignature(
   const MAX_TIME_DRIFT_MS = 5 * 60 * 1000
   const now = Date.now()
   if (Math.abs(now - Number(timestamp)) > MAX_TIME_DRIFT_MS) {
-    console.warn(`⚠️ [MQTT Security] Phát hiện Replay Attack hoặc lệch thời gian từ thiết bị ${deviceId}: ${now - Number(timestamp)}ms`)
+    mqttSecLogger.warn(`Phát hiện Replay Attack hoặc lệch thời gian từ thiết bị ${deviceId}: ${now - Number(timestamp)}ms`)
     return false
   }
 
@@ -76,7 +80,7 @@ export function registerDeviceMqttHandlers() {
         if (signature || env.NODE_ENV === 'production') {
           const isValid = verifyMqttDeviceSignature(deviceId, employeeId, timestamp, signature)
           if (!isValid) {
-            console.error(`❌ [MQTT Security] Gói tin check-in từ thiết bị '${deviceId}' bị TỪ CHỐI do chữ ký HMAC-SHA256 hoặc timestamp không hợp lệ!`)
+            mqttSecLogger.error(`Gói tin check-in từ thiết bị '${deviceId}' bị TỪ CHỐI do chữ ký HMAC-SHA256 hoặc timestamp không hợp lệ!`)
             return
           }
         }
@@ -90,7 +94,7 @@ export function registerDeviceMqttHandlers() {
         emitAttendanceEvent('checked-in', record)
       }
     } catch (error) {
-      console.error('MQTT message rejected:', error)
+      mqttHandlerLogger.error('MQTT message rejected:', error)
     }
   })
 }

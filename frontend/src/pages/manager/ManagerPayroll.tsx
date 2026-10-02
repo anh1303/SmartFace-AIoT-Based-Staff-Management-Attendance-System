@@ -12,10 +12,15 @@ import {
   Sparkles,
   Edit,
   Check,
-  DollarSign
+  DollarSign,
+  Search,
+  Filter
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { PayrollRecord } from '../../types';
+import { logger } from '../../utils/logger';
+
+const payrollLogger = logger.child('ManagerPayroll');
 
 export const ManagerPayroll: React.FC = () => {
   const {
@@ -35,6 +40,8 @@ export const ManagerPayroll: React.FC = () => {
   const [confirmFinalizeOpen, setConfirmFinalizeOpen] = useState(false);
   const [confirmUnlockOpen, setConfirmUnlockOpen] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('ALL');
 
   // Modal state for Bonus Penalty Policy
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
@@ -77,12 +84,34 @@ export const ManagerPayroll: React.FC = () => {
     selectedPeriod
   ])).sort().reverse();
 
-  // Filter records by selected period
-  const currentRecords = payroll.filter(p => p.period === selectedPeriod || p.payroll_period === selectedPeriod);
-  const isFinalized = currentRecords.length > 0 && currentRecords.every(p => p.status === 'FINALIZED');
+  // All records for the selected period (for status & total metrics)
+  const allPeriodRecords = payroll.filter(p => p.period === selectedPeriod || p.payroll_period === selectedPeriod);
+  const isFinalized = allPeriodRecords.length > 0 && allPeriodRecords.every(p => p.status === 'FINALIZED');
 
   // Compute metrics
-  const totalExpense = currentRecords.reduce((sum, r) => sum + (r.net_salary || 0), 0);
+  const totalExpense = allPeriodRecords.reduce((sum, r) => sum + (r.net_salary || 0), 0);
+
+  // Filter records by selected period, search term, and position/department
+  const currentRecords = allPeriodRecords.filter(p => {
+    const emp = employees.find(e => e.employee_id === p.employee_id);
+    const dept = emp?.department || p.department || '';
+    const pos = emp?.position || '';
+
+    if (departmentFilter !== 'ALL' && dept !== departmentFilter && pos !== departmentFilter) {
+      return false;
+    }
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      const matchName = (emp?.full_name || p.employee_name || '').toLowerCase().includes(term);
+      const matchId = (p.employee_id || '').toLowerCase().includes(term);
+      const matchDept = dept.toLowerCase().includes(term);
+      const matchPos = pos.toLowerCase().includes(term);
+      if (!matchName && !matchId && !matchDept && !matchPos) return false;
+    }
+
+    return true;
+  });
 
   const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5;
   const lateRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
@@ -131,14 +160,14 @@ export const ManagerPayroll: React.FC = () => {
       setIsCalculating(true);
       await generatePayroll(selectedPeriod);
     } catch (error: any) {
-      console.error('Lỗi khi tính toán bảng lương:', error);
+      payrollLogger.error('Lỗi khi tính toán bảng lương:', error);
     } finally {
       setIsCalculating(false);
     }
   };
 
   const handleExportCSV = () => {
-    if (currentRecords.length === 0) {
+    if (allPeriodRecords.length === 0) {
       showToast(`Kỳ ${selectedPeriod} chưa có dữ liệu bảng lương để xuất CSV!`, 'warning');
       return;
     }
@@ -156,7 +185,8 @@ export const ManagerPayroll: React.FC = () => {
       'Trạng Thái'
     ];
 
-    const rows = currentRecords.map(r => {
+    const recordsToExport = currentRecords.length > 0 ? currentRecords : allPeriodRecords;
+    const rows = recordsToExport.map(r => {
       const emp = employees.find(e => e.employee_id === r.employee_id);
       const name = emp?.full_name || r.employee_name || r.employee_id;
       const statusStr = r.status === 'FINALIZED' ? 'Đã Chốt' : 'Đang Soạn Thảo';
@@ -192,153 +222,160 @@ export const ManagerPayroll: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Bento Top Header */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
               Quản Lý Bảng Lương & Chi Trả
             </h1>
-            <span
-              className={`text-xs px-2.5 py-0.5 rounded-full font-mono font-medium border ${isFinalized
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                }`}
-            >
-              {isFinalized ? 'ĐÃ CHỐT SỔ' : 'ĐANG SOẠN THẢO'}
-            </span>
+
+            {/* Period Selector placed where yellow badge was */}
+            <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 shadow-inner">
+              <Calendar className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-xs text-slate-400 font-medium">Kỳ lương:</span>
+              <select
+                value={selectedPeriod}
+                onChange={e => setSelectedPeriod(e.target.value)}
+                className="bg-transparent text-xs text-white font-mono font-bold focus:outline-none cursor-pointer"
+              >
+                {availablePeriods.map(period => {
+                  const [year, month] = period.split('-');
+                  return (
+                    <option key={period} value={period} className="bg-slate-900">
+                      Tháng {month}/{year}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Chỉnh sửa các khoản phụ cấp, giảm trừ, số ngày công với nút xác nhận lưu minh bạch và phê duyệt chuyển lương.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Period Selector */}
-          <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-            <Calendar className="w-3.5 h-3.5 text-blue-400" />
-            <span className="text-xs text-slate-400">Kỳ lương:</span>
-            <select
-              value={selectedPeriod}
-              onChange={e => setSelectedPeriod(e.target.value)}
-              className="bg-transparent text-xs text-white font-mono font-bold focus:outline-none cursor-pointer"
+        {/* 3 Action Buttons Right-Aligned */}
+        <div className="flex flex-col items-start lg:items-end gap-2.5 shrink-0">
+          {/* Row 1: Tự động tính lương & Chốt lương */}
+          <div className="flex flex-wrap items-center justify-start lg:justify-end gap-2.5">
+            {/* Calculate / Generate Payroll Button */}
+            <button
+              type="button"
+              disabled={isCalculating || isFinalized}
+              onClick={handleCalculatePayroll}
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all active:scale-95 cursor-pointer"
+              title={isFinalized ? 'Bảng lương đã chốt sổ, hãy mở khóa để tính toán lại' : 'Tự động tính toán lại bảng lương từ dữ liệu chấm công mới nhất'}
             >
-              {availablePeriods.map(period => {
-                const [year, month] = period.split('-');
-                return (
-                  <option key={period} value={period} className="bg-slate-900">
-                    Tháng {month}/{year}
-                  </option>
-                );
-              })}
-            </select>
+              <Sparkles className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : 'text-amber-300'}`} />
+              <span>{isCalculating ? 'Đang tổng hợp...' : '⚡ Tự động tính lương kỳ này'}</span>
+            </button>
+
+            {/* Action Button: Finalize or Unlock */}
+            {isFinalized ? (
+              <button
+                type="button"
+                onClick={() => setConfirmUnlockOpen(true)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-colors cursor-pointer"
+              >
+                <Unlock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Mở khóa sửa bảng lương</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmFinalizeOpen(true)}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Chốt lương kỳ này</span>
+              </button>
+            )}
           </div>
 
-          {/* Calculate / Generate Payroll Button */}
-          <button
-            type="button"
-            disabled={isCalculating || isFinalized}
-            onClick={handleCalculatePayroll}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all active:scale-95"
-            title={isFinalized ? 'Bảng lương đã chốt sổ, hãy mở khóa để tính toán lại' : 'Tự động tính toán lại bảng lương từ dữ liệu chấm công mới nhất'}
-          >
-            <Sparkles className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : 'text-amber-300'}`} />
-            <span>{isCalculating ? 'Đang tổng hợp...' : '⚡ Tự động tính lương kỳ này'}</span>
-          </button>
-
-          {/* Action Button: Finalize or Unlock */}
-          {isFinalized ? (
+          {/* Row 2: Export CSV Button */}
+          <div className="flex items-center justify-start lg:justify-end w-full">
             <button
               type="button"
-              onClick={() => setConfirmUnlockOpen(true)}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700 transition-colors"
+              onClick={handleExportCSV}
+              className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              title="Xuất bảng lương chi tiết sang file CSV/Excel"
             >
-              <Unlock className="w-3.5 h-3.5 text-amber-400" />
-              <span>Mở khóa sửa bảng lương</span>
+              <Download className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Xuất Excel / CSV</span>
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmFinalizeOpen(true)}
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md transition-all"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Chốt lương kỳ này</span>
-            </button>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* 3 Bento Metric Cards with Equal Height (min-h-[140px] flex flex-col justify-between) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* 3 Bento Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         {/* Card 1: Mức thưởng tăng ca */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col justify-between min-h-[140px] group relative">
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col justify-between group relative">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Mức thưởng tăng ca</span>
-            <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Mức thưởng tăng ca</span>
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={handleOpenPolicyModal}
-                className="text-[11px] text-blue-400 hover:text-blue-300 underline font-medium"
+                className="text-[11px] text-blue-400 hover:text-blue-300 underline font-medium cursor-pointer"
               >
                 Thay đổi
               </button>
-              <Sparkles className="w-4 h-4 text-amber-400" />
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             </div>
           </div>
-          <div className="my-auto py-1 text-2xl font-bold font-mono text-amber-400">
+          <div className="pt-2 text-xl sm:text-2xl font-bold font-mono text-amber-400">
             {bonusPenalty?.overtime_rate ? (
               Number(bonusPenalty.overtime_rate) <= 10 ? (
-                <span>{bonusPenalty.overtime_rate}x <span className="text-sm font-normal text-slate-400">lương giờ</span></span>
+                <span>{bonusPenalty.overtime_rate}x <span className="text-xs font-normal text-slate-400">lương giờ</span></span>
               ) : (
-                <span>{Number(bonusPenalty.overtime_rate).toLocaleString('vi-VN')} <span className="text-sm font-normal text-slate-400">₫/h</span></span>
+                <span>{Number(bonusPenalty.overtime_rate).toLocaleString('vi-VN')} <span className="text-xs font-normal text-slate-400">₫/h</span></span>
               )
             ) : (
-              <span>1.5x <span className="text-sm font-normal text-slate-400">lương giờ</span></span>
+              <span>1.5x <span className="text-xs font-normal text-slate-400">lương giờ</span></span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500">Áp dụng cho giờ làm ngoài khung ca chính</p>
         </div>
 
         {/* Card 2: Mức phạt đi trễ / về sớm */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col justify-between min-h-[140px] group relative">
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col justify-between group relative">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Mức phạt đi trễ / về sớm</span>
-            <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Mức phạt đi trễ / về sớm</span>
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={handleOpenPolicyModal}
-                className="text-[11px] text-blue-400 hover:text-blue-300 underline font-medium"
+                className="text-[11px] text-blue-400 hover:text-blue-300 underline font-medium cursor-pointer"
               >
                 Thay đổi
               </button>
-              <AlertCircle className="w-4 h-4 text-rose-400" />
+              <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
             </div>
           </div>
-          <div className="my-auto py-1 text-2xl font-bold font-mono text-rose-400">
+          <div className="pt-2 text-xl sm:text-2xl font-bold font-mono text-rose-400">
             {bonusPenalty?.late_early_penalty ? (
               Number(bonusPenalty.late_early_penalty) <= 10 ? (
-                <span>{bonusPenalty.late_early_penalty}x <span className="text-sm font-normal text-slate-400">lương giờ</span></span>
+                <span>{bonusPenalty.late_early_penalty}x <span className="text-xs font-normal text-slate-400">lương giờ</span></span>
               ) : (
-                <span>{Number(bonusPenalty.late_early_penalty).toLocaleString('vi-VN')} <span className="text-sm font-normal text-slate-400">₫/h</span></span>
+                <span>{Number(bonusPenalty.late_early_penalty).toLocaleString('vi-VN')} <span className="text-xs font-normal text-slate-400">₫/h</span></span>
               )
             ) : (
-              <span>50.000 <span className="text-sm font-normal text-slate-400">₫/h</span></span>
+              <span>50.000 <span className="text-xs font-normal text-slate-400">₫/h</span></span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500">Khấu trừ tự động vào bảng lương cuối kỳ</p>
         </div>
 
         {/* Card 3: Trạng thái kỳ lương */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col justify-between min-h-[140px]">
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Trạng thái kỳ lương</span>
+            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Trạng thái kỳ lương</span>
             {isFinalized ? (
-              <Lock className="w-4 h-4 text-emerald-400" />
+              <Lock className="w-3.5 h-3.5 text-emerald-400" />
             ) : (
-              <Unlock className="w-4 h-4 text-amber-400" />
+              <Unlock className="w-3.5 h-3.5 text-amber-400" />
             )}
           </div>
-          <div className="my-auto py-1 text-xl font-bold font-mono flex items-center gap-2 text-white">
+          <div className="pt-1.5 pb-0.5 text-base sm:text-lg font-bold font-mono flex items-center gap-2 text-white">
             {isFinalized ? (
               <span className="text-emerald-400">Đã niêm phong (Khóa)</span>
             ) : (
@@ -346,27 +383,52 @@ export const ManagerPayroll: React.FC = () => {
             )}
           </div>
           <p className="text-[11px] text-slate-400">
-            {currentRecords.length} nhân sự • Quỹ lương: <span className="font-mono text-white font-medium">{totalExpense.toLocaleString('vi-VN')} ₫</span>
+            {allPeriodRecords.length} nhân sự • Tổng lương tháng này: <span className="font-mono text-white font-medium">{totalExpense.toLocaleString('vi-VN')} ₫</span>
           </p>
         </div>
       </div>
 
-      {/* Bento Table with Explicit Columns: Nhân sự, Lương theo giờ, Tổng giờ làm, Số giờ tăng ca, Số giờ đi trễ/về sớm, Phụ cấp, Thực lĩnh, Chỉnh sửa */}
+      {/* Bento Table with Search & Position Filter */}
       <div className="rounded-3xl bg-slate-900 border border-slate-800 overflow-hidden shadow-xl">
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-sm font-bold text-white font-heading">
               Chi tiết bảng lương từng nhân sự - Kỳ {selectedPeriod}
             </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Hiển thị {currentRecords.length} / {allPeriodRecords.length} nhân sự
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-semibold flex items-center gap-1.5 transition-colors"
-          >
-            <Download className="w-3.5 h-3.5 text-blue-400" />
-            <span>Xuất Excel / CSV</span>
-          </button>
+
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {/* Search by Employee */}
+            <div className="relative flex-1 md:w-64">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Tìm tên, mã NV, chức vụ..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+              />
+            </div>
+
+            {/* Position / Department Filter */}
+            <div className="relative">
+              <Filter className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                value={departmentFilter}
+                onChange={e => setDepartmentFilter(e.target.value)}
+                className="bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500/50 appearance-none cursor-pointer"
+              >
+                <option value="ALL">Tất cả chức vụ</option>
+                <option value="Bảo vệ">Bảo vệ</option>
+                <option value="Nhân viên">Nhân viên</option>
+                <option value="Thu ngân">Thu ngân</option>
+                <option value="Quản lý">Quản lý</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

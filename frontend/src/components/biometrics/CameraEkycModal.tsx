@@ -10,6 +10,10 @@ import {
   Check,
   Info
 } from 'lucide-react';
+import { logger } from '../../utils/logger';
+
+const cameraLogger = logger.child('CameraEkyc');
+
 
 export interface CapturedFaceSample {
   id: string;
@@ -117,12 +121,12 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
           setStreamReady(true);
         } catch {
           videoRef.current.onloadedmetadata = () => {
-            videoRef.current?.play().then(() => setStreamReady(true)).catch(console.error);
+            videoRef.current?.play().then(() => setStreamReady(true)).catch((e) => cameraLogger.warn('Video play deferred catch:', e));
           };
         }
       }
     } catch (err: any) {
-      console.error('Camera access error:', err);
+      cameraLogger.error('Camera access error:', err);
       let msg = 'Không thể mở Camera. Vui lòng cấp quyền truy cập webcam trên trình duyệt.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         msg = 'Quyền truy cập Camera bị từ chối. Hãy nhấp vào biểu tượng ổ khóa cạnh URL để cấp quyền.';
@@ -138,7 +142,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
     videoRef.current = node;
     if (node && streamRef.current) {
       node.srcObject = streamRef.current;
-      node.play().then(() => setStreamReady(true)).catch(console.error);
+      node.play().then(() => setStreamReady(true)).catch((e) => cameraLogger.warn('Video node play catch:', e));
     }
   }, []);
 

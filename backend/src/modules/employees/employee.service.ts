@@ -252,37 +252,68 @@ export async function update(
 }
 
 /**
- * 5. Soft-delete nhân viên: chuyển trạng thái sang TERMINATED và vô hiệu hóa tài khoản User trong transaction
+ * 5. Xóa vĩnh viễn nhân viên khỏi cơ sở dữ liệu (Hard-delete toàn bộ quan hệ liên quan trong transaction)
  */
-export async function terminate(idOrCode: string, actorUserId?: string) {
+export async function remove(idOrCode: string, actorUserId?: string) {
   const existing = await prisma.employee.findFirst({
     where: buildIdOrCodeWhere(idOrCode),
   })
-  if (!existing) throw new AppError(404, 'Employee not found')
+  if (!existing) throw new AppError(404, 'Không tìm thấy nhân viên cần xóa')
 
   return prisma.$transaction(async (tx) => {
-    await tx.employee.update({
-      where: { id: existing.id },
-      data: { status: 'TERMINATED' },
+    // 1. Xóa dữ liệu sinh trắc học Face Embeddings
+    await tx.face_embeddings.deleteMany({
+      where: { employee_id: existing.id },
     })
 
+    // 2. Xóa lịch sử chấm công attendance_logs
+    await tx.attendance_logs.deleteMany({
+      where: { employee_id: existing.id },
+    })
+
+    // 3. Xóa tổng hợp công hàng ngày daily_attendance_summary
+    await tx.daily_attendance_summary.deleteMany({
+      where: { employee_id: existing.id },
+    })
+
+    // 4. Xóa ca làm việc employee_shifts
+    await tx.employee_shifts.deleteMany({
+      where: { employee_id: existing.id },
+    })
+
+    // 5. Xóa dữ liệu bảng lương payroll_records
+    await tx.payrollRecord.deleteMany({
+      where: { employeeId: existing.id },
+    })
+
+    // 6. Xóa bản ghi nhân viên
+    await tx.employee.delete({
+      where: { id: existing.id },
+    })
+
+    // 7. Xóa tài khoản đăng nhập User liên kết (nếu có)
     if (existing.user_id) {
-      await tx.user.update({
+      await tx.user.delete({
         where: { id: existing.user_id },
-        data: { is_active: false },
       }).catch(() => { })
     }
 
+    // 8. Ghi log kiểm toán hành động xóa vĩnh viễn
     await logAction({
       userId: actorUserId,
-      action: 'TERMINATE_EMPLOYEE',
+      action: 'DELETE_EMPLOYEE_PERMANENT',
       target_table: 'employees',
       record_id: existing.id,
-      old_values: { status: existing.status },
-      new_values: { status: 'TERMINATED', user_disabled: true },
+      old_values: {
+        employee_code: existing.employee_code,
+        full_name: existing.full_name,
+        email: existing.email,
+        departmentId: existing.departmentId,
+      },
+      new_values: { deleted_permanently: true },
     })
   })
 }
 
-// Giữ alias remove để đảm bảo tương thích ngược toàn bộ router/controller
-export const remove = terminate
+// Alias terminate để đảm bảo tương thích
+export const terminate = remove

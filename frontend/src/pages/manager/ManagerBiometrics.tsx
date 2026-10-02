@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
@@ -19,11 +19,17 @@ import {
   Trash2,
   Plus,
   Layers,
+  Edit,
+  Search,
+  Filter,
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { CameraEkycModal, CapturedFaceSample } from '../../components/biometrics/CameraEkycModal';
-import { enrollFaceImagesApi, EnrollFaceResult } from '../../api/biometricApi';
+import { enrollFaceImagesApi, deleteEmployeeBiometricsApi, EnrollFaceResult } from '../../api/biometricApi';
 import { Employee } from '../../types';
+import { logger } from '../../utils/logger';
+
+const biometricLogger = logger.child('ManagerBiometrics');
 
 export interface FacePhotoItem {
   id: string;
@@ -64,6 +70,9 @@ export const ManagerBiometrics: React.FC = () => {
   const [fingerprintStep, setFingerprintStep] = useState<'IDLE' | 'SENDING' | 'WAITING_TOUCH' | 'CAPTURED' | 'VERIFIED'>('IDLE');
   const [fingerQualityScore, setFingerQualityScore] = useState<number | null>(null);
   const [fingerConfirmModal, setFingerConfirmModal] = useState<boolean>(false);
+
+  // Biometrics Management Popup Modal state for a specific employee
+  const [manageModalEmployee, setManageModalEmployee] = useState<Employee | null>(null);
 
   // Reset photos & biometric state whenever selected employee changes
   useEffect(() => {
@@ -163,7 +172,7 @@ export const ManagerBiometrics: React.FC = () => {
         'success'
       );
     } catch (err: any) {
-      console.error('Error updating face biometrics:', err);
+      biometricLogger.error('Error updating face biometrics:', err);
       showToast(`Lỗi khi cập nhật sinh trắc học: ${err.message || 'Thao tác không thành công'}`, 'error');
     } finally {
       setAnalyzingFace(false);
@@ -199,10 +208,88 @@ export const ManagerBiometrics: React.FC = () => {
     showToast(`Đã lưu mẫu vân tay ${selectedFinger} cho ${currentEmp.full_name} từ ${selectedDevice}!`, 'success');
   };
 
-  // Metrics
-  const totalEmployees = employees.length;
-  const faceEnrolledCount = employees.filter(e => e.face_enrolled).length;
-  const fingerEnrolledCount = employees.filter(e => e.fingerprint_enrolled).length;
+  // Resolve current employee selected for management in popup
+  const currentManageEmp = manageModalEmployee
+    ? employees.find(e => e.employee_id === manageModalEmployee.employee_id) || manageModalEmployee
+    : null;
+
+  // Handler to delete Face ID for an employee
+  const handleDeleteFaceId = async (emp: Employee) => {
+    try {
+      await deleteEmployeeBiometricsApi(emp.employee_id);
+    } catch (err: any) {
+      biometricLogger.warn('Biometric delete info:', err);
+    }
+    updateEmployee(emp.employee_id, {
+      face_enrolled: false
+    });
+    showToast(`Đã xóa dữ liệu Face ID của nhân viên ${emp.full_name} (${emp.employee_id}) thành công!`, 'success');
+  };
+
+  // Handler to delete Fingerprint for an employee
+  const handleDeleteFingerprint = (emp: Employee) => {
+    updateEmployee(emp.employee_id, {
+      fingerprint_enrolled: false
+    });
+    showToast(`Đã xóa dữ liệu vân tay của nhân viên ${emp.full_name} (${emp.employee_id}) thành công!`, 'success');
+  };
+
+  // Handler to start editing Face ID from popup
+  const handleStartEditFace = (emp: Employee) => {
+    setSelectedEmpId(emp.employee_id);
+    setSearchParams({ employee_id: emp.employee_id });
+    setActiveTab('FACE');
+    setManageModalEmployee(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Handler to start Camera eKYC from popup
+  const handleStartCameraEkycFromModal = (emp: Employee) => {
+    setSelectedEmpId(emp.employee_id);
+    setSearchParams({ employee_id: emp.employee_id });
+    setActiveTab('FACE');
+    setManageModalEmployee(null);
+    setIsEkycModalOpen(true);
+  };
+
+  // Handler to start editing Fingerprint from popup
+  const handleStartEditFingerprint = (emp: Employee) => {
+    setSelectedEmpId(emp.employee_id);
+    setSearchParams({ employee_id: emp.employee_id });
+    setActiveTab('FINGERPRINT');
+    setManageModalEmployee(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Table search & filter states
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [positionFilter, setPositionFilter] = useState<string>('ALL');
+
+  const positions = useMemo(() => {
+    const set = new Set<string>();
+    employees.forEach(e => {
+      const pos = e.position || e.department;
+      if (pos) set.add(pos);
+    });
+    return Array.from(set);
+  }, [employees]);
+
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(emp => {
+      const q = searchTerm.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        emp.full_name.toLowerCase().includes(q) ||
+        emp.employee_id.toLowerCase().includes(q) ||
+        (emp.position && emp.position.toLowerCase().includes(q)) ||
+        (emp.department && emp.department.toLowerCase().includes(q));
+
+      const pos = emp.position || emp.department;
+      const matchPosition = positionFilter === 'ALL' || pos === positionFilter;
+
+      return matchSearch && matchPosition;
+    });
+  }, [employees, searchTerm, positionFilter]);
 
   return (
     <div className="space-y-6">
@@ -218,35 +305,6 @@ export const ManagerBiometrics: React.FC = () => {
             Ghi nhận vector 512-D khuôn mặt từ hình ảnh hoặc phát tín hiệu IoT tới thiết bị FaceCam/Cảm biến vân tay FAP30.
           </p>
         </div>
-
-      </div>
-
-      {/* 3 Bento Telemetry Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors">
-          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Đã đăng ký Face ID</span>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold font-mono text-blue-400">
-              {faceEnrolledCount}/{totalEmployees}
-            </span>
-            <span className="text-xs font-mono text-slate-500">
-              ({totalEmployees ? Math.round((faceEnrolledCount / totalEmployees) * 100) : 0}%)
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between hover:border-slate-700 transition-colors">
-          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Đã đăng ký Vân tay</span>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-bold font-mono text-green-400">
-              {fingerEnrolledCount}/{totalEmployees}
-            </span>
-            <span className="text-xs font-mono text-slate-500">
-              ({totalEmployees ? Math.round((fingerEnrolledCount / totalEmployees) * 100) : 0}%)
-            </span>
-          </div>
-        </div>
-
       </div>
 
       {/* Main Enrollment Workspace */}
@@ -366,17 +424,9 @@ export const ManagerBiometrics: React.FC = () => {
                       <ScanFace className="w-5 h-5" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-white font-heading">
-                          Cập Nhật Dữ Liệu Khuôn Mặt
-                        </h3>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${uploadedPhotos.length >= 3
-                            ? 'bg-green-500/10 text-green-400 border-green-500/30'
-                            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                          }`}>
-                          {uploadedPhotos.length >= 3 ? `Đã đủ ${uploadedPhotos.length} ảnh` : `${uploadedPhotos.length}/3 ảnh (Tối thiểu 3)`}
-                        </span>
-                      </div>
+                      <h3 className="text-sm font-bold text-white font-heading">
+                        Cập Nhật Dữ Liệu Khuôn Mặt
+                      </h3>
                     </div>
                   </div>
 
@@ -648,18 +698,44 @@ export const ManagerBiometrics: React.FC = () => {
 
       {/* Master Employee Biometric Status Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3">
             <h2 className="text-base font-bold text-white font-heading">
               Bảng Tổng Hợp Trạng Thái Sinh Trắc Học Nhân Viên
             </h2>
-            <p className="text-xs text-slate-400">
-              Kiểm tra mức độ hoàn thiện dữ liệu sinh trắc học trước khi phân bổ vào hệ thống Edge Cams.
-            </p>
+            <span className="px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-blue-400 font-mono text-xs font-bold shadow-sm">
+              {filteredEmployees.length} / {employees.length}
+            </span>
           </div>
-          <span className="text-xs font-mono text-slate-400">
-            Tổng cộng: <strong className="text-white">{employees.length}</strong> nhân sự
-          </span>
+
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {/* Search by Employee */}
+            <div className="relative flex-1 md:w-64">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Tìm tên, mã NV..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+              />
+            </div>
+
+            {/* Position Filter */}
+            <div className="relative">
+              <Filter className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                value={positionFilter}
+                onChange={e => setPositionFilter(e.target.value)}
+                className="bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500/50 appearance-none cursor-pointer"
+              >
+                <option value="ALL">Tất cả chức vụ</option>
+                {positions.map(pos => (
+                  <option key={pos} value={pos}>{pos}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -675,51 +751,56 @@ export const ManagerBiometrics: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50 text-slate-300">
-              {employees.map(emp => (
-                <tr key={emp.employee_id} className="hover:bg-slate-800/40 transition-colors">
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={emp.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
-                        alt={emp.full_name}
-                        className="w-8 h-8 rounded-xl object-cover border border-slate-700"
-                      />
-                      <span className="font-semibold text-white">{emp.full_name}</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 font-mono text-blue-400">{emp.employee_id}</td>
-                  <td className="py-3 px-4 text-slate-400">{emp.department}</td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${emp.face_enrolled
-                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                      }`}>
-                      {emp.face_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${emp.fingerprint_enrolled
-                      ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                      }`}>
-                      {emp.fingerprint_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedEmpId(emp.employee_id);
-                        setSearchParams({ employee_id: emp.employee_id });
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition-colors cursor-pointer"
-                    >
-                      Chọn để cập nhật
-                    </button>
+              {filteredEmployees.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-slate-500">
+                    Không tìm thấy nhân sự phù hợp với bộ lọc
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredEmployees.map(emp => (
+                  <tr key={emp.employee_id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={emp.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
+                          alt={emp.full_name}
+                          className="w-8 h-8 rounded-xl object-cover border border-slate-700"
+                        />
+                        <span className="font-semibold text-white">{emp.full_name}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 font-mono text-blue-400">{emp.employee_id}</td>
+                    <td className="py-3 px-4 text-slate-400">{emp.position || emp.department}</td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${emp.face_enrolled
+                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                        }`}>
+                        {emp.face_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${emp.fingerprint_enrolled
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                        }`}>
+                        {emp.fingerprint_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setManageModalEmployee(emp)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
+                      >
+                        <Edit className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Sửa</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -909,6 +990,145 @@ export const ManagerBiometrics: React.FC = () => {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Biometrics Management & Editing Modal */}
+      <Modal
+        isOpen={Boolean(manageModalEmployee)}
+        onClose={() => setManageModalEmployee(null)}
+        title="Quản Lý Sinh Trắc Học Nhân Viên"
+        subtitle={`Nhân sự: ${currentManageEmp?.full_name} (${currentManageEmp?.employee_id})`}
+        maxWidth="lg"
+      >
+        {currentManageEmp && (
+          <div className="space-y-5">
+            {/* Employee Profile Header Card */}
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <img
+                  src={currentManageEmp.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"}
+                  alt={currentManageEmp.full_name}
+                  className="w-12 h-12 rounded-xl object-cover border border-slate-700"
+                />
+                <div>
+                  <h4 className="text-sm font-bold text-white">{currentManageEmp.full_name}</h4>
+                  <p className="text-xs font-mono text-blue-400">{currentManageEmp.employee_id}</p>
+                  <p className="text-[11px] text-slate-400">{currentManageEmp.department} • {currentManageEmp.position}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 1: Face ID Management */}
+            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                    <ScanFace className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-white uppercase tracking-wider">Khuôn mặt (Face ID)</h5>
+                    <p className="text-[11px] text-slate-400">Nhận diện khuôn mặt 512-D qua camera AIoT</p>
+                  </div>
+                </div>
+
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${
+                  currentManageEmp.face_enrolled
+                    ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                }`}>
+                  {currentManageEmp.face_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={() => handleStartEditFace(currentManageEmp)}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{currentManageEmp.face_enrolled ? 'Chỉnh sửa / Tải ảnh mới' : 'Đăng ký tải ảnh Face ID'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleStartCameraEkycFromModal(currentManageEmp)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Chụp bằng Camera eKYC</span>
+                </button>
+
+                {currentManageEmp.face_enrolled && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteFaceId(currentManageEmp)}
+                    className="px-3.5 py-2 rounded-xl bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Xóa Face ID</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Section 2: Fingerprint Management */}
+            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-400">
+                    <Fingerprint className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-white uppercase tracking-wider">Vân tay (FAP30)</h5>
+                    <p className="text-[11px] text-slate-400">Ghi nhận mẫu vân tay quang học 500 DPI qua IoT</p>
+                  </div>
+                </div>
+
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${
+                  currentManageEmp.fingerprint_enrolled
+                    ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                }`}>
+                  {currentManageEmp.fingerprint_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={() => handleStartEditFingerprint(currentManageEmp)}
+                  className="px-3.5 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                >
+                  <Radio className="w-3.5 h-3.5" />
+                  <span>{currentManageEmp.fingerprint_enrolled ? 'Chỉnh sửa / Lấy lại mẫu IoT' : 'Ghi nhận mẫu vân tay IoT'}</span>
+                </button>
+
+                {currentManageEmp.fingerprint_enrolled && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteFingerprint(currentManageEmp)}
+                    className="px-3.5 py-2 rounded-xl bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Xóa Vân tay</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-3 border-t border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setManageModalEmployee(null)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
     </div>

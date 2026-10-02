@@ -4,11 +4,12 @@ export interface EmployeePairExportItem {
   events: Array<{ time: string; methodLabel: string; device_id: string; statusText: string }>;
   lateEarlyStr?: string;
   overtimeStr?: string;
+  date?: string;
 }
 
 export const exportAttendanceToCSV = (
   employeePairs: EmployeePairExportItem[],
-  selectedDate: string,
+  dateLabel: string,
   showToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void
 ) => {
   const headers = [
@@ -36,12 +37,13 @@ export const exportAttendanceToCSV = (
     const checkOut = item.events[1];
     const lateEarlyStr = item.lateEarlyStr || '00:00:00';
     const overtimeStr = item.overtimeStr || '00:00:00';
+    const rowDate = item.date || dateLabel;
 
     rows.push([
       `"${emp.employee_id}"`,
       `"${emp.full_name}"`,
       `"${emp.department}"`,
-      `"${selectedDate}"`,
+      `"${rowDate}"`,
       `"${shift.name}"`,
       `"${shift.timeRange}"`,
       `"CHECK_IN"`,
@@ -57,7 +59,7 @@ export const exportAttendanceToCSV = (
       `"${emp.employee_id}"`,
       `"${emp.full_name}"`,
       `"${emp.department}"`,
-      `"${selectedDate}"`,
+      `"${rowDate}"`,
       `"${shift.name}"`,
       `"${shift.timeRange}"`,
       `"CHECK_OUT"`,
@@ -75,9 +77,10 @@ export const exportAttendanceToCSV = (
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `BaoCaoChamCong_${selectedDate}.csv`;
+  const safeFilenameDate = dateLabel.replace(/[^\w.-]/g, '_');
+  a.download = `BaoCaoChamCong_${safeFilenameDate}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  showToast(`Đã xuất báo cáo CSV thành công cho ngày ${selectedDate}!`, 'success');
+  showToast(`Đã xuất báo cáo CSV thành công (${dateLabel})!`, 'success');
 };

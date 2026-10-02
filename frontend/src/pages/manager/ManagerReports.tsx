@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { getTodayVNString } from '../../utils/dateUtils';
+import { getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
 import {
   BarChart3,
   Download,
@@ -37,6 +37,45 @@ export const ManagerReports: React.FC = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportType, setExportType] = useState<'attendance' | 'payroll' | 'employees'>('attendance');
 
+  // Date Range State
+  const [startDate, setStartDate] = useState<string>(() => getTodayVNString());
+  const [endDate, setEndDate] = useState<string>(() => getTodayVNString());
+
+  const handleStartDateChange = (newStart: string) => {
+    if (!newStart) return;
+    setStartDate(newStart);
+    // Logic tránh chọn ngày bắt đầu lớn hơn ngày kết thúc
+    if (endDate && newStart > endDate) {
+      setEndDate(newStart);
+    }
+  };
+
+  const handleEndDateChange = (newEnd: string) => {
+    if (!newEnd) return;
+    setEndDate(newEnd);
+    // Logic tránh chọn ngày kết thúc nhỏ hơn ngày bắt đầu
+    if (startDate && newEnd < startDate) {
+      setStartDate(newEnd);
+    }
+  };
+
+  const handleSelectToday = () => {
+    const today = getTodayVNString();
+    setStartDate(today);
+    setEndDate(today);
+  };
+
+  const isTodaySelected = startDate === getTodayVNString() && endDate === getTodayVNString();
+  const isSameDay = startDate === endDate;
+
+  // Filter attendance logs by date range [startDate 00:00:00 -> endDate 23:59:59]
+  const filteredAttendance = attendance.filter(a => {
+    const logDate = formatVNDateISO(a.timestamp);
+    if (startDate && logDate < startDate) return false;
+    if (endDate && logDate > endDate) return false;
+    return true;
+  });
+
   // Dynamic Payroll Trend Data by Period
   const periodsMap: Record<string, number> = {};
   payroll.forEach(p => {
@@ -52,10 +91,10 @@ export const ManagerReports: React.FC = () => {
   }));
 
   // Dynamic Method Breakdown from Attendance Logs
-  const totalLogs = attendance.length;
-  const faceLogs = attendance.filter(a => a.method === 'FACE').length;
-  const fpLogs = attendance.filter(a => a.method === 'FINGERPRINT').length;
-  const manualLogs = attendance.filter(a => a.method === 'MANUAL').length;
+  const totalLogs = filteredAttendance.length;
+  const faceLogs = filteredAttendance.filter(a => a.method === 'FACE').length;
+  const fpLogs = filteredAttendance.filter(a => a.method === 'FINGERPRINT').length;
+  const manualLogs = filteredAttendance.filter(a => a.method === 'MANUAL').length;
 
   const methodBreakdown = [
     {
@@ -132,7 +171,7 @@ export const ManagerReports: React.FC = () => {
 
   // Dynamic Leaderboard from attendance logs
   const empStats = employees.map(emp => {
-    const empAtt = attendance.filter(a => a.employee_id === emp.employee_id);
+    const empAtt = filteredAttendance.filter(a => a.employee_id === emp.employee_id);
     const totalPunches = empAtt.length;
     const onTimePunches = empAtt.filter(a => (a.punctuality || (a.status === 'VALID' ? 'ON_TIME' : a.status)) === 'ON_TIME').length;
     const latePunches = totalPunches - onTimePunches;
@@ -190,7 +229,9 @@ export const ManagerReports: React.FC = () => {
         `"${stat.badge}"`
       ]);
 
-      fileName = `Bao_cao_tong_hop_chuyen_can_${getTodayVNString()}.csv`;
+      fileName = isSameDay
+        ? `Bao_cao_tong_hop_chuyen_can_${startDate}.csv`
+        : `Bao_cao_tong_hop_chuyen_can_${startDate}_den_${endDate}.csv`;
     } else if (exportType === 'payroll') {
       // Option 2: Payroll Expense Report
       headers = [
@@ -291,6 +332,71 @@ export const ManagerReports: React.FC = () => {
           <Download className="w-4 h-4" />
           <span>Xuất báo cáo CSV</span>
         </button>
+      </div>
+
+      {/* Date Range Toolbar */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        {/* Date Range Pickers: Từ ngày - Đến ngày */}
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+          {/* Từ ngày */}
+          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-cyan-500/60 transition-colors">
+            <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">Từ ngày:</span>
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <input
+                type="date"
+                value={startDate}
+                max={endDate || undefined}
+                onChange={(e) => handleStartDateChange(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <span className="text-slate-500 font-semibold text-xs hidden sm:inline">-</span>
+
+          {/* Đến ngày */}
+          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-cyan-500/60 transition-colors">
+            <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">Đến ngày:</span>
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <input
+                type="date"
+                value={endDate}
+                min={startDate || undefined}
+                onChange={(e) => handleEndDateChange(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Nút Hôm nay */}
+          <button
+            type="button"
+            onClick={handleSelectToday}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              isTodaySelected
+                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
+            }`}
+          >
+            Hôm nay
+          </button>
+        </div>
+
+        {/* Thông tin thống kê theo khoảng ngày */}
+        <div className="flex items-center gap-3 text-xs text-slate-400">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60 font-mono text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>
+              {isSameDay
+                ? `Ngày: ${startDate}`
+                : `Khoảng: ${startDate} → ${endDate}`}
+            </span>
+            <span className="text-slate-500">|</span>
+            <span className="text-cyan-400 font-bold">{filteredAttendance.length} lượt chấm công</span>
+          </div>
+        </div>
       </div>
 
       {/* Bento Charts Grid */}

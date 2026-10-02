@@ -14,21 +14,23 @@ import { exportAttendanceToCSV } from '../../features/attendance-monitor/csvExpo
 export const ManagerAttendanceMonitor: React.FC = () => {
   const { attendance, employees, workShifts, showToast } = useApp();
 
-  const [selectedDate, setSelectedDate] = useState<string>(getTodayVNString());
+  const [startDate, setStartDate] = useState<string>(() => getTodayVNString());
+  const [endDate, setEndDate] = useState<string>(() => getTodayVNString());
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
   const { devices } = useDevices();
   const { isDateLocked, toggleLock } = useAttendanceLocks();
-  const { customOvertimeMap, customLateEarlyMap, adjustAttendance } = useAttendanceSummaries(selectedDate);
+  const { customOvertimeMap, customLateEarlyMap, adjustAttendance } = useAttendanceSummaries(startDate);
 
-  const isCurrentDateLocked = isDateLocked(selectedDate);
+  const isCurrentDateLocked = isDateLocked(startDate) || (startDate !== endDate && isDateLocked(endDate));
 
   const employeePairs = useAttendancePairs(
     employees,
     workShifts,
     attendance,
-    selectedDate,
+    startDate,
+    endDate,
     searchTerm,
     statusFilter,
     customOvertimeMap,
@@ -76,8 +78,11 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   };
 
   const handleToggleLock = () => {
-    if (!selectedDate) return;
-    toggleLock(selectedDate, !isCurrentDateLocked);
+    if (!startDate) return;
+    toggleLock(startDate, !isCurrentDateLocked);
+    if (startDate !== endDate) {
+      toggleLock(endDate, !isCurrentDateLocked);
+    }
   };
 
   const handleExportCSV = () => {
@@ -85,7 +90,8 @@ export const ManagerAttendanceMonitor: React.FC = () => {
       showToast('Nút chỉ bật sau khi đã chốt ca ngày đang chọn', 'warning');
       return;
     }
-    exportAttendanceToCSV(employeePairs, selectedDate, showToast);
+    const dateLabel = startDate === endDate ? startDate : `${startDate}_den_${endDate}`;
+    exportAttendanceToCSV(employeePairs, dateLabel, showToast);
   };
 
   const handleSaveAdjustments = async (payload: {
@@ -105,8 +111,10 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   return (
     <div className="space-y-6">
       <AttendanceFilters
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
+        startDate={startDate}
+        setStartDate={setStartDate}
+        endDate={endDate}
+        setEndDate={setEndDate}
         isCurrentDateLocked={isCurrentDateLocked}
         onToggleLock={handleToggleLock}
         onExportCSV={handleExportCSV}
@@ -120,7 +128,8 @@ export const ManagerAttendanceMonitor: React.FC = () => {
 
       <AttendanceTable
         employeePairs={employeePairs}
-        selectedDate={selectedDate}
+        startDate={startDate}
+        endDate={endDate}
         onOpenEditModal={handleOpenEditModal}
       />
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
@@ -16,9 +16,12 @@ import {
   Building2,
   Lock,
   Briefcase,
+  AlertTriangle,
   X
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
+import { PositionManagementModal } from '../../components/employees/PositionManagementModal';
+import { PositionItem, fetchPositionsApi } from '../../api/positionApi';
 import { Employee } from '../../types';
 
 function getNextEmployeeId(employeesList: Employee[]): string {
@@ -34,7 +37,7 @@ function getNextEmployeeId(employeesList: Employee[]): string {
 }
 
 export const ManagerEmployeeList: React.FC = () => {
-  const { employees, addEmployee, updateEmployee, toggleEmployeeStatus, showToast } = useApp();
+  const { employees, addEmployee, updateEmployee, deleteEmployee, toggleEmployeeStatus, showToast } = useApp();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const querySearch = searchParams.get('search') || '';
@@ -42,6 +45,37 @@ export const ManagerEmployeeList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState(querySearch);
   const [departmentFilter, setDepartmentFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Position Management Modal State
+  const [positionModalOpen, setPositionModalOpen] = useState(false);
+  const [dbPositions, setDbPositions] = useState<PositionItem[]>([]);
+
+  const loadDbPositions = async () => {
+    try {
+      const data = await fetchPositionsApi();
+      setDbPositions(data);
+    } catch {
+      // Handled gracefully
+    }
+  };
+
+  useEffect(() => {
+    loadDbPositions();
+  }, []);
+
+  const positionOptions = useMemo(() => {
+    const list = dbPositions.map(p => p.name);
+    employees.forEach(e => {
+      const pos = e.department || e.position;
+      if (pos && !list.includes(pos)) {
+        list.push(pos);
+      }
+    });
+    if (list.length === 0) {
+      return ['Bảo vệ', 'Nhân viên', 'Thu ngân', 'Quản lý'];
+    }
+    return list;
+  }, [dbPositions, employees]);
 
   useEffect(() => {
     if (querySearch) {
@@ -53,6 +87,7 @@ export const ManagerEmployeeList: React.FC = () => {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
   const [confirmStatusEmployee, setConfirmStatusEmployee] = useState<Employee | null>(null);
+  const [confirmDeleteEmployee, setConfirmDeleteEmployee] = useState<Employee | null>(null);
 
   // Form state for Add
   const [newEmp, setNewEmp] = useState(() => ({
@@ -144,23 +179,31 @@ export const ManagerEmployeeList: React.FC = () => {
             <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
               Quản Lý Danh Sách Nhân Sự
             </h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-mono font-medium border border-blue-500/20">
-              {employees.length} NHÂN SỰ
-            </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Quản lý hồ sơ nhân viên, trạng thái kích hoạt và đăng ký sinh trắc học Face ID / Vân tay.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleOpenAddModal}
-          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Thêm nhân viên mới</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setPositionModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 text-xs font-semibold flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+          >
+            <Briefcase className="w-4 h-4 text-cyan-400" />
+            <span>Quản lý chức vụ</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Thêm nhân viên mới</span>
+          </button>
+        </div>
       </div>
 
       {/* Bento Filters and Search Bar */}
@@ -201,13 +244,12 @@ export const ManagerEmployeeList: React.FC = () => {
           <select
             value={departmentFilter}
             onChange={e => setDepartmentFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+            className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
           >
             <option value="ALL">Tất cả chức vụ</option>
-            <option value="Bảo vệ">Bảo vệ</option>
-            <option value="Nhân viên">Nhân viên</option>
-            <option value="Thu ngân">Thu ngân</option>
-            <option value="Quản lý">Quản lý</option>
+            {positionOptions.map(pos => (
+              <option key={pos} value={pos}>{pos}</option>
+            ))}
           </select>
 
           <div className="flex items-center gap-1.5 text-xs text-slate-400 ml-2">
@@ -400,12 +442,11 @@ export const ManagerEmployeeList: React.FC = () => {
               <select
                 value={newEmp.department}
                 onChange={e => setNewEmp({ ...newEmp, department: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white"
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white cursor-pointer"
               >
-                <option value="Bảo vệ">Bảo vệ</option>
-                <option value="Nhân viên">Nhân viên</option>
-                <option value="Thu ngân">Thu ngân</option>
-                <option value="Quản lý">Quản lý</option>
+                {positionOptions.map(pos => (
+                  <option key={pos} value={pos}>{pos}</option>
+                ))}
               </select>
             </div>
 
@@ -504,12 +545,11 @@ export const ManagerEmployeeList: React.FC = () => {
                 <select
                   value={editEmployee.department}
                   onChange={e => setEditEmployee({ ...editEmployee, department: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white cursor-pointer"
                 >
-                  <option value="Bảo vệ">Bảo vệ</option>
-                  <option value="Nhân viên">Nhân viên</option>
-                  <option value="Thu ngân">Thu ngân</option>
-                  <option value="Quản lý">Quản lý</option>
+                  {positionOptions.map(pos => (
+                    <option key={pos} value={pos}>{pos}</option>
+                  ))}
                 </select>
               </div>
 
@@ -560,34 +600,81 @@ export const ManagerEmployeeList: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-2 p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center gap-6">
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={editEmployee.fingerprint_enrolled}
-                  onChange={e => setEditEmployee({ ...editEmployee, fingerprint_enrolled: e.target.checked })}
-                  className="rounded bg-slate-900 border-slate-700 text-blue-600"
-                />
-                <span>Kích hoạt Vân tay FAP30</span>
-              </label>
-            </div>
-
-            <div className="pt-4 flex justify-end gap-2 border-t border-slate-800">
+            <div className="pt-4 flex items-center justify-end gap-2 border-t border-slate-800">
               <button
                 type="button"
                 onClick={() => setEditEmployee(null)}
-                className="px-4 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800"
+                className="px-4 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 Hủy bỏ
               </button>
               <button
+                type="button"
+                onClick={() => {
+                  const empToDelete = editEmployee;
+                  setEditEmployee(null);
+                  setConfirmDeleteEmployee(empToDelete);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all cursor-pointer"
+              >
+                Xóa nhân viên
+              </button>
+              <button
                 type="submit"
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md"
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-all cursor-pointer"
               >
                 Xác nhận cập nhật thông tin
               </button>
             </div>
           </form>
+        )}
+      </Modal>
+
+      {/* Confirmation Modal for Delete Employee */}
+      <Modal
+        isOpen={Boolean(confirmDeleteEmployee)}
+        onClose={() => setConfirmDeleteEmployee(null)}
+        title="Xác nhận xóa vĩnh viễn nhân sự"
+        subtitle={`Nhân sự: ${confirmDeleteEmployee?.full_name} (${confirmDeleteEmployee?.employee_id})`}
+        maxWidth="md"
+      >
+        {confirmDeleteEmployee && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-800/60 text-xs text-slate-300 space-y-3">
+              <div className="flex items-center gap-2 text-rose-300 font-bold">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>CẢNH BÁO: XÓA VĨNH VIỄN KHỎI CƠ SỞ DỮ LIỆU</span>
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                Nhân viên: <strong className="text-white">{confirmDeleteEmployee.full_name}</strong> (Mã: <span className="font-mono text-cyan-400">{confirmDeleteEmployee.employee_id}</span> • Chức vụ: {confirmDeleteEmployee.department})
+              </p>
+              <div className="space-y-1 text-[11px] text-rose-300/90 bg-rose-950/60 p-3 rounded-xl border border-rose-900/50">
+                <p>• Toàn bộ dữ liệu hồ sơ, tài khoản đăng nhập, vector sinh trắc học Face ID, dữ liệu vân tay FAP30 và lịch sử liên quan sẽ bị <strong>XÓA VĨNH VIỄN</strong> trên cơ sở dữ liệu.</p>
+                <p className="text-rose-400 font-semibold">• Thao tác này KHÔNG THỂ KHÔI PHỤC lại được.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteEmployee(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteEmployee(confirmDeleteEmployee.id || confirmDeleteEmployee.employee_id);
+                  setConfirmDeleteEmployee(null);
+                }}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-600/30 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Xác nhận xóa vĩnh viễn</span>
+              </button>
+            </div>
+          </div>
         )}
       </Modal>
 
@@ -639,6 +726,15 @@ export const ManagerEmployeeList: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* Position Management Modal */}
+      <PositionManagementModal
+        isOpen={positionModalOpen}
+        onClose={() => setPositionModalOpen(false)}
+        onPositionsChanged={() => {
+          loadDbPositions();
+        }}
+      />
     </div>
   );
 };

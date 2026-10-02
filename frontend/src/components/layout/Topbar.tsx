@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { formatVNTime } from '../../utils/dateUtils';
+import { formatVNTime, formatVNDate } from '../../utils/dateUtils';
 import {
   Menu,
   LogOut,
-  User
+  User,
+  Calendar
 } from 'lucide-react';
 
 interface TopbarProps {
@@ -16,10 +17,13 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
   const { role, currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const [timeStr, setTimeStr] = useState<string>('');
+  const [dateStr, setDateStr] = useState<string>(() => formatVNDate(new Date()));
 
   useEffect(() => {
     const updateTime = () => {
-      setTimeStr(formatVNTime(new Date()));
+      const now = new Date();
+      setTimeStr(formatVNTime(now));
+      setDateStr(formatVNDate(now));
     };
     updateTime();
     const timer = setInterval(updateTime, 1000);
@@ -32,8 +36,8 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
   };
 
   return (
-    <header className="h-16 bg-slate-900/60 backdrop-blur border-b border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30">
-      {/* Left section: Hamburger */}
+    <header className="h-16 bg-slate-900/60 backdrop-blur border-b border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 select-none">
+      {/* Left section: Hamburger & Live Time + Current Date */}
       <div className="flex items-center gap-4">
         <button
           type="button"
@@ -42,9 +46,14 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
         >
           <Menu className="w-5 h-5" />
         </button>
-        <span className="text-xs font-mono text-cyan-400 bg-cyan-950/50 border border-cyan-800/50 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+        <span className="text-xs font-mono text-cyan-400 bg-cyan-950/50 border border-cyan-800/50 px-3 py-1.5 rounded-full flex items-center gap-2.5 shadow-sm">
           <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-          {timeStr || 'LIVE'}
+          <span className="font-semibold">{timeStr || 'LIVE'}</span>
+          <span className="text-cyan-800">|</span>
+          <span className="text-slate-300 font-sans font-medium flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-cyan-400/70" />
+            {dateStr}
+          </span>
         </span>
       </div>
 

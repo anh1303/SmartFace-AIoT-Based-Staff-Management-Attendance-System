@@ -3,10 +3,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { UserSession, Role, Employee } from '../types';
 import { loginApi, logoutApi, meApi, DEFAULT_USERS } from '../api/authApi';
 import { useToast } from './ToastContext';
+import { logger } from '../utils/logger';
+
+const authLogger = logger.child('AuthContext');
 
 interface AuthContextType {
   currentUser: UserSession | null;
   role: Role;
+  isInitializing: boolean;
+  isLoading: boolean;
   login: (identifier: string, password?: string) => Promise<{ success: boolean; message?: string; role?: Role }>;
   logout: () => void;
   switchRole: (role: Role, employeesFallback?: Employee[]) => void;
@@ -28,20 +33,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
+
   const role: Role = currentUser?.role || 'employee';
 
   useEffect(() => {
+    let isMounted = true;
+
     // Validate session on mount via HttpOnly cookie (Do not blindly trust localStorage)
-    meApi().then(session => {
-      if (session) {
-        setCurrentUser(session);
-        localStorage.setItem('userSession', JSON.stringify(session));
-      } else {
-        // If cookie verification fails or expires, force logout state
+    meApi()
+      .then(session => {
+        if (!isMounted) return;
+        if (session) {
+          setCurrentUser(session);
+          localStorage.setItem('userSession', JSON.stringify(session));
+        } else {
+          // If cookie verification fails or expires, clear stale local session
+          setCurrentUser(null);
+          localStorage.removeItem('userSession');
+        }
+      })
+      .catch(error => {
+        authLogger.warn('Session verification failed on mount:', error);
+        if (!isMounted) return;
         setCurrentUser(null);
         localStorage.removeItem('userSession');
-      }
-    });
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsInitializing(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = useCallback(async (identifier: string, password?: string) => {
@@ -62,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       showToast(`Đăng nhập thành công! Vai trò: ${targetRole === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Employee)'}`, 'success');
       return { success: true, role: targetRole };
     } catch (error: unknown) {
-      console.error('Login error:', error);
+      authLogger.error('Login error:', error);
       const err = error as Error;
       const errMsg = err.message === 'Invalid username/email or password'
         ? 'Tài khoản hoặc mật khẩu không chính xác!'
@@ -124,6 +150,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         currentUser,
         role,
+        isInitializing,
+        isLoading: isInitializing,
         login,
         logout,
         switchRole,

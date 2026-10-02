@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchEmployeesApi, createEmployeeApi, updateEmployeeApi } from '../api/employeeApi';
+import { fetchEmployeesApi, createEmployeeApi, updateEmployeeApi, deleteEmployeeApi } from '../api/employeeApi';
 import { Employee } from '../types';
 import { useToast } from '../context/ToastContext';
 
@@ -38,6 +38,17 @@ export function useEmployees() {
     },
   });
 
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: (id: string) => deleteEmployeeApi(id),
+    onSuccess: () => {
+      showToast('Đã xóa vĩnh viễn nhân viên khỏi cơ sở dữ liệu thành công', 'success');
+      queryClient.invalidateQueries({ queryKey: EMPLOYEES_QUERY_KEY });
+    },
+    onError: (error: Error) => {
+      showToast(`Lỗi khi xóa nhân viên: ${error.message || 'Không thể kết nối đến máy chủ'}`, 'error');
+    },
+  });
+
   const toggleEmployeeStatus = (id: string) => {
     const currentList = query.data || [];
     const emp = currentList.find(e => e.employee_id === id || e.id === id);
@@ -55,6 +66,7 @@ export function useEmployees() {
     refetchEmployees: query.refetch,
     addEmployee: (emp: Omit<Employee, 'created_at' | 'updated_at'>) => addEmployeeMutation.mutate(emp),
     updateEmployee: (id: string, updates: Partial<Employee>) => updateEmployeeMutation.mutate({ id, updates }),
+    deleteEmployee: (id: string) => deleteEmployeeMutation.mutate(id),
     toggleEmployeeStatus,
   };
 }

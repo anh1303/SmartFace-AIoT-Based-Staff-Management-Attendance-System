@@ -1,5 +1,8 @@
 import mqtt, { type MqttClient } from 'mqtt'
 import { env } from './env.js'
+import { logger } from '../common/logger.js'
+
+const mqttLogger = logger.child('MQTT')
 
 let client: MqttClient | undefined
 export const getMqttClient = () => client
@@ -15,19 +18,19 @@ export function connectMqtt() {
 
   // 15. Ghi log đầy đủ lifecycle của kết nối MQTT để dễ dàng giám sát và debug
   client.on('connect', () => {
-    console.log(`[MQTT] Connected successfully to broker at ${env.MQTT_URL}`)
+    mqttLogger.info(`Connected successfully to broker at ${env.MQTT_URL}`)
   })
   client.on('reconnect', () => {
-    console.warn('[MQTT] Reconnecting to broker...')
+    mqttLogger.warn('Reconnecting to broker...')
   })
   client.on('offline', () => {
-    console.warn('[MQTT] Client went offline')
+    mqttLogger.warn('Client went offline')
   })
   client.on('close', () => {
-    console.log('[MQTT] Connection closed')
+    mqttLogger.info('Connection closed')
   })
   client.on('error', (error) => {
-    console.error('[MQTT] Connection error:', error.message)
+    mqttLogger.error('Connection error:', error.message)
   })
 
   return client
@@ -41,7 +44,7 @@ export function publishMqtt(topic: string, payload: unknown): Promise<void> {
     }
     client.publish(topic, JSON.stringify(payload), (err) => {
       if (err) {
-        console.error(`[MQTT] Publish error on topic ${topic}:`, err)
+        mqttLogger.error(`Publish error on topic ${topic}:`, err)
         return reject(err)
       }
       resolve()

@@ -5,13 +5,15 @@ import { getStatusBadge } from '../timeUtils';
 
 interface AttendanceTableProps {
   employeePairs: AttendancePairItem[];
-  selectedDate: string;
+  startDate: string;
+  endDate: string;
   onOpenEditModal: (item: AttendancePairItem) => void;
 }
 
 export const AttendanceTable: React.FC<AttendanceTableProps> = ({
   employeePairs,
-  selectedDate,
+  startDate,
+  endDate,
   onOpenEditModal,
 }) => {
   return (
@@ -36,7 +38,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
             {employeePairs.length === 0 ? (
               <tr>
                 <td colSpan={10} className="py-12 text-center text-slate-500 text-xs">
-                  Không tìm thấy bản ghi chấm công nào phù hợp cho ngày {selectedDate}
+                  Không tìm thấy bản ghi chấm công nào phù hợp {startDate === endDate ? `cho ngày ${startDate}` : `trong khoảng từ ${startDate} đến ${endDate}`}
                 </td>
               </tr>
             ) : (
@@ -49,7 +51,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                 const outBadge = getStatusBadge(checkOutEv.status);
 
                 return (
-                  <React.Fragment key={`${employee.employee_id}-${item.date}`}>
+                  <React.Fragment key={`${employee.employee_id}-${item.date}-${shift.name}`}>
                     {/* Row 1: Check-in */}
                     <tr className="hover:bg-slate-800/30 transition-colors">
                       {/* Employee Info - rowSpan 2 */}
@@ -79,6 +81,11 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                       <td rowSpan={2} className="py-3 px-4 align-top border-r border-slate-800/40">
                         <p className="font-medium text-slate-200">{shift.name}</p>
                         <p className="text-[10px] text-slate-400 font-mono">{shift.timeRange}</p>
+                        {startDate !== endDate && (
+                          <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-cyan-400 border border-slate-700">
+                            {item.date}
+                          </span>
+                        )}
                       </td>
 
                       {/* Check-In Event */}

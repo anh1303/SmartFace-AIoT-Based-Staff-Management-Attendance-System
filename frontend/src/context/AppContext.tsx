@@ -19,6 +19,8 @@ import { usePayroll } from '../hooks/usePayroll';
 export interface AppContextType {
   currentUser: UserSession | null;
   role: Role;
+  isInitializing: boolean;
+  isLoading: boolean;
   login: (identifier: string, password?: string) => Promise<{ success: boolean; message?: string; role?: Role }>;
   logout: () => void;
   switchRole: (role: Role) => void;
@@ -27,6 +29,7 @@ export interface AppContextType {
   employees: Employee[];
   addEmployee: (emp: Omit<Employee, 'created_at' | 'updated_at'>) => void;
   updateEmployee: (id: string, updates: Partial<Employee>) => void;
+  deleteEmployee: (id: string) => void;
   toggleEmployeeStatus: (id: string) => void;
 
   // Shifts
@@ -72,6 +75,8 @@ const AppConsumerBridge: React.FC<{ children: React.ReactNode }> = ({ children }
     // Auth
     currentUser: auth.currentUser,
     role: auth.role,
+    isInitializing: auth.isInitializing,
+    isLoading: auth.isLoading,
     login: auth.login,
     logout: auth.logout,
     switchRole: switchRoleWithEmployees,
@@ -80,6 +85,7 @@ const AppConsumerBridge: React.FC<{ children: React.ReactNode }> = ({ children }
     employees: employeesHook.employees,
     addEmployee: employeesHook.addEmployee,
     updateEmployee: employeesHook.updateEmployee,
+    deleteEmployee: employeesHook.deleteEmployee,
     toggleEmployeeStatus: employeesHook.toggleEmployeeStatus,
 
     // Shifts
@@ -112,6 +118,8 @@ const AppConsumerBridge: React.FC<{ children: React.ReactNode }> = ({ children }
   }), [
     auth.currentUser,
     auth.role,
+    auth.isInitializing,
+    auth.isLoading,
     auth.login,
     auth.logout,
     switchRoleWithEmployees,

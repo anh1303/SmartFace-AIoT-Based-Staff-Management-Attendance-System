@@ -84,3 +84,10 @@ export async function updateEmployeeApi(id: string, updates: Partial<Employee>) 
   });
   return res.data;
 }
+
+export async function deleteEmployeeApi(id: string) {
+  const res = await apiFetch(`/api/employees/${id}`, {
+    method: 'DELETE',
+  });
+  return res.data;
+}

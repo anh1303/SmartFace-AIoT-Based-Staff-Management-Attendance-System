@@ -1,5 +1,8 @@
 import { aggregateDailyAttendance } from './attendance.service.js'
 import { getTodayVNString } from '../../common/utils.js'
+import { logger } from '../../common/logger.js'
+
+const cronLogger = logger.child('CronJob')
 
 let cronInterval: NodeJS.Timeout | null = null
 
@@ -14,11 +17,11 @@ export async function runAttendanceAggregationJob() {
     const year = parseInt(yearStr, 10)
     const month = parseInt(monthStr, 10)
 
-    console.log(`[CronJob] Đang tự động tổng hợp dữ liệu chấm công tháng ${month}/${year}...`)
+    cronLogger.info(`Đang tự động tổng hợp dữ liệu chấm công tháng ${month}/${year}...`)
     const result = await aggregateDailyAttendance(month, year)
-    console.log(`[CronJob] Đã tổng hợp thành công ${result.totalSummaries} bản ghi chấm công ngày tháng ${month}/${year}`)
+    cronLogger.info(`Đã tổng hợp thành công ${result.totalSummaries} bản ghi chấm công ngày tháng ${month}/${year}`)
   } catch (error) {
-    console.error('[CronJob] Lỗi khi tự động tổng hợp dữ liệu chấm công:', error)
+    cronLogger.error('Lỗi khi tự động tổng hợp dữ liệu chấm công:', error)
   }
 }
 
@@ -38,13 +41,13 @@ export function startAttendanceCron(intervalMs: number = 30 * 60 * 1000) {
     runAttendanceAggregationJob().catch(() => {})
   }, intervalMs)
 
-  console.log(`[CronJob] Dịch vụ tổng hợp chấm công tự động đã được kích hoạt (chu kỳ ${Math.round(intervalMs / 60000)} phút).`)
+  cronLogger.info(`Dịch vụ tổng hợp chấm công tự động đã được kích hoạt (chu kỳ ${Math.round(intervalMs / 60000)} phút).`)
 }
 
 export function stopAttendanceCron() {
   if (cronInterval) {
     clearInterval(cronInterval)
     cronInterval = null
-    console.log('[CronJob] Dịch vụ tổng hợp chấm công tự động đã dừng.')
+    cronLogger.info('Dịch vụ tổng hợp chấm công tự động đã dừng.')
   }
 }

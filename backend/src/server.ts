@@ -10,6 +10,10 @@ import { initializeAttendanceGateway } from './sockets/attendance.gateway.js'
 import { initializeDeviceGateway } from './sockets/device.gateway.js'
 import { registerDeviceMqttHandlers } from './modules/devices/device.mqtt.handler.js'
 import { startAttendanceCron, stopAttendanceCron } from './modules/attendance/attendance.cron.js'
+import { logger } from './common/logger.js'
+
+const serverLogger = logger.child('Server')
+const shutdownLogger = logger.child('Shutdown')
 
 const httpServer = createServer(app)
 const io = new Server(httpServer, {
@@ -27,7 +31,7 @@ initializeDeviceGateway(io)
 async function start() {
   // 11. Đảm bảo kết nối CSDL Prisma hoàn tất trước khi mở kết nối MQTT và nhận message
   await prisma.$connect()
-  console.log('Database connected successfully')
+  serverLogger.info('Database connected successfully')
 
   connectMqtt()
   registerDeviceMqttHandlers()
@@ -35,11 +39,11 @@ async function start() {
   // Khởi động dịch vụ tự động tổng hợp chấm công định kỳ
   startAttendanceCron()
 
-  httpServer.listen(env.PORT, () => console.log(`API listening on http://localhost:${env.PORT}`))
+  httpServer.listen(env.PORT, () => serverLogger.info(`API listening on http://localhost:${env.PORT}`))
 }
 
 start().catch((error) => {
-  console.error('Failed to start server:', error)
+  serverLogger.error('Failed to start server:', error)
   process.exit(1)
 })
 
@@ -48,12 +52,12 @@ let isShuttingDown = false
 async function gracefulShutdown(signal: string) {
   if (isShuttingDown) return
   isShuttingDown = true
-  console.log(`[Shutdown] Received ${signal}. Starting graceful shutdown...`)
+  shutdownLogger.info(`Received ${signal}. Starting graceful shutdown...`)
 
   // 10s force-kill timeout to prevent hanging processes
   const FORCE_KILL_TIMEOUT_MS = 10000
   const forceKillTimer = setTimeout(() => {
-    console.error(`[Shutdown] Force kill timeout (${FORCE_KILL_TIMEOUT_MS}ms) reached. Forcing exit.`)
+    shutdownLogger.error(`Force kill timeout (${FORCE_KILL_TIMEOUT_MS}ms) reached. Forcing exit.`)
     process.exit(1)
   }, FORCE_KILL_TIMEOUT_MS)
   forceKillTimer.unref()
@@ -62,7 +66,7 @@ async function gracefulShutdown(signal: string) {
     // 1. Close Socket.IO server & disconnect connected clients
     await new Promise<void>((resolve) => {
       io.close((err) => {
-        if (err) console.error('[Shutdown] Socket.IO close error:', err)
+        if (err) shutdownLogger.error('Socket.IO close error:', err)
         resolve()
       })
     })
@@ -77,7 +81,7 @@ async function gracefulShutdown(signal: string) {
     }
     await new Promise<void>((resolve) => {
       httpServer.close((err) => {
-        if (err) console.error('[Shutdown] HTTP server close error:', err)
+        if (err) shutdownLogger.error('HTTP server close error:', err)
         resolve()
       })
     })
@@ -85,11 +89,11 @@ async function gracefulShutdown(signal: string) {
     // 4. Disconnect Prisma database client
     await prisma.$disconnect()
 
-    console.log('[Shutdown] Graceful shutdown completed cleanly.')
+    shutdownLogger.info('Graceful shutdown completed cleanly.')
     clearTimeout(forceKillTimer)
     process.exit(0)
   } catch (error) {
-    console.error('[Shutdown] Error during graceful shutdown:', error)
+    shutdownLogger.error('Error during graceful shutdown:', error)
     process.exit(1)
   }
 }

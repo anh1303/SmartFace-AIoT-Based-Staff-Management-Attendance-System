@@ -1,21 +1,49 @@
 /**
  * Utility functions for date and time handling using Vietnam timezone (Asia/Ho_Chi_Minh - GMT+7).
  * Ensures consistency between DB ISO timestamps and Frontend display.
+ * 
+ * PERFORMANCE OPTIMIZATION:
+ * Uses pre-instantiated singleton Intl.DateTimeFormat formatters to prevent garbage collection spikes
+ * and performance degradation when formatting thousands of records in large tables/lists.
  */
 
 const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
+
+// Singleton Intl formatters
+const vnDateISOFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: VN_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+const vnDateGBFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: VN_TIMEZONE,
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
+
+const vnTimeWithSecondsFormatter = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: VN_TIMEZONE,
+  hour12: false,
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+});
+
+const vnTimeWithoutSecondsFormatter = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: VN_TIMEZONE,
+  hour12: false,
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 /**
  * Returns today's date in YYYY-MM-DD format based on Vietnam local time.
  */
 export function getTodayVNString(): string {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: VN_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  return formatter.format(new Date()); // Outputs YYYY-MM-DD
+  return vnDateISOFormatter.format(new Date()); // Outputs YYYY-MM-DD
 }
 
 /**
@@ -28,14 +56,7 @@ export function formatVNDateISO(
   try {
     const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
     if (isNaN(d.getTime())) return getTodayVNString();
-
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: VN_TIMEZONE,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    return formatter.format(d);
+    return vnDateISOFormatter.format(d);
   } catch {
     return getTodayVNString();
   }
@@ -53,13 +74,9 @@ export function formatVNTime(
     const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
     if (isNaN(d.getTime())) return '--:--:--';
 
-    return d.toLocaleTimeString('vi-VN', {
-      timeZone: VN_TIMEZONE,
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      ...(includeSeconds ? { second: '2-digit' } : {}),
-    });
+    return includeSeconds
+      ? vnTimeWithSecondsFormatter.format(d)
+      : vnTimeWithoutSecondsFormatter.format(d);
   } catch {
     return '--:--:--';
   }
@@ -76,12 +93,7 @@ export function formatVNDate(
     const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
     if (isNaN(d.getTime())) return '--/--/----';
 
-    return d.toLocaleDateString('vi-VN', {
-      timeZone: VN_TIMEZONE,
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    return vnDateGBFormatter.format(d);
   } catch {
     return '--/--/----';
   }

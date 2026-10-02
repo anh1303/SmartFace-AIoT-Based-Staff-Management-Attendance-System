@@ -3,17 +3,6 @@ import { useApp } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { formatVNTime, getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
 import {
-  Users,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  ScanFace,
-  ArrowUpRight,
-  Plus,
-  CalendarRange,
-  ChevronRight
-} from 'lucide-react';
-import {
   BarChart,
   Bar,
   XAxis,
@@ -26,7 +15,7 @@ import {
 } from 'recharts';
 
 export const ManagerDashboard: React.FC = () => {
-  const { employees, attendance, payroll } = useApp();
+  const { employees, attendance } = useApp();
   const navigate = useNavigate();
 
   // Metric computations
@@ -97,35 +86,14 @@ export const ManagerDashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Bento Header Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
-              Tổng Quan Hệ Thống
-            </h1>
-          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
+            Tổng Quan Hệ Thống
+          </h1>
           <p className="text-xs text-slate-400 mt-1">
             Bảng điều khiển theo dõi chấm công khuôn mặt & quản lý vận hành theo thời gian thực.
           </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => navigate('/app/manager/employees')}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Thêm nhân viên</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/app/manager/schedule')}
-            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
-          >
-            <CalendarRange className="w-4 h-4" />
-            <span>Lịch làm việc</span>
-          </button>
         </div>
       </div>
 

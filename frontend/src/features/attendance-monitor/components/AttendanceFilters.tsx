@@ -4,16 +4,16 @@ import {
   Lock,
   Download,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   Search,
   Filter,
 } from 'lucide-react';
 import { getTodayVNString } from '../../../utils/dateUtils';
 
 interface AttendanceFiltersProps {
-  selectedDate: string;
-  setSelectedDate: (date: string) => void;
+  startDate: string;
+  setStartDate: (date: string) => void;
+  endDate: string;
+  setEndDate: (date: string) => void;
   isCurrentDateLocked: boolean;
   onToggleLock: () => void;
   onExportCSV: () => void;
@@ -24,8 +24,10 @@ interface AttendanceFiltersProps {
 }
 
 export const AttendanceFilters: React.FC<AttendanceFiltersProps> = ({
-  selectedDate,
-  setSelectedDate,
+  startDate,
+  setStartDate,
+  endDate,
+  setEndDate,
   isCurrentDateLocked,
   onToggleLock,
   onExportCSV,
@@ -34,23 +36,32 @@ export const AttendanceFilters: React.FC<AttendanceFiltersProps> = ({
   statusFilter,
   setStatusFilter,
 }) => {
-  const handlePrevDay = () => {
-    const [y, m, d] = (selectedDate || getTodayVNString()).split('-').map(Number);
-    const dateObj = new Date(y, m - 1, d - 1);
-    const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    setSelectedDate(`${year}-${month}-${day}`);
+  const handleStartDateChange = (newStart: string) => {
+    if (!newStart) return;
+    setStartDate(newStart);
+    // Logic tránh chọn ngày bắt đầu lớn hơn ngày kết thúc
+    if (endDate && newStart > endDate) {
+      setEndDate(newStart);
+    }
   };
 
-  const handleNextDay = () => {
-    const [y, m, d] = (selectedDate || getTodayVNString()).split('-').map(Number);
-    const dateObj = new Date(y, m - 1, d + 1);
-    const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    setSelectedDate(`${year}-${month}-${day}`);
+  const handleEndDateChange = (newEnd: string) => {
+    if (!newEnd) return;
+    setEndDate(newEnd);
+    // Logic tránh chọn ngày kết thúc nhỏ hơn ngày bắt đầu
+    if (startDate && newEnd < startDate) {
+      setStartDate(newEnd);
+    }
   };
+
+  const handleSelectToday = () => {
+    const today = getTodayVNString();
+    setStartDate(today);
+    setEndDate(today);
+  };
+
+  const isTodaySelected = startDate === getTodayVNString() && endDate === getTodayVNString();
+  const isSameDay = startDate === endDate;
 
   return (
     <div className="space-y-6">
@@ -70,10 +81,10 @@ export const AttendanceFilters: React.FC<AttendanceFiltersProps> = ({
           <button
             type="button"
             onClick={onToggleLock}
-            disabled={selectedDate === ''}
-            title={selectedDate === '' ? 'Vui lòng chọn 1 ngày cụ thể để chốt ca' : ''}
+            disabled={!startDate}
+            title={!startDate ? 'Vui lòng chọn ngày để chốt ca' : ''}
             className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
-              selectedDate === ''
+              !startDate
                 ? 'bg-slate-800 text-slate-500 border border-slate-700/50 cursor-not-allowed'
                 : isCurrentDateLocked
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 shadow-sm cursor-pointer'
@@ -83,12 +94,14 @@ export const AttendanceFilters: React.FC<AttendanceFiltersProps> = ({
             {isCurrentDateLocked ? (
               <>
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Đã chốt ca ({selectedDate})</span>
+                <span>Đã chốt ca ({isSameDay ? startDate : `${startDate} → ${endDate}`})</span>
               </>
             ) : (
               <>
                 <Lock className="w-4 h-4 text-amber-400" />
-                <span>Chốt ca {selectedDate === getTodayVNString() ? 'hôm nay' : selectedDate ? selectedDate : ''}</span>
+                <span>
+                  Chốt ca {isSameDay ? (startDate === getTodayVNString() ? 'hôm nay' : startDate) : `${startDate} → ${endDate}`}
+                </span>
               </>
             )}
           </button>
@@ -97,7 +110,7 @@ export const AttendanceFilters: React.FC<AttendanceFiltersProps> = ({
             type="button"
             onClick={onExportCSV}
             disabled={!isCurrentDateLocked}
-            title={!isCurrentDateLocked ? 'Nút chỉ bật sau khi đã chốt ca ngày đang chọn' : 'Xuất dữ liệu chấm công sang file CSV/Excel'}
+            title={!isCurrentDateLocked ? 'Nút chỉ bật sau khi đã chốt ca' : 'Xuất dữ liệu chấm công sang file CSV/Excel'}
             className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
               isCurrentDateLocked
                 ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg hover:from-emerald-500 hover:to-teal-500 cursor-pointer'
@@ -110,42 +123,48 @@ export const AttendanceFilters: React.FC<AttendanceFiltersProps> = ({
         </div>
       </div>
 
-      {/* Date & Filter Controls */}
+      {/* Date Range & Filter Controls */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-slate-800 border border-slate-700 rounded-xl p-1">
-            <button
-              type="button"
-              onClick={handlePrevDay}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <div className="flex items-center gap-2 px-3">
-              <Calendar className="w-4 h-4 text-cyan-400" />
+        {/* Date Range Pickers: Từ ngày - Đến ngày */}
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+          {/* Từ ngày */}
+          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-cyan-500/60 transition-colors">
+            <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">Từ ngày:</span>
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
               <input
                 type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                value={startDate}
+                max={endDate || undefined}
+                onChange={(e) => handleStartDateChange(e.target.value)}
                 className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
               />
             </div>
-
-            <button
-              type="button"
-              onClick={handleNextDay}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
           </div>
 
+          <span className="text-slate-500 font-semibold text-xs hidden sm:inline">-</span>
+
+          {/* Đến ngày */}
+          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-cyan-500/60 transition-colors">
+            <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">Đến ngày:</span>
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <input
+                type="date"
+                value={endDate}
+                min={startDate || undefined}
+                onChange={(e) => handleEndDateChange(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Nút Hôm nay */}
           <button
             type="button"
-            onClick={() => setSelectedDate(getTodayVNString())}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              selectedDate === getTodayVNString()
+            onClick={handleSelectToday}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              isTodaySelected
                 ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
                 : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
             }`}

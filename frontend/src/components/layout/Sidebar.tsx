@@ -16,7 +16,6 @@ import {
   Banknote,
   Fingerprint,
   LogOut,
-  ShieldCheck,
   ExternalLink
 } from 'lucide-react';
 
@@ -85,14 +84,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           </div>
 
           {/* Role Pill */}
-          <div className="mt-4 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${role === 'manager' ? 'bg-amber-400 shadow-sm shadow-amber-400/50' : 'bg-emerald-400 shadow-sm shadow-emerald-400/50'}`} />
-              <span className="text-xs text-slate-300">
-                Vai trò: <strong className="text-white capitalize">{role === 'manager' ? 'Quản lý' : 'Nhân viên'}</strong>
-              </span>
-            </div>
-            <span className="text-[10px] font-mono text-slate-500">PROD</span>
+          <div className="mt-4 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${role === 'manager' ? 'bg-amber-400 shadow-sm shadow-amber-400/50' : 'bg-emerald-400 shadow-sm shadow-emerald-400/50'}`} />
+            <span className="text-xs text-slate-300">
+              Vai trò: <strong className="text-white capitalize">{role === 'manager' ? 'Quản lý' : 'Nhân viên'}</strong>
+            </span>
           </div>
         </div>
 

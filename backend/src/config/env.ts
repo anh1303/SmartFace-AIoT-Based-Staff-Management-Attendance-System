@@ -16,6 +16,8 @@ const envSchema = z.object({
   FACE_AUTH_URL: z.string().default('http://localhost:5000'),
   FACE_AUTH_TIMEOUT_MS: z.string().default('30000').transform(Number),
   FACE_AUTH_MODEL_VERSION: z.string().default('buffalo_s'),
+  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error', 'silent']).optional(),
+  LOG_FORMAT: z.enum(['pretty', 'json']).default('pretty'),
 })
 
 const parsed = envSchema.safeParse(process.env)

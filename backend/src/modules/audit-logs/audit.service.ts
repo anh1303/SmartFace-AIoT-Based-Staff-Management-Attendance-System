@@ -1,6 +1,11 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '../../config/database.js'
 
+import { isValidUuid } from '../../common/utils.js'
+import { logger } from '../../common/logger.js'
+
+const auditLogger = logger.child('AuditLog')
+
 export type LogActionInput = {
   userId?: string
   action: string
@@ -21,7 +26,7 @@ export const logAction = async (data: LogActionInput) => {
   try {
     return await prisma.auditLog.create({
       data: {
-        userId: data.userId || null,
+        userId: isValidUuid(data.userId) ? data.userId : null,
         action: data.action,
         target_table: data.target_table,
         record_id: String(data.record_id),
@@ -30,7 +35,7 @@ export const logAction = async (data: LogActionInput) => {
       },
     })
   } catch (err) {
-    console.error('[AuditLog] Failed to persist audit log:', err)
+    auditLogger.error('Failed to persist audit log:', err)
     return null
   }
 }

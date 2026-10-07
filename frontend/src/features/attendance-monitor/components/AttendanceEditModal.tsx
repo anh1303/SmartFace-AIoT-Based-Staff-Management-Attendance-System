@@ -129,21 +129,21 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
   };
 
   const modalNode = (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
-        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+        <div className="p-6 border-b border-slate-100 dark:border-[#21264b] flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold text-white font-heading">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white font-heading">
               Điều Chỉnh Thời Gian Chấm Công
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Nhân viên: <span className="text-white font-semibold">{editingItem.employee.full_name}</span> ({editingItem.employee.employee_id})
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Nhân viên: <span className="text-slate-900 dark:text-white font-semibold">{editingItem.employee.full_name}</span> ({editingItem.employee.employee_id})
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1d2243] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -151,21 +151,21 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
 
         <div className="p-6 space-y-5 text-xs">
           {/* Shift info summary */}
-          <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 grid grid-cols-2 gap-3 text-slate-300">
+          <div className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 grid grid-cols-2 gap-3 text-slate-700 dark:text-slate-300">
             <div>
-              <p className="text-[10px] text-slate-400 uppercase font-semibold">Ca làm việc</p>
-              <p className="font-semibold text-white mt-0.5">{editingItem.shiftName}</p>
-              <p className="text-[10px] font-mono text-slate-400">{editingItem.shiftTimeRange}</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Ca làm việc</p>
+              <p className="font-semibold text-slate-900 dark:text-white mt-0.5">{editingItem.shiftName}</p>
+              <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400">{editingItem.shiftTimeRange}</p>
             </div>
             <div>
-              <p className="text-[10px] text-slate-400 uppercase font-semibold">Thời gian điểm danh</p>
-              <p className="text-[10px] font-mono mt-0.5">Vào ca: <span className="text-white font-semibold">{editingItem.inTime}</span></p>
-              <p className="text-[10px] font-mono">Tan ca: <span className="text-white font-semibold">{editingItem.outTime}</span></p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Thời gian điểm danh</p>
+              <p className="text-[10px] font-mono mt-0.5">Vào ca: <span className="text-slate-900 dark:text-white font-semibold">{editingItem.inTime}</span></p>
+              <p className="text-[10px] font-mono">Tan ca: <span className="text-slate-900 dark:text-white font-semibold">{editingItem.outTime}</span></p>
             </div>
           </div>
 
           {modalError && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>{modalError}</span>
             </div>
@@ -174,46 +174,46 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
           {/* Input 1: Late / Early */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <label className="font-semibold text-white flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-rose-400" />
+              <label className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-rose-500 dark:text-rose-400" />
                 Thời gian Đi trễ / Về sớm
               </label>
-              <span className="text-[10px] text-slate-400">
-                Thực tế: <span className="font-mono text-rose-400 font-semibold">{formatSecondsToHHMMSS(editingItem.initialLateEarlySec)}</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                Thực tế: <span className="font-mono text-rose-600 dark:text-rose-400 font-semibold">{formatSecondsToHHMMSS(editingItem.initialLateEarlySec)}</span>
               </span>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <span className="text-[10px] text-slate-400 block mb-1">Giờ</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Giờ</span>
                 <input
                   type="number"
                   min={0}
                   max={23}
                   value={inputLEHours}
                   onChange={(e) => handleLEChange(parseInt(e.target.value, 10) || 0, inputLEMinutes, inputLESeconds)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-center font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
                 />
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block mb-1">Phút</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Phút</span>
                 <input
                   type="number"
                   min={0}
                   max={59}
                   value={inputLEMinutes}
                   onChange={(e) => handleLEChange(inputLEHours, parseInt(e.target.value, 10) || 0, inputLESeconds)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-center font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
                 />
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block mb-1">Giây</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Giây</span>
                 <input
                   type="number"
                   min={0}
                   max={59}
                   value={inputLESeconds}
                   onChange={(e) => handleLEChange(inputLEHours, inputLEMinutes, parseInt(e.target.value, 10) || 0)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-center font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
                 />
               </div>
             </div>
@@ -222,57 +222,57 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
           {/* Input 2: Overtime */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <label className="font-semibold text-white flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-emerald-400" />
+              <label className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
                 Thời gian Tăng ca (OT)
               </label>
-              <span className="text-[10px] text-slate-400">
-                Thực tế: <span className="font-mono text-emerald-400 font-semibold">{formatSecondsToHHMMSS(editingItem.initialOTSec)}</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                Thực tế: <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{formatSecondsToHHMMSS(editingItem.initialOTSec)}</span>
               </span>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <span className="text-[10px] text-slate-400 block mb-1">Giờ</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Giờ</span>
                 <input
                   type="number"
                   min={0}
                   max={23}
                   value={inputOTHours}
                   onChange={(e) => handleOTChange(parseInt(e.target.value, 10) || 0, inputOTMinutes, inputOTSeconds)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-center font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
                 />
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block mb-1">Phút</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Phút</span>
                 <input
                   type="number"
                   min={0}
                   max={59}
                   value={inputOTMinutes}
                   onChange={(e) => handleOTChange(inputOTHours, parseInt(e.target.value, 10) || 0, inputOTSeconds)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-center font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
                 />
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block mb-1">Giây</span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Giây</span>
                 <input
                   type="number"
                   min={0}
                   max={59}
                   value={inputOTSeconds}
                   onChange={(e) => handleOTChange(inputOTHours, inputOTMinutes, parseInt(e.target.value, 10) || 0)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-center font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
                 />
               </div>
             </div>
           </div>
         </div>
 
-        <div className="p-6 border-t border-slate-800 flex justify-end gap-3">
+        <div className="p-6 border-t border-slate-100 dark:border-[#21264b] flex justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-[#0f1224] hover:bg-slate-200 dark:hover:bg-[#1d2243] transition-colors cursor-pointer"
           >
             Hủy
           </button>
@@ -282,8 +282,8 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
             disabled={Boolean(modalError)}
             className={`px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all ${
               modalError
-                ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
-                : 'bg-cyan-600 hover:bg-cyan-500 cursor-pointer shadow-lg shadow-cyan-600/20'
+                ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-300 dark:border-slate-700 cursor-not-allowed'
+                : 'bg-purple-600 hover:bg-purple-700 cursor-pointer shadow-sm shadow-purple-600/20'
             }`}
           >
             Lưu thay đổi

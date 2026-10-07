@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { useTheme } from '../../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { formatVNTime, getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
 import {
@@ -16,6 +17,7 @@ import {
 
 export const ManagerDashboard: React.FC = () => {
   const { employees, attendance } = useApp();
+  const { isDark } = useTheme();
   const navigate = useNavigate();
 
   // Metric computations
@@ -69,7 +71,7 @@ export const ManagerDashboard: React.FC = () => {
   ];
 
   // Dynamic Department distribution from employees
-  const deptColors = ['#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#06b6d4', '#64748b'];
+  const deptColors = ['#8b5cf6', '#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ec4899'];
   const deptCounts: Record<string, number> = {};
   employees.forEach(e => {
     const d = e.department || 'Chưa phân chức vụ';
@@ -85,63 +87,90 @@ export const ManagerDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Bento Header Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
-            Tổng Quan Hệ Thống
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Bảng điều khiển theo dõi chấm công khuôn mặt & quản lý vận hành theo thời gian thực.
-          </p>
+      {/* Bento Header Bar with Continuous Animated Shifting Gradient & Floating Blobs */}
+      <div className="bento-hero-gradient rounded-2xl p-6 transition-all">
+        {/* Ambient Floating & Morphing Blurred Blobs */}
+        <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-purple-500/30 to-fuchsia-500/25 dark:from-purple-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
+        <div className="absolute -bottom-16 left-1/4 w-64 h-64 bg-gradient-to-tr from-indigo-500/30 to-blue-500/20 dark:from-indigo-600/30 dark:to-blue-600/20 rounded-full blur-3xl pointer-events-none animate-blob-2" />
+        <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
+
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-md shadow-purple-500/25 shrink-0">
+              <span className="text-lg font-bold font-heading">U</span>
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+                Tổng Quan Hệ Thống 👋
+              </h1>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                Bảng điều khiển theo dõi chấm công khuôn mặt & quản lý vận hành theo thời gian thực.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/app/manager/attendance')}
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-white/80 dark:bg-[#181c38]/90 hover:bg-white dark:hover:bg-[#20254b] text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-[#2e3566] backdrop-blur-sm transition-all shadow-xs"
+            >
+              Giám sát Face ID
+            </button>
+            <button
+              onClick={() => navigate('/app/manager/employees')}
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-xs shadow-purple-500/25 transition-all"
+            >
+              + Quản lý nhân sự
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 4 Bento Metric Cards (Matching Design HTML exactly) */}
+      {/* 4 Bento Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Tổng nhân sự */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
-          <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-purple-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
             Tổng nhân sự
           </span>
           <div className="flex items-end justify-between mt-3">
-            <span className="text-3xl font-bold text-white font-mono">{totalEmployees}</span>
-            <span className="text-green-500 text-xs pb-1 font-medium">{activeEmployees} Đang hoạt động</span>
+            <span className="text-3xl font-bold text-slate-900 dark:text-white font-mono">{totalEmployees}</span>
+            <span className="text-emerald-600 dark:text-emerald-400 text-xs pb-1 font-medium">{activeEmployees} Đang hoạt động</span>
           </div>
         </div>
 
         {/* Card 2: Có mặt hôm nay */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
-          <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            Lượt quẹt ({latestDateStr})
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-purple-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
+            Lượt Check in/out ({latestDateStr})
           </span>
           <div className="flex items-end justify-between mt-3">
-            <span className="text-3xl font-bold text-white font-mono">{todayPunches.length}</span>
-            <span className="text-slate-500 text-xs pb-1 font-mono">/ {attendance.length} tổng</span>
+            <span className="text-3xl font-bold text-slate-900 dark:text-white font-mono">{todayPunches.length}</span>
+            <span className="text-slate-400 dark:text-slate-500 text-xs pb-1 font-mono">/ {attendance.length} tổng</span>
           </div>
         </div>
 
         {/* Card 3: Tỷ lệ đúng giờ */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
-          <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-purple-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
             Tỷ lệ đúng giờ
           </span>
           <div className="flex items-end justify-between mt-3">
-            <span className="text-3xl font-bold text-white font-mono">{onTimeRate}%</span>
-            <span className="text-blue-400 text-xs pb-1 font-medium">{onTimeCount} đúng giờ</span>
+            <span className="text-3xl font-bold text-slate-900 dark:text-white font-mono">{onTimeRate}%</span>
+            <span className="text-purple-600 dark:text-purple-400 text-xs pb-1 font-medium">{onTimeCount} đúng giờ</span>
           </div>
         </div>
 
         {/* Card 4: Cảnh báo vắng */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-slate-700 transition-colors">
-          <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-purple-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
             Cảnh báo trễ / sớm
           </span>
           <div className="flex items-end justify-between mt-3">
-            <span className="text-3xl font-bold text-amber-400 font-mono">
+            <span className="text-3xl font-bold text-amber-500 dark:text-amber-400 font-mono">
               {String(lateCount).padStart(2, '0')}
             </span>
-            <span className="text-amber-500 text-xs pb-1 font-medium">Lượt vi phạm</span>
+            <span className="text-amber-600 dark:text-amber-500 text-xs pb-1 font-medium">Lượt vi phạm</span>
           </div>
         </div>
       </div>
@@ -149,15 +178,15 @@ export const ManagerDashboard: React.FC = () => {
       {/* Middle Bento Section: Attendance Bar Chart & Department Donut */}
       <div className="grid lg:grid-cols-12 gap-4">
         {/* Left: Weekly Attendance Chart (col-span-8) */}
-        <div className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col justify-between">
+        <div className="lg:col-span-8 bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-6 flex flex-col justify-between shadow-xs transition-colors">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-white text-base">Biểu đồ chấm công chuyên cần</h3>
+            <h3 className="font-bold text-slate-900 dark:text-white text-base">Biểu đồ chấm công chuyên cần</h3>
             <div className="flex gap-4">
-              <span className="flex items-center gap-1.5 text-xs text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-blue-500"></span> Đúng giờ
+              <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-purple-600 dark:bg-purple-500"></span> Đúng giờ
               </span>
-              <span className="flex items-center gap-1.5 text-xs text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-amber-400"></span> Đi muộn / về sớm
+              <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-amber-500 dark:bg-amber-400"></span> Đi muộn / về sớm
               </span>
             </div>
           </div>
@@ -165,22 +194,29 @@ export const ManagerDashboard: React.FC = () => {
           <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={weeklyAttendanceData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <XAxis dataKey="day" stroke="#64748b" fontSize={11} tickLine={false} />
-                <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
+                <XAxis dataKey="day" stroke={isDark ? '#64748b' : '#94a3b8'} fontSize={11} tickLine={false} />
+                <YAxis stroke={isDark ? '#64748b' : '#94a3b8'} fontSize={11} tickLine={false} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px', color: '#fff' }}
-                  labelStyle={{ color: '#94a3b8' }}
+                  contentStyle={{
+                    backgroundColor: isDark ? '#0f1224' : '#ffffff',
+                    borderColor: isDark ? '#21264b' : '#e2e8f0',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    color: isDark ? '#ffffff' : '#0f172a',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                  labelStyle={{ color: isDark ? '#94a3b8' : '#64748b' }}
                 />
-                <Bar dataKey="onTime" name="Đúng giờ" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="late" name="Đi muộn" stackId="a" fill="#f97316" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="onTime" name="Đúng giờ" stackId="a" fill="#8b5cf6" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="late" name="Đi muộn" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Right: Department Structure (col-span-4) */}
-        <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col justify-between">
-          <h3 className="font-bold text-white text-base mb-4">Cấu trúc chức vụ</h3>
+        <div className="lg:col-span-4 bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-6 flex flex-col justify-between shadow-xs transition-colors">
+          <h3 className="font-bold text-slate-900 dark:text-white text-base mb-4">Cấu trúc chức vụ</h3>
 
           <div className="flex-1 flex items-center justify-center py-2">
             <div className="relative w-36 h-36">
@@ -200,38 +236,44 @@ export const ManagerDashboard: React.FC = () => {
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
+                    contentStyle={{
+                      backgroundColor: isDark ? '#0f1224' : '#ffffff',
+                      borderColor: isDark ? '#21264b' : '#e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      color: isDark ? '#ffffff' : '#0f172a'
+                    }}
                   />
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                <span className="text-xl font-bold font-mono text-white">{deptData.length}</span>
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Chức vụ</span>
+                <span className="text-xl font-bold font-mono text-slate-900 dark:text-white">{deptData.length}</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Chức vụ</span>
               </div>
             </div>
           </div>
 
-          <div className="space-y-2 mt-4 pt-4 border-t border-slate-800">
+          <div className="space-y-2 mt-4 pt-4 border-t border-slate-100 dark:border-[#1d2243]">
             {deptData.map((d, i) => (
               <div key={i} className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-2 text-slate-300 truncate max-w-[140px]">
+                <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300 truncate max-w-[140px]">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.color }}></span> {d.name}
                 </span>
-                <span className="font-mono text-white font-medium">{d.value} NV ({d.percentage}%)</span>
+                <span className="font-mono text-slate-900 dark:text-white font-medium">{d.value} NV ({d.percentage}%)</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Bottom Bento Card: Real-time Attendance Logs (Matching Design HTML) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+      {/* Bottom Bento Card: Real-time Attendance Logs */}
+      <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-6 shadow-xs transition-colors">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-white text-base">Nhật ký chấm công Face ID (Real-time)</h3>
+          <h3 className="font-bold text-slate-900 dark:text-white text-base">Nhật ký chấm công Face ID (Real-time)</h3>
           <button
             type="button"
             onClick={() => navigate('/app/manager/attendance')}
-            className="text-xs text-blue-500 hover:text-blue-400 font-semibold"
+            className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold cursor-pointer"
           >
             Xem tất cả &rarr;
           </button>
@@ -240,7 +282,7 @@ export const ManagerDashboard: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="text-slate-500 text-[11px] uppercase tracking-wider border-b border-slate-800">
+              <tr className="text-slate-400 dark:text-slate-500 text-[11px] uppercase tracking-wider border-b border-slate-200/80 dark:border-[#21264b]">
                 <th className="pb-3 font-medium">Nhân viên</th>
                 <th className="pb-3 font-medium">Thời gian</th>
                 <th className="pb-3 font-medium">Thiết bị</th>
@@ -248,18 +290,17 @@ export const ManagerDashboard: React.FC = () => {
                 <th className="pb-3 font-medium text-right">Trạng thái</th>
               </tr>
             </thead>
-            <tbody className="text-sm divide-y divide-slate-800/50">
+            <tbody className="text-sm divide-y divide-slate-100 dark:divide-[#1d2243]">
               {attendance.slice(0, 5).map(att => {
                 const emp = employees.find(e => e.employee_id === att.employee_id);
-                const dateObj = new Date(att.timestamp);
                 const initials = emp?.full_name
                   ? emp.full_name.split(' ').map(w => w[0]).slice(-2).join('')
                   : 'NV';
 
                 return (
-                  <tr key={att.attendance_id} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={att.attendance_id} className="hover:bg-purple-50/40 dark:hover:bg-[#181c38]/50 transition-colors">
                     <td className="py-3 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-300 shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-[#181c38] border border-purple-200 dark:border-[#272d5a] flex items-center justify-center text-[10px] font-bold text-purple-700 dark:text-purple-300 shrink-0">
                         {emp?.avatar ? (
                           <img src={emp.avatar} alt={emp.full_name} className="w-full h-full rounded-full object-cover" />
                         ) : (
@@ -267,18 +308,18 @@ export const ManagerDashboard: React.FC = () => {
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-white text-xs sm:text-sm">{emp?.full_name || att.employee_id}</p>
-                        <p className="text-[10px] text-slate-500 font-mono">{att.employee_id} • {emp?.department}</p>
+                        <p className="font-medium text-slate-900 dark:text-white text-xs sm:text-sm">{emp?.full_name || att.employee_id}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{att.employee_id} • {emp?.department}</p>
                       </div>
                     </td>
-                    <td className="py-3 font-mono text-xs text-slate-300">
+                    <td className="py-3 font-mono text-xs text-slate-600 dark:text-slate-300">
                       {formatVNTime(att.timestamp)}
                     </td>
-                    <td className="py-3 text-xs text-slate-400 font-mono">
+                    <td className="py-3 text-xs text-slate-500 dark:text-slate-400 font-mono">
                       {att.device_id}
                     </td>
                     <td className="py-3 text-center">
-                      <span className="bg-green-500/10 text-green-500 border border-green-500/20 px-2 py-0.5 rounded text-[10px] font-mono font-medium">
+                      <span className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium">
                         {(att.verification_score * 100).toFixed(1)}%
                       </span>
                     </td>
@@ -287,11 +328,10 @@ export const ManagerDashboard: React.FC = () => {
                         const punc = getPunctuality(att);
                         return (
                           <span
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${
-                              punc === 'ON_TIME'
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            }`}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${punc === 'ON_TIME'
+                              ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
+                              : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
+                              }`}
                           >
                             {punc === 'ON_TIME' ? 'Đúng giờ' : punc === 'EARLY_LEAVE' ? 'Về sớm' : 'Muộn ca'}
                           </span>

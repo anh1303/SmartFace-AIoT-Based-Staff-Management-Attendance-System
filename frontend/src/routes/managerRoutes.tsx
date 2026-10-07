@@ -24,6 +24,9 @@ const ManagerPayroll = lazy(() =>
 const ManagerBiometrics = lazy(() =>
   import('../pages/manager/ManagerBiometrics').then(module => ({ default: module.ManagerBiometrics }))
 );
+const ManagerEmployeeDetail = lazy(() =>
+  import('../pages/manager/ManagerEmployeeDetail').then(module => ({ default: module.ManagerEmployeeDetail }))
+);
 
 export const managerRoutes: RouteObject = {
   path: '/app/manager',
@@ -36,6 +39,9 @@ export const managerRoutes: RouteObject = {
     { index: true, element: <Navigate to="/app/manager/dashboard" replace /> },
     { path: 'dashboard', element: <ManagerDashboard /> },
     { path: 'employees', element: <ManagerEmployeeList /> },
+    { path: 'employees/:id', element: <ManagerEmployeeDetail /> },
+    { path: 'employee-detail', element: <ManagerEmployeeDetail /> },
+    { path: 'employee-detail/:id', element: <ManagerEmployeeDetail /> },
     { path: 'schedule', element: <ManagerSchedule /> },
     { path: 'attendance', element: <ManagerAttendanceMonitor /> },
     { path: 'biometrics', element: <ManagerBiometrics /> },

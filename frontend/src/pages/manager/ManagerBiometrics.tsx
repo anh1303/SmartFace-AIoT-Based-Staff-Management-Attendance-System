@@ -293,15 +293,20 @@ export const ManagerBiometrics: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Bento Header Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      {/* Bento Header Banner with Continuous Shifting Gradient & Floating Blobs */}
+      <div className="bento-hero-gradient rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
+        {/* Ambient Floating & Morphing Blurred Blobs */}
+        <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-purple-500/30 to-fuchsia-500/25 dark:from-purple-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
+        <div className="absolute -bottom-16 left-1/4 w-64 h-64 bg-gradient-to-tr from-indigo-500/30 to-blue-500/20 dark:from-indigo-600/30 dark:to-blue-600/20 rounded-full blur-3xl pointer-events-none animate-blob-2" />
+        <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
+
+        <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
               Quản Lý & Cập Nhật Sinh Trắc Học
             </h1>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
             Ghi nhận vector 512-D khuôn mặt từ hình ảnh hoặc phát tín hiệu IoT tới thiết bị FaceCam/Cảm biến vân tay FAP30.
           </p>
         </div>
@@ -311,20 +316,20 @@ export const ManagerBiometrics: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Choose Employee & Current Profile */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5">
-            <h2 className="text-sm font-bold text-white font-heading uppercase tracking-wider mb-4">
+          <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-5 shadow-xs transition-colors">
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white font-heading uppercase tracking-wider mb-4">
               1. Chọn Nhân Sự Cần Cập Nhật
             </h2>
 
             <div className="mb-4">
-              <label className="block text-xs text-slate-400 mb-1.5">Danh sách nhân viên:</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1.5 font-semibold">Danh sách nhân viên:</label>
               <select
                 value={selectedEmpId}
                 onChange={e => {
                   setSelectedEmpId(e.target.value);
                   setSearchParams({ employee_id: e.target.value });
                 }}
-                className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer"
               >
                 {employees.map(emp => (
                   <option key={emp.employee_id} value={emp.employee_id}>
@@ -336,42 +341,42 @@ export const ManagerBiometrics: React.FC = () => {
 
             {/* Selected Employee Card */}
             {currentEmp && (
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-4">
                 <div className="flex items-center gap-3">
                   <img
                     src={currentEmp.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"}
                     alt={currentEmp.full_name}
-                    className="w-14 h-14 rounded-2xl object-cover border border-slate-700"
+                    className="w-14 h-14 rounded-xl object-cover border border-purple-200 dark:border-purple-800"
                   />
                   <div>
-                    <h3 className="text-sm font-bold text-white">{currentEmp.full_name}</h3>
-                    <p className="text-xs text-blue-400 font-mono">{currentEmp.employee_id}</p>
-                    <p className="text-[11px] text-slate-400">{currentEmp.department} • {currentEmp.position}</p>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">{currentEmp.full_name}</h3>
+                    <p className="text-xs text-purple-600 dark:text-purple-400 font-mono">{currentEmp.employee_id}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{currentEmp.department} • {currentEmp.position}</p>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-800/80 space-y-2 text-xs">
+                <div className="pt-3 border-t border-slate-200/60 dark:border-[#21264b] space-y-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400 flex items-center gap-1.5">
-                      <ScanFace className="w-3.5 h-3.5 text-blue-400" />
+                    <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <ScanFace className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                       Face ID:
                     </span>
                     <span className={`font-mono text-[11px] px-2 py-0.5 rounded-md font-semibold ${currentEmp.face_enrolled
-                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                        ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
+                        : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
                       }`}>
                       {currentEmp.face_enrolled ? 'ĐÃ CẬP NHẬT' : 'CHƯA ĐĂNG KÝ'}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400 flex items-center gap-1.5">
-                      <Fingerprint className="w-3.5 h-3.5 text-green-400" />
+                    <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Fingerprint className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       Vân tay (FAP30):
                     </span>
                     <span className={`font-mono text-[11px] px-2 py-0.5 rounded-md font-semibold ${currentEmp.fingerprint_enrolled
-                      ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
+                        : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
                       }`}>
                       {currentEmp.fingerprint_enrolled ? 'ĐÃ CẬP NHẬT' : 'CHƯA ĐĂNG KÝ'}
                     </span>
@@ -384,16 +389,16 @@ export const ManagerBiometrics: React.FC = () => {
 
         {/* Right Column: Biometric Actions (Tabs: Face / Fingerprint) */}
         <div className="lg:col-span-8">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-6">
+          <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-6 space-y-6 shadow-xs transition-colors">
             {/* Mode Switcher */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex gap-2 p-1 bg-slate-950 border border-slate-800 rounded-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#21264b] pb-4">
+              <div className="flex gap-2 p-1 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl">
                 <button
                   type="button"
                   onClick={() => setActiveTab('FACE')}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${activeTab === 'FACE'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${activeTab === 'FACE'
+                      ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                 >
                   <ScanFace className="w-4 h-4" />
@@ -403,9 +408,9 @@ export const ManagerBiometrics: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setActiveTab('FINGERPRINT')}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${activeTab === 'FINGERPRINT'
-                    ? 'bg-green-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${activeTab === 'FINGERPRINT'
+                      ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                 >
                   <Fingerprint className="w-4 h-4" />
@@ -418,31 +423,32 @@ export const ManagerBiometrics: React.FC = () => {
             {activeTab === 'FACE' && (
               <div className="space-y-5">
                 {/* Header Action Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-950 border border-slate-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b]">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700/50 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
                       <ScanFace className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white font-heading">
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white font-heading">
                         Cập Nhật Dữ Liệu Khuôn Mặt
                       </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Trích xuất vector 512-D chất lượng cao từ nhiều góc chụp</p>
                     </div>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => setIsEkycModalOpen(true)}
-                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm shadow-purple-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
                   >
-                    <Camera className="w-4 h-4 text-cyan-200" />
+                    <Camera className="w-4 h-4 text-purple-200" />
                     <span>Chụp bằng Camera</span>
                   </button>
                 </div>
 
                 {/* Upload Area / Photos Gallery */}
                 {uploadedPhotos.length === 0 ? (
-                  <div className="relative border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-slate-950 group">
+                  <div className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-purple-500 dark:hover:border-purple-500 rounded-xl p-8 text-center cursor-pointer transition-colors bg-slate-50/50 dark:bg-[#0f1224]/50 group">
                     <input
                       type="file"
                       accept="image/*"
@@ -450,25 +456,25 @@ export const ManagerBiometrics: React.FC = () => {
                       onChange={handlePhotoUpload}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
                     />
-                    <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 mx-auto flex items-center justify-center text-blue-400 mb-3 group-hover:scale-110 transition-transform">
+                    <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700/50 mx-auto flex items-center justify-center text-purple-600 dark:text-purple-400 mb-3 group-hover:scale-110 transition-transform">
                       <Upload className="w-6 h-6" />
                     </div>
-                    <p className="text-sm font-bold text-white">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">
                       Kéo thả ảnh vào đây hoặc bấm để chọn tệp
                     </p>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       Tối thiểu 3 ảnh các góc (Chính diện, Quay trái, Quay phải)
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-300 flex items-center gap-1.5">
-                        <Layers className="w-4 h-4 text-blue-400" />
+                      <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                         Danh sách ảnh mẫu ({uploadedPhotos.length} ảnh):
                       </span>
-                      <label className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors">
-                        <Plus className="w-3.5 h-3.5 text-blue-400" />
+                      <label className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1d2243] border border-slate-200 dark:border-[#272d5a] text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors">
+                        <Plus className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                         <span>Thêm ảnh</span>
                         <input
                           type="file"
@@ -484,9 +490,9 @@ export const ManagerBiometrics: React.FC = () => {
                       {uploadedPhotos.map((photo, idx) => (
                         <div
                           key={photo.id}
-                          className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 group shadow-md"
+                          className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-[#21264b] bg-white dark:bg-[#0f1224] group shadow-xs"
                         >
-                          <div className="aspect-[4/3] bg-slate-900 relative">
+                          <div className="aspect-[4/3] bg-slate-100 dark:bg-[#0b0d19] relative">
                             <img
                               src={photo.url}
                               alt={photo.name}
@@ -498,14 +504,14 @@ export const ManagerBiometrics: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleRemovePhoto(photo.id)}
-                              className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-600/90 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow"
+                              className="absolute top-2 right-2 p-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-xs"
                               title="Xóa ảnh này"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          <div className="p-2 text-center bg-slate-950 border-t border-slate-800/80">
-                            <p className="text-xs font-medium text-slate-300 truncate">
+                          <div className="p-2 text-center bg-white dark:bg-[#0f1224] border-t border-slate-100 dark:border-[#21264b]">
+                            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
                               {photo.tag || `Ảnh ${idx + 1}`}
                             </p>
                           </div>
@@ -513,7 +519,7 @@ export const ManagerBiometrics: React.FC = () => {
                       ))}
 
                       {/* Add more photo card */}
-                      <label className="border-2 border-dashed border-slate-800 hover:border-slate-700 rounded-2xl flex flex-col items-center justify-center p-4 text-center cursor-pointer transition-colors bg-slate-950/40 hover:bg-slate-950 text-slate-500 hover:text-slate-400 min-h-[130px]">
+                      <label className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-500 rounded-xl flex flex-col items-center justify-center p-4 text-center cursor-pointer transition-colors bg-slate-50/40 hover:bg-slate-100 dark:bg-[#0f1224]/40 dark:hover:bg-[#0f1224] text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 min-h-[130px]">
                         <input
                           type="file"
                           accept="image/*"
@@ -529,14 +535,14 @@ export const ManagerBiometrics: React.FC = () => {
                 )}
 
                 {/* Action Footer */}
-                <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-xs text-slate-400">
+                <div className="pt-4 border-t border-slate-100 dark:border-[#21264b] flex items-center justify-between">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
                     {uploadedPhotos.length < 3 ? (
-                      <span className="text-amber-400 font-medium">
+                      <span className="text-amber-600 dark:text-amber-400 font-medium">
                         Cần tối thiểu 3 ảnh để cập nhật ({uploadedPhotos.length}/3)
                       </span>
                     ) : (
-                      <span className="text-green-400 font-medium">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">
                         Đã đủ {uploadedPhotos.length} ảnh hợp lệ
                       </span>
                     )}
@@ -547,8 +553,8 @@ export const ManagerBiometrics: React.FC = () => {
                     disabled={uploadedPhotos.length < 3 || analyzingFace}
                     onClick={() => setFaceConfirmModal(true)}
                     className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer ${uploadedPhotos.length >= 3 && !analyzingFace
-                        ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
                       }`}
                   >
                     <Check className="w-4 h-4" />
@@ -565,13 +571,13 @@ export const ManagerBiometrics: React.FC = () => {
                   {/* Select Device & Finger */}
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                         Chọn thiết bị Edge IoT ghi nhận:
                       </label>
                       <select
                         value={selectedDevice}
                         onChange={e => setSelectedDevice(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-green-500"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
                       >
                         <option value="FaceCam-01 (Máy chấm công Face_ID Vào ca)">
                           FaceCam-01 (Máy chấm công Face_ID Vào ca)
@@ -589,13 +595,13 @@ export const ManagerBiometrics: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                         Vị trí ngón tay lấy mẫu:
                       </label>
                       <select
                         value={selectedFinger}
                         onChange={e => setSelectedFinger(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-green-500"
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
                       >
                         <option value="Ngón trỏ phải (Right Index)">Ngón trỏ phải (Right Index) - Khuyên dùng</option>
                         <option value="Ngón cái phải (Right Thumb)">Ngón cái phải (Right Thumb)</option>
@@ -604,12 +610,12 @@ export const ManagerBiometrics: React.FC = () => {
                       </select>
                     </div>
 
-                    <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs text-slate-400">
-                      <p className="font-semibold text-slate-300 flex items-center gap-1.5">
-                        <Radio className="w-3.5 h-3.5 text-green-400" />
+                    <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-2 text-xs text-slate-500 dark:text-slate-400">
+                      <p className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <Radio className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                         Giao thức IoT Sensor:
                       </p>
-                      <p>• Lệnh điều khiển gửi qua MQTT topic: <code className="text-green-400 font-mono">edge/devices/fap30/enroll</code></p>
+                      <p>• Lệnh điều khiển gửi qua MQTT topic: <code className="text-emerald-600 dark:text-emerald-400 font-mono">edge/devices/fap30/enroll</code></p>
                       <p>• Độ phân giải cảm biến: 500 DPI optical FAP30 với công nghệ chống vân tay giả Silicon.</p>
                     </div>
 
@@ -618,7 +624,7 @@ export const ManagerBiometrics: React.FC = () => {
                       type="button"
                       disabled={fingerprintStep === 'SENDING' || fingerprintStep === 'WAITING_TOUCH' || fingerprintStep === 'CAPTURED'}
                       onClick={handleSendIoTTrigger}
-                      className="w-full py-3 px-4 rounded-xl bg-green-600 hover:bg-green-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-md transition-all"
+                      className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
                     >
                       <Send className="w-4 h-4" />
                       <span>Gửi tín hiệu tới thiết bị để lấy mẫu (IoT Trigger)</span>
@@ -626,34 +632,34 @@ export const ManagerBiometrics: React.FC = () => {
                   </div>
 
                   {/* Device Feedback HUD */}
-                  <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between">
+                  <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
-                        <span className="font-mono text-slate-400">TRẠNG THÁI KẾT NỐI THIẾT BỊ</span>
-                        <span className="font-mono text-green-400 font-bold">ONLINE</span>
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-[#21264b] text-xs">
+                        <span className="font-mono text-slate-500 dark:text-slate-400 font-medium">TRẠNG THÁI KẾT NỐI THIẾT BỊ</span>
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">ONLINE</span>
                       </div>
 
                       <div className="mt-6 text-center space-y-3">
                         <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center border-2 transition-all ${fingerprintStep === 'IDLE'
-                          ? 'border-slate-800 text-slate-600'
-                          : fingerprintStep === 'SENDING'
-                            ? 'border-blue-500 text-blue-400 animate-pulse'
-                            : fingerprintStep === 'WAITING_TOUCH'
-                              ? 'border-amber-400 text-amber-400 animate-bounce'
-                              : 'border-green-500 text-green-400 bg-green-500/10'
+                            ? 'border-slate-300 dark:border-slate-700 text-slate-400'
+                            : fingerprintStep === 'SENDING'
+                              ? 'border-purple-500 text-purple-600 dark:text-purple-400 animate-pulse'
+                              : fingerprintStep === 'WAITING_TOUCH'
+                                ? 'border-amber-400 text-amber-500 animate-bounce'
+                                : 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40'
                           }`}>
                           <Fingerprint className="w-10 h-10" />
                         </div>
 
                         <div>
-                          <p className="text-sm font-bold text-white font-heading">
+                          <p className="text-sm font-bold text-slate-900 dark:text-white font-heading">
                             {fingerprintStep === 'IDLE' && 'Thiết bị đang ở chế độ chờ'}
                             {fingerprintStep === 'SENDING' && 'Đang gửi gói tin IoT kích hoạt cảm biến...'}
                             {fingerprintStep === 'WAITING_TOUCH' && 'Đèn cảm biến bật sáng - Chờ nhân viên đặt ngón tay...'}
                             {fingerprintStep === 'CAPTURED' && 'Đã đọc vân tay 500 DPI - Đang phân tích...'}
                             {fingerprintStep === 'VERIFIED' && 'Lấy mẫu thành công! NFIQ 2.0: 98.5%'}
                           </p>
-                          <p className="text-xs text-slate-400 mt-1">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                             {fingerprintStep === 'VERIFIED'
                               ? `Mẫu đã sẵn sàng lưu cho ${selectedFinger}`
                               : `Mục tiêu: ${selectedDevice}`}
@@ -664,7 +670,7 @@ export const ManagerBiometrics: React.FC = () => {
 
                     {/* Quality score badge */}
                     {fingerQualityScore && fingerprintStep === 'VERIFIED' && (
-                      <div className="mt-4 p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-xs flex items-center justify-between">
+                      <div className="mt-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 text-xs flex items-center justify-between">
                         <span className="flex items-center gap-1.5 font-semibold">
                           <CheckCheck className="w-4 h-4" />
                           Chuẩn FAP30 500DPI hợp lệ
@@ -676,14 +682,14 @@ export const ManagerBiometrics: React.FC = () => {
                 </div>
 
                 {/* Explicit Confirm Button for Fingerprint */}
-                <div className="pt-4 border-t border-slate-800 flex justify-end">
+                <div className="pt-4 border-t border-slate-100 dark:border-[#21264b] flex justify-end">
                   <button
                     type="button"
                     disabled={fingerprintStep !== 'VERIFIED'}
                     onClick={() => setFingerConfirmModal(true)}
-                    className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all ${fingerprintStep === 'VERIFIED'
-                      ? 'bg-green-600 hover:bg-green-500 text-white shadow-md'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                    className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer ${fingerprintStep === 'VERIFIED'
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
                       }`}
                   >
                     <Check className="w-4 h-4" />
@@ -697,13 +703,13 @@ export const ManagerBiometrics: React.FC = () => {
       </div>
 
       {/* Master Employee Biometric Status Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+      <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-6 shadow-xs transition-colors">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
-            <h2 className="text-base font-bold text-white font-heading">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
               Bảng Tổng Hợp Trạng Thái Sinh Trắc Học Nhân Viên
             </h2>
-            <span className="px-3 py-1 rounded-full bg-slate-950 border border-slate-800 text-blue-400 font-mono text-xs font-bold shadow-sm">
+            <span className="px-3 py-1 rounded-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] text-purple-600 dark:text-purple-400 font-mono text-xs font-bold shadow-xs">
               {filteredEmployees.length} / {employees.length}
             </span>
           </div>
@@ -711,23 +717,23 @@ export const ManagerBiometrics: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             {/* Search by Employee */}
             <div className="relative flex-1 md:w-64">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Tìm tên, mã NV..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+                className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
               />
             </div>
 
             {/* Position Filter */}
             <div className="relative">
-              <Filter className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Filter className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select
                 value={positionFilter}
                 onChange={e => setPositionFilter(e.target.value)}
-                className="bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-4 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500/50 appearance-none cursor-pointer"
+                className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-9 pr-4 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
               >
                 <option value="ALL">Tất cả chức vụ</option>
                 {positions.map(pos => (
@@ -740,7 +746,7 @@ export const ManagerBiometrics: React.FC = () => {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950 border-b border-slate-800 text-slate-500 uppercase tracking-wider font-mono text-[11px]">
+            <thead className="bg-slate-50 dark:bg-[#0f1224] border-b border-slate-100 dark:border-[#21264b] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono text-[11px]">
               <tr>
                 <th className="py-3.5 px-4 font-medium">Nhân sự</th>
                 <th className="py-3.5 px-4 font-medium">Mã NV</th>
@@ -750,40 +756,40 @@ export const ManagerBiometrics: React.FC = () => {
                 <th className="py-3.5 px-4 text-right font-medium">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50 text-slate-300">
+            <tbody className="divide-y divide-slate-100 dark:divide-[#1d2243] text-slate-700 dark:text-slate-300">
               {filteredEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-500">
+                  <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-slate-500">
                     Không tìm thấy nhân sự phù hợp với bộ lọc
                   </td>
                 </tr>
               ) : (
                 filteredEmployees.map(emp => (
-                  <tr key={emp.employee_id} className="hover:bg-slate-800/40 transition-colors">
+                  <tr key={emp.employee_id} className="hover:bg-slate-50/80 dark:hover:bg-[#1a1e3a]/40 transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
                         <img
                           src={emp.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
                           alt={emp.full_name}
-                          className="w-8 h-8 rounded-xl object-cover border border-slate-700"
+                          className="w-8 h-8 rounded-xl object-cover border border-slate-200 dark:border-slate-700"
                         />
-                        <span className="font-semibold text-white">{emp.full_name}</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{emp.full_name}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 font-mono text-blue-400">{emp.employee_id}</td>
-                    <td className="py-3 px-4 text-slate-400">{emp.position || emp.department}</td>
+                    <td className="py-3 px-4 font-mono text-purple-600 dark:text-purple-400">{emp.employee_id}</td>
+                    <td className="py-3 px-4 text-slate-500 dark:text-slate-400">{emp.position || emp.department}</td>
                     <td className="py-3 px-4">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${emp.face_enrolled
-                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                          ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
+                          : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
                         }`}>
                         {emp.face_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
                       </span>
                     </td>
                     <td className="py-3 px-4">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${emp.fingerprint_enrolled
-                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
+                          : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
                         }`}>
                         {emp.fingerprint_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
                       </span>
@@ -792,7 +798,7 @@ export const ManagerBiometrics: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setManageModalEmployee(emp)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1d2243] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
                       >
                         <Edit className="w-3.5 h-3.5 text-slate-400" />
                         <span>Sửa</span>
@@ -824,14 +830,14 @@ export const ManagerBiometrics: React.FC = () => {
         maxWidth="md"
       >
         <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-2">
-            <p className="font-semibold text-white">
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] text-xs text-slate-700 dark:text-slate-300 space-y-2">
+            <p className="font-semibold text-slate-900 dark:text-white">
               Xác nhận ghi nhận {uploadedPhotos.length} ảnh mẫu sinh trắc học?
             </p>
-            <p className="text-slate-400 leading-relaxed">
-              Ảnh sẽ được gửi đến Face Auth để phát hiện khuôn mặt, trích xuất vector 512-D và tạo centroid. Các vector được lưu trong bảng <code>face_embeddings</code> của database PBL6. Luồng đăng ký này chưa kiểm tra liveness hoặc đồng bộ đến thiết bị Edge.
+            <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
+              Ảnh sẽ được gửi đến Face Auth để phát hiện khuôn mặt, trích xuất vector 512-D và tạo centroid. Các vector được lưu trong bảng <code className="text-purple-600 dark:text-purple-400">face_embeddings</code> của database PBL6.
             </p>
-            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-green-400 font-mono">
+            <div className="pt-2 border-t border-slate-200/60 dark:border-[#21264b] flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">
               <span>ĐIỀU KIỆN: ĐỦ 3 ẢNH</span>
             </div>
           </div>
@@ -841,7 +847,7 @@ export const ManagerBiometrics: React.FC = () => {
               type="button"
               disabled={analyzingFace}
               onClick={() => setFaceConfirmModal(false)}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1d2243] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#272d5a] text-xs font-semibold cursor-pointer"
             >
               Hủy bỏ
             </button>
@@ -849,11 +855,10 @@ export const ManagerBiometrics: React.FC = () => {
               type="button"
               disabled={analyzingFace}
               onClick={handleConfirmFaceSave}
-              className={`px-5 py-2 rounded-xl text-white text-xs font-semibold shadow-md flex items-center gap-2 transition-all cursor-pointer ${
-                analyzingFace
-                  ? 'bg-blue-600/70 cursor-wait'
-                  : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30'
-              }`}
+              className={`px-5 py-2 rounded-xl text-white text-xs font-semibold shadow-sm flex items-center gap-2 transition-all cursor-pointer ${analyzingFace
+                  ? 'bg-purple-600/70 cursor-wait'
+                  : 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
+                }`}
             >
               {analyzingFace ? (
                 <>
@@ -877,53 +882,53 @@ export const ManagerBiometrics: React.FC = () => {
         maxWidth="md"
       >
         <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-400">Trạng thái xử lý:</span>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono bg-green-500/10 text-green-400 border border-green-500/30 flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Trạng thái xử lý:</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 ĐÃ TRÍCH XUẤT THÀNH CÔNG
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-2">
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                <span className="text-[11px] text-slate-400 block mb-1">Khung hình trích xuất:</span>
-                <span className="text-base font-bold font-mono text-blue-400">
+              <div className="p-3 rounded-xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b]">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Khung hình trích xuất:</span>
+                <span className="text-base font-bold font-mono text-purple-600 dark:text-purple-400">
                   {enrollResult?.detected_faces ?? uploadedPhotos.length}/{enrollResult?.total_images ?? uploadedPhotos.length} khung hình
                 </span>
                 <span className="text-[11px] text-slate-400 block mt-0.5">
-                  Tỉ lệ đạt: <strong className="text-cyan-400 font-mono">{enrollResult?.extraction_rate ?? 100}%</strong>
+                  Tỉ lệ đạt: <strong className="text-indigo-600 dark:text-indigo-400 font-mono">{enrollResult?.extraction_rate ?? 100}%</strong>
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
-                <span className="text-[11px] text-slate-400 block mb-1">Vector 512-D hợp lệ:</span>
-                <span className="text-base font-bold font-mono text-green-400">
+              <div className="p-3 rounded-xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b]">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Vector 512-D hợp lệ:</span>
+                <span className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400">
                   {enrollResult?.n_samples_used ?? uploadedPhotos.length} vector
                 </span>
                 <span className="text-[11px] text-slate-400 block mt-0.5">
-                  Loại bỏ outlier: <strong className="text-slate-400 font-mono">{enrollResult?.n_outliers_removed ?? 0} ảnh</strong>
+                  Loại bỏ outlier: <strong className="text-slate-500 dark:text-slate-400 font-mono">{enrollResult?.n_outliers_removed ?? 0} ảnh</strong>
                 </span>
               </div>
             </div>
 
             {/* Progress bar */}
             <div className="space-y-1.5 pt-1">
-              <div className="flex justify-between text-[11px] font-mono text-slate-400">
+              <div className="flex justify-between text-[11px] font-mono text-slate-500 dark:text-slate-400">
                 <span>Tỉ lệ trích xuất thành công</span>
-                <span className="font-bold text-green-400">{enrollResult?.extraction_rate ?? 100}%</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">{enrollResult?.extraction_rate ?? 100}%</span>
               </div>
-              <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+              <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-300 dark:border-slate-700">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-500 via-cyan-500 to-green-500 rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full transition-all duration-500"
                   style={{ width: `${enrollResult?.extraction_rate ?? 100}%` }}
                 />
               </div>
             </div>
 
             {enrollResult?.warnings && enrollResult.warnings.length > 0 && (
-              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] space-y-1">
+              <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-300 text-[11px] space-y-1">
                 <p className="font-semibold flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5" />
                   Ghi chú trích xuất:
@@ -934,8 +939,8 @@ export const ManagerBiometrics: React.FC = () => {
               </div>
             )}
 
-            <p className="text-[11px] text-slate-400 pt-1 leading-relaxed">
-              Các mẫu khuôn mặt đã được lưu vào bảng <code>face_embeddings</code> trong database PBL6. Việc đăng ký không tự đồng bộ dữ liệu sang thiết bị Edge.
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 leading-relaxed">
+              Các mẫu khuôn mặt đã được lưu vào bảng <code className="text-purple-600 dark:text-purple-400">face_embeddings</code> trong database PBL6.
             </p>
           </div>
 
@@ -943,7 +948,7 @@ export const ManagerBiometrics: React.FC = () => {
             <button
               type="button"
               onClick={() => setResultModalOpen(false)}
-              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md cursor-pointer transition-colors"
+              className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-sm shadow-purple-600/20 cursor-pointer transition-colors"
             >
               Hoàn tất & Đóng
             </button>
@@ -960,16 +965,16 @@ export const ManagerBiometrics: React.FC = () => {
         maxWidth="md"
       >
         <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-2">
-            <p className="font-semibold text-white">Xác nhận ghi đè mẫu sinh trắc vân tay</p>
-            <p className="text-slate-400">
-              Vị trí ngón: <strong className="text-white">{selectedFinger}</strong>
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] text-xs text-slate-700 dark:text-slate-300 space-y-2">
+            <p className="font-semibold text-slate-900 dark:text-white">Xác nhận ghi đè mẫu sinh trắc vân tay</p>
+            <p className="text-slate-500 dark:text-slate-400">
+              Vị trí ngón: <strong className="text-slate-900 dark:text-white">{selectedFinger}</strong>
             </p>
-            <p className="text-slate-400">
-              Thiết bị ghi nhận: <strong className="text-white">{selectedDevice}</strong>
+            <p className="text-slate-500 dark:text-slate-400">
+              Thiết bị ghi nhận: <strong className="text-slate-900 dark:text-white">{selectedDevice}</strong>
             </p>
-            <p className="text-slate-400">
-              Chỉ số chất lượng NFIQ: <strong className="text-green-400">98.5/100 (Rất tốt)</strong>
+            <p className="text-slate-500 dark:text-slate-400">
+              Chỉ số chất lượng NFIQ: <strong className="text-emerald-600 dark:text-emerald-400">98.5/100 (Rất tốt)</strong>
             </p>
           </div>
 
@@ -977,14 +982,14 @@ export const ManagerBiometrics: React.FC = () => {
             <button
               type="button"
               onClick={() => setFingerConfirmModal(false)}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1d2243] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#272d5a] text-xs font-semibold cursor-pointer"
             >
               Hủy bỏ
             </button>
             <button
               type="button"
               onClick={handleConfirmFingerprintSave}
-              className="px-5 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-xs font-semibold shadow-md"
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm shadow-emerald-600/20 cursor-pointer"
             >
               Xác nhận lưu mẫu vân tay
             </button>
@@ -1003,48 +1008,47 @@ export const ManagerBiometrics: React.FC = () => {
         {currentManageEmp && (
           <div className="space-y-5">
             {/* Employee Profile Header Card */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center justify-between gap-4">
               <div className="flex items-center gap-3.5">
                 <img
                   src={currentManageEmp.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"}
                   alt={currentManageEmp.full_name}
-                  className="w-12 h-12 rounded-xl object-cover border border-slate-700"
+                  className="w-12 h-12 rounded-xl object-cover border border-purple-200 dark:border-purple-800"
                 />
                 <div>
-                  <h4 className="text-sm font-bold text-white">{currentManageEmp.full_name}</h4>
-                  <p className="text-xs font-mono text-blue-400">{currentManageEmp.employee_id}</p>
-                  <p className="text-[11px] text-slate-400">{currentManageEmp.department} • {currentManageEmp.position}</p>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">{currentManageEmp.full_name}</h4>
+                  <p className="text-xs font-mono text-purple-600 dark:text-purple-400">{currentManageEmp.employee_id}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">{currentManageEmp.department} • {currentManageEmp.position}</p>
                 </div>
               </div>
             </div>
 
             {/* Section 1: Face ID Management */}
-            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+            <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                  <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700/50 flex items-center justify-center text-purple-600 dark:text-purple-400">
                     <ScanFace className="w-4 h-4" />
                   </div>
                   <div>
-                    <h5 className="text-xs font-bold text-white uppercase tracking-wider">Khuôn mặt (Face ID)</h5>
-                    <p className="text-[11px] text-slate-400">Nhận diện khuôn mặt 512-D qua camera AIoT</p>
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Khuôn mặt (Face ID)</h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Nhận diện khuôn mặt 512-D qua camera AIoT</p>
                   </div>
                 </div>
 
-                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${
-                  currentManageEmp.face_enrolled
-                    ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                }`}>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${currentManageEmp.face_enrolled
+                    ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
+                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
+                  }`}>
                   {currentManageEmp.face_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80">
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60 dark:border-[#21264b]">
                 <button
                   type="button"
                   onClick={() => handleStartEditFace(currentManageEmp)}
-                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                  className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shadow-purple-600/20"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>{currentManageEmp.face_enrolled ? 'Chỉnh sửa / Tải ảnh mới' : 'Đăng ký tải ảnh Face ID'}</span>
@@ -1053,9 +1057,9 @@ export const ManagerBiometrics: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleStartCameraEkycFromModal(currentManageEmp)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#13162b] dark:hover:bg-[#1d2243] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <Camera className="w-3.5 h-3.5 text-cyan-400" />
+                  <Camera className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
                   <span>Chụp bằng Camera eKYC</span>
                 </button>
 
@@ -1063,7 +1067,7 @@ export const ManagerBiometrics: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleDeleteFaceId(currentManageEmp)}
-                    className="px-3.5 py-2 rounded-xl bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
+                    className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-600 dark:bg-rose-950/40 dark:hover:bg-rose-600 text-rose-600 hover:text-white dark:text-rose-300 dark:hover:text-white border border-rose-200 dark:border-rose-800/50 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Xóa Face ID</span>
@@ -1073,32 +1077,31 @@ export const ManagerBiometrics: React.FC = () => {
             </div>
 
             {/* Section 2: Fingerprint Management */}
-            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+            <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-400">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                     <Fingerprint className="w-4 h-4" />
                   </div>
                   <div>
-                    <h5 className="text-xs font-bold text-white uppercase tracking-wider">Vân tay (FAP30)</h5>
-                    <p className="text-[11px] text-slate-400">Ghi nhận mẫu vân tay quang học 500 DPI qua IoT</p>
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">Vân tay (FAP30)</h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Ghi nhận mẫu vân tay quang học 500 DPI qua IoT</p>
                   </div>
                 </div>
 
-                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${
-                  currentManageEmp.fingerprint_enrolled
-                    ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                }`}>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${currentManageEmp.fingerprint_enrolled
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
+                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
+                  }`}>
                   {currentManageEmp.fingerprint_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80">
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/60 dark:border-[#21264b]">
                 <button
                   type="button"
                   onClick={() => handleStartEditFingerprint(currentManageEmp)}
-                  className="px-3.5 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shadow-emerald-600/20"
                 >
                   <Radio className="w-3.5 h-3.5" />
                   <span>{currentManageEmp.fingerprint_enrolled ? 'Chỉnh sửa / Lấy lại mẫu IoT' : 'Ghi nhận mẫu vân tay IoT'}</span>
@@ -1108,7 +1111,7 @@ export const ManagerBiometrics: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleDeleteFingerprint(currentManageEmp)}
-                    className="px-3.5 py-2 rounded-xl bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
+                    className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-600 dark:bg-rose-950/40 dark:hover:bg-rose-600 text-rose-600 hover:text-white dark:text-rose-300 dark:hover:text-white border border-rose-200 dark:border-rose-800/50 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ml-auto"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Xóa Vân tay</span>
@@ -1118,11 +1121,11 @@ export const ManagerBiometrics: React.FC = () => {
             </div>
 
             {/* Footer */}
-            <div className="pt-3 border-t border-slate-800 flex justify-end">
+            <div className="pt-3 border-t border-slate-100 dark:border-[#21264b] flex justify-end">
               <button
                 type="button"
                 onClick={() => setManageModalEmployee(null)}
-                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1d2243] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#272d5a] text-xs font-semibold transition-colors cursor-pointer"
               >
                 Đóng
               </button>

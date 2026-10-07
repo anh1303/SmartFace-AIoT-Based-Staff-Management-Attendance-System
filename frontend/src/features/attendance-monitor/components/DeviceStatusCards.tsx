@@ -18,22 +18,22 @@ export const DeviceStatusCards: React.FC<DeviceStatusCardsProps> = ({ devices })
         return (
           <div
             key={dev.name}
-            className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors"
+            className="p-4 rounded-xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-[#2f3668] transition-all shadow-xs"
           >
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                <p className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                   {isFingerprint ? (
-                    <Fingerprint className="w-4 h-4 text-emerald-400" />
+                    <Fingerprint className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   ) : (
-                    <ScanFace className="w-4 h-4 text-blue-400" />
+                    <ScanFace className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                   )}
                   {dev.name}
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">{dev.location}</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{dev.location}</p>
               </div>
-              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-green-500/10 text-green-500 border border-green-500/20 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-ping" />
+              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                 {dev.status}
               </span>
             </div>
@@ -43,3 +43,4 @@ export const DeviceStatusCards: React.FC<DeviceStatusCardsProps> = ({ devices })
     </div>
   );
 };
+

@@ -59,33 +59,33 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen bg-slate-950 text-slate-200 flex items-center justify-center p-4 sm:p-6 font-sans">
-          <div className="max-w-xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+        <div className="min-h-screen bg-[#f5f7fc] dark:bg-[#0b0d19] text-slate-900 dark:text-slate-200 flex items-center justify-center p-4 sm:p-6 font-sans">
+          <div className="max-w-xl w-full bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
             {/* Ambient Background Glow */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-[90px] pointer-events-none" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/10 rounded-full blur-[90px] pointer-events-none" />
 
             {/* Error Header */}
             <div className="flex items-center gap-3.5 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center shadow-lg shadow-red-500/10">
+              <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shadow-xs">
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white font-heading tracking-tight">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
                   Đã xảy ra lỗi giao diện
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Ứng dụng gặp sự cố không mong muốn trong quá trình kết xuất.
                 </p>
               </div>
             </div>
 
             {/* Error Message Card */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs space-y-2 mb-6">
-              <div className="flex items-center gap-2 text-red-400 font-semibold">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] text-xs space-y-2 mb-6">
+              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-semibold">
                 <ShieldAlert className="w-4 h-4 shrink-0" />
                 <span>Chi tiết lỗi:</span>
               </div>
-              <p className="text-slate-300 font-mono text-[11px] break-words">
+              <p className="text-slate-700 dark:text-slate-300 font-mono text-[11px] break-words">
                 {this.state.error?.message || 'Không thể xác định nguyên nhân sự cố'}
               </p>
             </div>
@@ -96,13 +96,13 @@ export class ErrorBoundary extends Component<Props, State> {
                 <button
                   type="button"
                   onClick={this.toggleDetails}
-                  className="flex items-center justify-between w-full text-xs text-slate-400 hover:text-slate-300 py-1"
+                  className="flex items-center justify-between w-full text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 py-1"
                 >
                   <span>Xem thông tin kỹ thuật (Stack Trace)</span>
                   {this.state.showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </button>
                 {this.state.showDetails && (
-                  <pre className="mt-2 p-3 bg-slate-950 rounded-xl border border-slate-800 text-[10px] font-mono text-slate-400 overflow-x-auto max-h-48 whitespace-pre-wrap leading-relaxed">
+                  <pre className="mt-2 p-3 bg-slate-50 dark:bg-[#0f1224] rounded-xl border border-slate-200 dark:border-[#272d5a] text-[10px] font-mono text-slate-600 dark:text-slate-400 overflow-x-auto max-h-48 whitespace-pre-wrap leading-relaxed">
                     {this.state.errorInfo.componentStack}
                   </pre>
                 )}
@@ -110,11 +110,11 @@ export class ErrorBoundary extends Component<Props, State> {
             )}
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-800">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-200 dark:border-[#21264b]">
               <button
                 type="button"
                 onClick={this.handleReset}
-                className="py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
+                className="py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2 shadow-xs"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Thử lại</span>
@@ -122,7 +122,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <button
                 type="button"
                 onClick={this.handleHardReload}
-                className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-colors flex items-center justify-center gap-2"
+                className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] font-semibold text-xs transition-colors flex items-center justify-center gap-2"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Làm mới trang</span>
@@ -130,7 +130,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <button
                 type="button"
                 onClick={this.handleGoHome}
-                className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-colors flex items-center justify-center gap-2"
+                className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] font-semibold text-xs transition-colors flex items-center justify-center gap-2"
               >
                 <Home className="w-3.5 h-3.5" />
                 <span>Về trang chủ</span>

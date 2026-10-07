@@ -1,67 +1,255 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
+  :root {
+    --bg-page: #f4f6fc;
+    --bg-card: #ffffff;
+    --border-card: #cbd5e1;
+    --text-main: #090d16;
+    --text-muted: #334155;
+    --text-sub: #475569;
+    --accent-primary: #6d28d9;
+    --accent-primary-hover: #5b21b6;
+    --accent-light: #ede9fe;
+    color-scheme: light;
+  }
+
+  .dark {
+    --bg-page: #0b0d19;
+    --bg-card: #13162b;
+    --border-card: #282e60;
+    --text-main: #ffffff;
+    --text-muted: #cbd5e1;
+    --text-sub: #94a3b8;
+    --accent-primary: #8b5cf6;
+    --accent-primary-hover: #7c3aed;
+    --accent-light: rgba(139, 92, 246, 0.2);
+    color-scheme: dark;
+  }
+
   body {
-    font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #020617; /* slate-950 */
-    color: #e2e8f0; /* slate-200 */
+    font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 500;
+    background-color: var(--bg-page);
+    color: var(--text-main);
     margin: 0;
     padding: 0;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
-  
-  h1, h2, h3, h4, .font-heading {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-heading {
     font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.015em;
   }
-  
-  .font-mono-code, code, kbd {
+
+  .font-mono-code,
+  code,
+  kbd,
+  .font-mono {
     font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+
+  b, strong {
+    font-weight: 700;
+  }
+
+  p {
+    font-weight: 450;
+  }
+
+  /* Boost table text readability */
+  th {
+    font-weight: 700 !important;
+    color: #0f172a;
+  }
+  .dark th {
+    color: #f8fafc !important;
+  }
+
+  td {
+    font-weight: 500;
+  }
+
+  /* Boost form label readability */
+  label {
+    font-weight: 600;
   }
 }
 
-/* Custom scrollbar - Bento Grid Slate Palette */
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
-  background: #020617;
+  background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #1e293b; /* slate-800 */
-  border-radius: 4px;
+  background: #cbd5e1;
+  border-radius: 9999px;
 }
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #21264b;
+}
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155; /* slate-700 */
+  background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #313866;
 }
 
 /* Bento Grid Card styling utilities */
 .bento-card {
-  background-color: #0f172a; /* slate-900 */
-  border: 1px solid #1e293b; /* slate-800 */
-  border-radius: 1.5rem; /* rounded-3xl */
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  /* rounded-xl */
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.dark .bento-card {
+  background-color: #13162b;
+  border: 1px solid #21264b;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.2);
 }
 
 .bento-card:hover {
-  border-color: #334155; /* slate-700 */
+  border-color: #cbd5e1;
+}
+
+.dark .bento-card:hover {
+  border-color: #2e3566;
+}
+
+/* Ethereal Bento Hero Mesh & Animated Continuous Shifting Gradient Cards */
+@keyframes bentoGradientFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.bento-hero-gradient,
+.bento-animated-gradient {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    -45deg,
+    #f3e8ff,
+    #ede9fe,
+    #e0e7ff,
+    #fae8ff,
+    #f5f3ff
+  );
+  background-size: 300% 300%;
+  animation: bentoGradientFlow 8s ease infinite;
+  border: 1px solid rgba(216, 180, 254, 0.5);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+}
+
+.bento-hero-gradient h1,
+.bento-hero-gradient h2,
+.bento-hero-gradient h3 {
+  font-weight: 800 !important;
+  color: #090d16 !important;
+}
+
+.bento-hero-gradient p {
+  color: #334155 !important;
+  font-weight: 500 !important;
+}
+
+.dark .bento-hero-gradient,
+.dark .bento-animated-gradient {
+  background: linear-gradient(
+    -45deg,
+    #16193d,
+    #23174f,
+    #101432,
+    #281a5e,
+    #121535
+  );
+  background-size: 300% 300%;
+  animation: bentoGradientFlow 10s ease infinite;
+  border: 1px solid #282e60;
+  box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.3);
+}
+
+.dark .bento-hero-gradient h1,
+.dark .bento-hero-gradient h2,
+.dark .bento-hero-gradient h3 {
+  color: #ffffff !important;
+}
+
+.dark .bento-hero-gradient p {
+  color: #e2e8f0 !important;
+  font-weight: 500 !important;
+}
+
+.animate-gradient-flow {
+  background-size: 300% 300% !important;
+  animation: bentoGradientFlow 8s ease infinite !important;
 }
 
 .bento-card-sm {
-  background-color: #0f172a; /* slate-900 */
-  border: 1px solid #1e293b; /* slate-800 */
-  border-radius: 1rem; /* rounded-2xl */
-  transition: border-color 0.2s ease;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  /* rounded-xl */
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+}
+
+.dark .bento-card-sm {
+  background-color: #13162b;
+  border: 1px solid #21264b;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.15);
 }
 
 .bento-card-sm:hover {
-  border-color: #334155;
+  border-color: #cbd5e1;
+}
+
+.dark .bento-card-sm:hover {
+  border-color: #2e3566;
 }
 
 /* Subtle grid line overlay */
 .cyber-grid {
   background-size: 48px 48px;
-  background-image: 
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+}
+
+.dark .cyber-grid {
+  background-image:
     linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
 }
@@ -71,12 +259,85 @@
     top: 20%;
     opacity: 0.3;
   }
+
   50% {
     opacity: 0.9;
   }
+
   100% {
     top: 75%;
     opacity: 0.3;
   }
 }
 
+/* ========================================================================= */
+/* Bento Background Floating / Morphing Fluid Blobs Animations              */
+/* ========================================================================= */
+@keyframes blobMorph1 {
+  0% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+  33% {
+    border-radius: 70% 30% 50% 50% / 30% 60% 40% 70%;
+    transform: translate(40px, -25px) scale(1.25) rotate(45deg);
+  }
+  66% {
+    border-radius: 40% 60% 70% 30% / 50% 40% 60% 50%;
+    transform: translate(-35px, 30px) scale(0.9) rotate(90deg);
+  }
+  100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes blobMorph2 {
+  0% {
+    border-radius: 40% 60% 60% 40% / 70% 30% 70% 30%;
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+  33% {
+    border-radius: 60% 40% 30% 70% / 40% 70% 30% 60%;
+    transform: translate(-45px, 25px) scale(1.3) rotate(-45deg);
+  }
+  66% {
+    border-radius: 30% 70% 50% 50% / 60% 30% 70% 40%;
+    transform: translate(35px, -35px) scale(0.85) rotate(-90deg);
+  }
+  100% {
+    border-radius: 40% 60% 60% 40% / 70% 30% 70% 30%;
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes blobMorph3 {
+  0% {
+    border-radius: 50% 50% 40% 60% / 40% 60% 50% 50%;
+    transform: translate(0px, 0px) scale(0.9);
+  }
+  50% {
+    border-radius: 70% 30% 60% 40% / 50% 40% 60% 50%;
+    transform: translate(35px, 25px) scale(1.35);
+  }
+  100% {
+    border-radius: 50% 50% 40% 60% / 40% 60% 50% 50%;
+    transform: translate(0px, 0px) scale(0.9);
+  }
+}
+
+.animate-blob-1 {
+  animation: blobMorph1 10s ease-in-out infinite;
+  will-change: transform, border-radius;
+}
+
+.animate-blob-2 {
+  animation: blobMorph2 14s ease-in-out infinite;
+  will-change: transform, border-radius;
+}
+
+.animate-blob-3 {
+  animation: blobMorph3 9s ease-in-out infinite;
+  will-change: transform, border-radius;
+}
+

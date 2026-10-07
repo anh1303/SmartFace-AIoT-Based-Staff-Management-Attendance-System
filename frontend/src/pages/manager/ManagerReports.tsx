@@ -101,7 +101,7 @@ export const ManagerReports: React.FC = () => {
       name: 'Khuôn mặt (Face ID 512D)',
       value: totalLogs > 0 ? Math.round((faceLogs / totalLogs) * 100) : 0,
       count: faceLogs,
-      color: '#3b82f6'
+      color: '#8b5cf6'
     },
     {
       name: 'Vân tay (Fingerprint)',
@@ -197,14 +197,12 @@ export const ManagerReports: React.FC = () => {
     };
   }).sort((a, b) => b.rateNum - a.rateNum);
 
-  // Handle Export based on selected report type
   const handleExecuteExport = () => {
     let headers: string[] = [];
     let rows: (string | number)[][] = [];
     let fileName = '';
 
     if (exportType === 'attendance') {
-      // Option 1: Attendance Summary Report
       headers = [
         'Mã NV',
         'Họ và Tên',
@@ -233,7 +231,6 @@ export const ManagerReports: React.FC = () => {
         ? `Bao_cao_tong_hop_chuyen_can_${startDate}.csv`
         : `Bao_cao_tong_hop_chuyen_can_${startDate}_den_${endDate}.csv`;
     } else if (exportType === 'payroll') {
-      // Option 2: Payroll Expense Report
       headers = [
         'Mã NV',
         'Họ và Tên',
@@ -268,7 +265,6 @@ export const ManagerReports: React.FC = () => {
 
       fileName = `Bao_cao_chi_phi_luong_${selectedPeriod || getTodayVNString()}.csv`;
     } else {
-      // Option 3: Employee Profiles & Biometrics
       headers = [
         'Mã NV',
         'Họ và Tên',
@@ -313,13 +309,18 @@ export const ManagerReports: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Bento Header */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white font-heading tracking-tight">
+      {/* Bento Header with Continuous Shifting Gradient & Floating Blobs */}
+      <div className="bento-hero-gradient rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
+        {/* Ambient Floating & Morphing Blurred Blobs */}
+        <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-purple-500/30 to-fuchsia-500/25 dark:from-purple-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
+        <div className="absolute -bottom-16 left-1/4 w-64 h-64 bg-gradient-to-tr from-indigo-500/30 to-blue-500/20 dark:from-indigo-600/30 dark:to-blue-600/20 rounded-full blur-3xl pointer-events-none animate-blob-2" />
+        <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
+
+        <div className="relative z-10">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
             Báo Cáo & Thống Kê Chuyên Cần
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
             Tổng hợp xu hướng đi làm, phương thức sinh trắc và phân tích chi phí nhân sự toàn hệ thống.
           </p>
         </div>
@@ -327,7 +328,7 @@ export const ManagerReports: React.FC = () => {
         <button
           type="button"
           onClick={() => setIsExportModalOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md shadow-blue-500/20 transition-all active:scale-95"
+          className="relative z-10 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm shadow-purple-500/20 transition-all active:scale-95 cursor-pointer"
         >
           <Download className="w-4 h-4" />
           <span>Xuất báo cáo CSV</span>
@@ -335,37 +336,37 @@ export const ManagerReports: React.FC = () => {
       </div>
 
       {/* Date Range Toolbar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
         {/* Date Range Pickers: Từ ngày - Đến ngày */}
         <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
           {/* Từ ngày */}
-          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-cyan-500/60 transition-colors">
-            <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">Từ ngày:</span>
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-1.5 focus-within:border-purple-500 transition-colors">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">Từ ngày:</span>
             <div className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
               <input
                 type="date"
                 value={startDate}
                 max={endDate || undefined}
                 onChange={(e) => handleStartDateChange(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
               />
             </div>
           </div>
 
-          <span className="text-slate-500 font-semibold text-xs hidden sm:inline">-</span>
+          <span className="text-slate-400 dark:text-slate-500 font-semibold text-xs hidden sm:inline">-</span>
 
           {/* Đến ngày */}
-          <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-cyan-500/60 transition-colors">
-            <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">Đến ngày:</span>
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-1.5 focus-within:border-purple-500 transition-colors">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">Đến ngày:</span>
             <div className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
               <input
                 type="date"
                 value={endDate}
                 min={startDate || undefined}
                 onChange={(e) => handleEndDateChange(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
               />
             </div>
           </div>
@@ -374,27 +375,26 @@ export const ManagerReports: React.FC = () => {
           <button
             type="button"
             onClick={handleSelectToday}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              isTodaySelected
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
-            }`}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${isTodaySelected
+                ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
+                : 'bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#272d5a]'
+              }`}
           >
             Hôm nay
           </button>
         </div>
 
         {/* Thông tin thống kê theo khoảng ngày */}
-        <div className="flex items-center gap-3 text-xs text-slate-400">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/60 font-mono text-[11px]">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] font-mono text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>
               {isSameDay
                 ? `Ngày: ${startDate}`
                 : `Khoảng: ${startDate} → ${endDate}`}
             </span>
-            <span className="text-slate-500">|</span>
-            <span className="text-cyan-400 font-bold">{filteredAttendance.length} lượt chấm công</span>
+            <span className="text-slate-300 dark:text-slate-600">|</span>
+            <span className="text-purple-600 dark:text-purple-400 font-bold">{filteredAttendance.length} lượt chấm công</span>
           </div>
         </div>
       </div>
@@ -402,32 +402,32 @@ export const ManagerReports: React.FC = () => {
       {/* Bento Charts Grid */}
       <div className="grid lg:grid-cols-12 gap-6">
         {/* Payroll Expense Trend */}
-        <div className="lg:col-span-6 p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
+        <div className="lg:col-span-6 p-6 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] space-y-4 shadow-xs">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-white font-heading">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
                 Chi phí quỹ lương theo kỳ (Triệu VNĐ)
               </h2>
-              <p className="text-xs text-slate-400">Tổng ngân sách chi trả thực tế các kỳ</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Tổng ngân sách chi trả thực tế các kỳ</p>
             </div>
-            <span className="text-xs font-mono text-blue-400 font-bold">{payrollTrendData.length} kỳ lương</span>
+            <span className="text-xs font-mono text-purple-600 dark:text-purple-400 font-bold">{payrollTrendData.length} kỳ lương</span>
           </div>
 
           {payrollTrendData.length > 0 ? (
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={payrollTrendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <XAxis dataKey="period" stroke="#64748b" fontSize={11} />
-                  <YAxis stroke="#64748b" fontSize={11} />
+                  <XAxis dataKey="period" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
+                    contentStyle={{ backgroundColor: '#13162b', borderColor: '#21264b', borderRadius: '12px', fontSize: '12px', color: '#fff' }}
                   />
-                  <Bar dataKey="cost" name="Quỹ lương (Triệu ₫)" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="cost" name="Quỹ lương (Triệu ₫)" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-64 w-full flex flex-col items-center justify-center text-slate-500 text-xs">
+            <div className="h-64 w-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 text-xs">
               <FileSpreadsheet className="w-8 h-8 mb-2 stroke-1 opacity-50 text-slate-400" />
               <span>Chưa có dữ liệu</span>
             </div>
@@ -435,15 +435,15 @@ export const ManagerReports: React.FC = () => {
         </div>
 
         {/* Punctuality Rate Area Chart */}
-        <div className="lg:col-span-6 p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
+        <div className="lg:col-span-6 p-6 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] space-y-4 shadow-xs">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-white font-heading">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
                 Tỷ lệ đi làm đúng giờ theo tuần (%)
               </h2>
-              <p className="text-xs text-slate-400">Đo lường mức độ tuân thủ nội quy (4 tuần gần nhất)</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Đo lường mức độ tuân thủ nội quy (4 tuần gần nhất)</p>
             </div>
-            <span className="text-xs font-mono text-emerald-400 font-bold">Thời gian thực</span>
+            <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-bold">Thời gian thực</span>
           </div>
 
           {hasPunctualityData ? (
@@ -452,25 +452,25 @@ export const ManagerReports: React.FC = () => {
                 <AreaChart data={punctualityData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="punctualityColor" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="week" stroke="#64748b" fontSize={11} />
-                  <YAxis stroke="#64748b" fontSize={11} domain={[0, 100]} />
+                  <XAxis dataKey="week" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} domain={[0, 100]} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
+                    contentStyle={{ backgroundColor: '#13162b', borderColor: '#21264b', borderRadius: '12px', fontSize: '12px', color: '#fff' }}
                     formatter={(val: unknown, _name: unknown, item: { payload?: { count?: number } }) => [
                       (item?.payload?.count ?? 0) > 0 ? `${val}%` : 'Chưa có dữ liệu',
                       'Tỷ lệ đúng giờ'
                     ]}
                   />
-                  <Area type="monotone" dataKey="rate" name="Tỷ lệ đúng giờ" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#punctualityColor)" />
+                  <Area type="monotone" dataKey="rate" name="Tỷ lệ đúng giờ" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#punctualityColor)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-64 w-full flex flex-col items-center justify-center text-slate-500 text-xs">
+            <div className="h-64 w-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 text-xs">
               <BarChart3 className="w-8 h-8 mb-2 stroke-1 opacity-50 text-slate-400" />
               <span>Chưa có dữ liệu</span>
             </div>
@@ -481,12 +481,12 @@ export const ManagerReports: React.FC = () => {
       {/* Bento Biometrics Distribution & Punctuality Leaderboard */}
       <div className="grid lg:grid-cols-12 gap-6">
         {/* Method breakdown with Larger Outer Radius (85) and Percentage Legend */}
-        <div className="lg:col-span-5 p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
+        <div className="lg:col-span-5 p-6 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] space-y-4 shadow-xs">
           <div>
-            <h2 className="text-base font-bold text-white font-heading">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
               Cơ cấu phương thức chấm công
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Tỷ lệ nhận diện khuôn mặt Face ID so với các phương thức khác
             </p>
           </div>
@@ -511,7 +511,7 @@ export const ManagerReports: React.FC = () => {
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#020617', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
+                      contentStyle={{ backgroundColor: '#13162b', borderColor: '#21264b', borderRadius: '12px', fontSize: '12px', color: '#fff' }}
                       formatter={(val: any, name: any, item: any) => [
                         `${val}% (${item?.payload?.count || 0} lượt)`,
                         item?.payload?.name || name
@@ -524,21 +524,21 @@ export const ManagerReports: React.FC = () => {
               {/* Clear Legend with Percentage and Exact Punch Count */}
               <div className="space-y-2 text-xs pt-1">
                 {methodBreakdown.map(m => (
-                  <div key={m.name} className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors">
+                  <div key={m.name} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: m.color }} />
-                      <span className="text-slate-300 font-medium">{m.name}</span>
+                      <div className="w-3 h-3 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: m.color }} />
+                      <span className="text-slate-700 dark:text-slate-300 font-medium">{m.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-white text-sm">{m.value}%</span>
-                      <span className="text-slate-400 text-[11px] font-mono">({m.count} lượt)</span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white text-sm">{m.value}%</span>
+                      <span className="text-slate-500 dark:text-slate-400 text-[11px] font-mono">({m.count} lượt)</span>
                     </div>
                   </div>
                 ))}
               </div>
             </>
           ) : (
-            <div className="h-56 w-full flex flex-col items-center justify-center text-slate-500 text-xs">
+            <div className="h-56 w-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 text-xs">
               <ScanFace className="w-8 h-8 mb-2 stroke-1 opacity-50 text-slate-400" />
               <span>Chưa có dữ liệu chấm công</span>
             </div>
@@ -546,15 +546,15 @@ export const ManagerReports: React.FC = () => {
         </div>
 
         {/* Attendance Leaderboard */}
-        <div className="lg:col-span-7 p-6 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
+        <div className="lg:col-span-7 p-6 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] space-y-4 shadow-xs">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-white font-heading">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
                 Bảng Xếp Hạng Chuyên Cần Nhân Sự
               </h2>
-              <p className="text-xs text-slate-400">Đánh giá tỷ lệ đúng giờ và chấp hành ca trực</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Đánh giá tỷ lệ đúng giờ và chấp hành ca trực</p>
             </div>
-            <span className="text-xs text-slate-400 font-mono">Đánh giá KPI CSDL</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Đánh giá KPI CSDL</span>
           </div>
 
           <div className="space-y-3">
@@ -562,35 +562,35 @@ export const ManagerReports: React.FC = () => {
               empStats.map((item, idx) => (
                 <div
                   key={item.id}
-                  className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 flex items-center justify-between hover:border-slate-700 transition-colors"
+                  className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center justify-between hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs ${idx === 0
-                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30'
                         : idx === 1
-                          ? 'bg-slate-700/20 text-slate-200 border border-slate-700/40'
-                          : 'bg-slate-900 text-slate-400 border border-slate-800'
+                          ? 'bg-slate-200 dark:bg-slate-700/20 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700/40'
+                          : 'bg-slate-100 dark:bg-[#13162b] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#21264b]'
                         }`}
                     >
                       #{idx + 1}
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-white">{item.name}</p>
-                      <p className="text-[10px] text-slate-400">{item.dept} • {item.onTime}</p>
+                      <p className="text-xs font-semibold text-slate-900 dark:text-white">{item.name}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">{item.dept} • {item.onTime}</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs font-bold text-blue-400">{item.rate}</span>
+                    <span className="font-mono text-xs font-bold text-purple-600 dark:text-purple-400">{item.rate}</span>
                     <span
                       className={`text-[9px] font-bold px-2.5 py-0.5 rounded-full ${item.badge === 'XUẤT SẮC'
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
                         : item.badge === 'TỐT'
-                          ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                          ? 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20'
                           : item.badge === 'CẦN LƯU Ý'
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                         }`}
                     >
                       {item.badge}
@@ -599,7 +599,7 @@ export const ManagerReports: React.FC = () => {
                 </div>
               ))
             ) : (
-              <div className="p-8 text-center text-xs text-slate-500">Chưa có dữ liệu nhân sự</div>
+              <div className="p-8 text-center text-xs text-slate-400 dark:text-slate-500">Chưa có dữ liệu nhân sự</div>
             )}
           </div>
         </div>
@@ -618,21 +618,20 @@ export const ManagerReports: React.FC = () => {
             {/* Option 1: Attendance */}
             <div
               onClick={() => setExportType('attendance')}
-              className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3 ${
-                exportType === 'attendance'
-                  ? 'bg-blue-600/10 border-blue-500 text-white shadow-sm'
-                  : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300'
-              }`}
+              className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${exportType === 'attendance'
+                  ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-500 text-slate-900 dark:text-white shadow-xs'
+                  : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200 dark:border-[#272d5a] hover:border-purple-300 text-slate-700 dark:text-slate-300'
+                }`}
             >
-              <div className={`p-2 rounded-xl mt-0.5 ${exportType === 'attendance' ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400'}`}>
+              <div className={`p-2 rounded-xl mt-0.5 ${exportType === 'attendance' ? 'bg-purple-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
                 <Award className="w-4 h-4" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-white">1. Báo cáo Tổng hợp Chuyên cần (Attendance Summary)</p>
-                  {exportType === 'attendance' && <Check className="w-4 h-4 text-blue-400" />}
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">1. Báo cáo Tổng hợp Chuyên cần (Attendance Summary)</p>
+                  {exportType === 'attendance' && <Check className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                   Xuất dữ liệu: Mã NV, Họ tên, Phòng ban, Tổng lượt điểm danh, Số lượt đúng giờ, Đi muộn/Về sớm, Tỷ lệ đúng giờ (%), Xếp loại thi đua.
                 </p>
               </div>
@@ -641,21 +640,20 @@ export const ManagerReports: React.FC = () => {
             {/* Option 2: Payroll */}
             <div
               onClick={() => setExportType('payroll')}
-              className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3 ${
-                exportType === 'payroll'
-                  ? 'bg-blue-600/10 border-blue-500 text-white shadow-sm'
-                  : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300'
-              }`}
+              className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${exportType === 'payroll'
+                  ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-500 text-slate-900 dark:text-white shadow-xs'
+                  : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200 dark:border-[#272d5a] hover:border-purple-300 text-slate-700 dark:text-slate-300'
+                }`}
             >
-              <div className={`p-2 rounded-xl mt-0.5 ${exportType === 'payroll' ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400'}`}>
+              <div className={`p-2 rounded-xl mt-0.5 ${exportType === 'payroll' ? 'bg-purple-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
                 <FileSpreadsheet className="w-4 h-4" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-white">2. Báo cáo Chi phí Lương (Payroll Report)</p>
-                  {exportType === 'payroll' && <Check className="w-4 h-4 text-blue-400" />}
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">2. Báo cáo Chi phí Lương (Payroll Report)</p>
+                  {exportType === 'payroll' && <Check className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                   Xuất dữ liệu: Mã NV, Họ tên, Kỳ lương, Lương theo giờ, Giờ làm việc, Giờ tăng ca, Giờ trễ/sớm, Phụ cấp, Lương thực lĩnh Net, Trạng thái chốt sổ.
                 </p>
               </div>
@@ -664,39 +662,38 @@ export const ManagerReports: React.FC = () => {
             {/* Option 3: Employees & Biometrics */}
             <div
               onClick={() => setExportType('employees')}
-              className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3 ${
-                exportType === 'employees'
-                  ? 'bg-blue-600/10 border-blue-500 text-white shadow-sm'
-                  : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300'
-              }`}
+              className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${exportType === 'employees'
+                  ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-500 text-slate-900 dark:text-white shadow-xs'
+                  : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200 dark:border-[#272d5a] hover:border-purple-300 text-slate-700 dark:text-slate-300'
+                }`}
             >
-              <div className={`p-2 rounded-xl mt-0.5 ${exportType === 'employees' ? 'bg-blue-600 text-white' : 'bg-slate-900 text-slate-400'}`}>
+              <div className={`p-2 rounded-xl mt-0.5 ${exportType === 'employees' ? 'bg-purple-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
                 <Users className="w-4 h-4" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-white">3. Hồ sơ & Đăng ký Sinh trắc (Employee Biometrics)</p>
-                  {exportType === 'employees' && <Check className="w-4 h-4 text-blue-400" />}
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">3. Hồ sơ & Đăng ký Sinh trắc (Employee Biometrics)</p>
+                  {exportType === 'employees' && <Check className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                   Xuất danh sách: Mã NV, Họ tên, Phòng ban, Chức vụ, Email, Trạng thái, Lương cơ bản, Trạng thái Face ID 512D, Vân tay.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="pt-2 flex justify-end gap-2 border-t border-slate-800">
+          <div className="pt-3 flex justify-end gap-2 border-t border-slate-200 dark:border-[#21264b]">
             <button
               type="button"
               onClick={() => setIsExportModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 rounded-xl text-xs text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] border border-slate-200 dark:border-[#272d5a] cursor-pointer"
             >
               Hủy bỏ
             </button>
             <button
               type="button"
               onClick={handleExecuteExport}
-              className="px-5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md flex items-center gap-1.5 transition-all"
+              className="px-5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/20 flex items-center gap-1.5 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Tải file CSV ngay</span>

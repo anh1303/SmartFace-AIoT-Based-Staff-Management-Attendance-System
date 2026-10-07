@@ -10,6 +10,7 @@ import {
   DollarSign,
   FileText,
   Users,
+  UserCheck,
   CalendarRange,
   Eye,
   BarChart3,
@@ -45,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const managerNavItems = [
     { label: 'Tổng quan hệ thống', path: '/app/manager/dashboard', icon: LayoutDashboard },
     { label: 'Quản lý nhân viên', path: '/app/manager/employees', icon: Users },
+    { label: 'Chi tiết nhân viên', path: '/app/manager/employee-detail', icon: UserCheck },
     { label: 'Cập nhật sinh trắc học', path: '/app/manager/biometrics', icon: Fingerprint },
     { label: 'Sắp xếp lịch làm', path: '/app/manager/schedule', icon: CalendarRange },
     { label: 'Theo dõi chấm công', path: '/app/manager/attendance', icon: Eye },
@@ -65,18 +67,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       )}
 
       <aside
-        className={`fixed lg:static top-0 bottom-0 left-0 z-40 w-64 bg-slate-900 border-r border-slate-800 flex flex-col transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-          }`}
+        className={`fixed lg:static top-0 bottom-0 left-0 z-40 w-64 bg-white dark:bg-[#0f1224] border-r border-slate-200/80 dark:border-[#1d2243] flex flex-col transition-all duration-300 shadow-sm ${
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
       >
         {/* Brand Header */}
-        <div className="p-6 border-b border-slate-800">
+        <div className="p-6 border-b border-slate-200/80 dark:border-[#1d2243]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center shadow-md shadow-purple-500/25">
               <ScanFace className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-heading font-bold text-white text-base tracking-tight">
+                <span className="font-heading font-bold text-slate-900 dark:text-white text-base tracking-tight">
                   AIoT Attendance
                 </span>
               </div>
@@ -84,17 +87,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           </div>
 
           {/* Role Pill */}
-          <div className="mt-4 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${role === 'manager' ? 'bg-amber-400 shadow-sm shadow-amber-400/50' : 'bg-emerald-400 shadow-sm shadow-emerald-400/50'}`} />
-            <span className="text-xs text-slate-300">
-              Vai trò: <strong className="text-white capitalize">{role === 'manager' ? 'Quản lý' : 'Nhân viên'}</strong>
+          <div className="mt-4 p-2.5 rounded-xl bg-slate-50 dark:bg-[#151936] border border-slate-200/80 dark:border-[#242b5c] flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${role === 'manager' ? 'bg-purple-500 shadow-xs shadow-purple-400/50' : 'bg-emerald-500 shadow-xs shadow-emerald-400/50'}`} />
+            <span className="text-xs text-slate-600 dark:text-slate-300">
+              Vai trò: <strong className="text-slate-900 dark:text-white capitalize">{role === 'manager' ? 'Quản lý' : 'Nhân viên'}</strong>
             </span>
           </div>
         </div>
 
         {/* Navigation Menu */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
-          <div className="px-3 pb-2 text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
+          <div className="px-3 pb-2 text-[10px] font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
             {role === 'manager' ? 'Phân hệ Quản trị' : 'Phân hệ Nhân viên'}
           </div>
 
@@ -106,19 +109,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 to={item.path}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${isActive
-                    ? 'bg-blue-600/10 text-blue-400 font-semibold border border-blue-500/20'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    isActive
+                      ? 'bg-purple-50 text-purple-700 dark:bg-purple-600/20 dark:text-purple-300 font-semibold border border-purple-200/80 dark:border-purple-500/30 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-[#181c38] hover:text-slate-900 dark:hover:text-slate-200'
                   }`
                 }
               >
-                <Icon className="w-5 h-5 shrink-0" />
+                <Icon className="w-4.5 h-4.5 shrink-0" />
                 <span>{item.label}</span>
               </NavLink>
             );
           })}
 
-          <div className="pt-4 px-3 pb-2 text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
+          <div className="pt-4 px-3 pb-2 text-[10px] font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
             Cổng thông tin
           </div>
 
@@ -126,18 +130,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           <NavLink
             to="/"
             onClick={onClose}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-[#181c38] transition-colors"
           >
-            <ExternalLink className="w-5 h-5 shrink-0" />
+            <ExternalLink className="w-4.5 h-4.5 shrink-0" />
             <span>Trang giới thiệu</span>
           </NavLink>
         </div>
 
         {/* User Footer Profile */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900">
+        <div className="p-4 border-t border-slate-200/80 dark:border-[#1d2243] bg-slate-50/60 dark:bg-[#0f1224]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-10 h-10 rounded-xl bg-slate-800 overflow-hidden flex items-center justify-center border border-slate-700 shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-[#181c38] overflow-hidden flex items-center justify-center border border-slate-200 dark:border-[#272d5a] shrink-0">
                 <img
                   src={currentUser?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
                   alt={currentUser?.full_name}
@@ -145,10 +149,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate text-white">
+                <p className="text-sm font-semibold truncate text-slate-900 dark:text-white">
                   {currentUser?.full_name || 'Khách'}
                 </p>
-                <p className="text-xs text-slate-400 truncate">
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                   {currentUser?.email || (role === 'manager' ? 'manager@company.com' : 'staff@company.com')}
                 </p>
               </div>
@@ -157,7 +161,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               type="button"
               onClick={handleLogout}
               title="Đăng xuất"
-              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition-colors shrink-0"
+              className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-[#181c38] rounded-xl transition-colors shrink-0 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -166,4 +170,4 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       </aside>
     </>
   );
-};
+};

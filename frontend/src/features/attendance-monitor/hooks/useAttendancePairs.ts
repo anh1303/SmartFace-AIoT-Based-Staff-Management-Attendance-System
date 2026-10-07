@@ -155,8 +155,8 @@ export function useAttendancePairs(
         label: 'Vào Ca',
         time: checkInTime,
         isFace: isCheckInFace,
-        methodLabel: isCheckInFace ? 'Face-id' : 'Vân tay',
-        device_id: normalizeDeviceId(checkInLog?.device_id, isCheckInFace, true),
+        methodLabel: checkInLog ? (isCheckInFace ? 'Face-id' : 'Vân tay') : 'UNRECORDED',
+        device_id: checkInLog ? normalizeDeviceId(checkInLog?.device_id, isCheckInFace, true) : '--',
         score: checkInLog?.verification_score ?? (checkInLog ? 0.99 : null),
         status: checkInLog
           ? checkInLog.punctuality || (checkInLog.status === 'VALID' ? 'ON_TIME' : checkInLog.status)
@@ -177,8 +177,8 @@ export function useAttendancePairs(
         label: 'Hết ca',
         time: checkOutTime,
         isFace: isCheckOutFace,
-        methodLabel: isCheckOutFace ? 'Face-id' : 'Vân tay',
-        device_id: normalizeDeviceId(checkOutLog?.device_id, isCheckOutFace, false),
+        methodLabel: checkOutLog ? (isCheckOutFace ? 'Face-id' : 'Vân tay') : 'UNRECORDED',
+        device_id: checkOutLog ? normalizeDeviceId(checkOutLog?.device_id, isCheckOutFace, false) : '--',
         score: checkOutLog?.verification_score ?? (checkOutLog ? 0.80 : null),
         status: checkOutLog ? outPunc || 'VALID' : checkInLog ? 'WORKING' : 'UNRECORDED',
         statusText: checkOutLog

@@ -42,12 +42,15 @@ Mở Terminal tại thư mục gốc `SmartFace-AIoT-Based-Staff-Management-Atte
 
 ### 🟡 Cách 2: Thực Hiện Thủ Công (Manual Step-by-Step)
 
-#### Bước 1: Khởi động Database với Docker
-```bash
-# Chạy từ thư mục gốc repo
-docker compose --env-file .env.compose --profile tools up -d
-```
-*Lệnh này dùng chung PostgreSQL + pgvector PBL6 tại port `5432` và pgAdmin tại port `5050`.*
+#### Bước 1: Chuẩn bị Database (Neon Cloud hoặc Docker Local)
+- **Phương án A: Sử dụng Neon Cloud Serverless PostgreSQL (Khuyên dùng)**:
+  - Tạo project trên [Neon Console](https://console.neon.tech/) (Region: Singapore `ap-southeast-1`, Postgres: 16).
+  - Lấy cả 2 chuỗi kết nối: **Pooled URL** (cho `DATABASE_URL`) và **Direct URL** (cho `DIRECT_URL`).
+- **Phương án B: Sử dụng Docker Cục bộ**:
+  ```bash
+  # Chạy từ thư mục gốc repo
+  docker compose --env-file .env.compose --profile tools up -d
+  ```
 
 #### Bước 2: Cài đặt Dependencies
 ```bash
@@ -60,18 +63,25 @@ Tạo file `.env` từ file mẫu `.env.example`:
 ```bash
 cp .env.example .env
 ```
+Cấu hình các giá trị kết nối tới Database (Neon Cloud hoặc Local).
 
-#### Bước 4: Thực thi Prisma Migration
+#### Bước 4: Thực thi Prisma Migration & Seed
 ```bash
-# Áp dụng các migration đã commit, không reset database
+# 1. Sinh Prisma Client SDK
+npx prisma generate
+
+# 2. Áp dụng toàn bộ 3 bản migration lên Database
 npm run prisma:migrate
+
+# 3. Nạp dữ liệu mẫu ban đầu (Nếu database mới rỗng)
+npm run prisma:seed
 ```
-Không chạy `npm run prisma:seed` trên database đang sử dụng: seed xóa dữ liệu hiện có trước khi nạp lại dữ liệu mẫu.
 
 #### Bước 5: Khởi chạy Server Development
 ```bash
 npm run dev
 # Server lắng nghe tại địa chỉ: http://localhost:3000
+# Kiểm tra Health Check: GET http://localhost:3000/health
 ```
 
 ---
@@ -84,14 +94,15 @@ Các biến môi trường cấu hình trong file `backend/.env`:
 | :--- | :--- | :--- | :---: |
 | `NODE_ENV` | Môi trường ứng dụng (`development` / `production` / `test`) | `development` | 🔴 Có |
 | `PORT` | Cổng kết nối HTTP Server | `3000` | 🔴 Có |
-| `DATABASE_URL` | Chuỗi kết nối Database PostgreSQL | `postgresql://postgres:postgres@localhost:5432/PBL6?schema=public` | 🔴 Có |
+| `DATABASE_URL` | Chuỗi kết nối Database (Pooled URL qua PgBouncer trên Cloud) | `postgresql://<USER>:<PASS>@<HOST>-pooler.ap-southeast-1.aws.neon.tech/PBL6?sslmode=require` | 🔴 Có |
+| `DIRECT_URL` | Chuỗi kết nối Database trực tiếp (Direct URL cho Migration & Studio) | `postgresql://<USER>:<PASS>@<HOST>.ap-southeast-1.aws.neon.tech/PBL6?sslmode=require` | 🔴 Có (khi dùng Cloud) |
 | `JWT_SECRET` | Chìa khóa bí mật dùng mã hóa & ký token JWT (≥32 ký tự) | `super_secret_jwt_key_random_string_pbl6_2026_backend` | 🔴 Có |
 | `JWT_EXPIRES_IN` | Thời gian hết hạn của Access Token (Mặc định: `7d`) | `7d` | 🟠 Tùy chọn |
 | `MQTT_URL` | Địa chỉ kết nối Broker MQTT cho AIoT Devices | `mqtt://localhost:1883` | 🔴 Có |
 | `MQTT_USERNAME` | Tài khoản đăng nhập MQTT Broker | `device_user` | 🟠 Tùy chọn |
 | `MQTT_PASSWORD` | Mật khẩu đăng nhập MQTT Broker | `device_pass` | 🟠 Tùy chọn |
 | `MQTT_DEVICE_SECRET` | Khóa bí mật xác thực gói tin từ Edge Device (≥32 ký tự) | `pbl6_device_shared_secret_key_12345678` | 🔴 Có |
-| `BIOMETRIC_ENCRYPTION_KEY` | Biến cấu hình tương thích; luồng lưu face vector hiện ghi trực tiếp vào pgvector | `0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef` | 🔴 Có |
+| `BIOMETRIC_ENCRYPTION_KEY` | Khóa 64-hex ký tự bảo mật sinh trắc học | `0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef` | 🔴 Có |
 | `CORS_ORIGIN` | URL Frontend được phép gọi API (CORS) | `http://localhost:5173` | 🔴 Có |
 | `FACE_AUTH_URL` | Địa chỉ Service Python Face Authentication nội bộ | `http://localhost:5000` | 🔴 Có |
 | `FACE_AUTH_TIMEOUT_MS` | Thời gian chờ tối đa kết nối tới Face Auth Service (ms) | `30000` | 🟠 Tùy chọn |

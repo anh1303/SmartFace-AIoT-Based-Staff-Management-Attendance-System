@@ -145,9 +145,10 @@ Hệ thống kết nối và hiển thị trạng thái thời gian thực của
 Trước khi khởi chạy dự án, máy tính cần cài đặt sẵn:
 1. **Git**: Dùng để tải mã nguồn (`git clone`).
 2. **Node.js**: Phiên bản **v20+** hoặc **v22+ LTS** (kèm theo trình quản lý gói `npm`).
-3. **Docker & Docker Desktop**:
-   - **Bắt buộc** cài đặt và **phải khởi động ứng dụng Docker Desktop** trước khi chạy dự án.
-   - *Lý do*: Dự án sử dụng hệ quản trị PostgreSQL 16 tích hợp extension vector **`pgvector`** (image `pgvector/pgvector:pg16`) để lưu trữ và so khớp 512-dimension embeddings khuôn mặt (ArcFace). Việc cài đặt trực tiếp PostgreSQL kèm pgvector trên Windows bằng tay rất phức tạp và dễ phát sinh lỗi, do đó Docker là giải pháp chuẩn hóa, ổn định nhất.
+3. **Cơ sở Dữ liệu PostgreSQL 16 + `pgvector`**:
+   - **Cách 1 (Neon Cloud — Khuyên dùng)**: Sử dụng [Neon Serverless PostgreSQL](https://neon.tech/) tích hợp sẵn `pgvector`, không tốn tài nguyên máy và dễ dàng deploy toàn cầu.
+   - **Cách 2 (Docker Compose Cục bộ)**: Khởi chạy PostgreSQL + `pgvector` qua Docker Desktop (`docker compose --env-file .env.compose --profile tools up -d`).
+4. **Python**: Phiên bản **3.10** hoặc **3.11** (dành cho phân hệ AI Face Authentication).
 
 ---
 

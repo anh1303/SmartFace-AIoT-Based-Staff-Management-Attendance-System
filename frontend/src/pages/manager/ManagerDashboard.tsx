@@ -95,18 +95,13 @@ export const ManagerDashboard: React.FC = () => {
         <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
 
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-md shadow-purple-500/25 shrink-0">
-              <span className="text-lg font-bold font-heading">U</span>
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
-                Tổng Quan Hệ Thống 👋
-              </h1>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                Bảng điều khiển theo dõi chấm công khuôn mặt & quản lý vận hành theo thời gian thực.
-              </p>
-            </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+              Tổng Quan Hệ Thống
+            </h1>
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+              Bảng điều khiển theo dõi chấm công khuôn mặt & quản lý vận hành theo thời gian thực.
+            </p>
           </div>
 
           <div className="flex items-center gap-2">

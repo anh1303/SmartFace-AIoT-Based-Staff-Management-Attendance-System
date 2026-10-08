@@ -60,26 +60,37 @@ menu() {
     echo "  SMARTFACE AIoT - STAFF MANAGEMENT AND ATTENDANCE SYSTEM"
     echo "======================================================================"
     echo ""
-    echo "  [1] Chay Docker DB, Face Auth API, Backend va Frontend"
-    echo "  [2] Chay Face Auth API, Backend va Frontend - DB da chay"
+    echo "  [1] Chay toan bo (Backend, Frontend, Face Auth) - Dung Cloud DB (Mac dinh)"
+    echo "  [2] Chay toan bo kem theo Docker Database Local (PostgreSQL + pgAdmin)"
     echo "  [3] Chi chay Backend - Port 3000"
     echo "  [4] Chi chay Frontend - Port 5173"
-    echo "  [5] Khoi dong Docker Database - PostgreSQL va pgAdmin"
+    echo "  [5] Chi khoi dong Docker Database Local (PostgreSQL + pgAdmin)"
     echo "  [6] Cai dat dependencies cho Backend va Frontend"
     echo "  [7] Chay Prisma Generate va Migrate (khong Seed)"
+    echo "  [8] Mo Prisma Studio (Web GUI xem Database tren localhost:5555)"
     echo "  [0] Thoat"
     echo ""
     echo "======================================================================"
-    read -p "Chon chuc nang [0-7] (Mac dinh: 1): " choice
+    read -p "Chon chuc nang [0-8] (Mac dinh: 1): " choice
     choice=${choice:-1}
 
     case "$choice" in
       1)
         check_env
         echo ""
-        echo "Dang khoi dong Docker Database..."
+        echo "Dang khoi chay Face Auth API, Backend va Frontend (Cloud DB) trong cua so Terminal moi..."
+        open_terminal "SmartFace Backend" "cd '$DIR/backend' && npm run dev"
+        open_terminal "SmartFace Frontend" "cd '$DIR/frontend' && npm run dev"
+        open_terminal "SmartFace Face Auth API" "cd '$DIR/face_auth' && '$FACE_AUTH_PYTHON' -m uvicorn api_service:app --host 0.0.0.0 --port 5000"
+        echo "Da mo terminal Face Auth API, Backend va Frontend. Kiem tra /health de xac nhan ready."
+        pause
+        ;;
+      2)
+        check_env
+        echo ""
+        echo "Dang khoi dong Docker Database Local..."
         if ! docker compose --env-file "$DIR/.env.compose" --profile tools -f "$DIR/docker-compose.yml" up -d; then
-          echo "Khong khoi dong duoc PostgreSQL. Kiem tra volume va mat khau trong .env.compose."
+          echo "Khong khoi dong duoc PostgreSQL. Kiem tra Docker Desktop va .env.compose."
           pause
           continue
         fi
@@ -89,16 +100,6 @@ menu() {
         open_terminal "SmartFace Frontend" "cd '$DIR/frontend' && npm run dev"
         open_terminal "SmartFace Face Auth API" "cd '$DIR/face_auth' && '$FACE_AUTH_PYTHON' -m uvicorn api_service:app --host 0.0.0.0 --port 5000"
         echo "Da mo cac terminal. Kiem tra log va /health de xac nhan ready."
-        pause
-        ;;
-      2)
-        check_env
-        echo ""
-        echo "Dang khoi chay Face Auth API, Backend va Frontend trong cua so Terminal moi..."
-        open_terminal "SmartFace Backend" "cd '$DIR/backend' && npm run dev"
-        open_terminal "SmartFace Frontend" "cd '$DIR/frontend' && npm run dev"
-        open_terminal "SmartFace Face Auth API" "cd '$DIR/face_auth' && '$FACE_AUTH_PYTHON' -m uvicorn api_service:app --host 0.0.0.0 --port 5000"
-        echo "Da mo terminal Face Auth API, Backend va Frontend."
         pause
         ;;
       3)
@@ -120,7 +121,7 @@ menu() {
         echo ""
         echo "Dang khoi dong PostgreSQL va pgAdmin qua Docker..."
         if ! docker compose --env-file "$DIR/.env.compose" --profile tools -f "$DIR/docker-compose.yml" up -d; then
-          echo "Khong khoi dong duoc PostgreSQL. Kiem tra volume va mat khau trong .env.compose."
+          echo "Khong khoi dong duoc PostgreSQL. Kiem tra Docker Desktop va .env.compose."
           pause
           continue
         fi
@@ -150,6 +151,13 @@ menu() {
         else
           echo "Migration that bai; kiem tra loi phia tren."
         fi
+        pause
+        ;;
+      8)
+        check_env
+        echo ""
+        echo "Dang mo Prisma Studio tai http://localhost:5555..."
+        open_terminal "SmartFace Prisma Studio" "cd '$DIR/backend' && npx prisma studio"
         pause
         ;;
       0)

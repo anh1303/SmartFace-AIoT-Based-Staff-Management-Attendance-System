@@ -35,8 +35,10 @@
 Mở Terminal tại thư mục gốc `SmartFace-AIoT-Based-Staff-Management-Attendance-System/` và chọn menu tùy chọn:
 - Windows: `.\run.bat`
 - macOS / Linux: `chmod +x run.sh && ./run.sh`
-- Select `[1]`: Chạy toàn bộ (Khởi động Docker DB + Backend + Frontend).
-- Select `[3]`: Chỉ chạy riêng phân hệ Backend Service (`http://localhost:3000`).
+- **Lựa chọn `[1]` (Mặc định)**: Khởi chạy toàn bộ (Backend, Frontend, Face Auth API) kết nối Cloud DB.
+- **Lựa chọn `[2]`**: Khởi chạy toàn bộ kèm theo Docker Database Local (PostgreSQL + pgAdmin).
+- **Lựa chọn `[3]`**: Chỉ chạy riêng phân hệ Backend Service (`http://localhost:3000`).
+- **Lựa chọn `[8]`**: Mở nhanh giao diện đồ họa **Prisma Studio** (`http://localhost:5555`).
 
 ---
 

@@ -176,11 +176,12 @@ Dự án cung cấp script menu để tạo file `.env` mẫu nếu thiếu, cà
 #### Quy trình thao tác lần đầu tiên sau khi clone:
 1. **Nhập `[6]`**: Tự động tạo `.env` nếu thiếu và chạy `npm install` cho cả Backend và Frontend.
    Cài Python dependencies: `cd face_auth` rồi `python3 -m pip install -r requirements.txt` (Windows dùng `python`). Có thể dùng virtualenv `face_auth/.venv`.
-2. **Cấu hình `.env.compose`**: Điền đúng tên volume PostgreSQL PBL6 hiện có và mật khẩu đang dùng; script không tự tạo volume database mới.
-3. **Nhập `[5]`**: Khởi động PostgreSQL + pgAdmin bằng cấu hình Docker Compose chung.
-4. **Nhập `[7]`**: Chạy `prisma:generate` và `prisma:migrate`, không seed dữ liệu.
-5. **Nhập `[1]`**: Mở Face Auth API, Backend và Frontend; camera realtime chạy riêng bằng `python3 app.py` trong `face_auth`.
-> 💡 *Các lần tiếp theo, bạn chỉ cần mở script và nhập **`[1]`** để khởi động toàn bộ!*
+2. **Cấu hình `.env`**: Điền thông tin kết nối Database Neon Cloud vào `backend/.env` và `face_auth/.env` (hoặc cấu hình `.env.compose` nếu muốn dùng Docker local).
+3. **Nhập `[7]`**: Chạy `prisma:generate` và `prisma:migrate` để đồng bộ cấu trúc database.
+4. **Nhập `[1]` (Mặc định)**: Khởi chạy toàn bộ hệ thống (Face Auth API `:5000`, Backend `:3000`, Frontend `:5173`) kết nối trực tiếp lên Cloud DB mà không cần bật Docker!
+5. **Nhập `[8]`**: Mở trực tiếp giao diện Web đồ họa **Prisma Studio** tại `http://localhost:5555` để xem toàn bộ 14 bảng dữ liệu.
+
+> 💡 *Các lần tiếp theo, bạn chỉ cần mở script và nhấn **`Enter`** (chọn `[1]`) để khởi động toàn bộ hệ thống!*
 
 ---
 

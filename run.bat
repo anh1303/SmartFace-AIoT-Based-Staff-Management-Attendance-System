@@ -12,41 +12,35 @@ echo ======================================================================
 echo   SMARTFACE AIoT - STAFF MANAGEMENT AND ATTENDANCE SYSTEM
 echo ======================================================================
 echo.
-echo   [1] Chay Docker DB, Face Auth API, Backend va Frontend
-echo   [2] Chay Face Auth API, Backend va Frontend - DB da chay
+echo   [1] Chay toan bo (Backend, Frontend, Face Auth) - Dung Cloud DB (Mac dinh)
+echo   [2] Chay toan bo kem theo Docker Database Local (PostgreSQL + pgAdmin)
 echo   [3] Chi chay Backend - Port 3000
 echo   [4] Chi chay Frontend - Port 5173
-echo   [5] Khoi dong Docker Database - PostgreSQL va pgAdmin
+echo   [5] Chi khoi dong Docker Database Local (PostgreSQL + pgAdmin)
 echo   [6] Cai dat dependencies cho Backend va Frontend
 echo   [7] Chay Prisma Generate va Migrate (khong Seed)
+echo   [8] Mo Prisma Studio (Web GUI xem Database tren localhost:5555)
 echo   [0] Thoat
 echo.
 echo ======================================================================
 set choice=1
-set /p choice="Chon chuc nang [0-7] (Mac dinh: 1): "
+set /p choice="Chon chuc nang [0-8] (Mac dinh: 1): "
 
-if "%choice%"=="1" goto run_all
-if "%choice%"=="2" goto run_dev
+if "%choice%"=="1" goto run_cloud
+if "%choice%"=="2" goto run_all_docker
 if "%choice%"=="3" goto run_backend
 if "%choice%"=="4" goto run_frontend
 if "%choice%"=="5" goto run_docker
 if "%choice%"=="6" goto install_deps
 if "%choice%"=="7" goto migrate_db
+if "%choice%"=="8" goto open_studio
 if "%choice%"=="0" exit
 goto menu
 
-:run_all
+:run_cloud
 call :check_env
 echo.
-echo Dang khoi dong Docker Database...
-docker compose --env-file .env.compose --profile tools -f docker-compose.yml up -d
-if errorlevel 1 (
-    echo Khong khoi dong duoc PostgreSQL. Kiem tra volume va mat khau trong .env.compose.
-    pause
-    goto menu
-)
-echo.
-echo Dang khoi chay Backend va Frontend...
+echo Dang khoi chay Face Auth API, Backend va Frontend (Cloud DB)...
 start "SmartFace Backend" cmd /k "cd /d "%~dp0backend" && npm run dev"
 start "SmartFace Frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev"
 start "SmartFace Face Auth API" cmd /k "cd /d "%~dp0face_auth" && "%FACE_AUTH_PYTHON%" -m uvicorn api_service:app --host 0.0.0.0 --port 5000"
@@ -54,14 +48,22 @@ echo Da mo cac terminal. Kiem tra log va /health de xac nhan ready.
 pause
 goto menu
 
-:run_dev
+:run_all_docker
 call :check_env
 echo.
-echo Dang khoi chay Backend va Frontend...
+echo Dang khoi dong Docker Database Local...
+docker compose --env-file .env.compose --profile tools -f docker-compose.yml up -d
+if errorlevel 1 (
+    echo Khong khoi dong duoc PostgreSQL. Kiem tra Docker Desktop va .env.compose.
+    pause
+    goto menu
+)
+echo.
+echo Dang khoi chay Face Auth API, Backend va Frontend...
 start "SmartFace Backend" cmd /k "cd /d "%~dp0backend" && npm run dev"
 start "SmartFace Frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev"
 start "SmartFace Face Auth API" cmd /k "cd /d "%~dp0face_auth" && "%FACE_AUTH_PYTHON%" -m uvicorn api_service:app --host 0.0.0.0 --port 5000"
-echo Da mo terminal Face Auth API, Backend va Frontend.
+echo Da mo cac terminal. Kiem tra log va /health de xac nhan ready.
 pause
 goto menu
 
@@ -86,7 +88,7 @@ call :check_env
 echo.
 echo Dang khoi dong PostgreSQL va pgAdmin qua Docker...
 docker compose --env-file .env.compose --profile tools -f docker-compose.yml up -d
-if errorlevel 1 echo Khong khoi dong duoc PostgreSQL. Kiem tra volume va mat khau trong .env.compose.
+if errorlevel 1 echo Khong khoi dong duoc PostgreSQL. Kiem tra Docker Desktop va .env.compose.
 pause
 goto menu
 
@@ -121,6 +123,14 @@ goto migration_done
 cd /d "%~dp0"
 echo Migration that bai. Kiem tra loi phia tren.
 :migration_done
+pause
+goto menu
+
+:open_studio
+call :check_env
+echo.
+echo Dang mo Prisma Studio tai http://localhost:5555...
+start "SmartFace Prisma Studio" cmd /k "cd /d "%~dp0backend" && npx prisma studio"
 pause
 goto menu
 

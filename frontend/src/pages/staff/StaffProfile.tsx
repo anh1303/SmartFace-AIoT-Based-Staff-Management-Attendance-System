@@ -49,16 +49,13 @@ export const StaffProfile: React.FC = () => {
 
         <div className="relative z-10">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
               Hồ sơ Cá nhân & Dữ liệu Sinh trắc
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-medium flex items-center gap-1">
               <Lock className="w-3 h-3" /> Chế độ chỉ đọc (Read-only)
             </span>
           </div>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            Thông tin nhân sự và dữ liệu sinh trắc học được đồng bộ an toàn từ phòng Nhân sự (HR).
-          </p>
         </div>
 
         <div className="relative z-10 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 dark:bg-[#0f1224] border border-purple-200/80 dark:border-[#272d5a] text-purple-600 dark:text-purple-400 text-xs font-mono shadow-xs backdrop-blur-sm">

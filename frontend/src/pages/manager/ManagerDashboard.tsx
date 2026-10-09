@@ -96,26 +96,17 @@ export const ManagerDashboard: React.FC = () => {
 
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
               Tổng Quan Hệ Thống
             </h1>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              Bảng điều khiển theo dõi chấm công khuôn mặt & quản lý vận hành theo thời gian thực.
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate('/app/manager/attendance')}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-white/80 dark:bg-[#181c38]/90 hover:bg-white dark:hover:bg-[#20254b] text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-[#2e3566] backdrop-blur-sm transition-all shadow-xs"
-            >
-              Giám sát Face ID
-            </button>
-            <button
               onClick={() => navigate('/app/manager/employees')}
               className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-xs shadow-purple-500/25 transition-all"
             >
-              + Quản lý nhân sự
+              Quản lý nhân sự
             </button>
           </div>
         </div>

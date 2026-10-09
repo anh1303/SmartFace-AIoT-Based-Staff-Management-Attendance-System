@@ -14,7 +14,7 @@ import {
   Check,
   DollarSign,
   Search,
-  Filter
+  ChevronDown
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { PayrollRecord } from '../../types';
@@ -230,7 +230,7 @@ export const ManagerPayroll: React.FC = () => {
 
         <div className="relative z-10">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
               Quản Lý Bảng Lương & Chi Trả
             </h1>
 
@@ -254,9 +254,6 @@ export const ManagerPayroll: React.FC = () => {
               </select>
             </div>
           </div>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            Chỉnh sửa các khoản phụ cấp, giảm trừ, số ngày công với nút xác nhận lưu minh bạch và phê duyệt chuyển lương.
-          </p>
         </div>
 
         {/* 3 Action Buttons Right-Aligned */}
@@ -272,7 +269,7 @@ export const ManagerPayroll: React.FC = () => {
               title={isFinalized ? 'Bảng lương đã chốt sổ, hãy mở khóa để tính toán lại' : 'Tự động tính toán lại bảng lương từ dữ liệu chấm công mới nhất'}
             >
               <Sparkles className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : 'text-amber-300'}`} />
-              <span>{isCalculating ? 'Đang tổng hợp...' : '⚡ Tự động tính lương kỳ này'}</span>
+              <span>{isCalculating ? 'Đang tổng hợp...' : 'Tự động tính lương kỳ này'}</span>
             </button>
 
             {/* Action Button: Finalize or Unlock */}
@@ -419,19 +416,24 @@ export const ManagerPayroll: React.FC = () => {
             </div>
 
             {/* Position / Department Filter */}
-            <div className="relative">
-              <Filter className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <select
-                value={departmentFilter}
-                onChange={e => setDepartmentFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-9 pr-8 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer"
-              >
-                <option value="ALL" className="bg-white dark:bg-[#13162b]">Tất cả chức vụ</option>
-                <option value="Bảo vệ" className="bg-white dark:bg-[#13162b]">Bảo vệ</option>
-                <option value="Nhân viên" className="bg-white dark:bg-[#13162b]">Nhân viên</option>
-                <option value="Thu ngân" className="bg-white dark:bg-[#13162b]">Thu ngân</option>
-                <option value="Quản lý" className="bg-white dark:bg-[#13162b]">Quản lý</option>
-              </select>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
+                Chức vụ:
+              </span>
+              <div className="relative">
+                <select
+                  value={departmentFilter}
+                  onChange={e => setDepartmentFilter(e.target.value)}
+                  className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
+                >
+                  <option value="ALL" className="bg-white dark:bg-[#13162b]">Tất cả chức vụ</option>
+                  <option value="Bảo vệ" className="bg-white dark:bg-[#13162b]">Bảo vệ</option>
+                  <option value="Nhân viên" className="bg-white dark:bg-[#13162b]">Nhân viên</option>
+                  <option value="Thu ngân" className="bg-white dark:bg-[#13162b]">Thu ngân</option>
+                  <option value="Quản lý" className="bg-white dark:bg-[#13162b]">Quản lý</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
           </div>
         </div>

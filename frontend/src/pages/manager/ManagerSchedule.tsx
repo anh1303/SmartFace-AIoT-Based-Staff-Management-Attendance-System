@@ -5,7 +5,6 @@ import {
   Clock,
   Users,
   CheckCircle2,
-  Filter,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -14,7 +13,8 @@ import {
   Calendar,
   Layers,
   Copy,
-  Trash2
+  Trash2,
+  ChevronDown
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { WorkShift } from '../../types';
@@ -320,12 +320,9 @@ export const ManagerSchedule: React.FC = () => {
         <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
 
         <div className="relative z-10">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
             Sắp Xếp & Phân Bổ Ca Làm Việc
           </h1>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            Bấm vào bất kỳ ô ca trực để phân bổ hoặc điều chỉnh.
-          </p>
         </div>
 
         <div className="relative z-10 flex flex-wrap items-center gap-3">
@@ -415,19 +412,24 @@ export const ManagerSchedule: React.FC = () => {
           </div>
 
           {/* Position / Department Filter */}
-          <div className="relative">
-            <Filter className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <select
-              value={departmentFilter}
-              onChange={e => setDepartmentFilter(e.target.value)}
-              className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-9 pr-8 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer"
-            >
-              <option value="ALL" className="bg-white dark:bg-[#13162b]">Tất cả ({employees.length})</option>
-              <option value="Bảo vệ" className="bg-white dark:bg-[#13162b]">Bảo vệ</option>
-              <option value="Nhân viên" className="bg-white dark:bg-[#13162b]">Nhân viên</option>
-              <option value="Thu ngân" className="bg-white dark:bg-[#13162b]">Thu ngân</option>
-              <option value="Quản lý" className="bg-white dark:bg-[#13162b]">Quản lý</option>
-            </select>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
+              Chức vụ:
+            </span>
+            <div className="relative">
+              <select
+                value={departmentFilter}
+                onChange={e => setDepartmentFilter(e.target.value)}
+                className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
+              >
+                <option value="ALL" className="bg-white dark:bg-[#13162b]">Tất cả chức vụ</option>
+                <option value="Bảo vệ" className="bg-white dark:bg-[#13162b]">Bảo vệ</option>
+                <option value="Nhân viên" className="bg-white dark:bg-[#13162b]">Nhân viên</option>
+                <option value="Thu ngân" className="bg-white dark:bg-[#13162b]">Thu ngân</option>
+                <option value="Quản lý" className="bg-white dark:bg-[#13162b]">Quản lý</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
         </div>
       </div>
@@ -642,8 +644,8 @@ export const ManagerSchedule: React.FC = () => {
                 type="button"
                 onClick={() => setBulkTarget('ALL')}
                 className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${bulkTarget === 'ALL'
-                    ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-600'
-                    : 'bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-purple-300'
+                  ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-600'
+                  : 'bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-purple-300'
                   }`}
               >
                 Tất cả nhân sự ({employees.filter(e => e.status !== 'INACTIVE').length})
@@ -653,8 +655,8 @@ export const ManagerSchedule: React.FC = () => {
                 type="button"
                 onClick={() => setBulkTarget('DEPARTMENT')}
                 className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${bulkTarget === 'DEPARTMENT'
-                    ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-600'
-                    : 'bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-purple-300'
+                  ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-600'
+                  : 'bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-purple-300'
                   }`}
               >
                 Theo chức vụ
@@ -791,8 +793,8 @@ export const ManagerSchedule: React.FC = () => {
                       }
                     }}
                     className={`py-2 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer ${isSelected
-                        ? 'bg-purple-600 text-white border-purple-500 shadow-xs shadow-purple-500/20'
-                        : 'bg-slate-50 dark:bg-[#0f1224] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-purple-300'
+                      ? 'bg-purple-600 text-white border-purple-500 shadow-xs shadow-purple-500/20'
+                      : 'bg-slate-50 dark:bg-[#0f1224] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-purple-300'
                       }`}
                   >
                     {dName}

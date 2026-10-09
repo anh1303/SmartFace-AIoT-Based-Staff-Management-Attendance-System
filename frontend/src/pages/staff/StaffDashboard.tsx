@@ -121,7 +121,7 @@ export const StaffDashboard: React.FC = () => {
 
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
                 Xin chào, {currentUser?.full_name || currentEmp?.full_name || 'Nguyễn Văn A'} 👋
               </h1>
               <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50">

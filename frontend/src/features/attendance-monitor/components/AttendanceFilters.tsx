@@ -5,7 +5,7 @@ import {
   Download,
   Calendar,
   Search,
-  Filter,
+  ChevronDown,
 } from 'lucide-react';
 import { getTodayVNString } from '../../../utils/dateUtils';
 
@@ -189,18 +189,23 @@ export const AttendanceFilters: React.FC<AttendanceFiltersProps> = ({
           </div>
 
           {/* Status Filter */}
-          <div className="relative">
-            <Filter className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
-            >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="ON_TIME">Đúng giờ</option>
-              <option value="LATE">Đi muộn</option>
-              <option value="EARLY_LEAVE">Về sớm</option>
-            </select>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
+              Chức vụ:
+            </span>
+            <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
+              >
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="ON_TIME">Đúng giờ</option>
+                <option value="LATE">Đi muộn</option>
+                <option value="EARLY_LEAVE">Về sớm</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
         </div>
       </div>

@@ -46,16 +46,13 @@ export const StaffSalaryHistory: React.FC = () => {
 
         <div className="relative z-10">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
               Lịch sử Phiếu Lương Hàng Tháng
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono font-medium border border-emerald-500/20">
               ĐÃ XÁC THỰC CSDL
             </span>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Tra cứu và tải phiếu lương (Payslip) chi tiết của các kỳ đã hoàn tất thanh toán.
-          </p>
         </div>
 
         <span className="relative z-10 text-xs font-mono text-purple-600 dark:text-purple-400 bg-white/80 dark:bg-[#0f1224]/80 backdrop-blur-sm px-3.5 py-2 rounded-xl border border-purple-200/80 dark:border-[#272d5a] shadow-xs">

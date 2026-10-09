@@ -317,12 +317,9 @@ export const ManagerReports: React.FC = () => {
         <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
 
         <div className="relative z-10">
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
             Báo Cáo & Thống Kê Chuyên Cần
           </h1>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            Tổng hợp xu hướng đi làm, phương thức sinh trắc và phân tích chi phí nhân sự toàn hệ thống.
-          </p>
         </div>
 
         <button

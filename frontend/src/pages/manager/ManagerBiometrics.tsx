@@ -21,7 +21,7 @@ import {
   Layers,
   Edit,
   Search,
-  Filter,
+  ChevronDown,
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { CameraEkycModal, CapturedFaceSample } from '../../components/biometrics/CameraEkycModal';
@@ -302,13 +302,10 @@ export const ManagerBiometrics: React.FC = () => {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
               Quản Lý & Cập Nhật Sinh Trắc Học
             </h1>
           </div>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            Ghi nhận vector 512-D khuôn mặt từ hình ảnh hoặc phát tín hiệu IoT tới thiết bị FaceCam/Cảm biến vân tay FAP30.
-          </p>
         </div>
       </div>
 
@@ -318,7 +315,7 @@ export const ManagerBiometrics: React.FC = () => {
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-5 shadow-xs transition-colors">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white font-heading uppercase tracking-wider mb-4">
-              1. Chọn Nhân Sự Cần Cập Nhật
+              Chọn Nhân Sự Cần Cập Nhật
             </h2>
 
             <div className="mb-4">
@@ -362,8 +359,8 @@ export const ManagerBiometrics: React.FC = () => {
                       Face ID:
                     </span>
                     <span className={`font-mono text-[11px] px-2 py-0.5 rounded-md font-semibold ${currentEmp.face_enrolled
-                        ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
-                        : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
+                      ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
+                      : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
                       }`}>
                       {currentEmp.face_enrolled ? 'ĐÃ CẬP NHẬT' : 'CHƯA ĐĂNG KÝ'}
                     </span>
@@ -375,8 +372,8 @@ export const ManagerBiometrics: React.FC = () => {
                       Vân tay (FAP30):
                     </span>
                     <span className={`font-mono text-[11px] px-2 py-0.5 rounded-md font-semibold ${currentEmp.fingerprint_enrolled
-                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
-                        : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
+                      : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
                       }`}>
                       {currentEmp.fingerprint_enrolled ? 'ĐÃ CẬP NHẬT' : 'CHƯA ĐĂNG KÝ'}
                     </span>
@@ -391,30 +388,30 @@ export const ManagerBiometrics: React.FC = () => {
         <div className="lg:col-span-8">
           <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-6 space-y-6 shadow-xs transition-colors">
             {/* Mode Switcher */}
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#21264b] pb-4">
-              <div className="flex gap-2 p-1 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl">
+            <div className="border-b border-slate-100 dark:border-[#21264b] pb-4">
+              <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl w-full">
                 <button
                   type="button"
                   onClick={() => setActiveTab('FACE')}
-                  className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${activeTab === 'FACE'
-                      ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  className={`w-full py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${activeTab === 'FACE'
+                    ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1e3a]'
                     }`}
                 >
                   <ScanFace className="w-4 h-4" />
-                  <span>Cập nhật Khuôn mặt (Upload ảnh)</span>
+                  <span>Cập nhật Khuôn mặt</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setActiveTab('FINGERPRINT')}
-                  className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${activeTab === 'FINGERPRINT'
-                      ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  className={`w-full py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${activeTab === 'FINGERPRINT'
+                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1e3a]'
                     }`}
                 >
                   <Fingerprint className="w-4 h-4" />
-                  <span>Ghi nhận Vân tay (Gửi tín hiệu IoT)</span>
+                  <span>Cập nhật Vân tay</span>
                 </button>
               </div>
             </div>
@@ -432,7 +429,6 @@ export const ManagerBiometrics: React.FC = () => {
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white font-heading">
                         Cập Nhật Dữ Liệu Khuôn Mặt
                       </h3>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Trích xuất vector 512-D chất lượng cao từ nhiều góc chụp</p>
                     </div>
                   </div>
 
@@ -553,8 +549,8 @@ export const ManagerBiometrics: React.FC = () => {
                     disabled={uploadedPhotos.length < 3 || analyzingFace}
                     onClick={() => setFaceConfirmModal(true)}
                     className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer ${uploadedPhotos.length >= 3 && !analyzingFace
-                        ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20'
-                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
                       }`}
                   >
                     <Check className="w-4 h-4" />
@@ -641,12 +637,12 @@ export const ManagerBiometrics: React.FC = () => {
 
                       <div className="mt-6 text-center space-y-3">
                         <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center border-2 transition-all ${fingerprintStep === 'IDLE'
-                            ? 'border-slate-300 dark:border-slate-700 text-slate-400'
-                            : fingerprintStep === 'SENDING'
-                              ? 'border-purple-500 text-purple-600 dark:text-purple-400 animate-pulse'
-                              : fingerprintStep === 'WAITING_TOUCH'
-                                ? 'border-amber-400 text-amber-500 animate-bounce'
-                                : 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40'
+                          ? 'border-slate-300 dark:border-slate-700 text-slate-400'
+                          : fingerprintStep === 'SENDING'
+                            ? 'border-purple-500 text-purple-600 dark:text-purple-400 animate-pulse'
+                            : fingerprintStep === 'WAITING_TOUCH'
+                              ? 'border-amber-400 text-amber-500 animate-bounce'
+                              : 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40'
                           }`}>
                           <Fingerprint className="w-10 h-10" />
                         </div>
@@ -688,8 +684,8 @@ export const ManagerBiometrics: React.FC = () => {
                     disabled={fingerprintStep !== 'VERIFIED'}
                     onClick={() => setFingerConfirmModal(true)}
                     className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer ${fingerprintStep === 'VERIFIED'
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20'
-                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
                       }`}
                   >
                     <Check className="w-4 h-4" />
@@ -728,18 +724,23 @@ export const ManagerBiometrics: React.FC = () => {
             </div>
 
             {/* Position Filter */}
-            <div className="relative">
-              <Filter className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <select
-                value={positionFilter}
-                onChange={e => setPositionFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-9 pr-4 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
-              >
-                <option value="ALL">Tất cả chức vụ</option>
-                {positions.map(pos => (
-                  <option key={pos} value={pos}>{pos}</option>
-                ))}
-              </select>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
+                Chức vụ:
+              </span>
+              <div className="relative">
+                <select
+                  value={positionFilter}
+                  onChange={e => setPositionFilter(e.target.value)}
+                  className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
+                >
+                  <option value="ALL">Tất cả chức vụ</option>
+                  {positions.map(pos => (
+                    <option key={pos} value={pos}>{pos}</option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
             </div>
           </div>
         </div>
@@ -780,16 +781,16 @@ export const ManagerBiometrics: React.FC = () => {
                     <td className="py-3 px-4 text-slate-500 dark:text-slate-400">{emp.position || emp.department}</td>
                     <td className="py-3 px-4">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${emp.face_enrolled
-                          ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
-                          : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
+                        ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
+                        : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
                         }`}>
                         {emp.face_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
                       </span>
                     </td>
                     <td className="py-3 px-4">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${emp.fingerprint_enrolled
-                          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
-                          : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
+                        : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
                         }`}>
                         {emp.fingerprint_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
                       </span>
@@ -856,8 +857,8 @@ export const ManagerBiometrics: React.FC = () => {
               disabled={analyzingFace}
               onClick={handleConfirmFaceSave}
               className={`px-5 py-2 rounded-xl text-white text-xs font-semibold shadow-sm flex items-center gap-2 transition-all cursor-pointer ${analyzingFace
-                  ? 'bg-purple-600/70 cursor-wait'
-                  : 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
+                ? 'bg-purple-600/70 cursor-wait'
+                : 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
                 }`}
             >
               {analyzingFace ? (
@@ -1037,8 +1038,8 @@ export const ManagerBiometrics: React.FC = () => {
                 </div>
 
                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${currentManageEmp.face_enrolled
-                    ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
-                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
+                  ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
+                  : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
                   }`}>
                   {currentManageEmp.face_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
                 </span>
@@ -1090,8 +1091,8 @@ export const ManagerBiometrics: React.FC = () => {
                 </div>
 
                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${currentManageEmp.fingerprint_enrolled
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
-                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
+                  : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
                   }`}>
                   {currentManageEmp.fingerprint_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
                 </span>

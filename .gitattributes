@@ -1,0 +1,21 @@
+# Auto detect text files and perform line ending normalization
+* text=auto
+
+# Source code files (normalize to LF in Git)
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.py text eol=lf
+*.prisma text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+
+# Windows batch files must keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf

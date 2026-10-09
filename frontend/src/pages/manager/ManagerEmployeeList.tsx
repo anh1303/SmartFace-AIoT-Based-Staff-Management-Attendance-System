@@ -3,14 +3,14 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import {
   Search,
-  Filter,
   Plus,
   Edit,
   ScanFace,
   Fingerprint,
   Briefcase,
   AlertTriangle,
-  X
+  X,
+  ChevronDown
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { PositionManagementModal } from '../../components/employees/PositionManagementModal';
@@ -174,13 +174,10 @@ export const ManagerEmployeeList: React.FC = () => {
 
         <div className="relative z-10">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
               Quản Lý Danh Sách Nhân Sự
             </h1>
           </div>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            Quản lý hồ sơ nhân viên, trạng thái kích hoạt và đăng ký sinh trắc học Face ID / Vân tay.
-          </p>
         </div>
 
         <div className="relative z-10 flex items-center gap-3">
@@ -235,33 +232,42 @@ export const ManagerEmployeeList: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-            <Filter className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-            <span>Chức vụ:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
+              Chức vụ:
+            </span>
+            <div className="relative">
+              <select
+                value={departmentFilter}
+                onChange={e => setDepartmentFilter(e.target.value)}
+                className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
+              >
+                <option value="ALL">Tất cả chức vụ</option>
+                {positionOptions.map(pos => (
+                  <option key={pos} value={pos}>{pos}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
-          <select
-            value={departmentFilter}
-            onChange={e => setDepartmentFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 cursor-pointer"
-          >
-            <option value="ALL">Tất cả chức vụ</option>
-            {positionOptions.map(pos => (
-              <option key={pos} value={pos}>{pos}</option>
-            ))}
-          </select>
 
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 ml-2">
-            <span>Trạng thái:</span>
+          <div className="flex items-center gap-2 ml-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
+              Trạng thái:
+            </span>
+            <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
+              >
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="ACTIVE">Đang hoạt động</option>
+                <option value="INACTIVE">Tạm ngưng</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 cursor-pointer"
-          >
-            <option value="ALL">Tất cả trạng thái</option>
-            <option value="ACTIVE">Đang hoạt động (ACTIVE)</option>
-            <option value="INACTIVE">Tạm ngưng (INACTIVE)</option>
-          </select>
         </div>
       </div>
 

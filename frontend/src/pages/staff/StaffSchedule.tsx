@@ -99,16 +99,13 @@ export const StaffSchedule: React.FC = () => {
 
         <div className="relative z-10">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
               Lịch trình làm việc & Phân bổ ca
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-mono font-medium border border-purple-200 dark:border-purple-700/50">
               {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
             </span>
           </div>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            Xem lịch làm việc cá nhân, thông tin điểm danh và danh sách đồng đội cùng ca.
-          </p>
         </div>
 
         <div className="relative z-10 flex items-center gap-3">

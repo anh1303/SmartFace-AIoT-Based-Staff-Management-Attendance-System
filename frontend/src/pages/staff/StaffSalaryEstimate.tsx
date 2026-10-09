@@ -87,16 +87,13 @@ export const StaffSalaryEstimate: React.FC = () => {
 
         <div className="relative z-10">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
               Lương Tạm Tính ({selectedStaffPeriod ? `Kỳ ${selectedStaffPeriod}` : 'Kỳ hiện tại'})
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono font-medium border border-amber-500/20">
               {currentPayroll?.status === 'FINALIZED' ? 'ĐÃ CHỐT' : 'ĐANG TÍCH LŨY CÔNG'}
             </span>
           </div>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            Số liệu tự động tính toán từ ca làm việc, giờ quẹt thẻ và chính sách thưởng/phạt CSDL.
-          </p>
         </div>
 
         <div className="relative z-10 flex flex-wrap items-center gap-3">

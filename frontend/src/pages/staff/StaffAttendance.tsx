@@ -8,9 +8,9 @@ import {
   AlertCircle,
   ScanFace,
   Fingerprint,
-  Filter,
   ShieldCheck,
-  Lock
+  Lock,
+  ChevronDown
 } from 'lucide-react';
 
 export const StaffAttendance: React.FC = () => {
@@ -40,16 +40,13 @@ export const StaffAttendance: React.FC = () => {
 
         <div className="relative z-10">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
               Lịch sử Chấm công & Điểm danh
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-mono font-medium border border-purple-200 dark:border-purple-700/50">
               LOGS SINH TRẮC
             </span>
           </div>
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            Ghi nhận tự động qua hệ thống Camera AIoT và máy quét vân tay tại các cửa ra vào.
-          </p>
         </div>
 
         <div className="relative z-10 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 dark:bg-[#0f1224] border border-purple-200/80 dark:border-[#272d5a] text-purple-600 dark:text-purple-400 text-xs font-mono shadow-xs backdrop-blur-sm">
@@ -61,33 +58,42 @@ export const StaffAttendance: React.FC = () => {
       {/* Bento Filter Bar */}
       <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <Filter className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            <span>Phương thức:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
+              Phương thức:
+            </span>
+            <div className="relative">
+              <select
+                value={methodFilter}
+                onChange={e => setMethodFilter(e.target.value)}
+                className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
+              >
+                <option value="ALL" className="bg-white dark:bg-[#13162b]">Tất cả phương thức</option>
+                <option value="FACE" className="bg-white dark:bg-[#13162b]">Khuôn mặt (Face ID)</option>
+                <option value="FINGERPRINT" className="bg-white dark:bg-[#13162b]">Vân tay (Fingerprint)</option>
+                <option value="MANUAL" className="bg-white dark:bg-[#13162b]">Thủ công (Manual)</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
-          <select
-            value={methodFilter}
-            onChange={e => setMethodFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:border-purple-500 cursor-pointer"
-          >
-            <option value="ALL" className="bg-white dark:bg-[#13162b]">Tất cả phương thức</option>
-            <option value="FACE" className="bg-white dark:bg-[#13162b]">Khuôn mặt (Face ID)</option>
-            <option value="FINGERPRINT" className="bg-white dark:bg-[#13162b]">Vân tay (Fingerprint)</option>
-            <option value="MANUAL" className="bg-white dark:bg-[#13162b]">Thủ công (Manual)</option>
-          </select>
 
-          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 ml-2">
-            <span>Loại điểm danh:</span>
+          <div className="flex items-center gap-2 ml-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
+              Loại điểm danh:
+            </span>
+            <div className="relative">
+              <select
+                value={typeFilter}
+                onChange={e => setTypeFilter(e.target.value)}
+                className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
+              >
+                <option value="ALL" className="bg-white dark:bg-[#13162b]">Vào ca & Tan ca</option>
+                <option value="CHECK_IN" className="bg-white dark:bg-[#13162b]">Vào ca (Check-in)</option>
+                <option value="CHECK_OUT" className="bg-white dark:bg-[#13162b]">Tan ca (Check-out)</option>
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
-          <select
-            value={typeFilter}
-            onChange={e => setTypeFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:border-purple-500 cursor-pointer"
-          >
-            <option value="ALL" className="bg-white dark:bg-[#13162b]">Vào ca & Tan ca</option>
-            <option value="CHECK_IN" className="bg-white dark:bg-[#13162b]">Vào ca (Check-in)</option>
-            <option value="CHECK_OUT" className="bg-white dark:bg-[#13162b]">Tan ca (Check-out)</option>
-          </select>
         </div>
 
         <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
@@ -170,12 +176,12 @@ export const StaffAttendance: React.FC = () => {
                           return (
                             <span
                               className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-semibold ${punctuality === 'ON_TIME'
-                                  ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
-                                  : punctuality === 'LATE'
+                                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
+                                : punctuality === 'LATE'
+                                  ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
+                                  : punctuality === 'EARLY_LEAVE'
                                     ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
-                                    : punctuality === 'EARLY_LEAVE'
-                                      ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
-                                      : 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20'
+                                    : 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20'
                                 }`}
                             >
                               {punctuality === 'ON_TIME'

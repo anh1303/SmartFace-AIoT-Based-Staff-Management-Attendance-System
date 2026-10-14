@@ -22,15 +22,15 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956]">Nhân viên</th>
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956]">Ca làm việc</th>
+              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Nhân viên</th>
+              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Ca làm việc</th>
               <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Sự kiện</th>
               <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Thời gian</th>
               <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Phương thức</th>
               <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Độ tin cậy</th>
               <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Trạng thái</th>
               <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Trễ / Sớm</th>
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Tăng ca (OT)</th>
+              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Tăng ca</th>
               <th className="py-3.5 px-4 text-center">Thao tác</th>
             </tr>
           </thead>
@@ -151,9 +151,10 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                           type="button"
                           onClick={() => onOpenEditModal(item)}
                           title="Chỉnh sửa giờ trễ/sớm và tăng ca"
-                          className="p-2 rounded-xl bg-slate-100 hover:bg-purple-50 dark:bg-[#0f1224] dark:hover:bg-purple-950/40 text-slate-600 hover:text-purple-600 dark:text-slate-300 dark:hover:text-purple-300 border border-slate-200 dark:border-[#272d5a] transition-colors cursor-pointer inline-flex items-center justify-center"
+                          className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] font-medium text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                         >
-                          <Edit className="w-3.5 h-3.5" />
+                          <Edit className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Sửa</span>
                         </button>
                       </td>
                     </tr>

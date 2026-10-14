@@ -378,7 +378,7 @@ export const PositionManagementModal: React.FC<PositionManagementModalProps> = (
                         <button
                           type="button"
                           onClick={() => handleStartEdit(pos)}
-                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                          className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] font-medium text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                         >
                           <Edit className="w-3.5 h-3.5 text-slate-400" />
                           <span>Sửa</span>

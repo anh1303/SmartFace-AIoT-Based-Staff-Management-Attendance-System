@@ -253,8 +253,8 @@ export const ManagerDashboard: React.FC = () => {
       </div>
 
       {/* Bottom Bento Card: Real-time Attendance Logs */}
-      <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-6 shadow-xs transition-colors">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white dark:bg-[#13162b] border border-slate-300 dark:border-[#28305c] rounded-xl overflow-hidden shadow-xs transition-colors">
+        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-200 dark:border-[#28305c] bg-white dark:bg-[#13162b]">
           <h3 className="font-bold text-slate-900 dark:text-white text-base">Nhật ký chấm công Face ID (Real-time)</h3>
           <button
             type="button"
@@ -266,67 +266,80 @@ export const ManagerDashboard: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="text-slate-400 dark:text-slate-500 text-[11px] uppercase tracking-wider border-b border-slate-200/80 dark:border-[#21264b]">
-                <th className="pb-3 font-medium">Nhân viên</th>
-                <th className="pb-3 font-medium">Thời gian</th>
-                <th className="pb-3 font-medium">Thiết bị</th>
-                <th className="pb-3 font-medium text-center">Độ chính xác</th>
-                <th className="pb-3 font-medium text-right">Trạng thái</th>
+              <tr className="border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-mono">
+                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Nhân viên</th>
+                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Thời gian</th>
+                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Thiết bị</th>
+                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Độ chính xác</th>
+                <th className="py-3.5 px-4 text-center">Trạng thái</th>
               </tr>
             </thead>
-            <tbody className="text-sm divide-y divide-slate-100 dark:divide-[#1d2243]">
-              {attendance.slice(0, 5).map(att => {
-                const emp = employees.find(e => e.employee_id === att.employee_id);
-                const initials = emp?.full_name
-                  ? emp.full_name.split(' ').map(w => w[0]).slice(-2).join('')
-                  : 'NV';
+            <tbody className="text-slate-700 dark:text-slate-300 text-center">
+              {attendance.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-400 dark:text-slate-500">
+                    Chưa có dữ liệu chấm công.
+                  </td>
+                </tr>
+              ) : (
+                attendance.slice(0, 5).map(att => {
+                  const emp = employees.find(e => e.employee_id === att.employee_id);
+                  const initials = emp?.full_name
+                    ? emp.full_name.split(' ').map(w => w[0]).slice(-2).join('')
+                    : 'NV';
 
-                return (
-                  <tr key={att.attendance_id} className="hover:bg-purple-50/40 dark:hover:bg-[#181c38]/50 transition-colors">
-                    <td className="py-3 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-[#181c38] border border-purple-200 dark:border-[#272d5a] flex items-center justify-center text-[10px] font-bold text-purple-700 dark:text-purple-300 shrink-0">
-                        {emp?.avatar ? (
-                          <img src={emp.avatar} alt={emp.full_name} className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                          initials
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900 dark:text-white text-xs sm:text-sm">{emp?.full_name || att.employee_id}</p>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{att.employee_id} • {emp?.department}</p>
-                      </div>
-                    </td>
-                    <td className="py-3 font-mono text-xs text-slate-600 dark:text-slate-300">
-                      {formatVNTime(att.timestamp)}
-                    </td>
-                    <td className="py-3 text-xs text-slate-500 dark:text-slate-400 font-mono">
-                      {att.device_id}
-                    </td>
-                    <td className="py-3 text-center">
-                      <span className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium">
-                        {(att.verification_score * 100).toFixed(1)}%
-                      </span>
-                    </td>
-                    <td className="py-3 text-right">
-                      {(() => {
-                        const punc = getPunctuality(att);
-                        return (
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${punc === 'ON_TIME'
-                              ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
-                              : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
-                              }`}
-                          >
-                            {punc === 'ON_TIME' ? 'Đúng giờ' : punc === 'EARLY_LEAVE' ? 'Về sớm' : 'Muộn ca'}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                  </tr>
-                );
-              })}
+                  return (
+                    <tr
+                      key={att.attendance_id}
+                      className="hover:bg-purple-50/40 dark:hover:bg-[#181c38]/50 transition-colors border-b border-slate-200 dark:border-[#202752]"
+                    >
+                      <td className="py-3.5 px-4 border-r border-slate-200 dark:border-[#202752]">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-[#181c38] border border-purple-200 dark:border-[#272d5a] flex items-center justify-center text-[10px] font-bold text-purple-700 dark:text-purple-300 shrink-0">
+                            {emp?.avatar ? (
+                              <img src={emp.avatar} alt={emp.full_name} className="w-full h-full rounded-full object-cover" />
+                            ) : (
+                              initials
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-900 dark:text-white text-xs sm:text-sm">{emp?.full_name || att.employee_id}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{att.employee_id} • {emp?.department}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-xs text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-[#202752]">
+                        {formatVNTime(att.timestamp)}
+                      </td>
+                      <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-slate-400 font-mono border-r border-slate-200 dark:border-[#202752]">
+                        {att.device_id}
+                      </td>
+                      <td className="py-3.5 px-4 text-center border-r border-slate-200 dark:border-[#202752]">
+                        <span className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium">
+                          {(att.verification_score * 100).toFixed(1)}%
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        {(() => {
+                          const punc = getPunctuality(att);
+                          return (
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${punc === 'ON_TIME'
+                                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
+                                : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
+                                }`}
+                            >
+                              {punc === 'ON_TIME' ? 'Đúng giờ' : punc === 'EARLY_LEAVE' ? 'Về sớm' : 'Muộn ca'}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

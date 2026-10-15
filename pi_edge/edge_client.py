@@ -12,6 +12,8 @@ Orchestrator kết nối toàn diện các module:
 """
 
 import os
+os.environ["OPENCV_LOG_LEVEL"] = "OFF"
+os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
 import sys
 import time
 from pathlib import Path

@@ -19,6 +19,13 @@
 
 ---
 
+> 🚀 **BẮT ĐẦU NHANH CHO THÀNH VIÊN MỚI / NGƯỜI BẠN CLONE REPO:**  
+> Xem ngay tài liệu hướng dẫn cài đặt từng bước chi tiết từ A-Z tại: **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)**  
+> *(Hỗ trợ chạy test 100% bằng Webcam trên máy tính hoặc triển khai thực tế trên Raspberry Pi 4)*  
+> Xem sơ đồ luồng dữ liệu chi tiết tại: **[DATA_FLOWS.md](./DATA_FLOWS.md)**
+
+---
+
 ## 🏗️ Kiến Trúc Hệ Thống (System Architecture)
 
 ```text

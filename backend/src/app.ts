@@ -26,8 +26,9 @@ app.get('/health', (_req, res) =>
   successResponse(res, { status: 'ok', timestamp: new Date().toISOString() })
 );
 
-// Centralized API Routes (/api/*)
+// Centralized API Routes (/api/* & /api/v1/*)
 app.use('/api', apiRouter);
+app.use('/api/v1', apiRouter);
 
 // Global Error & 404 Handlers
 app.use(notFound);

@@ -126,3 +126,74 @@ export async function updateStatus(id: string, status: string) {
     return null
   }
 }
+
+let cachedTbJwt: { token: string; exp: number } | null = null
+
+async function getThingsBoardToken(tbHost: string, tbPort: string): Promise<string | null> {
+  if (cachedTbJwt && Date.now() < cachedTbJwt.exp - 60000) {
+    return cachedTbJwt.token
+  }
+  try {
+    const res = await fetch(`http://${tbHost}:${tbPort}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: process.env.TB_USERNAME || 'tenant@thingsboard.org',
+        password: process.env.TB_PASSWORD || 'tenant',
+      }),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as any
+    cachedTbJwt = { token: data.token, exp: Date.now() + 2 * 3600 * 1000 }
+    return data.token
+  } catch (err) {
+    console.warn('[ThingsBoard] Could not login to ThingsBoard API:', err)
+    return null
+  }
+}
+
+export async function setDeviceAttendanceMode(deviceId: string, mode: 'CHECK_IN' | 'CHECK_OUT') {
+  const tbHost = process.env.TB_HOST || '10.52.138.36'
+  const tbPort = process.env.TB_HTTP_PORT || '8080'
+  const tbToken = process.env.TB_DEVICE_TOKEN || 'ivu62ZoR6gkXyqqoDobJ'
+  const tbDeviceId = process.env.TB_DEVICE_UUID || 'efbab930-c7f6-11f1-b4f0-4bfc18af14d5'
+
+  try {
+    // 1. Gửi Telemetry thô qua Device token
+    await fetch(`http://${tbHost}:${tbPort}/api/v1/${tbToken}/telemetry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_mode: mode, mode }),
+    }).catch(() => {})
+
+    // 2. Gửi Shared Attribute & Timeseries với quyền Tenant qua ThingsBoard REST API
+    const jwt = await getThingsBoardToken(tbHost, tbPort)
+    if (jwt) {
+      await Promise.all([
+        // Cập nhật SHARED_SCOPE -> ThingsBoard tự động đẩy MQTT xuống Pi 4
+        fetch(`http://${tbHost}:${tbPort}/api/plugins/telemetry/DEVICE/${tbDeviceId}/SHARED_SCOPE`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Authorization': `Bearer ${jwt}`,
+          },
+          body: JSON.stringify({ attendance_mode: mode }),
+        }),
+        // Cập nhật Timeseries -> Dashboard Widgets đổi trạng thái thời gian thực
+        fetch(`http://${tbHost}:${tbPort}/api/plugins/telemetry/DEVICE/${tbDeviceId}/timeseries/ANY`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Authorization': `Bearer ${jwt}`,
+          },
+          body: JSON.stringify({ current_mode: mode, mode }),
+        }),
+      ])
+      console.log(`[ThingsBoard] Đã đồng bộ mode '${mode}' lên Shared Attribute và Telemetry`)
+    }
+  } catch (err) {
+    console.warn('[ThingsBoard] Could not sync mode to ThingsBoard:', err)
+  }
+
+  return { deviceId, mode }
+}

@@ -1,0 +1,91 @@
+"""
+Module Dự đoán Anti-Spoofing (MiniFASNetV2 R7)
+Sử dụng ONNX Runtime CPU.
+"""
+
+import os
+import cv2
+import numpy as np
+from pathlib import Path
+
+
+class AntiSpoofPredictor:
+    """MiniFASNet R7 Anti-Spoofing Predictor sử dụng ONNX Runtime."""
+
+    def __init__(self, model_path: str = None, threshold_logit: float = -4.2998):
+        import onnxruntime as ort
+
+        if model_path is None:
+            model_path = str(Path(__file__).resolve().parent.parent / "models" / "R7_SC_100K_crop15.onnx")
+
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Không tìm thấy model Anti-Spoofing tại: {model_path}")
+
+        opts = ort.SessionOptions()
+        opts.intra_op_num_threads = 2
+        opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        self.session = ort.InferenceSession(model_path, sess_options=opts, providers=["CPUExecutionProvider"])
+        self.input_name = self.session.get_inputs()[0].name
+        self.threshold_logit = threshold_logit
+
+    @staticmethod
+    def crop_face(img: np.ndarray, bbox: tuple, expansion: float = 1.5, size: int = 80):
+        src_h, src_w = img.shape[:2]
+        x1, y1, x2, y2 = map(float, bbox)
+        box_w, box_h = x2 - x1, y2 - y1
+        if box_w <= 0 or box_h <= 0 or src_w < 2 or src_h < 2:
+            return None
+
+        used_scale = min((src_h - 1) / box_h, (src_w - 1) / box_w, float(expansion))
+        new_w, new_h = box_w * used_scale, box_h * used_scale
+        cx, cy = box_w / 2 + x1, box_h / 2 + y1
+        left, top = cx - new_w / 2, cy - new_h / 2
+        right, bottom = cx + new_w / 2, cy + new_h / 2
+
+        if left < 0:
+            right -= left
+            left = 0
+        if top < 0:
+            bottom -= top
+            top = 0
+        if right > src_w - 1:
+            left -= right - src_w + 1
+            right = src_w - 1
+        if bottom > src_h - 1:
+            top -= bottom - src_h + 1
+            bottom = src_h - 1
+
+        lx, ty, rx, by = map(int, (left, top, right, bottom))
+        if lx < 0 or ty < 0 or rx >= src_w or by >= src_h or rx < lx or by < ty:
+            return None
+
+        patch = img[ty : by + 1, lx : rx + 1]
+        if patch.size == 0:
+            return None
+        return cv2.resize(patch, (size, size))
+
+    def predict(self, frame: np.ndarray, bbox: tuple):
+        """
+        Dự đoán ảnh là REAL hay SPOOF.
+        Trả về: (is_real: bool, real_probability: float, pad_score: float)
+        """
+        crop = self.crop_face(frame, bbox, expansion=1.5, size=80)
+        if crop is None:
+            return False, 0.0, 0.0
+
+        # MiniFASNet nhận BGR, scale [0, 1], shape (1, 3, 80, 80)
+        blob = (crop.astype(np.float32) / 255.0).transpose((2, 0, 1))[None, :]
+        logits = self.session.run(None, {self.input_name: blob})[0].flatten()
+        real_logit, spoof_logit = float(logits[0]), float(logits[1])
+        pad_score = real_logit - spoof_logit
+        is_real = pad_score >= self.threshold_logit
+
+        # Độ tin cậy liveness chuẩn hóa theo sigmoid quanh ngưỡng quyết định threshold_logit
+        # Tại threshold_logit, score = 0.50 (ranh giới phân định giữa Real và Spoof).
+        # Khi là người thật (pad_score > threshold_logit), score nằm trong khoảng [0.50, 1.00], thường đạt 0.85 - 0.98.
+        # Khi là giả mạo (pad_score < threshold_logit), score rơi xuống < 0.50, thường 0.05 - 0.35.
+        delta = pad_score - self.threshold_logit
+        calibrated_score = float(1.0 / (1.0 + np.exp(-delta)))
+
+        return is_real, calibrated_score, pad_score
+

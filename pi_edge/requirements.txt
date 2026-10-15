@@ -1,0 +1,10 @@
+numpy>=1.24.0
+opencv-python-headless>=4.8.0
+onnxruntime>=1.15.0
+paho-mqtt>=2.0.0
+python-dotenv>=1.0.0
+insightface>=0.7.3
+Pillow>=9.0.0
+luma.lcd>=2.10.0
+spidev>=3.6
+RPi.GPIO>=0.7.1

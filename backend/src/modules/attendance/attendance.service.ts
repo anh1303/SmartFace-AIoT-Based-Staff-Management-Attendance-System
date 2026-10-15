@@ -3,6 +3,7 @@ import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, formatVNDateISO } from '../../common/utils.js'
 import { attendanceInclude } from './attendance.model.js'
 import { logAction } from '../audit-logs/audit.service.js'
+import { emitAttendanceEvent } from '../../sockets/attendance.gateway.js'
 import {
   ATTENDANCE_METHOD,
   ATTENDANCE_LOG_STATUS,
@@ -744,5 +745,165 @@ export async function aggregateDailyAttendance(
     year,
     totalSummaries: summaryCount,
     details,
+  }
+}
+
+export interface ThingsBoardWebhookPayload {
+  device_id?: string
+  mode?: string
+  antispoof_score?: number
+  embedding?: number[]
+  embedding_b64?: string
+  client_timestamp?: number | string
+}
+
+export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) {
+  const { device_id = 'PI4_FRONT_GATE', mode = 'CHECK_IN', antispoof_score = 1.0 } = data
+
+  // Giải mã vector: Hỗ trợ cả Base64 Float32 (tối ưu ~2.7KB) và Array JSON truyền thống
+  let vector: ArrayLike<number> | null = null
+
+  if (typeof data.embedding_b64 === 'string' && data.embedding_b64.trim()) {
+    try {
+      const buf = Buffer.from(data.embedding_b64.trim(), 'base64')
+      if (buf.length !== 512 * 4) {
+        throw new Error(`Buffer size is ${buf.length} bytes, expected 2048 bytes (512 float32)`)
+      }
+      vector = new Float32Array(buf.buffer, buf.byteOffset, buf.length / Float32Array.BYTES_PER_ELEMENT)
+    } catch (err: any) {
+      throw AppError.badRequest(`Invalid embedding_b64: ${err.message}`)
+    }
+  } else if (Array.isArray(data.embedding)) {
+    vector = data.embedding
+  }
+
+  if (!vector || vector.length !== 512) {
+    throw AppError.badRequest('Invalid embedding vector: must be an array or base64 of 512 float32 numbers')
+  }
+
+  // Anti-spoofing check
+  if (typeof antispoof_score === 'number' && antispoof_score < 0.5) {
+    emitAttendanceEvent('attendance-spoof-blocked', {
+      device_id,
+      antispoof_score,
+      timestamp: new Date().toISOString(),
+    })
+    return {
+      success: false,
+      matched: false,
+      message: 'Khuôn mặt bị nghi ngờ giả mạo (Anti-spoofing rejected)',
+      antispoof_score,
+    }
+  }
+
+  // L2 Normalize vector
+  let norm = 0
+  for (let i = 0; i < vector.length; i++) {
+    const val = vector[i]
+    if (typeof val !== 'number' || !isFinite(val)) {
+      throw AppError.badRequest('Embedding contains non-finite numbers')
+    }
+    norm += val * val
+  }
+  norm = Math.sqrt(norm)
+  if (norm === 0) {
+    throw AppError.badRequest('Embedding norm is zero')
+  }
+  const parts: string[] = []
+  for (let i = 0; i < vector.length; i++) {
+    parts.push((vector[i] / norm).toFixed(8))
+  }
+  const vecLiteral = '[' + parts.join(',') + ']'
+
+  // Vector similarity search against active employees in DB
+  const MATCH_THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD) || 0.45
+  const rows: Array<{
+    emp_id: string
+    employee_code: string
+    full_name: string
+    avatar_url: string | null
+    embedding_type: string
+    similarity: number
+  }> = await prisma.$queryRaw`
+    SELECT
+      e.id AS emp_id,
+      e.employee_code,
+      e.full_name,
+      e.avatar_url,
+      f.embedding_type,
+      (1 - (f.embedding <=> ${vecLiteral}::vector))::float AS similarity
+    FROM face_embeddings f
+    JOIN employees e ON e.id = f.employee_id
+    WHERE f.is_active = true
+      AND e.status = 'ACTIVE'
+      AND f.embedding IS NOT NULL
+    ORDER BY f.embedding <=> ${vecLiteral}::vector ASC
+    LIMIT 1;
+  `
+
+  if (!rows || rows.length === 0 || rows[0].similarity < MATCH_THRESHOLD) {
+    const bestSim = rows.length > 0 ? Number(rows[0].similarity.toFixed(4)) : 0
+    emitAttendanceEvent('attendance-unknown', {
+      device_id,
+      similarity: bestSim,
+      timestamp: new Date().toISOString(),
+    })
+    return {
+      success: false,
+      matched: false,
+      similarity: bestSim,
+      message: 'Không tìm thấy nhân viên phù hợp hoặc độ tương đồng quá thấp',
+    }
+  }
+
+  const match = rows[0]
+  const normalizedMode = (mode || 'CHECK_IN').toUpperCase()
+  const isCheckOut = normalizedMode === 'CHECK_OUT'
+
+  try {
+    let attendanceRecord
+    if (isCheckOut) {
+      attendanceRecord = await checkOut(match.emp_id, `device:${device_id}`)
+    } else {
+      attendanceRecord = await checkIn({
+        employeeId: match.emp_id,
+        device_info: `device:${device_id}`,
+        method: 'FACE',
+      })
+    }
+
+    // Emit Realtime Socket.IO Event for live web monitor
+    emitAttendanceEvent(isCheckOut ? 'checked-out' : 'checked-in', attendanceRecord)
+
+    return {
+      success: true,
+      matched: true,
+      mode: normalizedMode,
+      employee: {
+        id: match.emp_id,
+        employee_code: match.employee_code,
+        full_name: match.full_name,
+        avatar_url: match.avatar_url,
+      },
+      similarity: Number(match.similarity.toFixed(4)),
+      attendance: attendanceRecord,
+      message: `${isCheckOut ? 'Check-out' : 'Check-in'} thành công`,
+    }
+  } catch (err: any) {
+    // Return structured response for 409 (already checked in / out today)
+    return {
+      success: false,
+      matched: true,
+      mode: normalizedMode,
+      employee: {
+        id: match.emp_id,
+        employee_code: match.employee_code,
+        full_name: match.full_name,
+        avatar_url: match.avatar_url,
+      },
+      similarity: Number(match.similarity.toFixed(4)),
+      code: err.statusCode || 400,
+      message: err.message || 'Lỗi xử lý điểm danh',
+    }
   }
 }

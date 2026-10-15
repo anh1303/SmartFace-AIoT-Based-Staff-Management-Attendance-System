@@ -10,9 +10,13 @@ import { DeviceStatusCards } from '../../features/attendance-monitor/components/
 import { AttendanceTable } from '../../features/attendance-monitor/components/AttendanceTable';
 import { AttendanceEditModal } from '../../features/attendance-monitor/components/AttendanceEditModal';
 import { exportAttendanceToCSV } from '../../features/attendance-monitor/csvExport';
+import { WebRTCPlayer } from '../../features/attendance-monitor/components/WebRTCPlayer';
+import { LiveEventFeed } from '../../features/attendance-monitor/components/LiveEventFeed';
+import { useAttendanceSocket } from '../../features/attendance-monitor/hooks/useAttendanceSocket';
 
 export const ManagerAttendanceMonitor: React.FC = () => {
   const { attendance, employees, workShifts, showToast } = useApp();
+  const { liveEvents, isSocketConnected, clearEvents } = useAttendanceSocket({ showToast });
 
   const [startDate, setStartDate] = useState<string>(() => getTodayVNString());
   const [endDate, setEndDate] = useState<string>(() => getTodayVNString());
@@ -125,6 +129,24 @@ export const ManagerAttendanceMonitor: React.FC = () => {
       />
 
       <DeviceStatusCards devices={devices} />
+
+      {/* AIoT Realtime Gate Camera & Live Events Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2">
+          <WebRTCPlayer
+            deviceId="PI4_FRONT_GATE"
+            deviceName="Cổng Kiểm Soát — Raspberry Pi 4 Edge AI"
+            showToast={showToast}
+          />
+        </div>
+        <div className="lg:col-span-1 h-full min-h-[360px]">
+          <LiveEventFeed
+            events={liveEvents}
+            onClear={clearEvents}
+            isSocketConnected={isSocketConnected}
+          />
+        </div>
+      </div>
 
       <AttendanceTable
         employeePairs={employeePairs}

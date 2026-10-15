@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # 1. ThingsBoard IoT Platform (Bản tích hợp sẵn DB Postgres nội bộ)
+  thingsboard:
+    image: thingsboard/tb-postgres:latest
+    container_name: smartface_thingsboard
+    restart: always
+    ports:
+      - "8080:9090"     # Cổng giao diện Web UI của ThingsBoard
+      - "1883:1883"     # Cổng MQTT Broker để Pi 4 kết nối vào
+      - "7070:7070"     # Cổng Edge RPC
+    environment:
+      TB_QUEUE_TYPE: in-memory
+    volumes:
+      - tb-data:/data
+      - tb-logs:/var/log/thingsboard
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Giúp container gọi được Node.js đang chạy ở máy thật
+
+  # 2. MediaMTX - Máy chủ nhận luồng RTSP từ Pi và phát WebRTC lên Web
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: smartface_mediamtx
+    restart: always
+    ports:
+      - "8554:8554"     # Cổng nhận luồng RTSP từ Pi 4
+      - "8889:8889"     # Cổng phát WebRTC (WHEP) lên giao diện React
+      - "8189:8189/udp" # Cổng UDP tăng tốc truyền tải WebRTC
+    environment:
+      MTX_PROTOCOLS: tcp
+      MTX_WEBRTCADDITIONALHOSTS: "10.52.138.36" # IP LAN máy tính Server
+
+volumes:
+  tb-data:
+  tb-logs:

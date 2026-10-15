@@ -96,3 +96,15 @@ venv/
 env/
 ENV/
 .pytest_cache/
+
+# ==============================================================================
+# 7. AI EXPERIMENTS, CHECKPOINTS & RESEARCH ARTIFACTS (Không đưa lên Git)
+# ==============================================================================
+*.pth
+*.pt
+face_auth/antispoof/notebooks/final/
+face_auth/slide_figures_mast_pad_fullscale/
+face_auth/md/research/
+face_auth/scripts/benchmark_performance.py
+face_auth/edge_client.py
+md/

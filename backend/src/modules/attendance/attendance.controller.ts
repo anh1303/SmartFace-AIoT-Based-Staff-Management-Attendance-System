@@ -16,6 +16,27 @@ import {
 } from './attendance.dto.js';
 
 export const attendanceRouter = Router();
+
+// Webhook từ ThingsBoard Rule Chain (Hỗ trợ cả REST Webhook và Two-way RPC) - Không cần JWT người dùng
+attendanceRouter.post(
+  '/tb-webhook',
+  asyncHandler(async (req, res) => {
+    // Nếu payload gửi qua RPC ({ method, params }), trích xuất params
+    const rawData = (req.body?.params && typeof req.body.params === 'object') ? req.body.params : req.body;
+    const deviceId =
+      rawData?.device_id ||
+      req.body?.device_id ||
+      (req.headers['x-device-name'] as string) ||
+      'PI4_FRONT_GATE';
+    const result = await service.handleThingsBoardWebhook({
+      ...rawData,
+      device_id: deviceId,
+    });
+    // Phản hồi thẳng JSON kết quả để TbSendRPCReplyNode đóng gói gửi về Pi 4
+    res.status(200).json(result);
+  })
+);
+
 attendanceRouter.use(authenticate);
 
 attendanceRouter.get(

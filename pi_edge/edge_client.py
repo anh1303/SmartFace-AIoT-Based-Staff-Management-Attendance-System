@@ -229,12 +229,38 @@ def main():
     embedder = FaceEmbedder()
     print("  [OK] Face Embedder : ArcFace MobileFaceNet (~13 MB)")
 
-    # 3. Mở Camera
+    # 3. Mở Camera (Tự động quét các index 1, 2, 3... nếu index 0 bị chiếm bởi codec phần cứng trên Pi)
     cap = cv2.VideoCapture(CAM_INDEX)
     if not cap.isOpened():
-        print(f"[ERROR] Không thể mở Camera tại index {CAM_INDEX}!")
-        tb_client.stop()
-        sys.exit(1)
+        print(f"[WARN] Không mở được Camera tại index {CAM_INDEX}. Đang tự động quét các cổng video khác...")
+        found_cap = None
+        for test_idx in [1, 2, 3, 4, 10, 14, 0]:
+            if test_idx == CAM_INDEX:
+                continue
+            test_cap = cv2.VideoCapture(test_idx)
+            if test_cap.isOpened():
+                ret, _ = test_cap.read()
+                if ret:
+                    print(f"[OK] ✅ Đã tự động kết nối Camera hợp lệ tại CAMERA_INDEX={test_idx}!")
+                    found_cap = test_cap
+                    CAM_INDEX = test_idx
+                    break
+                test_cap.release()
+        if found_cap:
+            cap = found_cap
+        else:
+            print(f"[ERROR] Không thể mở Camera tại index {CAM_INDEX}!")
+            print("=====================================================================")
+            print("  HƯỚNG DẪN KHẮC PHỤC TRÊN RASPBERRY PI:")
+            print("  1. Nếu dùng USB Webcam:")
+            print("     - Kiểm tra cổng camera: gõ `v4l2-ctl --list-devices` hoặc `ls /dev/video*`")
+            print("     - Cập nhật CAMERA_INDEX=1 (hoặc 2) vào file .env")
+            print("  2. Nếu dùng Raspberry Pi Camera (Cáp dẹt CSI):")
+            print("     - Chạy qua lớp tương thích: `libcamerify python edge_client.py`")
+            print("     - Hoặc kiểm tra kết nối cáp: `rpicam-hello` (hoặc `libcamera-hello`)")
+            print("=====================================================================")
+            tb_client.stop()
+            sys.exit(1)
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)

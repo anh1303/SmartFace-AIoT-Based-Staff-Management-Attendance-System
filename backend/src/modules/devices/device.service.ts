@@ -153,7 +153,7 @@ async function getThingsBoardToken(tbHost: string, tbPort: string): Promise<stri
 }
 
 export async function setDeviceAttendanceMode(deviceId: string, mode: 'CHECK_IN' | 'CHECK_OUT') {
-  const tbHost = process.env.TB_HOST || '10.52.138.36'
+  const tbHost = process.env.TB_HOST || '10.74.201.36'
   const tbPort = process.env.TB_HTTP_PORT || '8080'
   const tbToken = process.env.TB_DEVICE_TOKEN || 'ivu62ZoR6gkXyqqoDobJ'
   const tbDeviceId = process.env.TB_DEVICE_UUID || 'efbab930-c7f6-11f1-b4f0-4bfc18af14d5'

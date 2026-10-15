@@ -22,7 +22,7 @@ interface WebRTCPlayerProps {
 }
 
 export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
-  streamUrl = (import.meta.env.VITE_MEDIAMTX_WHEP_URL || 'http://10.52.138.36:8889/pi4_cam/whep'),
+  streamUrl = (import.meta.env.VITE_MEDIAMTX_WHEP_URL || `http://${typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '10.74.201.36'}:8889/pi4_cam/whep`),
   deviceId = 'PI4_FRONT_GATE',
   deviceName = 'Cổng Chính — Raspberry Pi 4 Edge',
   currentMode = 'CHECK_IN',

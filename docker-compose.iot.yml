@@ -29,7 +29,7 @@ services:
       - "8189:8189/udp" # Cổng UDP tăng tốc truyền tải WebRTC
     environment:
       MTX_PROTOCOLS: tcp
-      MTX_WEBRTCADDITIONALHOSTS: "10.52.138.36" # IP LAN máy tính Server
+      MTX_WEBRTCADDITIONALHOSTS: "10.74.201.36" # IP LAN máy tính Server
 
 volumes:
   tb-data:

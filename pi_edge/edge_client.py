@@ -16,6 +16,9 @@ os.environ["OPENCV_LOG_LEVEL"] = "OFF"
 os.environ["OPENCV_VIDEOIO_DEBUG"] = "0"
 import sys
 import time
+import glob
+import re
+import threading
 from pathlib import Path
 import cv2
 import numpy as np
@@ -145,6 +148,110 @@ def on_mode_change(new_mode: str):
     print(f"\n[MODE SWITCH] Nhận lệnh từ ThingsBoard: Đổi sang {current_mode}!\n")
 
 
+def find_available_cameras(preferred_index: int = 0) -> list[int]:
+    """
+    Quét tìm danh sách các cổng Camera (index) hợp lệ trên Linux/Raspberry Pi.
+    Loại bỏ triệt để các thiết bị VideoCore M2M (codec, isp, rpivid, unicam) để tránh
+    việc cv2.VideoCapture() bị treo vĩnh viễn (freeze/hang) trên Pi.
+    """
+    candidates = []
+
+    # 1. Quét USB Webcams qua /dev/v4l/by-id (Đáng tin cậy nhất cho USB Webcams)
+    usb_devs = glob.glob("/dev/v4l/by-id/*")
+    for dev_path in sorted(usb_devs):
+        if "index0" in dev_path or not any(x in dev_path for x in ["index1", "index2"]):
+            try:
+                real_target = os.path.realpath(dev_path)
+                m = re.search(r"video(\d+)$", real_target)
+                if m:
+                    idx = int(m.group(1))
+                    if idx not in candidates:
+                        candidates.append(idx)
+            except Exception:
+                pass
+
+    # 2. Quét /sys/class/video4linux/video*
+    for name_path in sorted(glob.glob("/sys/class/video4linux/video*/name")):
+        try:
+            with open(name_path, "r", encoding="utf-8", errors="ignore") as f:
+                dev_name = f.read().strip().lower()
+
+            # Loại trừ tuyệt đối các node phần cứng codec / ISP / M2M của Raspberry Pi
+            blacklist = ["codec", "isp", "rpivid", "decode", "encode", "m2m", "metadata", "pisp", "unicam"]
+            if any(b in dev_name for b in blacklist):
+                continue
+
+            v_dir = os.path.dirname(name_path)
+            m = re.search(r"video(\d+)$", v_dir)
+            if m:
+                idx = int(m.group(1))
+                if idx not in candidates:
+                    candidates.append(idx)
+        except Exception:
+            pass
+
+    # Nếu preferred_index hợp lệ, đưa lên đầu danh sách ưu tiên
+    if preferred_index in candidates:
+        candidates.remove(preferred_index)
+        candidates.insert(0, preferred_index)
+    elif preferred_index not in candidates and 0 <= preferred_index < 10:
+        candidates.insert(0, preferred_index)
+
+    # Thêm các index thông dụng [0, 1, 2] nếu chưa có (tránh index >= 10 đụng codec Pi)
+    for basic_idx in [0, 1, 2]:
+        if basic_idx not in candidates:
+            candidates.append(basic_idx)
+
+    return candidates
+
+
+def open_camera_safely(index_or_pipeline, width: int, height: int, fps: int, timeout: float = 2.0):
+    """
+    Mở VideoCapture và kiểm tra đọc 1 frame với timeout chống treo.
+    Trả về cap đã cấu hình hoặc None nếu thất bại / timeout.
+    """
+    result = {"cap": None, "success": False}
+
+    def _worker():
+        cap = None
+        try:
+            if isinstance(index_or_pipeline, str):
+                cap = cv2.VideoCapture(index_or_pipeline, cv2.CAP_GSTREAMER)
+            else:
+                cap = cv2.VideoCapture(index_or_pipeline)
+
+            if not cap.isOpened():
+                if cap is not None:
+                    cap.release()
+                return
+
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            cap.set(cv2.CAP_PROP_FPS, fps)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+            ret, frame = cap.read()
+            if ret and frame is not None and frame.size > 0:
+                result["cap"] = cap
+                result["success"] = True
+            else:
+                cap.release()
+        except Exception:
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+    t.join(timeout=timeout)
+
+    if result["success"] and result["cap"] is not None:
+        return result["cap"]
+    return None
+
+
 def main():
     global current_mode
 
@@ -229,43 +336,71 @@ def main():
     embedder = FaceEmbedder()
     print("  [OK] Face Embedder : ArcFace MobileFaceNet (~13 MB)")
 
-    # 3. Mở Camera (Tự động quét các index 1, 2, 3... nếu index 0 bị chiếm bởi codec phần cứng trên Pi)
+    # 3. Mở Camera an toàn & tự động phát hiện cổng trên Raspberry Pi
+    print(f"[CAMERA] Đang khởi tạo Camera (Ưu tiên CAMERA_INDEX={CAM_INDEX}, {WIDTH}x{HEIGHT}@{FPS}fps)...")
+    cap = None
     active_cam_index = CAM_INDEX
-    cap = cv2.VideoCapture(active_cam_index)
-    if not cap.isOpened():
-        print(f"[WARN] Không mở được Camera tại index {active_cam_index}. Đang tự động quét các cổng video khác...")
-        found_cap = None
-        for test_idx in [1, 2, 3, 4, 10, 14, 0]:
-            if test_idx == active_cam_index:
-                continue
-            test_cap = cv2.VideoCapture(test_idx)
-            if test_cap.isOpened():
-                ret, _ = test_cap.read()
-                if ret:
-                    print(f"[OK] ✅ Đã tự động kết nối Camera hợp lệ tại CAMERA_INDEX={test_idx}!")
-                    found_cap = test_cap
-                    active_cam_index = test_idx
-                    break
-                test_cap.release()
-        if found_cap:
-            cap = found_cap
-        else:
-            print(f"[ERROR] Không thể mở Camera tại index {active_cam_index}!")
-            print("=====================================================================")
-            print("  HƯỚNG DẪN KHẮC PHỤC TRÊN RASPBERRY PI:")
-            print("  1. Nếu dùng USB Webcam:")
-            print("     - Kiểm tra cổng camera: gõ `v4l2-ctl --list-devices` hoặc `ls /dev/video*`")
-            print("     - Cập nhật CAMERA_INDEX=1 (hoặc 2) vào file .env")
-            print("  2. Nếu dùng Raspberry Pi Camera (Cáp dẹt CSI):")
-            print("     - Chạy qua lớp tương thích: `libcamerify python edge_client.py`")
-            print("     - Hoặc kiểm tra kết nối cáp: `rpicam-hello` (hoặc `libcamera-hello`)")
-            print("=====================================================================")
-            tb_client.stop()
-            sys.exit(1)
 
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
-    cap.set(cv2.CAP_PROP_FPS, FPS)
+    # Bước 3.1: Thử mở camera ưu tiên (CAM_INDEX) với timeout chống freeze
+    cap = open_camera_safely(CAM_INDEX, WIDTH, HEIGHT, FPS, timeout=2.0)
+    if cap is not None:
+        print(f"[CAMERA] [OK] ✅ Đã kết nối thành công Camera tại CAMERA_INDEX={CAM_INDEX}!")
+    else:
+        print(f"[CAMERA] [WARN] Không mở được Camera tại index {CAM_INDEX}. Đang tự động quét các cổng khả dụng...")
+        candidates = find_available_cameras(preferred_index=CAM_INDEX)
+        for cand_idx in candidates:
+            if cand_idx == CAM_INDEX:
+                continue
+            test_cap = open_camera_safely(cand_idx, WIDTH, HEIGHT, FPS, timeout=1.5)
+            if test_cap is not None:
+                cap = test_cap
+                active_cam_index = cand_idx
+                print(f"[CAMERA] [OK] ✅ Đã tự động kết nối Camera hợp lệ tại CAMERA_INDEX={cand_idx}!")
+                break
+
+    # Bước 3.2: Thử fallback qua GStreamer libcamerasrc nếu là Raspberry Pi CSI Camera
+    if cap is None and sys.platform.startswith("linux"):
+        gst_pipeline = f"libcamerasrc ! video/x-raw, width={WIDTH}, height={HEIGHT}, framerate={FPS}/1 ! videoconvert ! appsink"
+        gst_cap = open_camera_safely(gst_pipeline, WIDTH, HEIGHT, FPS, timeout=2.0)
+        if gst_cap is not None:
+            cap = gst_cap
+            print("[CAMERA] [OK] ✅ Đã tự động kết nối Raspberry Pi CSI Camera qua libcamerasrc!")
+
+    if cap is None:
+        print("\n" + "=" * 68)
+        print(" [LỖI] KHÔNG THỂ MỞ ĐƯỢC THIẾT BỊ CAMERA NÀO TRÊN RASPBERRY PI!")
+        print("=" * 68)
+        print(" CHẨN ĐOÁN THIẾT BỊ HỆ THỐNG:")
+        detected_nodes = []
+        for p in sorted(glob.glob("/sys/class/video4linux/video*/name")):
+            try:
+                with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                    dname = f.read().strip()
+                node = os.path.basename(os.path.dirname(p))
+                detected_nodes.append(f"   • /dev/{node}: {dname}")
+            except Exception:
+                pass
+        if detected_nodes:
+            print(" Các cổng video phát hiện trên Pi:")
+            for dn in detected_nodes[:12]:
+                print(dn)
+        else:
+            print("   • Không phát hiện cổng /dev/video nào.")
+
+        print("\n HƯỚNG DẪN KHẮC PHỤC:")
+        print(" 1. NẾU BẠN DÙNG RASPBERRY PI CAMERA (Cáp dẹt CSI Ribbon):")
+        print("    -> Raspberry Pi OS (Bullseye/Bookworm) dùng libcamera thay cho V4L2 mặc định.")
+        print("    -> Hãy chạy qua shim tương thích của libcamera:")
+        print("       libcamerify python edge_client.py")
+        print("    -> Hoặc kiểm tra kết nối camera bằng lệnh:")
+        print("       rpicam-hello   (hoặc libcamera-hello)")
+        print("\n 2. NẾU BẠN DÙNG USB WEBCAM:")
+        print("    -> Kiểm tra thiết bị đã cắm nhận diện chưa: gõ lệnh `lsusb`")
+        print("    -> Xem cổng video chính xác: `v4l2-ctl --list-devices` hoặc `ls -l /dev/v4l/by-id/`")
+        print("    -> Cập nhật CAMERA_INDEX=1 (hoặc số tương ứng) vào file pi_edge/.env")
+        print("=" * 68 + "\n")
+        tb_client.stop()
+        sys.exit(1)
 
     # 4. Khởi tạo Live Streamer (RTSP -> MediaMTX)
     streamer = RTSPStreamer(RTSP_URL, WIDTH, HEIGHT, FPS, enabled=STREAM_ENABLED)

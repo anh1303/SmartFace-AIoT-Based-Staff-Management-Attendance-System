@@ -230,12 +230,13 @@ def main():
     print("  [OK] Face Embedder : ArcFace MobileFaceNet (~13 MB)")
 
     # 3. Mở Camera (Tự động quét các index 1, 2, 3... nếu index 0 bị chiếm bởi codec phần cứng trên Pi)
-    cap = cv2.VideoCapture(CAM_INDEX)
+    active_cam_index = CAM_INDEX
+    cap = cv2.VideoCapture(active_cam_index)
     if not cap.isOpened():
-        print(f"[WARN] Không mở được Camera tại index {CAM_INDEX}. Đang tự động quét các cổng video khác...")
+        print(f"[WARN] Không mở được Camera tại index {active_cam_index}. Đang tự động quét các cổng video khác...")
         found_cap = None
         for test_idx in [1, 2, 3, 4, 10, 14, 0]:
-            if test_idx == CAM_INDEX:
+            if test_idx == active_cam_index:
                 continue
             test_cap = cv2.VideoCapture(test_idx)
             if test_cap.isOpened():
@@ -243,13 +244,13 @@ def main():
                 if ret:
                     print(f"[OK] ✅ Đã tự động kết nối Camera hợp lệ tại CAMERA_INDEX={test_idx}!")
                     found_cap = test_cap
-                    CAM_INDEX = test_idx
+                    active_cam_index = test_idx
                     break
                 test_cap.release()
         if found_cap:
             cap = found_cap
         else:
-            print(f"[ERROR] Không thể mở Camera tại index {CAM_INDEX}!")
+            print(f"[ERROR] Không thể mở Camera tại index {active_cam_index}!")
             print("=====================================================================")
             print("  HƯỚNG DẪN KHẮC PHỤC TRÊN RASPBERRY PI:")
             print("  1. Nếu dùng USB Webcam:")

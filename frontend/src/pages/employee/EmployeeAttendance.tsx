@@ -13,12 +13,12 @@ import {
   ChevronDown
 } from 'lucide-react';
 
-export const StaffAttendance: React.FC = () => {
+export const EmployeeAttendance: React.FC = () => {
   const { currentUser, attendance } = useApp();
   const [methodFilter, setMethodFilter] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
 
-  // Staff's records only
+  // Employee's records only
   const myRecords = attendance.filter(
     a => a.employee_id === (currentUser?.employee_id || 'NV-001')
   );
@@ -206,3 +206,5 @@ export const StaffAttendance: React.FC = () => {
     </div>
   );
 };
+
+export const StaffAttendance = EmployeeAttendance;

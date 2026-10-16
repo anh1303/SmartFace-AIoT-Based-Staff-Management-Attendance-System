@@ -75,8 +75,7 @@ npx prisma generate
 # 2. Áp dụng toàn bộ 3 bản migration lên Database
 npm run prisma:migrate
 
-# 3. Nạp dữ liệu mẫu ban đầu (Nếu database mới rỗng)
-npm run prisma:seed
+# 3. Nạp dữ liệu mẫu ban đầu (CHÚ Ý: Chỉ dùng cho Database mới rỗng vì lệnh này sẽ xóa sạch dữ liệu cũ để nạp lại)
 ```
 
 #### Bước 5: Khởi chạy Server Development
@@ -85,6 +84,24 @@ npm run dev
 # Server lắng nghe tại địa chỉ: http://localhost:3000
 # Kiểm tra Health Check: GET http://localhost:3000/health
 ```
+
+---
+
+### 🔑 Danh Sách Tài Khoản Đăng Nhập & Mật Khẩu Đang Có
+
+| Tên đăng nhập (Username) | Mật khẩu truy cập | Vai trò (Role) | Chức năng / Nhân viên |
+| :--- | :--- | :---: | :--- |
+| **`admin`** | **`Admin@123456`** | `ADMIN` | Quản trị viên hệ thống |
+| **`NV-001`** | **`92E9Dac4`** | `MANAGER` | Nguyễn Văn A (Quản lý chính) |
+| **`NV-002`** | **`DuFAh34T`** | `EMPLOYEE` | Lê Hoàng Phúc (Thu ngân chính) |
+| **`NV-003`** | **`gzXWzj6P`** | `MANAGER` | Nguyễn Minh Anh (Trưởng phòng QL) |
+| **`NV-004`** | **`sx7TmHTs`** | `EMPLOYEE` | Trần Thu Thảo (Nhân viên bán hàng) |
+| **`NV-005`** | **`yRKXEeZ4`** | `EMPLOYEE` | Nguyễn Hải Nam (Nhân viên an ninh) |
+| **`NV-006`** | **`kbEnYA9i`** | `EMPLOYEE` | Vũ Khánh Linh (Thu ngân dự phòng) |
+| **`NV-007`** | **`G9uVKumx`** | `MANAGER` | Nguyễn Quang Anh (Quản lý) |
+| **`NV-008`** | **`gdF2Biz5`** | `EMPLOYEE` | Trịnh Minh Đạt (Nhân viên) |
+| **`NV-009`** | **`SWM5jTyW`** | `MANAGER` | ngovanloc (Quản lý) |
+| **`NV-011`** | *(Đã gửi qua Gmail)* | `EMPLOYEE` | abc (`nvgiap812005@gmail.com`) |
 
 ---
 

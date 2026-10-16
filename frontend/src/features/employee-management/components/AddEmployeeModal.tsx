@@ -1,4 +1,5 @@
 import React from 'react';
+import { Mail, KeyRound } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
 
 export interface NewEmployeeFormState {
@@ -141,6 +142,13 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               onChange={(e) => onChangeNewEmp({ ...newEmp, hourly_rate: Number(e.target.value) })}
               className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-purple-500"
             />
+          </div>
+        </div>
+
+        <div className="p-3 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/50 rounded-xl flex items-start gap-2.5 text-xs text-blue-700 dark:text-blue-300">
+          <Mail className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
+          <div className="leading-relaxed">
+            Hệ thống sẽ <strong>tự động tạo tài khoản đăng nhập</strong> với tên đăng nhập là mã nhân viên và mật khẩu ngẫu nhiên (8 ký tự), sau đó tự động gửi email hướng dẫn đăng nhập đến email nhân viên.
           </div>
         </div>
 

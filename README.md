@@ -91,7 +91,7 @@ SmartFace-AIoT-Based-Staff-Management-Attendance-System/
 │   │   ├── pages/
 │   │   │   ├── manager/      # Dành cho Quản lý (Dashboard, Giám sát chấm công, Nhân viên,
 │   │   │   │                 # Lập lịch ca, Sinh trắc học, Bảng lương, Báo cáo thống kê)
-│   │   │   ├── staff/        # Cổng nhân viên (Dashboard cá nhân, Điểm danh, Lịch làm, Ước tính lương, Hồ sơ)
+│   │   │   ├── employee/     # Cổng nhân viên (Dashboard cá nhân, Điểm danh, Lịch làm, Ước tính lương, Hồ sơ)
 │   │   │   └── public/       # Trang công khai (Landing Page, Trang đăng nhập)
 │   │   ├── types/            # Khai báo kiểu TypeScript toàn dự án
 │   │   └── utils/            # Chuẩn hóa múi giờ Việt Nam (+07:00), định dạng tiền tệ VND
@@ -113,17 +113,35 @@ SmartFace-AIoT-Based-Staff-Management-Attendance-System/
 
 ---
 
-## 🔑 Tài Khoản Đăng Nhập & Dữ Liệu Mẫu
+## 🔑 Danh Sách Tài Khoản Đăng Nhập & Mật Khẩu Đang Có
 
-Hệ thống được khởi tạo sẵn với bộ dữ liệu mẫu đầy đủ sau khi thực hiện Seed (`npm run prisma:seed`):
+Hệ thống được thiết lập sẵn tài khoản quản trị và tài khoản riêng biệt cho từng nhân viên:
 
-- **Mật khẩu dùng chung cho mọi tài khoản mẫu**: **`Admin@123456`**
+### 1. Tài Khoản Quản Trị Hệ Thống
+| Tên đăng nhập (Username) | Mật khẩu | Phân quyền (Role) | Chức năng truy cập |
+| :--- | :--- | :---: | :--- |
+| **`admin`** | **`Admin@123456`** | `ADMIN` | Toàn quyền quản trị hệ thống, quản lý thiết bị, phân quyền |
 
-| Tài khoản (Username) | Phân quyền (Role) | Chức năng truy cập | Nhân viên liên kết |
-| :--- | :--- | :--- | :--- |
-| **`admin`** | `ADMIN` | Toàn quyền quản trị hệ thống, quản lý thiết bị, phân quyền | Quản trị viên hệ thống |
-| **`manager`** | `MANAGER` | Giám sát chấm công, lập lịch ca, tính lương, duyệt báo cáo | Nguyễn Văn A (`NV-001`) |
-| **`employee`** | `EMPLOYEE` | Xem lịch làm việc cá nhân, lịch sử điểm danh, ước tính lương | Lê Hoàng Phúc (`NV-002`) |
+### 2. Danh Sách Tài Khoản Cá Nhân Từng Nhân Viên Hiện Có Trên DB
+> 💡 **Quy tắc**: Tên đăng nhập là **Mã nhân viên (`NV-xxx`)**. Mỗi nhân viên có tài khoản độc lập để theo dõi ca làm, chấm công và phiếu lương cá nhân:
+
+| Tên đăng nhập (Username) | Mật khẩu truy cập | Họ và tên nhân viên | Quyền (Role) | Chức vụ / Vị trí | Email liên kết |
+| :--- | :--- | :--- | :---: | :--- | :--- |
+| **`NV-001`** | **`92E9Dac4`** | Nguyễn Văn A | `MANAGER` | Quản lý chính | `anv@aiot.corp` |
+| **`NV-002`** | **`DuFAh34T`** | Lê Hoàng Phúc | `EMPLOYEE` | Thu ngân chính | `staff@company.com` |
+| **`NV-003`** | **`gzXWzj6P`** | Nguyễn Minh Anh | `MANAGER` | Trưởng phòng quản lý | `manager@company.com` |
+| **`NV-004`** | **`sx7TmHTs`** | Trần Thu Thảo | `EMPLOYEE` | Nhân viên bán hàng | `thao.tran@aiot.corp` |
+| **`NV-005`** | **`yRKXEeZ4`** | Nguyễn Hải Nam | `EMPLOYEE` | Nhân viên an ninh | `nam.nguyen@aiot.corp` |
+| **`NV-006`** | **`kbEnYA9i`** | Vũ Khánh Linh | `EMPLOYEE` | Thu ngân dự phòng | `linh.vu@aiot.corp` |
+| **`NV-007`** | **`G9uVKumx`** | Nguyễn Quang Anh | `MANAGER` | Quản lý | `anh@aiot.vn` |
+| **`NV-008`** | **`gdF2Biz5`** | Trịnh Minh Đạt | `EMPLOYEE` | Nhân viên | `a@abcgamil.com` |
+| **`NV-009`** | **`SWM5jTyW`** | ngovanloc | `MANAGER` | Quản lý | `test-c206@gmail.com` |
+
+> 📌 **Lưu ý**:
+> - Khi bấm **Thêm nhân viên** mới trên giao diện Web, hệ thống sẽ tự động tạo User với username là mã NV tiếp theo và gửi mật khẩu ngẫu nhiên 8 ký tự trực tiếp qua Gmail.
+> - Khi khởi tạo lại CSDL rỗng qua seed (`npm run prisma:seed`), mật khẩu mặc định của các nhân viên mẫu sẽ là **`Employee@123456`**.
+
+---
 
 ### 🏢 Danh Sách 4 Chức Vụ Chuẩn Hóa
 Hệ thống sử dụng đồng bộ thuật ngữ **Chức vụ** (thay cho Phòng ban) trên toàn bộ bảng và giao diện:
@@ -290,7 +308,7 @@ npm run dev
 - Hỗ trợ cả ca cố định (`Full time`) và ca bán thời gian (`Part time Ca sáng / Ca chiều`).
 - Dữ liệu phân ca được dùng làm căn cứ tự động xác định tính đúng giờ (Punctuality) cho các lần quẹt thẻ.
 
-### 5. Cổng Tự Phục Vụ Dành Cho Nhân Viên (Staff Portal)
+### 5. Cổng Tự Phục Vụ Dành Cho Nhân Viên (Employee Portal)
 - Nhân viên đăng nhập tra cứu tức thì:
   - Thông tin ca làm việc trong ngày và lịch làm việc cả tuần.
   - Lịch sử chấm công chi tiết kèm ảnh chụp/phương thức và độ tin cậy.

@@ -79,6 +79,8 @@ async function main() {
 
   // 5. Bảng 4: Users
   const hashedPassword = await bcrypt.hash('Admin@123456', 10)
+  const defaultEmployeePasswordHash = await bcrypt.hash('Employee@123456', 10)
+
   const adminUser = await prisma.user.create({
     data: {
       username: 'admin',
@@ -87,25 +89,9 @@ async function main() {
       is_active: true,
     },
   })
-  const managerUser = await prisma.user.create({
-    data: {
-      username: 'manager',
-      passwordHash: hashedPassword,
-      role_id: roleManager.id,
-      is_active: true,
-    },
-  })
-  const employeeUser = await prisma.user.create({
-    data: {
-      username: 'employee',
-      passwordHash: hashedPassword,
-      role_id: roleEmployee.id,
-      is_active: true,
-    },
-  })
-  console.log('✅ 4. Bảng users (3 bản ghi)')
+  console.log('✅ 4. Bảng users (Khởi tạo tài khoản quản trị hệ thống: admin)')
 
-  // 6. Bảng 5: Employees
+  // 6. Bảng 5: Employees & Tài khoản người dùng tương ứng cho từng nhân viên
   const initialEmployees = [
     {
       employee_code: 'NV-001',
@@ -119,7 +105,6 @@ async function main() {
       avatar_url:
         'https://lh3.googleusercontent.com/aida-public/AB6AXuA0KS6nUhHdsndSeZ0LOeLkOfZAEfZAfm63Txsb3ryYsAUsiH0gLZ9VIT3CcW3uMw_MkVbDlsl53kBdUR8_KlS0J9tew5ToWiUd-q4Ct0wcosdejjVyvTptYjYHD0OY6LKozVPucFXEEHhfJqTf9_78zsEhE0xrMlMTYy2M9jxhP8ZrayoGhJz_E9WrMsLfaZlj-stHu3rWBibcwNnFos3o70DrOeSmxACoW5JdNeIoP3zwcbW4dK42',
       hourly_rate: 120000,
-      user_id: employeeUser.id,
     },
     {
       employee_code: 'NV-002',
@@ -133,7 +118,6 @@ async function main() {
       avatar_url:
         'https://lh3.googleusercontent.com/aida/AEtjO1WI3ysdLdr6Ya6JgC-p_9Nrkual12Y1Q6p9q4Ln5kqEpHlD50Rf1fcFfWprqeiBnI7yplufSIPIriJBm7cmqB9foAoNHZen3eTFSXz2qDN7q8YMY4rzBTWQDerqU9fyTBkbyV1XkqNLbr1gaEf5pNt4z-p2XSFW0goQoox1RfdhgeYyFDqdH1XwQLMvES4M7Jxu_utGWnqzMjF1b3SMgovKmeeN--rfL1vVW2BVhMloJ9HYKfXBJ81hcv8',
       hourly_rate: 110000,
-      user_id: null,
     },
     {
       employee_code: 'NV-003',
@@ -146,7 +130,6 @@ async function main() {
       created_at: new Date('2023-11-01T08:00:00Z'),
       avatar_url: 'https://lh3.googleusercontent.com/aida/AEtjO1U0gZ8qJdE6oYqQ-R2V5d_h0b4VdCqX1_qZ_6M9=s256',
       hourly_rate: 150000,
-      user_id: managerUser.id,
     },
     {
       employee_code: 'NV-004',
@@ -160,7 +143,6 @@ async function main() {
       avatar_url:
         'https://lh3.googleusercontent.com/aida/AEtjO1Xw6tE-Kl6RJ0I4DImDsStSZc3dy2IU_ZbQk7wMhedEX9JhhFr0BZokHPz0wSZrZhqjYywULEMWtq5lPcL84X3aM6fdTnuWFHzAYO3Bq6xU57QOSfoPRD7TkdbT3C60GjGqI1SuN0moP_3u2hSYDZHJ_pViM0_ZPsVZizt9_RU5HK2yV0zXt5eWr5Un4rF1mMKbeZWwUieS7vg9zysgFJYqzQ9echXu2Lpdj6jcibnSkIeyv6bp8_gD3rg',
       hourly_rate: 125000,
-      user_id: null,
     },
     {
       employee_code: 'NV-005',
@@ -173,7 +155,6 @@ async function main() {
       created_at: new Date('2024-06-15T08:00:00Z'),
       avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
       hourly_rate: 100000,
-      user_id: null,
     },
     {
       employee_code: 'NV-006',
@@ -186,17 +167,28 @@ async function main() {
       created_at: new Date('2024-02-01T08:00:00Z'),
       avatar_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80',
       hourly_rate: 95000,
-      user_id: null,
     },
   ]
 
   const employeesMap: Record<string, any> = {}
   for (const empData of initialEmployees) {
     const deptId = deptsMap[empData.departmentName] || null
+
+    // Tạo tài khoản User riêng biệt cho từng nhân viên (username = employee_code, mật khẩu: Employee@123456)
+    const empRole = empData.departmentName === 'Quản lý' ? roleManager : roleEmployee
+    const empUser = await prisma.user.create({
+      data: {
+        username: empData.employee_code,
+        passwordHash: defaultEmployeePasswordHash,
+        role_id: empRole.id,
+        is_active: empData.status === 'ACTIVE',
+      },
+    })
+
     const emp = await prisma.employee.create({
       data: {
         employee_code: empData.employee_code,
-        user_id: empData.user_id,
+        user_id: empUser.id,
         departmentId: deptId,
         full_name: empData.full_name,
         position: empData.position,
@@ -211,7 +203,7 @@ async function main() {
     employeesMap[empData.employee_code] = emp
   }
   await prisma.$executeRawUnsafe(`SELECT setval('employee_code_seq', 7, false);`)
-  console.log('✅ 5. Bảng employees (6 bản ghi + thiết lập sequence employee_code_seq)')
+  console.log('✅ 5. Bảng employees (6 bản ghi + 6 tài khoản User liên kết tương ứng + thiết lập sequence employee_code_seq)')
 
   // 7. Bảng 6: Employee Shifts
   const rawShifts = [
@@ -621,7 +613,7 @@ async function main() {
   })
   await prisma.auditLog.create({
     data: {
-      userId: managerUser.id,
+      userId: adminUser.id,
       action: 'CREATE_SHIFTS',
       target_table: 'employee_shifts',
       record_id: 'WEEK_37',

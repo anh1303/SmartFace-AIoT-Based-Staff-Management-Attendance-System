@@ -5,6 +5,7 @@ import { useDevices } from '../../features/attendance-monitor/hooks/useDevices';
 import { useAttendanceSummaries } from '../../features/attendance-monitor/hooks/useAttendanceSummaries';
 import { useAttendanceLocks } from '../../features/attendance-monitor/hooks/useAttendanceLocks';
 import { useAttendancePairs, AttendancePairItem } from '../../features/attendance-monitor/hooks/useAttendancePairs';
+import { AttendanceHeader } from '../../features/attendance-monitor/components/AttendanceHeader';
 import { AttendanceFilters } from '../../features/attendance-monitor/components/AttendanceFilters';
 import { DeviceStatusCards } from '../../features/attendance-monitor/components/DeviceStatusCards';
 import { AttendanceTable } from '../../features/attendance-monitor/components/AttendanceTable';
@@ -114,18 +115,12 @@ export const ManagerAttendanceMonitor: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <AttendanceFilters
+      <AttendanceHeader
         startDate={startDate}
-        setStartDate={setStartDate}
         endDate={endDate}
-        setEndDate={setEndDate}
         isCurrentDateLocked={isCurrentDateLocked}
         onToggleLock={handleToggleLock}
         onExportCSV={handleExportCSV}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
       />
 
       <DeviceStatusCards devices={devices} />
@@ -147,6 +142,18 @@ export const ManagerAttendanceMonitor: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Date Range & Status Filter Bar (Vùng màu xanh ngay trên bảng chấm công) */}
+      <AttendanceFilters
+        startDate={startDate}
+        setStartDate={setStartDate}
+        endDate={endDate}
+        setEndDate={setEndDate}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+      />
 
       <AttendanceTable
         employeePairs={employeePairs}

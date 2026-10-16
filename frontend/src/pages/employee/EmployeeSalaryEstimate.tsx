@@ -13,29 +13,29 @@ import {
   Briefcase
 } from 'lucide-react';
 
-export const StaffSalaryEstimate: React.FC = () => {
+export const EmployeeSalaryEstimate: React.FC = () => {
   const { currentUser, payroll, employees, bonusPenalty, attendance } = useApp();
 
   const empCode = currentUser?.employee_id || 'NV-001';
   const currentEmp = employees.find(e => e.employee_id === empCode);
 
-  // Dynamic periods available for this staff member
+  // Dynamic periods available for this employee member
   const myPayrolls = payroll.filter(p => p.employee_id === empCode);
   const availablePeriods = Array.from(
     new Set(myPayrolls.map(p => p.period || p.payroll_period).filter(Boolean) as string[])
   ).sort().reverse();
 
-  const [selectedStaffPeriod, setSelectedStaffPeriod] = useState<string>(() => {
+  const [selectedEmployeePeriod, setSelectedEmployeePeriod] = useState<string>(() => {
     return availablePeriods[0] || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   });
 
   useEffect(() => {
-    if (availablePeriods.length > 0 && !availablePeriods.includes(selectedStaffPeriod)) {
-      setSelectedStaffPeriod(availablePeriods[0]);
+    if (availablePeriods.length > 0 && !availablePeriods.includes(selectedEmployeePeriod)) {
+      setSelectedEmployeePeriod(availablePeriods[0]);
     }
-  }, [availablePeriods, selectedStaffPeriod]);
+  }, [availablePeriods, selectedEmployeePeriod]);
 
-  const currentPayroll = myPayrolls.find(p => (p.period || p.payroll_period) === selectedStaffPeriod)
+  const currentPayroll = myPayrolls.find(p => (p.period || p.payroll_period) === selectedEmployeePeriod)
     || myPayrolls[0]
     || payroll.find(p => p.employee_id === empCode)
     || payroll[0];
@@ -88,7 +88,7 @@ export const StaffSalaryEstimate: React.FC = () => {
         <div className="relative z-10">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
-              Lương Tạm Tính ({selectedStaffPeriod ? `Kỳ ${selectedStaffPeriod}` : 'Kỳ hiện tại'})
+              Lương Tạm Tính ({selectedEmployeePeriod ? `Kỳ ${selectedEmployeePeriod}` : 'Kỳ hiện tại'})
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono font-medium border border-amber-500/20">
               {currentPayroll?.status === 'FINALIZED' ? 'ĐÃ CHỐT' : 'ĐANG TÍCH LŨY CÔNG'}
@@ -102,8 +102,8 @@ export const StaffSalaryEstimate: React.FC = () => {
               <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
               <span className="text-xs text-slate-500 dark:text-slate-400">Kỳ lương:</span>
               <select
-                value={selectedStaffPeriod}
-                onChange={e => setSelectedStaffPeriod(e.target.value)}
+                value={selectedEmployeePeriod}
+                onChange={e => setSelectedEmployeePeriod(e.target.value)}
                 className="bg-transparent text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none cursor-pointer"
               >
                 {availablePeriods.map(period => {
@@ -228,3 +228,5 @@ export const StaffSalaryEstimate: React.FC = () => {
     </div>
   );
 };
+
+export const StaffSalaryEstimate = EmployeeSalaryEstimate;

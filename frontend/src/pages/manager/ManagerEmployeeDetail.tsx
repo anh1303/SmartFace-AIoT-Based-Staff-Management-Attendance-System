@@ -13,6 +13,7 @@ import {
   EmployeeAttendanceTab,
   EmployeePayrollTab,
   EmployeeScheduleTab,
+  EmployeeAccountTab,
   EmployeeEditModal,
   EmployeePayslipModal,
   EmployeeEditFormData
@@ -100,7 +101,7 @@ export const ManagerEmployeeDetail: React.FC = () => {
   const [endDate, setEndDate] = useState<string>(() => todayVN);
   const [attendanceTypeFilter, setAttendanceTypeFilter] = useState<string>('ALL');
   const [attendanceStatusFilter, setAttendanceStatusFilter] = useState<string>('ALL');
-  const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'payroll' | 'schedule'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'payroll' | 'schedule' | 'account'>('overview');
   const [quickPreset, setQuickPreset] = useState<'today' | 'month' | 'all' | 'custom'>('month');
 
   // Quick Date Range Preset helper
@@ -383,6 +384,19 @@ export const ManagerEmployeeDetail: React.FC = () => {
         <EmployeeScheduleTab
           currentEmp={currentEmp}
           employeeShifts={employeeShifts}
+        />
+      )}
+
+      {/* 6. TAB 5: ACCOUNT & CREDENTIALS */}
+      {activeTab === 'account' && (
+        <EmployeeAccountTab
+          currentEmp={currentEmp}
+          onUpdateStatus={async (newStatus) => {
+            await updateEmployee(currentEmp.id || currentEmp.employee_id, {
+              status: newStatus,
+            });
+          }}
+          showToast={showToast}
         />
       )}
 

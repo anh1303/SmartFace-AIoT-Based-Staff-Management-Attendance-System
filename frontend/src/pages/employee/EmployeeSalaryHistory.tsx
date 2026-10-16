@@ -13,13 +13,13 @@ import {
 import { Modal } from '../../components/common/Modal';
 import { PayrollRecord } from '../../types';
 
-export const StaffSalaryHistory: React.FC = () => {
+export const EmployeeSalaryHistory: React.FC = () => {
   const { currentUser, payroll, bonusPenalty } = useApp();
   const [selectedSlip, setSelectedSlip] = useState<PayrollRecord | null>(null);
 
   const empCode = currentUser?.employee_id || 'NV-001';
 
-  // Staff's payroll records sorted by period desc
+  // Employee's payroll records sorted by period desc
   const myPayrolls = payroll
     .filter(p => p.employee_id === empCode)
     .sort((a, b) => (b.period || '').localeCompare(a.period || ''));
@@ -222,3 +222,5 @@ export const StaffSalaryHistory: React.FC = () => {
     </div>
   );
 };
+
+export const StaffSalaryHistory = EmployeeSalaryHistory;

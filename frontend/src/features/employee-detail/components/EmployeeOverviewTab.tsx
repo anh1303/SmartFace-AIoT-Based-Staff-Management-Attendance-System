@@ -44,9 +44,9 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
         <div className="lg:col-span-7 bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl overflow-hidden shadow-xs flex flex-col justify-between transition-colors">
           <div className="divide-y divide-slate-100 dark:divide-[#21264b]">
             {/* Hàng 1: Avatar, Họ tên & Trạng thái */}
-            <div className="p-5 bg-slate-50/70 dark:bg-[#0f1224]/70 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="relative">
+            <div className="p-5 bg-slate-50/70 dark:bg-[#0f1224]/70 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0 flex-1">
+                <div className="relative shrink-0">
                   <img
                     src={currentEmp.avatar}
                     alt={currentEmp.full_name}
@@ -57,13 +57,16 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
                       }`}
                   />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white font-heading">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h2
+                      className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white font-heading truncate max-w-[180px] sm:max-w-[240px]"
+                      title={currentEmp.full_name}
+                    >
                       {currentEmp.full_name}
                     </h2>
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border ${currentEmp.status === 'ACTIVE'
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border shrink-0 ${currentEmp.status === 'ACTIVE'
                         ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                         }`}
@@ -71,16 +74,13 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
                       {currentEmp.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm ngưng'}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Hồ sơ nhân sự • Hệ thống AIoT SmartFace
-                  </p>
                 </div>
               </div>
 
               <button
                 type="button"
                 onClick={onOpenEditModal}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] font-medium text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] font-medium text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs shrink-0"
               >
                 <Edit className="w-3.5 h-3.5 text-slate-400" />
                 <span>Sửa</span>
@@ -89,13 +89,18 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
 
             {/* Hàng 2: Mã Nhân Viên & Chức vụ */}
             <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-[#21264b]">
-              <div className="p-4 space-y-1">
+              <div className="p-4 space-y-1 min-w-0">
                 <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Mã Nhân Viên:</span>
-                <p className="text-sm font-mono font-bold text-purple-600 dark:text-purple-400">{currentEmp.employee_id}</p>
+                <p className="text-sm font-mono font-bold text-purple-600 dark:text-purple-400 truncate" title={currentEmp.employee_id}>
+                  {currentEmp.employee_id}
+                </p>
               </div>
-              <div className="p-4 space-y-1">
+              <div className="p-4 space-y-1 min-w-0">
                 <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Chức vụ:</span>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                <p
+                  className="text-sm font-semibold text-slate-900 dark:text-white truncate"
+                  title={`${currentEmp.position || 'Nhân viên'} (${currentEmp.department || 'Chung'})`}
+                >
                   {currentEmp.position || 'Nhân viên'}
                   <span className="text-xs font-normal text-slate-500 dark:text-slate-400 ml-1">
                     ({currentEmp.department || 'Chung'})
@@ -106,13 +111,17 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
 
             {/* Hàng 3: Email & Số điện thoại */}
             <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-[#21264b]">
-              <div className="p-4 space-y-1">
+              <div className="p-4 space-y-1 min-w-0">
                 <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Email:</span>
-                <p className="text-xs font-mono text-slate-800 dark:text-slate-200 truncate">{currentEmp.email || 'Chưa cập nhật'}</p>
+                <p className="text-xs font-mono text-slate-800 dark:text-slate-200 truncate" title={currentEmp.email || 'Chưa cập nhật'}>
+                  {currentEmp.email || 'Chưa cập nhật'}
+                </p>
               </div>
-              <div className="p-4 space-y-1">
+              <div className="p-4 space-y-1 min-w-0">
                 <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Số điện thoại:</span>
-                <p className="text-xs font-mono text-slate-800 dark:text-slate-200">{currentEmp.phone || 'Chưa cập nhật'}</p>
+                <p className="text-xs font-mono text-slate-800 dark:text-slate-200 truncate" title={currentEmp.phone || 'Chưa cập nhật'}>
+                  {currentEmp.phone || 'Chưa cập nhật'}
+                </p>
               </div>
             </div>
 

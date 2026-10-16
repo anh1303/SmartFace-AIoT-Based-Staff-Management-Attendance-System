@@ -13,7 +13,7 @@ import {
   FacePhotoItem,
   FingerprintEnrollmentSection,
   FingerprintStep,
-  BiometricsStaffTable,
+  BiometricsEmployeeTable,
   ManageBiometricsModal,
   FaceConfirmModal,
   FaceResultModal,
@@ -359,7 +359,7 @@ export const ManagerBiometrics: React.FC = () => {
       </div>
 
       {/* Master Employee Biometric Status Table */}
-      <BiometricsStaffTable
+      <BiometricsEmployeeTable
         employees={employees}
         filteredEmployees={filteredEmployees}
         searchTerm={searchTerm}

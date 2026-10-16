@@ -13,12 +13,12 @@ import {
   ChevronDown
 } from 'lucide-react';
 
-export const StaffAttendance: React.FC = () => {
+export const EmployeeAttendance: React.FC = () => {
   const { currentUser, attendance } = useApp();
   const [methodFilter, setMethodFilter] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
 
-  // Staff's records only
+  // Employee's records only
   const myRecords = attendance.filter(
     a => a.employee_id === (currentUser?.employee_id || 'NV-001')
   );
@@ -104,16 +104,16 @@ export const StaffAttendance: React.FC = () => {
       {/* Bento Attendance Table */}
       <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs border-collapse table-fixed min-w-[850px]">
             <thead className="bg-slate-50 dark:bg-[#0f1224] border-b border-slate-200/80 dark:border-[#21264b] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono text-[11px]">
               <tr>
-                <th className="py-3.5 px-4 font-medium">Mã bản ghi</th>
-                <th className="py-3.5 px-4 font-medium">Thời gian</th>
-                <th className="py-3.5 px-4 font-medium">Loại sự kiện</th>
-                <th className="py-3.5 px-4 font-medium">Phương thức</th>
-                <th className="py-3.5 px-4 font-medium">Thiết bị điểm danh</th>
-                <th className="py-3.5 px-4 font-medium">Độ tin cậy</th>
-                <th className="py-3.5 px-4 font-medium">Trạng thái</th>
+                <th className="py-3.5 px-4 w-[120px] font-medium">Mã bản ghi</th>
+                <th className="py-3.5 px-4 w-[130px] font-medium">Thời gian</th>
+                <th className="py-3.5 px-4 w-[110px] font-medium">Loại sự kiện</th>
+                <th className="py-3.5 px-4 w-[120px] font-medium">Phương thức</th>
+                <th className="py-3.5 px-4 w-[160px] font-medium">Thiết bị điểm danh</th>
+                <th className="py-3.5 px-4 w-[110px] font-medium">Độ tin cậy</th>
+                <th className="py-3.5 px-4 w-[100px] font-medium">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-[#1d2243] text-slate-700 dark:text-slate-300">
@@ -130,12 +130,12 @@ export const StaffAttendance: React.FC = () => {
 
                   return (
                     <tr key={record.attendance_id} className="hover:bg-slate-50/80 dark:hover:bg-[#1a1e3a]/40 transition-colors">
-                      <td className="py-3.5 px-4 font-mono text-slate-500 dark:text-slate-400">
+                      <td className="py-3.5 px-4 font-mono text-slate-500 dark:text-slate-400 truncate max-w-[120px]" title={record.attendance_id}>
                         {record.attendance_id}
                       </td>
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-900 dark:text-white font-mono">{timeFormatted}</div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{dateFormatted}</div>
+                      <td className="py-3.5 px-4 truncate" title={`${timeFormatted} ${dateFormatted}`}>
+                        <div className="font-semibold text-slate-900 dark:text-white font-mono truncate">{timeFormatted}</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">{dateFormatted}</div>
                       </td>
                       <td className="py-3.5 px-4">
                         <span
@@ -148,23 +148,23 @@ export const StaffAttendance: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0" title={record.method === 'FACE' ? 'Face ID' : record.method === 'FINGERPRINT' ? 'Vân tay' : 'Thủ công'}>
                           {record.method === 'FACE' ? (
                             <>
-                              <ScanFace className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                              <span>Face ID</span>
+                              <ScanFace className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                              <span className="truncate">Face ID</span>
                             </>
                           ) : record.method === 'FINGERPRINT' ? (
                             <>
-                              <Fingerprint className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                              <span>Vân tay</span>
+                              <Fingerprint className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              <span className="truncate">Vân tay</span>
                             </>
                           ) : (
-                            <span>Thủ công</span>
+                            <span className="truncate">Thủ công</span>
                           )}
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-700 dark:text-slate-300">
+                      <td className="py-3.5 px-4 font-mono text-slate-700 dark:text-slate-300 truncate max-w-[160px]" title={record.device_id}>
                         {record.device_id}
                       </td>
                       <td className="py-3.5 px-4 font-mono text-emerald-600 dark:text-emerald-400 font-bold">
@@ -206,3 +206,5 @@ export const StaffAttendance: React.FC = () => {
     </div>
   );
 };
+
+export const StaffAttendance = EmployeeAttendance;

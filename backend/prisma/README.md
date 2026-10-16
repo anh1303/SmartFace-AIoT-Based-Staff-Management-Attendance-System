@@ -113,15 +113,7 @@ npx prisma migrate status
 ### Bước 5: Nạp dữ liệu mẫu (Seeding)
 ```bash
 npm run prisma:seed
-```
-*Script sẽ tự động khởi tạo:*
-- 3 Roles (`ADMIN`, `MANAGER`, `EMPLOYEE`).
-- 4 Phòng ban & 3 Ca làm việc.
-- 3 Tài khoản quản trị (`admin`, `manager`, `employee` - Mật khẩu: `Admin@123456`).
-- 6 Nhân viên mẫu (`NV-001` đến `NV-006`) và đồng bộ `employee_code_seq`.
-- Ca làm việc, Chấm công lịch sử, Bảng lương, Audit logs và Khóa chấm công.
 
----
 
 ## 🔍 5. Hướng Dẫn Kiểm Tra & Quản Lý Dữ Liệu
 

@@ -110,7 +110,7 @@ frontend/
 │   ├── pages/              # Màn hình chức năng ứng dụng
 │   │   ├── public/         # LandingPage, LoginPage
 │   │   ├── manager/        # Manager Dashboard, Employee Manager, Schedule, Attendance, Payroll, Reports...
-│   │   └── staff/          # Staff Dashboard, Personal Attendance, Profile, Schedule, SalaryEstimate...
+│   │   └── employee/       # Employee Dashboard, Personal Attendance, Profile, Schedule, SalaryEstimate... (tương thích ngược với staff/)
 │   ├── types/              # Interfaces & TypeScript Definitions chuẩn hóa
 │   └── utils/              # Helper functions (getTodayVNString, formatVNDateISO, Currency, Socket client)
 ├── index.html              # HTML Template entry point

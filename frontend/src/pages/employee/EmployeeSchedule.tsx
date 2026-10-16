@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 
-export const StaffSchedule: React.FC = () => {
+export const EmployeeSchedule: React.FC = () => {
   const { currentUser, workShifts, employees, attendance, showToast } = useApp();
   const [exchangeModalOpen, setExchangeModalOpen] = useState(false);
   const [exchangeTargetEmp, setExchangeTargetEmp] = useState('');
@@ -46,7 +46,7 @@ export const StaffSchedule: React.FC = () => {
 
   const empCode = currentUser?.employee_id || 'NV-001';
 
-  // Current staff's shifts
+  // Current employee's shifts
   const myShifts = workShifts.filter(s => s.employee_id === empCode);
   const myAttendance = attendance.filter(a => a.employee_id === empCode);
 
@@ -362,3 +362,5 @@ export const StaffSchedule: React.FC = () => {
     </div>
   );
 };
+
+export const StaffSchedule = EmployeeSchedule;

@@ -91,3 +91,11 @@ export async function deleteEmployeeApi(id: string) {
   });
   return res.data;
 }
+
+export async function resetEmployeePasswordApi(id: string) {
+  const res = await apiFetch(`/api/employees/${id}/reset-password`, {
+    method: 'POST',
+  });
+  return res.data;
+}
+

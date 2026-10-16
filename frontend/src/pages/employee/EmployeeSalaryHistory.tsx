@@ -13,13 +13,13 @@ import {
 import { Modal } from '../../components/common/Modal';
 import { PayrollRecord } from '../../types';
 
-export const StaffSalaryHistory: React.FC = () => {
+export const EmployeeSalaryHistory: React.FC = () => {
   const { currentUser, payroll, bonusPenalty } = useApp();
   const [selectedSlip, setSelectedSlip] = useState<PayrollRecord | null>(null);
 
   const empCode = currentUser?.employee_id || 'NV-001';
 
-  // Staff's payroll records sorted by period desc
+  // Employee's payroll records sorted by period desc
   const myPayrolls = payroll
     .filter(p => p.employee_id === empCode)
     .sort((a, b) => (b.period || '').localeCompare(a.period || ''));
@@ -63,17 +63,17 @@ export const StaffSalaryHistory: React.FC = () => {
       {/* Bento Payroll Records Table */}
       <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-xs border-collapse table-fixed min-w-[950px]">
             <thead className="bg-slate-50/80 dark:bg-[#0f1224] border-b border-slate-200 dark:border-[#21264b] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono text-[11px]">
               <tr>
-                <th className="py-3.5 px-4 font-medium">Kỳ lương</th>
-                <th className="py-3.5 px-4 font-medium">Lương/giờ</th>
-                <th className="py-3.5 px-4 font-medium">Tăng ca (OT)</th>
-                <th className="py-3.5 px-4 font-medium">Trễ / Sớm</th>
-                <th className="py-3.5 px-4 font-medium">Phụ cấp</th>
-                <th className="py-3.5 px-4 font-medium">Thực lĩnh (Net)</th>
-                <th className="py-3.5 px-4 font-medium">Trạng thái</th>
-                <th className="py-3.5 px-4 text-right font-medium">Thao tác</th>
+                <th className="py-3.5 px-4 w-[130px] font-medium">Kỳ lương</th>
+                <th className="py-3.5 px-4 w-[120px] font-medium">Lương/giờ</th>
+                <th className="py-3.5 px-4 w-[160px] font-medium">Tăng ca (OT)</th>
+                <th className="py-3.5 px-4 w-[160px] font-medium">Trễ / Sớm</th>
+                <th className="py-3.5 px-4 w-[120px] font-medium">Phụ cấp</th>
+                <th className="py-3.5 px-4 w-[140px] font-medium">Thực lĩnh (Net)</th>
+                <th className="py-3.5 px-4 w-[110px] font-medium">Trạng thái</th>
+                <th className="py-3.5 px-4 w-[110px] text-right font-medium">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-[#1d2243] text-slate-700 dark:text-slate-300">
@@ -85,25 +85,26 @@ export const StaffSalaryHistory: React.FC = () => {
                 const net = Number(p.net_salary ?? 0);
                 const otAmount = getOTAmount(ot, hourly);
                 const lateAmount = getLateAmount(late, hourly);
+                const periodStr = p.period || p.payroll_period;
 
                 return (
                   <tr key={p.payroll_id || idx} className="hover:bg-slate-50/80 dark:hover:bg-[#1a1e3a]/40 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white">
-                      {p.period || p.payroll_period}
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white truncate max-w-[130px]" title={periodStr}>
+                      {periodStr}
                     </td>
-                    <td className="py-3.5 px-4 font-mono">
+                    <td className="py-3.5 px-4 font-mono truncate" title={`${hourly.toLocaleString('vi-VN')} ₫/h`}>
                       {hourly.toLocaleString('vi-VN')} ₫/h
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-emerald-600 dark:text-emerald-400">
+                    <td className="py-3.5 px-4 font-mono text-emerald-600 dark:text-emerald-400 truncate" title={`+${ot}h (${otAmount.toLocaleString('vi-VN')} ₫)`}>
                       +{ot}h ({otAmount.toLocaleString('vi-VN')} ₫)
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-rose-600 dark:text-red-400">
+                    <td className="py-3.5 px-4 font-mono text-rose-600 dark:text-red-400 truncate" title={`-${late}h (${lateAmount.toLocaleString('vi-VN')} ₫)`}>
                       -{late}h ({lateAmount.toLocaleString('vi-VN')} ₫)
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-emerald-600 dark:text-emerald-400">
+                    <td className="py-3.5 px-4 font-mono text-emerald-600 dark:text-emerald-400 truncate" title={`+${allw.toLocaleString('vi-VN')} ₫`}>
                       +{allw.toLocaleString('vi-VN')} ₫
                     </td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white text-sm">
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white text-sm truncate" title={`${net.toLocaleString('vi-VN')} ₫`}>
                       {net.toLocaleString('vi-VN')} ₫
                     </td>
                     <td className="py-3.5 px-4">
@@ -221,3 +222,5 @@ export const StaffSalaryHistory: React.FC = () => {
     </div>
   );
 };
+
+export const StaffSalaryHistory = EmployeeSalaryHistory;

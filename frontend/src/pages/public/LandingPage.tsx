@@ -135,7 +135,7 @@ export const LandingPage: React.FC = () => {
             <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-5">
               <Users className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3 font-heading">Cho Nhân viên (Staff)</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3 font-heading">Cho Nhân viên (Employee)</h3>
             <ul className="space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
               <li className="flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />

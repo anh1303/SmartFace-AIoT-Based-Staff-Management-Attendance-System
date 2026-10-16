@@ -34,13 +34,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     navigate('/login');
   };
 
-  const staffNavItems = [
-    { label: 'Bàn làm việc', path: '/app/staff/dashboard', icon: LayoutDashboard },
-    { label: 'Lịch trình làm việc', path: '/app/staff/schedule', icon: CalendarDays },
-    { label: 'Chấm công & Check-in', path: '/app/staff/attendance', icon: Clock },
-    { label: 'Hồ sơ & Sinh trắc', path: '/app/staff/profile', icon: User },
-    { label: 'Lương tạm tính', path: '/app/staff/salary-estimate', icon: DollarSign },
-    { label: 'Lịch sử phiếu lương', path: '/app/staff/salary-history', icon: FileText },
+  const employeeNavItems = [
+    { label: 'Bàn làm việc', path: '/app/employee/dashboard', icon: LayoutDashboard },
+    { label: 'Lịch trình làm việc', path: '/app/employee/schedule', icon: CalendarDays },
+    { label: 'Chấm công & Check-in', path: '/app/employee/attendance', icon: Clock },
+    { label: 'Hồ sơ & Sinh trắc', path: '/app/employee/profile', icon: User },
+    { label: 'Lương tạm tính', path: '/app/employee/salary-estimate', icon: DollarSign },
+    { label: 'Lịch sử phiếu lương', path: '/app/employee/salary-history', icon: FileText },
   ];
 
   const managerNavItems = [
@@ -54,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { label: 'Quản lý lương', path: '/app/manager/payroll', icon: Banknote },
   ];
 
-  const navItems = role === 'manager' ? managerNavItems : staffNavItems;
+  const navItems = role === 'manager' ? managerNavItems : employeeNavItems;
 
   return (
     <>
@@ -153,7 +153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   {currentUser?.full_name || 'Khách'}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {currentUser?.email || (role === 'manager' ? 'manager@company.com' : 'staff@company.com')}
+                  {currentUser?.email || (role === 'manager' ? 'manager@company.com' : 'employee@company.com')}
                 </p>
               </div>
             </div>

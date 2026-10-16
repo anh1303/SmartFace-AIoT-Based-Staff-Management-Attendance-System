@@ -27,9 +27,9 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles, children }) 
   if (allowedRoles && allowedRoles.length > 0) {
     const hasRole = allowedRoles.includes(currentUser.role);
     if (!hasRole) {
-      // If employee tries to enter manager area, bounce to staff dashboard
+      // If employee tries to enter manager area, bounce to employee dashboard
       if (currentUser.role === 'employee') {
-        return <Navigate to="/app/staff/dashboard" replace />;
+        return <Navigate to="/app/employee/dashboard" replace />;
       }
       // If manager tries to enter an exclusive area or other roles, redirect appropriately
       return <Navigate to="/app/manager/dashboard" replace />;

@@ -266,7 +266,7 @@ export const ManagerPayroll: React.FC = () => {
         onClose={() => setConfirmFinalizeOpen(false)}
         selectedPeriod={selectedPeriod}
         totalExpense={totalExpense}
-        staffCount={currentRecords.length}
+        employeeCount={currentRecords.length}
         onConfirm={handleFinalizeConfirm}
       />
 

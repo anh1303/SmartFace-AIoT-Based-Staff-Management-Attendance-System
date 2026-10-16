@@ -27,6 +27,5 @@ export const emitAttendanceEvent = (event: string, payload: unknown, room?: stri
     nsp.to(room).emit(event, payload)
   } else {
     nsp.to('ADMIN').to('MANAGER').emit(event, payload)
-    nsp.emit(event, payload)
   }
 }

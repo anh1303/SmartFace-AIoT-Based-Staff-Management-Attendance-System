@@ -35,23 +35,23 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
       <div className="space-y-5">
         {/* Employee Profile Header Card */}
         <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
+          <div className="flex items-center gap-3.5 min-w-0 flex-1">
             <img
               src={
                 employee.avatar ||
                 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
               }
               alt={employee.full_name}
-              className="w-12 h-12 rounded-xl object-cover border border-purple-200 dark:border-purple-800"
+              className="w-12 h-12 rounded-xl object-cover border border-purple-200 dark:border-purple-800 shrink-0"
             />
-            <div>
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white max-w-[150px] sm:max-w-[180px] truncate" title={employee.full_name}>
                 {employee.full_name}
               </h4>
-              <p className="text-xs font-mono text-purple-600 dark:text-purple-400">
+              <p className="text-xs font-mono text-purple-600 dark:text-purple-400 max-w-[150px] sm:max-w-[180px] truncate" title={employee.employee_id}>
                 {employee.employee_id}
               </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[150px] sm:max-w-[180px] truncate" title={`${employee.department} • ${employee.position}`}>
                 {employee.department} • {employee.position}
               </p>
             </div>

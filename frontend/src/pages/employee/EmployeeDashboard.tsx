@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 
-export const StaffDashboard: React.FC = () => {
+export const EmployeeDashboard: React.FC = () => {
   const { currentUser, workShifts, attendance, payroll, employees, bonusPenalty, showToast } = useApp();
   const [explainModalOpen, setExplainModalOpen] = useState(false);
   const [explainReason, setExplainReason] = useState('');
@@ -24,12 +24,12 @@ export const StaffDashboard: React.FC = () => {
   const empCode = currentUser?.employee_id || 'NV-001';
   const currentEmp = employees.find(e => e.employee_id === empCode);
 
-  // Staff's upcoming shifts
+  // Employee's upcoming shifts
   const myShifts = workShifts
     .filter(s => s.employee_id === empCode)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // Staff's recent attendance
+  // Employee's recent attendance
   const myAttendance = attendance
     .filter(a => a.employee_id === empCode)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -142,7 +142,7 @@ export const StaffDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick actions for staff */}
+        {/* Quick actions for employee */}
         <div className="relative z-10 flex flex-wrap items-center gap-2.5">
           <button
             type="button"
@@ -452,3 +452,5 @@ export const StaffDashboard: React.FC = () => {
     </div>
   );
 };
+
+export const StaffDashboard = EmployeeDashboard;

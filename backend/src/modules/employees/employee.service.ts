@@ -1,6 +1,8 @@
+import bcrypt from 'bcryptjs'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { buildIdOrCodeWhere, generateUniqueEmployeeCode } from '../../common/utils.js'
+import { buildIdOrCodeWhere, generateUniqueEmployeeCode, generateRandomPassword } from '../../common/utils.js'
+import { sendAccountCredentialsEmail, type EmailSendResult } from '../../common/email.service.js'
 import { logAction } from '../audit-logs/audit.service.js'
 import { employeeInclude } from './employee.model.js'
 
@@ -20,12 +22,14 @@ export interface RawEmployeeDb {
   avatar_url?: string | null
   hourly_rate?: { toString(): string } | number | string | bigint | null
   departmentId?: number | null
+  users?: { id?: string; username?: string; is_active?: boolean } | null
 }
 
 export function formatEmployee(emp: RawEmployeeDb) {
   return {
     id: emp.id,
     employee_id: emp.employee_code || emp.id,
+    username: emp.users?.username || emp.employee_code || emp.id,
     full_name: emp.full_name,
     department: emp.department?.name || '',
     position: emp.position || '',
@@ -121,11 +125,21 @@ export async function create(data: {
     ? data.employee_code.trim()
     : await generateUniqueEmployeeCode()
 
-  // Ensure unique employee_code
+  // 1. Đảm bảo mã nhân viên là duy nhất
   const existingCode = await prisma.employee.findFirst({ where: { employee_code: codeCandidate } })
-  const finalCode = existingCode ? await generateUniqueEmployeeCode() : codeCandidate
+  let finalCode = existingCode ? await generateUniqueEmployeeCode() : codeCandidate
 
-  // Check email uniqueness if email provided
+  // 2. Kiểm tra tên đăng nhập (username) trên bảng users trùng khớp với finalCode
+  const existingUser = await prisma.user.findFirst({ where: { username: finalCode } })
+  if (existingUser) {
+    if (!data.employee_code) {
+      finalCode = await generateUniqueEmployeeCode()
+    } else {
+      throw new AppError(409, `Tài khoản đăng nhập với username '${finalCode}' đã tồn tại trong hệ thống`)
+    }
+  }
+
+  // 3. Kiểm tra tính duy nhất của email nếu được cung cấp
   if (emailVal) {
     const existingEmail = await prisma.employee.findFirst({ where: { email: emailVal } })
     if (existingEmail) {
@@ -133,23 +147,54 @@ export async function create(data: {
     }
   }
 
+  // 4. Sinh mật khẩu ngẫu nhiên 8 ký tự và băm mật khẩu bằng bcrypt
+  const rawPassword = generateRandomPassword(8)
+  const hashedPassword = await bcrypt.hash(rawPassword, 10)
+
+  // 5. Tìm vai trò EMPLOYEE mặc định cho nhân viên mới
+  const empRole = await prisma.roles.findFirst({
+    where: { role_name: { equals: 'EMPLOYEE', mode: 'insensitive' } },
+  })
+  const fallbackRole = empRole || (await prisma.roles.findFirst())
+  if (!fallbackRole) {
+    throw new AppError(500, 'Không tìm thấy vai trò (roles) trong hệ thống để gán cho người dùng mới')
+  }
+
   const rate = data.hourly_rate ?? 0
 
-  const created = await prisma.employee.create({
-    data: {
-      employee_code: finalCode,
-      full_name: data.full_name,
-      email: emailVal,
-      position: data.position || null,
-      departmentId: deptId ?? null,
-      status: data.status ?? 'ACTIVE',
-      phone: data.phone || null,
-      hourly_rate: rate,
-      avatar_url: data.avatar_url ?? data.avatar ?? null,
-    },
-    include: employeeInclude,
+  // 6. Thực hiện tạo User và Employee đồng thời trong transaction
+  const { created, user } = await prisma.$transaction(async (tx) => {
+    // 6.1 Tạo tài khoản đăng nhập User mới với username = finalCode
+    const newUser = await tx.user.create({
+      data: {
+        username: finalCode,
+        passwordHash: hashedPassword,
+        role_id: fallbackRole.id,
+        is_active: data.status ? data.status === 'ACTIVE' : true,
+      },
+    })
+
+    // 6.2 Tạo bản ghi Employee liên kết với User qua user_id
+    const newEmployee = await tx.employee.create({
+      data: {
+        employee_code: finalCode,
+        user_id: newUser.id,
+        full_name: data.full_name,
+        email: emailVal,
+        position: data.position || null,
+        departmentId: deptId ?? null,
+        status: data.status ?? 'ACTIVE',
+        phone: data.phone || null,
+        hourly_rate: rate,
+        avatar_url: data.avatar_url ?? data.avatar ?? null,
+      },
+      include: employeeInclude,
+    })
+
+    return { created: newEmployee, user: newUser }
   })
 
+  // 7. Ghi Audit Log hành động tạo nhân viên và tài khoản
   await logAction({
     userId: actorUserId,
     action: 'CREATE_EMPLOYEE',
@@ -162,11 +207,40 @@ export async function create(data: {
       position: created.position,
       departmentId: created.departmentId,
       status: created.status,
+      user_id: user.id,
+      username: user.username,
     },
   })
 
-  return formatEmployee(created)
+  // 8. Tự động gửi email thông báo tài khoản & mật khẩu cho nhân viên
+  let emailResult: EmailSendResult = { success: false, simulated: false, error: 'Không có email' }
+  if (emailVal) {
+    try {
+      emailResult = await sendAccountCredentialsEmail({
+        to: emailVal,
+        fullName: created.full_name,
+        employeeCode: finalCode,
+        rawPassword,
+        subject: `[SmartFace AIoT] Thông tin tài khoản truy cập hệ thống - ${created.full_name} (${finalCode})`,
+      })
+    } catch (err: any) {
+      console.error('[Employee Service] Lỗi khi gửi email thông tin tài khoản:', err?.message || err)
+      emailResult = { success: false, simulated: false, error: err?.message || 'Gửi email thất bại' }
+    }
+  }
+
+  const formatted = formatEmployee(created)
+  return {
+    ...formatted,
+    initial_account: {
+      username: finalCode,
+      temporary_password: rawPassword,
+      email_sent: emailResult.success,
+      simulated: emailResult.simulated ?? false,
+    },
+  }
 }
+
 
 export async function update(
   idOrCode: string,
@@ -317,3 +391,99 @@ export async function remove(idOrCode: string, actorUserId?: string) {
 
 // Alias terminate để đảm bảo tương thích
 export const terminate = remove
+
+export async function resetPassword(idOrCode: string, actorUserId?: string) {
+  const existing = await prisma.employee.findFirst({
+    where: buildIdOrCodeWhere(idOrCode),
+    include: employeeInclude,
+  })
+  if (!existing) throw new AppError(404, 'Không tìm thấy thông tin nhân viên')
+
+  if (!existing.email) {
+    throw new AppError(400, 'Nhân viên chưa có địa chỉ email. Vui lòng cập nhật email trước khi đặt lại mật khẩu.')
+  }
+
+  // Lấy hoặc tạo tài khoản User nếu chưa có
+  let userId = existing.user_id
+  let username = existing.users?.username || existing.employee_code
+
+  const rawPassword = generateRandomPassword(8)
+  const hashedPassword = await bcrypt.hash(rawPassword, 10)
+
+  if (userId) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: hashedPassword,
+        updated_at: new Date(),
+      },
+    })
+  } else {
+    // Nếu nhân viên chưa có User thì tạo mới
+    const empRole = await prisma.roles.findFirst({
+      where: { role_name: { equals: 'EMPLOYEE', mode: 'insensitive' } },
+    })
+    const fallbackRole = empRole || (await prisma.roles.findFirst())
+    if (!fallbackRole) {
+      throw new AppError(500, 'Không tìm thấy vai trò (roles) trong hệ thống')
+    }
+
+    const newUser = await prisma.user.create({
+      data: {
+        username: existing.employee_code,
+        passwordHash: hashedPassword,
+        role_id: fallbackRole.id,
+        is_active: existing.status === 'ACTIVE',
+      },
+    })
+    await prisma.employee.update({
+      where: { id: existing.id },
+      data: { user_id: newUser.id },
+    })
+    userId = newUser.id
+    username = newUser.username
+  }
+
+  // Ghi audit log
+  await logAction({
+    userId: actorUserId,
+    action: 'RESET_PASSWORD',
+    target_table: 'users',
+    record_id: userId,
+    new_values: {
+      employee_code: existing.employee_code,
+      full_name: existing.full_name,
+      email: existing.email,
+    },
+  })
+
+  // Gửi email thông báo tài khoản & mật khẩu mới
+  let emailResult: EmailSendResult = { success: false, simulated: false }
+  try {
+    emailResult = await sendAccountCredentialsEmail({
+      to: existing.email,
+      fullName: existing.full_name,
+      employeeCode: username,
+      rawPassword,
+      subject: `[SmartFace AIoT] Đặt lại mật khẩu tài khoản truy cập hệ thống - ${existing.full_name} (${username})`,
+    })
+  } catch (err: any) {
+    console.error('[Employee Service] Lỗi khi gửi email đặt lại mật khẩu:', err?.message || err)
+    emailResult = { success: false, simulated: false, error: err?.message || 'Gửi email thất bại' }
+  }
+
+  return {
+    success: true,
+    message: emailResult.success
+      ? `Đã đặt lại mật khẩu và gửi thông tin đến email ${existing.email} thành công!`
+      : (emailResult.simulated
+        ? `Đã đặt lại mật khẩu thành công (Mô phỏng gửi mail do chưa cấu hình SMTP).`
+        : `Đã đặt lại mật khẩu thành công nhưng gửi email thất bại: ${emailResult.error}`),
+    username,
+    email: existing.email,
+    temporary_password: rawPassword,
+    email_sent: emailResult.success,
+    simulated: emailResult.simulated ?? false,
+  }
+}
+

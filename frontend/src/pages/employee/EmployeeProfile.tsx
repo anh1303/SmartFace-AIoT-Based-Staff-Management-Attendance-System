@@ -16,7 +16,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-export const StaffProfile: React.FC = () => {
+export const EmployeeProfile: React.FC = () => {
   const { currentUser } = useAuth();
   const { employees } = useEmployees();
 
@@ -192,7 +192,7 @@ export const StaffProfile: React.FC = () => {
                   <Lock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> Phân cấp quyền hạn
                 </span>
                 <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
-                  {currentUser?.role === 'manager' ? 'ROLE_MANAGER • LEVEL 1' : 'ROLE_STAFF • LEVEL 2'}
+                  {currentUser?.role === 'manager' ? 'ROLE_MANAGER • LEVEL 1' : 'ROLE_EMPLOYEE • LEVEL 2'}
                 </p>
               </div>
             </div>
@@ -228,3 +228,5 @@ export const StaffProfile: React.FC = () => {
     </div>
   );
 };
+
+export const StaffProfile = EmployeeProfile;

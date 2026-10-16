@@ -68,6 +68,16 @@ employeeRouter.put(
   })
 );
 
+employeeRouter.post(
+  '/:id/reset-password',
+  authorize('ADMIN', 'MANAGER'),
+  asyncHandler(async (req, res) => {
+    const id = req.params.id as string;
+    const result = await service.resetPassword(id, req.user?.id);
+    successResponse(res, result, 'Đặt lại mật khẩu thành công');
+  })
+);
+
 employeeRouter.delete(
   '/:id',
   authorize('ADMIN', 'MANAGER'),

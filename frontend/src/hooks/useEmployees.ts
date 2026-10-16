@@ -19,7 +19,7 @@ export function useEmployees() {
   const addEmployeeMutation = useMutation({
     mutationFn: (newEmp: Omit<Employee, 'created_at' | 'updated_at'>) => createEmployeeApi(newEmp),
     onSuccess: (_data, variables) => {
-      showToast(`Đã thêm nhân viên ${variables.full_name} vào CSDL thành công`, 'success');
+      showToast(`Đã thêm nhân viên ${variables.full_name} & tự động tạo tài khoản, gửi email thành công`, 'success');
       queryClient.invalidateQueries({ queryKey: EMPLOYEES_QUERY_KEY });
     },
     onError: (error: Error) => {

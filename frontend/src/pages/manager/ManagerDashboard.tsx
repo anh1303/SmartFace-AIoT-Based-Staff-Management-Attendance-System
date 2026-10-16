@@ -266,14 +266,14 @@ export const ManagerDashboard: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs border-collapse table-fixed min-w-[700px]">
             <thead>
               <tr className="border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-mono">
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Nhân viên</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Thời gian</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Thiết bị</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Độ chính xác</th>
-                <th className="py-3.5 px-4 text-center">Trạng thái</th>
+                <th className="py-3.5 px-4 w-[220px] border-r border-slate-300 dark:border-[#222956] text-center">Nhân viên</th>
+                <th className="py-3.5 px-4 w-[110px] border-r border-slate-300 dark:border-[#222956] text-center">Thời gian</th>
+                <th className="py-3.5 px-4 w-[140px] border-r border-slate-300 dark:border-[#222956] text-center">Thiết bị</th>
+                <th className="py-3.5 px-4 w-[110px] border-r border-slate-300 dark:border-[#222956] text-center">Độ chính xác</th>
+                <th className="py-3.5 px-4 w-[120px] text-center">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="text-slate-700 dark:text-slate-300 text-center">
@@ -286,6 +286,7 @@ export const ManagerDashboard: React.FC = () => {
               ) : (
                 attendance.slice(0, 5).map(att => {
                   const emp = employees.find(e => e.employee_id === att.employee_id);
+                  const empName = emp?.full_name || att.employee_id;
                   const initials = emp?.full_name
                     ? emp.full_name.split(' ').map(w => w[0]).slice(-2).join('')
                     : 'NV';
@@ -295,8 +296,8 @@ export const ManagerDashboard: React.FC = () => {
                       key={att.attendance_id}
                       className="hover:bg-purple-50/40 dark:hover:bg-[#181c38]/50 transition-colors border-b border-slate-200 dark:border-[#202752]"
                     >
-                      <td className="py-3.5 px-4 border-r border-slate-200 dark:border-[#202752]">
-                        <div className="flex items-center gap-3">
+                      <td className="py-3.5 px-4 border-r border-slate-200 dark:border-[#202752] text-left max-w-[220px]">
+                        <div className="flex items-center gap-3 min-w-0" title={empName}>
                           <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-[#181c38] border border-purple-200 dark:border-[#272d5a] flex items-center justify-center text-[10px] font-bold text-purple-700 dark:text-purple-300 shrink-0">
                             {emp?.avatar ? (
                               <img src={emp.avatar} alt={emp.full_name} className="w-full h-full rounded-full object-cover" />
@@ -304,16 +305,16 @@ export const ManagerDashboard: React.FC = () => {
                               initials
                             )}
                           </div>
-                          <div>
-                            <p className="font-medium text-slate-900 dark:text-white text-xs sm:text-sm">{emp?.full_name || att.employee_id}</p>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{att.employee_id} • {emp?.department}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-slate-900 dark:text-white text-xs sm:text-sm truncate" title={empName}>{empName}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate" title={`${att.employee_id} • ${emp?.department}`}>{att.employee_id} • {emp?.department}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-xs text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-[#202752]">
+                      <td className="py-3.5 px-4 font-mono text-xs text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-[#202752] truncate" title={formatVNTime(att.timestamp)}>
                         {formatVNTime(att.timestamp)}
                       </td>
-                      <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-slate-400 font-mono border-r border-slate-200 dark:border-[#202752]">
+                      <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-slate-400 font-mono border-r border-slate-200 dark:border-[#202752] truncate max-w-[140px]" title={att.device_id}>
                         {att.device_id}
                       </td>
                       <td className="py-3.5 px-4 text-center border-r border-slate-200 dark:border-[#202752]">

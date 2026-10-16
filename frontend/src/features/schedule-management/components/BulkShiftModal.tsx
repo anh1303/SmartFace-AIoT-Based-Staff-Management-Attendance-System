@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Lock } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
 import { WorkShift, Employee } from '../../../types';
 
@@ -133,6 +133,9 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
                 } else if (val === 'OFFICE_HOURS') {
                   setBulkStartTime('08:00');
                   setBulkEndTime('17:30');
+                } else if (val === 'OFF') {
+                  setBulkStartTime('00:00');
+                  setBulkEndTime('00:00');
                 }
               }}
               className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
@@ -145,29 +148,23 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
           </div>
 
           {bulkShiftType !== 'OFF' ? (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Bắt đầu</label>
-                <input
-                  type="time"
-                  value={bulkStartTime}
-                  onChange={e => setBulkStartTime(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-purple-500"
-                />
+            <div className="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/40 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Khung giờ làm việc cố định:
+                </span>
+                <span className="px-2.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 text-xs font-mono font-bold">
+                  {bulkStartTime} - {bulkEndTime}
+                </span>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Kết thúc</label>
-                <input
-                  type="time"
-                  value={bulkEndTime}
-                  onChange={e => setBulkEndTime(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-purple-500"
-                />
-              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <Lock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                <span>Giờ bắt đầu và kết thúc là mặc định theo quy định doanh nghiệp và không thể chỉnh sửa.</span>
+              </p>
             </div>
           ) : (
-            <div className="flex items-center text-xs text-slate-500 italic pt-6">
-              Đặt trạng thái nghỉ không tính giờ làm.
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] text-xs text-slate-500 dark:text-slate-400 italic">
+              Nghỉ ca (OFF): Không tính giờ làm việc trong ngày.
             </div>
           )}
         </div>

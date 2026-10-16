@@ -27,14 +27,39 @@ model User {
   @@map("users")
 }
 
+enum PositionLevel {
+  MANAGER
+  EMPLOYEE
+}
+
 model Department {
   id              Int        @id @default(autoincrement())
   department_code String     @unique @db.VarChar(50)
   name            String     @db.VarChar(100)
+  description     String?    @db.VarChar(255)
+  is_active       Boolean    @default(true)
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  positions       Position[]
   employees       Employee[]
 
   @@map("departments")
+}
+
+model Position {
+  id            Int           @id @default(autoincrement())
+  position_code String        @unique @db.VarChar(50)
+  name          String        @db.VarChar(100)
+  level         PositionLevel @default(EMPLOYEE)
+  departmentId  Int           @map("department_id")
+  is_active     Boolean       @default(true)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  department    Department    @relation(fields: [departmentId], references: [id], onUpdate: NoAction)
+  employees     Employee[]
+
+  @@index([departmentId], map: "idx_positions_dept")
+  @@map("positions")
 }
 
 model Employee {
@@ -42,8 +67,8 @@ model Employee {
   employee_code            String                     @unique @db.VarChar(50)
   user_id                  String?                    @unique @db.Uuid
   departmentId             Int?                       @map("department_id")
+  positionId               Int?                       @map("position_id")
   full_name                String                     @db.VarChar(100)
-  position                 String?                    @db.VarChar(100)
   phone                    String?                    @db.VarChar(20)
   email                    String?                    @unique @db.VarChar(100)
   avatar_url               String?                    @db.Text
@@ -55,12 +80,14 @@ model Employee {
   daily_attendance_summary daily_attendance_summary[]
   employee_shifts          employee_shifts[]
   department               Department?                @relation(fields: [departmentId], references: [id], onUpdate: NoAction)
+  position                 Position?                  @relation(fields: [positionId], references: [id], onUpdate: NoAction)
   users                    User?                      @relation(fields: [user_id], references: [id], onUpdate: NoAction)
   face_embeddings          face_embeddings[]
   payrollRecords           PayrollRecord[]
 
   @@index([employee_code], map: "idx_employees_code")
   @@index([departmentId], map: "idx_employees_dept")
+  @@index([positionId])
   @@index([status], map: "idx_employees_status")
   @@map("employees")
 }
@@ -159,17 +186,17 @@ model employee_shifts {
 }
 
 model face_embeddings {
-  id             String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  employee_id    String                      @db.Uuid
+  id             String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_id    String                     @db.Uuid
   embedding      Unsupported("vector(512)")
-  model_version  String                      @db.VarChar(50)
-  sample_tag     String?                     @default("FRONTAL") @db.VarChar(50)
+  model_version  String                     @db.VarChar(50)
+  sample_tag     String?                    @default("FRONTAL") @db.VarChar(50)
   quality_score  Float?
-  is_active      Boolean                     @default(true)
-  created_at     DateTime                    @default(now()) @db.Timestamptz(6)
+  is_active      Boolean                    @default(true)
+  created_at     DateTime                   @default(now()) @db.Timestamptz(6)
   /// SAMPLE = vector gốc từng ảnh, CENTROID = vector trung bình đại diện danh tính
-  embedding_type String                      @default("SAMPLE") @db.VarChar(20)
-  employees      Employee                    @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  embedding_type String                     @default("SAMPLE") @db.VarChar(20)
+  employees      Employee                   @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([employee_id], map: "idx_face_embeddings_emp_id")
   @@index([embedding_type], map: "idx_face_embeddings_type")

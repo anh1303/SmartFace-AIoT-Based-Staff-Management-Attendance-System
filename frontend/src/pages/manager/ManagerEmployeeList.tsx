@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { PositionManagementModal } from '../../components/employees/PositionManagementModal';
 import { PositionItem, fetchPositionsApi } from '../../api/positionApi';
+import { DepartmentItem, fetchDepartmentsApi } from '../../api/departmentApi';
 import { Employee } from '../../types';
 import {
   getNextEmployeeId,
@@ -31,11 +32,13 @@ export const ManagerEmployeeList: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState(querySearch);
   const [departmentFilter, setDepartmentFilter] = useState('ALL');
+  const [positionFilter, setPositionFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  // Position Management Modal State
+  // Position & Department Management State
   const [positionModalOpen, setPositionModalOpen] = useState(false);
   const [dbPositions, setDbPositions] = useState<PositionItem[]>([]);
+  const [dbDepartments, setDbDepartments] = useState<DepartmentItem[]>([]);
 
   const loadDbPositions = async () => {
     try {
@@ -46,14 +49,51 @@ export const ManagerEmployeeList: React.FC = () => {
     }
   };
 
+  const loadDbDepartments = async () => {
+    try {
+      const data = await fetchDepartmentsApi();
+      setDbDepartments(data);
+    } catch {
+      // Handled gracefully
+    }
+  };
+
   useEffect(() => {
     loadDbPositions();
+    loadDbDepartments();
   }, []);
 
-  const positionOptions = useMemo(() => {
-    const list = dbPositions.map((p) => p.name);
+  const departmentOptions = useMemo(() => {
+    const list = dbDepartments.map((d) => d.name);
     employees.forEach((e) => {
-      const pos = e.department || e.position;
+      const dept = e.department;
+      if (dept && !list.includes(dept)) {
+        list.push(dept);
+      }
+    });
+    if (list.length === 0) {
+      return ['Nhân sự', 'Kế toán', 'Kinh doanh', 'Marketing', 'IT', 'CSKH'];
+    }
+    return list;
+  }, [dbDepartments, employees]);
+
+  const positionOptions = useMemo(() => {
+    let positionsToUse = dbPositions;
+    if (departmentFilter !== 'ALL') {
+      const filteredByDept = dbPositions.filter(
+        (p) => p.department_name === departmentFilter
+      );
+      if (filteredByDept.length > 0) {
+        positionsToUse = filteredByDept;
+      }
+    }
+
+    const list = positionsToUse.map((p) => p.name);
+    employees.forEach((e) => {
+      if (departmentFilter !== 'ALL' && e.department !== departmentFilter) {
+        return;
+      }
+      const pos = e.position;
       if (pos && !list.includes(pos)) {
         list.push(pos);
       }
@@ -62,7 +102,7 @@ export const ManagerEmployeeList: React.FC = () => {
       return ['Bảo vệ', 'Nhân viên', 'Thu ngân', 'Quản lý'];
     }
     return list;
-  }, [dbPositions, employees]);
+  }, [dbPositions, employees, departmentFilter]);
 
   useEffect(() => {
     if (querySearch) {
@@ -111,10 +151,15 @@ export const ManagerEmployeeList: React.FC = () => {
       emp.position.toLowerCase().includes(term) ||
       emp.department.toLowerCase().includes(term);
 
-    const matchDept = departmentFilter === 'ALL' || emp.department === departmentFilter;
+    const matchDept =
+      departmentFilter === 'ALL' ||
+      emp.department?.toLowerCase() === departmentFilter.toLowerCase();
+    const matchPos =
+      positionFilter === 'ALL' ||
+      emp.position?.toLowerCase() === positionFilter.toLowerCase();
     const matchStatus = statusFilter === 'ALL' || emp.status === statusFilter;
 
-    return matchSearch && matchDept && matchStatus;
+    return matchSearch && matchDept && matchPos && matchStatus;
   });
 
   const handleAddSubmit = (e: React.FormEvent) => {
@@ -186,7 +231,13 @@ export const ManagerEmployeeList: React.FC = () => {
         filteredCount={filteredEmployees.length}
         totalCount={employees.length}
         departmentFilter={departmentFilter}
-        onDepartmentFilterChange={setDepartmentFilter}
+        onDepartmentFilterChange={(val) => {
+          setDepartmentFilter(val);
+          setPositionFilter('ALL');
+        }}
+        departmentOptions={departmentOptions}
+        positionFilter={positionFilter}
+        onPositionFilterChange={setPositionFilter}
         positionOptions={positionOptions}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}

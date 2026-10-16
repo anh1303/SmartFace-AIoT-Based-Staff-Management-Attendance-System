@@ -10,9 +10,12 @@ import {
   Clock,
   DollarSign,
   CalendarRange,
-  ShieldCheck
+  ShieldCheck,
+  Lock
 } from 'lucide-react';
 import { Employee } from '../../../types';
+import { useAuth } from '../../../context/AuthContext';
+import { isAnotherManager } from '../../../utils/permissionUtils';
 
 interface EmployeeDetailHeaderProps {
   currentEmp: Employee;
@@ -41,6 +44,7 @@ export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
   shiftsCount
 }) => {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
   const [isEmployeeDropdownOpen, setIsEmployeeDropdownOpen] = useState(false);
 
@@ -158,35 +162,58 @@ export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
                         Không tìm thấy
                       </div>
                     ) : (
-                      filteredEmployeeList.map(emp => (
-                        <button
-                          key={emp.employee_id}
-                          type="button"
-                          onClick={() => {
-                            onSelectEmployee(emp);
-                            setIsEmployeeDropdownOpen(false);
-                            setEmployeeSearchQuery('');
-                          }}
-                          title={`${emp.employee_id} - ${emp.full_name} (${emp.position || emp.department})`}
-                          className={`w-full h-9 px-2.5 flex items-center gap-2 text-left hover:bg-slate-50 dark:hover:bg-[#1a1e3a] transition-colors cursor-pointer min-w-0 ${
-                            emp.employee_id === currentEmp.employee_id ? 'bg-purple-50/60 dark:bg-purple-950/30' : ''
-                          }`}
-                        >
-                          <img
-                            src={emp.avatar}
-                            alt={emp.full_name}
-                            className="w-5 h-5 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                          />
-                          <div className="overflow-hidden min-w-0 flex-1">
-                            <p className="text-xs font-semibold text-slate-900 dark:text-white truncate" title={emp.full_name}>
-                              {emp.full_name}
-                            </p>
-                            <p className="text-[10px] font-mono text-purple-600 dark:text-purple-400 truncate" title={`${emp.employee_id} • ${emp.position || emp.department}`}>
-                              {emp.employee_id} • {emp.position || emp.department}
-                            </p>
-                          </div>
-                        </button>
-                      ))
+                      filteredEmployeeList.map(emp => {
+                        const restricted = isAnotherManager(emp, currentUser);
+
+                        return (
+                          <button
+                            key={emp.employee_id}
+                            type="button"
+                            disabled={restricted}
+                            onClick={() => {
+                              if (restricted) return;
+                              onSelectEmployee(emp);
+                              setIsEmployeeDropdownOpen(false);
+                              setEmployeeSearchQuery('');
+                            }}
+                            title={
+                              restricted
+                                ? `Quản lý khác (${emp.full_name}) - Không có quyền xem chi tiết`
+                                : `${emp.employee_id} - ${emp.full_name} (${emp.position || emp.department})`
+                            }
+                            className={`w-full h-9 px-2.5 flex items-center gap-2 text-left transition-colors min-w-0 ${
+                              restricted
+                                ? 'opacity-50 cursor-not-allowed bg-slate-50/50 dark:bg-[#121528]'
+                                : 'hover:bg-slate-50 dark:hover:bg-[#1a1e3a] cursor-pointer'
+                            } ${
+                              emp.employee_id === currentEmp.employee_id ? 'bg-purple-50/60 dark:bg-purple-950/30' : ''
+                            }`}
+                          >
+                            <img
+                              src={emp.avatar}
+                              alt={emp.full_name}
+                              className={`w-5 h-5 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 ${
+                                restricted ? 'grayscale-50' : ''
+                              }`}
+                            />
+                            <div className="overflow-hidden min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <p className="text-xs font-semibold text-slate-900 dark:text-white truncate" title={emp.full_name}>
+                                  {emp.full_name}
+                                </p>
+                                {restricted && (
+                                  <span className="shrink-0 flex items-center text-amber-500 text-[10px]">
+                                    <Lock className="w-2.5 h-2.5" />
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] font-mono text-purple-600 dark:text-purple-400 truncate" title={`${emp.employee_id} • ${emp.position || emp.department}`}>
+                                {emp.employee_id} • {restricted ? 'Quản lý khác' : (emp.position || emp.department)}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })
                     )}
                   </div>
                 </div>

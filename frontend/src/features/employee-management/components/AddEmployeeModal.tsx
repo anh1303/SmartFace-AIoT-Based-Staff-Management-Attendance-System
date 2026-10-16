@@ -1,6 +1,7 @@
 import React from 'react';
 import { Mail, KeyRound } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
+import { useAuth } from '../../../context/AuthContext';
 
 export interface NewEmployeeFormState {
   employee_id: string;
@@ -33,6 +34,11 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   positionOptions,
   onSubmit,
 }) => {
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
+  const availablePositions = isAdmin
+    ? positionOptions
+    : positionOptions.filter((pos) => !/quản lý|manager|trưởng phòng|giám đốc/i.test(pos));
   return (
     <Modal
       isOpen={isOpen}
@@ -79,7 +85,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               onChange={(e) => onChangeNewEmp({ ...newEmp, department: e.target.value })}
               className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white cursor-pointer focus:outline-none focus:border-purple-500"
             >
-              {positionOptions.map((pos) => (
+              {availablePositions.map((pos) => (
                 <option key={pos} value={pos}>
                   {pos}
                 </option>

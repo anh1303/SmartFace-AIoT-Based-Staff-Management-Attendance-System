@@ -22,8 +22,16 @@ export const PublicGuard: React.FC<PublicGuardProps> = ({ children }) => {
   if (currentUser) {
     // If the user was redirected to /login with a previous target location, send them there
     const fromLocation = (location.state as { from?: { pathname?: string } })?.from?.pathname;
+
+    const isManagerOrAdmin =
+      currentUser.role === 'admin' ||
+      currentUser.role === 'manager' ||
+      currentUser.role_name?.toUpperCase() === 'ADMIN' ||
+      currentUser.role_name?.toUpperCase() === 'MANAGER' ||
+      Boolean(currentUser.is_manager);
+
     const defaultDashboard =
-      currentUser.role === 'manager' ? '/app/manager/dashboard' : '/app/employee/dashboard';
+      isManagerOrAdmin ? '/app/manager/dashboard' : '/app/employee/dashboard';
 
     const target = fromLocation && fromLocation !== '/login' ? fromLocation : defaultDashboard;
     return <Navigate to={target} replace />;

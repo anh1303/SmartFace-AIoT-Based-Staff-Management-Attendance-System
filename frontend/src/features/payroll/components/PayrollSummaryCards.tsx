@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sparkles, AlertCircle, Lock, Unlock } from 'lucide-react';
 import { BonusPenaltyPolicy, PayrollRecord } from '../../../types';
+import { useAuth } from '../../../context/AuthContext';
 
 interface PayrollSummaryCardsProps {
   bonusPenalty: BonusPenaltyPolicy | null;
@@ -17,6 +18,9 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
   totalExpense,
   onOpenPolicyModal,
 }) => {
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
       {/* Card 1: Mức thưởng tăng ca */}
@@ -26,13 +30,23 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
             Mức thưởng tăng ca
           </span>
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onOpenPolicyModal}
-              className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline font-medium cursor-pointer"
-            >
-              Thay đổi
-            </button>
+            {isAdmin ? (
+              <button
+                type="button"
+                onClick={onOpenPolicyModal}
+                className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline font-medium cursor-pointer"
+              >
+                Thay đổi
+              </button>
+            ) : (
+              <span
+                title="Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số này"
+                className="text-[10px] text-slate-400 dark:text-slate-500 font-medium flex items-center gap-0.5"
+              >
+                <Lock className="w-3 h-3 text-slate-400" />
+                <span>Admin</span>
+              </span>
+            )}
             <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
           </div>
         </div>
@@ -71,13 +85,23 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
             Mức phạt đi trễ / về sớm
           </span>
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onOpenPolicyModal}
-              className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline font-medium cursor-pointer"
-            >
-              Thay đổi
-            </button>
+            {isAdmin ? (
+              <button
+                type="button"
+                onClick={onOpenPolicyModal}
+                className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline font-medium cursor-pointer"
+              >
+                Thay đổi
+              </button>
+            ) : (
+              <span
+                title="Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số này"
+                className="text-[10px] text-slate-400 dark:text-slate-500 font-medium flex items-center gap-0.5"
+              >
+                <Lock className="w-3 h-3 text-slate-400" />
+                <span>Admin</span>
+              </span>
+            )}
             <AlertCircle className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
           </div>
         </div>

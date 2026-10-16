@@ -9,6 +9,9 @@ interface EmployeeListFiltersProps {
   totalCount?: number;
   departmentFilter: string;
   onDepartmentFilterChange: (val: string) => void;
+  departmentOptions: string[];
+  positionFilter: string;
+  onPositionFilterChange: (val: string) => void;
   positionOptions: string[];
   statusFilter: string;
   onStatusFilterChange: (val: string) => void;
@@ -20,6 +23,9 @@ export const EmployeeListFilters: React.FC<EmployeeListFiltersProps> = ({
   onClearSearch,
   departmentFilter,
   onDepartmentFilterChange,
+  departmentOptions,
+  positionFilter,
+  onPositionFilterChange,
   positionOptions,
   statusFilter,
   onStatusFilterChange,
@@ -47,14 +53,37 @@ export const EmployeeListFilters: React.FC<EmployeeListFiltersProps> = ({
       </div>
 
       <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+        {/* Bộ lọc Phòng ban */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
+            Phòng ban:
+          </span>
+          <div className="relative">
+            <select
+              value={departmentFilter}
+              onChange={(e) => onDepartmentFilterChange(e.target.value)}
+              className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
+            >
+              <option value="ALL">Tất cả phòng ban</option>
+              {departmentOptions.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Bộ lọc Chức vụ */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
             Chức vụ:
           </span>
           <div className="relative">
             <select
-              value={departmentFilter}
-              onChange={(e) => onDepartmentFilterChange(e.target.value)}
+              value={positionFilter}
+              onChange={(e) => onPositionFilterChange(e.target.value)}
               className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 appearance-none cursor-pointer"
             >
               <option value="ALL">Tất cả chức vụ</option>
@@ -68,7 +97,8 @@ export const EmployeeListFilters: React.FC<EmployeeListFiltersProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 ml-2">
+        {/* Bộ lọc Trạng thái */}
+        <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
             Trạng thái:
           </span>

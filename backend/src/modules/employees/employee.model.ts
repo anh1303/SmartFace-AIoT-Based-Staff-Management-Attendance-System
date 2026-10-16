@@ -10,8 +10,18 @@ export const employeeModel = prisma.employee
 // KHÔNG có: shift, biometricData (tên này không tồn tại trong schema)
 export const employeeInclude = {
   department: true,
+  position: true,
   users: {
-    select: { id: true, username: true, is_active: true },
+    select: {
+      id: true,
+      username: true,
+      is_active: true,
+      roles: {
+        select: {
+          role_name: true,
+        },
+      },
+    },
   },
   employee_shifts: {
     include: { work_shifts: true },

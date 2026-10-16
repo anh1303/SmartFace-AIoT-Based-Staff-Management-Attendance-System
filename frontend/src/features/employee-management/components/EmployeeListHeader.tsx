@@ -1,5 +1,6 @@
 import React from 'react';
 import { Briefcase, Plus } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
 
 interface EmployeeListHeaderProps {
   onOpenPositionModal: () => void;
@@ -10,6 +11,9 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
   onOpenPositionModal,
   onOpenAddModal,
 }) => {
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
+
   return (
     <div className="bento-hero-gradient rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
       {/* Ambient Floating & Morphing Blurred Blobs */}
@@ -26,14 +30,16 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
       </div>
 
       <div className="relative z-10 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onOpenPositionModal}
-          className="px-4 py-2.5 rounded-xl bg-white/80 hover:bg-white text-slate-700 dark:bg-[#181c38]/90 dark:hover:bg-[#20254b] dark:text-slate-200 border border-purple-200/80 dark:border-[#272d5a] backdrop-blur-sm text-xs font-semibold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
-        >
-          <Briefcase className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-          <span>Quản lý chức vụ</span>
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={onOpenPositionModal}
+            className="px-4 py-2.5 rounded-xl bg-white/80 hover:bg-white text-slate-700 dark:bg-[#181c38]/90 dark:hover:bg-[#20254b] dark:text-slate-200 border border-purple-200/80 dark:border-[#272d5a] backdrop-blur-sm text-xs font-semibold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+          >
+            <Briefcase className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <span>Quản lý chức vụ</span>
+          </button>
+        )}
 
         <button
           type="button"

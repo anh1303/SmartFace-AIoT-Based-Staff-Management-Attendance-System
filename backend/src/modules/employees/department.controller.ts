@@ -17,29 +17,30 @@ departmentRouter.get(
 
 departmentRouter.post(
   '/',
-  authorize('ADMIN', 'MANAGER'),
+  authorize('ADMIN'),
   asyncHandler(async (req, res) => {
     const created = await service.createDepartment(req.body, req.user?.id);
-    successResponse(res, created, 'Đã tạo chức vụ mới thành công', 201);
+    successResponse(res, created, 'Đã tạo phòng ban mới thành công', 201);
   })
 );
 
 departmentRouter.put(
   '/:id',
-  authorize('ADMIN', 'MANAGER'),
+  authorize('ADMIN'),
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id as string, 10);
     const updated = await service.updateDepartment(id, req.body, req.user?.id);
-    successResponse(res, updated, 'Đã cập nhật chức vụ thành công');
+    successResponse(res, updated, 'Đã cập nhật phòng ban thành công');
   })
 );
 
 departmentRouter.delete(
   '/:id',
-  authorize('ADMIN', 'MANAGER'),
+  authorize('ADMIN'),
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id as string, 10);
     await service.deleteDepartment(id, req.user?.id);
-    successResponse(res, null, 'Đã xóa chức vụ thành công');
+    successResponse(res, null, 'Đã xóa phòng ban thành công');
   })
 );
+

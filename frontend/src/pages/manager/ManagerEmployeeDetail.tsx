@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Users } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Users, ShieldAlert, Lock } from 'lucide-react';
 import { Employee, PayrollRecord } from '../../types';
+import { isAnotherManager } from '../../utils/permissionUtils';
 import {
   formatVNDateISO,
   getTodayVNString
@@ -30,6 +32,7 @@ export const ManagerEmployeeDetail: React.FC = () => {
     showToast
   } = useApp();
 
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const params = useParams<{ id?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -44,7 +47,9 @@ export const ManagerEmployeeDetail: React.FC = () => {
       );
       if (match) return match.employee_id;
     }
-    return employees[0]?.employee_id || 'NV-001';
+    // Prefer selecting an employee that this user is allowed to view
+    const allowed = employees.find(e => !isAnotherManager(e, currentUser));
+    return allowed?.employee_id || employees[0]?.employee_id || 'NV-001';
   });
 
   // Keep state synced with URL or employees list
@@ -57,9 +62,10 @@ export const ManagerEmployeeDetail: React.FC = () => {
         setSelectedEmpCode(match.employee_id);
       }
     } else if (employees.length > 0 && !employees.some(e => e.employee_id === selectedEmpCode)) {
-      setSelectedEmpCode(employees[0].employee_id);
+      const allowed = employees.find(e => !isAnotherManager(e, currentUser));
+      setSelectedEmpCode(allowed?.employee_id || employees[0].employee_id);
     }
-  }, [urlEmployeeId, employees, selectedEmpCode]);
+  }, [urlEmployeeId, employees, selectedEmpCode, currentUser]);
 
   // Current selected employee object
   const currentEmp = useMemo(() => {
@@ -71,22 +77,31 @@ export const ManagerEmployeeDetail: React.FC = () => {
   }, [employees, selectedEmpCode]);
 
   const handleSelectEmployee = (emp: Employee) => {
+    if (isAnotherManager(emp, currentUser)) {
+      showToast(
+        `Quản lý không có quyền xem thông tin chi tiết của Quản lý khác (${emp.full_name})!`,
+        'warning'
+      );
+      return;
+    }
     setSelectedEmpCode(emp.employee_id);
     setSearchParams({ id: emp.employee_id });
   };
 
   const handlePrevEmployee = () => {
-    if (employees.length === 0) return;
-    const currentIndex = employees.findIndex(e => e.employee_id === currentEmp?.employee_id);
-    const prevIndex = (currentIndex - 1 + employees.length) % employees.length;
-    handleSelectEmployee(employees[prevIndex]);
+    const list = employees.filter(e => !isAnotherManager(e, currentUser));
+    if (list.length === 0) return;
+    const currentIndex = list.findIndex(e => e.employee_id === currentEmp?.employee_id);
+    const prevIndex = (currentIndex - 1 + list.length) % list.length;
+    handleSelectEmployee(list[prevIndex]);
   };
 
   const handleNextEmployee = () => {
-    if (employees.length === 0) return;
-    const currentIndex = employees.findIndex(e => e.employee_id === currentEmp?.employee_id);
-    const nextIndex = (currentIndex + 1) % employees.length;
-    handleSelectEmployee(employees[nextIndex]);
+    const list = employees.filter(e => !isAnotherManager(e, currentUser));
+    if (list.length === 0) return;
+    const currentIndex = list.findIndex(e => e.employee_id === currentEmp?.employee_id);
+    const nextIndex = (currentIndex + 1) % list.length;
+    handleSelectEmployee(list[nextIndex]);
   };
 
   // ==========================
@@ -303,6 +318,64 @@ export const ManagerEmployeeDetail: React.FC = () => {
         >
           Đến trang danh sách nhân viên
         </button>
+      </div>
+    );
+  }
+
+  // Nếu người dùng là Quản lý và đang cố truy cập chi tiết của Quản lý khác
+  if (isAnotherManager(currentEmp, currentUser)) {
+    return (
+      <div className="space-y-6 pb-12">
+        <EmployeeDetailHeader
+          currentEmp={currentEmp}
+          employees={employees}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onSelectEmployee={handleSelectEmployee}
+          onPrevEmployee={handlePrevEmployee}
+          onNextEmployee={handleNextEmployee}
+          onOpenEditModal={handleOpenEditModal}
+          onPrint={handlePrint}
+          attendanceTotalLogs={0}
+          shiftsCount={0}
+        />
+        <div className="p-10 text-center bg-white dark:bg-[#13162b] border border-amber-300/70 dark:border-amber-900/40 rounded-2xl shadow-sm max-w-2xl mx-auto my-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto mb-4 border border-amber-200 dark:border-amber-800/60 shadow-xs">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white font-heading">
+            Giới Hạn Quyền Xem Chi Tiết
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-2.5 leading-relaxed">
+            Bạn đang đăng nhập với vai trò <strong className="text-purple-600 dark:text-purple-400">Quản lý (Manager)</strong>.
+            Theo quy định phân quyền, Quản lý có thể xem danh sách nhân viên nhưng{' '}
+            <strong className="text-rose-600 dark:text-rose-400">
+              không có quyền xem trang chi tiết của Quản lý khác
+            </strong>{' '}
+            ({currentEmp.full_name} - {currentEmp.employee_id}).
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/app/manager/employees')}
+              className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer"
+            >
+              Quay lại danh sách nhân viên
+            </button>
+            {employees.find(e => !isAnotherManager(e, currentUser)) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const fallback = employees.find(e => !isAnotherManager(e, currentUser));
+                  if (fallback) handleSelectEmployee(fallback);
+                }}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-[#272d5a] transition-all cursor-pointer"
+              >
+                Xem nhân sự khác
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     );
   }

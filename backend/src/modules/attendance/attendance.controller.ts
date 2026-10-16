@@ -116,7 +116,7 @@ attendanceRouter.patch(
   authorize('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const body = adjustAttendanceSchema.parse(req.body);
-    const updated = await service.adjustAttendance(body, req.user?.id);
+    const updated = await service.adjustAttendance(body, req.user?.id, req.user?.role);
     successResponse(res, updated, 'Attendance adjusted successfully');
   })
 );

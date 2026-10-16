@@ -1,17 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchAttendanceApi, addAttendanceApi } from '../api/attendanceApi';
+import { fetchAttendanceApi, addAttendanceApi, FetchAttendanceParams } from '../api/attendanceApi';
 import { AttendanceRecord } from '../types';
 import { useToast } from '../context/ToastContext';
 
 export const ATTENDANCE_QUERY_KEY = ['attendance'];
 
-export function useAttendance() {
+export function useAttendance(params?: FetchAttendanceParams) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
+  const queryKey = params ? [...ATTENDANCE_QUERY_KEY, params] : ATTENDANCE_QUERY_KEY;
+
   const query = useQuery({
-    queryKey: ATTENDANCE_QUERY_KEY,
-    queryFn: fetchAttendanceApi,
+    queryKey,
+    queryFn: () => fetchAttendanceApi(params),
     staleTime: 1000 * 60 * 2, // 2 minutes cache
     retry: 1,
   });

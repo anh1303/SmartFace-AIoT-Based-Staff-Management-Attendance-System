@@ -11,7 +11,8 @@ export interface RawEmployeeDb {
   employee_code?: string | null
   full_name: string
   department?: { name?: string } | null
-  position?: string | null
+  position?: { id?: number; name?: string; level?: string; position_code?: string } | string | null
+  positionId?: number | null
   phone?: string | null
   email?: string | null
   status?: string | null
@@ -22,20 +23,49 @@ export interface RawEmployeeDb {
   avatar_url?: string | null
   hourly_rate?: { toString(): string } | number | string | bigint | null
   departmentId?: number | null
-  users?: { id?: string; username?: string; is_active?: boolean } | null
+  users?: {
+    id?: string
+    username?: string
+    is_active?: boolean
+    roles?: { role_name?: string } | null
+  } | null
 }
 
 export function formatEmployee(emp: RawEmployeeDb) {
+  const roleName =
+    emp.users?.roles?.role_name?.toUpperCase() ||
+    (emp.department?.name === 'Quản lý' ? 'MANAGER' : 'EMPLOYEE')
+
+  const posName =
+    typeof emp.position === 'string'
+      ? emp.position
+      : emp.position?.name || ''
+  const posLevel =
+    typeof emp.position === 'object' && emp.position
+      ? (emp.position as any).level
+      : undefined
+
+  const isManager =
+    roleName === 'MANAGER' ||
+    roleName === 'ADMIN' ||
+    posLevel === 'MANAGER' ||
+    Boolean(posName && /quản lý|manager/i.test(posName)) ||
+    Boolean(emp.department?.name && /quản lý/i.test(emp.department.name))
+
   return {
     id: emp.id,
     employee_id: emp.employee_code || emp.id,
     username: emp.users?.username || emp.employee_code || emp.id,
     full_name: emp.full_name,
     department: emp.department?.name || '',
-    position: emp.position || '',
+    position: posName,
+    positionId: emp.positionId ?? (typeof emp.position === 'object' && emp.position ? (emp.position as any).id : null),
+    positionLevel: posLevel,
     phone: emp.phone || '',
     email: emp.email || '',
     status: emp.status,
+    role: roleName,
+    is_manager: isManager,
     created_at: emp.createdAt ? emp.createdAt.toISOString() : new Date().toISOString(),
     updated_at: emp.updatedAt ? emp.updatedAt.toISOString() : new Date().toISOString(),
     face_enrolled: Array.isArray(emp.face_embeddings) && emp.face_embeddings.length > 0,
@@ -102,8 +132,11 @@ export async function create(data: {
   employee_code?: string
   full_name: string
   email?: string | null
-  position?: string | null
+  position?: string | number | null
+  positionId?: number | null
+  position_id?: number | null
   departmentId?: number | null
+  department_id?: number | null
   department?: string | null
   status?: string
   phone?: string | null
@@ -111,13 +144,53 @@ export async function create(data: {
   avatar?: string | null
   avatar_url?: string | null
 }, actorUserId?: string) {
-  let deptId = data.departmentId
+  let deptId = data.departmentId ?? data.department_id
+  let posId = data.positionId ?? data.position_id
 
   if (!deptId && data.department) {
     const dept = await prisma.department.findFirst({
-      where: { name: { equals: data.department, mode: 'insensitive' } },
+      where: { name: { equals: data.department.trim(), mode: 'insensitive' } },
     })
-    if (dept) deptId = dept.id
+    if (dept) {
+      deptId = dept.id
+    } else {
+      // Nếu frontend truyền tên chức vụ vào trường department
+      const foundPos = await prisma.position.findFirst({
+        where: { name: { equals: data.department.trim(), mode: 'insensitive' } },
+      })
+      if (foundPos) {
+        deptId = foundPos.departmentId
+        if (posId === undefined) posId = foundPos.id
+      }
+    }
+  }
+
+  if (posId === undefined && data.position) {
+    if (typeof data.position === 'number') {
+      posId = data.position
+    } else if (typeof data.position === 'string' && data.position.trim()) {
+      const parsedId = parseInt(data.position, 10)
+      if (!isNaN(parsedId)) {
+        posId = parsedId
+      } else {
+        const found = await prisma.position.findFirst({
+          where: {
+            name: { equals: data.position.trim(), mode: 'insensitive' },
+            ...(deptId ? { departmentId: deptId } : {}),
+          },
+        })
+        if (found) {
+          posId = found.id
+          if (!deptId) deptId = found.departmentId
+        }
+      }
+    }
+  }
+
+  // Tự động suy ra departmentId từ position nếu chưa có
+  if (!deptId && posId) {
+    const p = await prisma.position.findUnique({ where: { id: posId } })
+    if (p) deptId = p.departmentId
   }
 
   const emailVal = data.email && data.email.trim() !== '' ? data.email.trim() : null
@@ -181,7 +254,7 @@ export async function create(data: {
         user_id: newUser.id,
         full_name: data.full_name,
         email: emailVal,
-        position: data.position || null,
+        positionId: posId ?? null,
         departmentId: deptId ?? null,
         status: data.status ?? 'ACTIVE',
         phone: data.phone || null,
@@ -204,7 +277,7 @@ export async function create(data: {
       employee_code: created.employee_code,
       full_name: created.full_name,
       email: created.email,
-      position: created.position,
+      positionId: created.positionId,
       departmentId: created.departmentId,
       status: created.status,
       user_id: user.id,
@@ -247,8 +320,11 @@ export async function update(
   data: {
     full_name?: string
     email?: string | null
-    position?: string | null
+    position?: string | number | null
+    positionId?: number | null
+    position_id?: number | null
     departmentId?: number | null
+    department_id?: number | null
     department?: string | null
     status?: string
     phone?: string | null
@@ -265,12 +341,54 @@ export async function update(
   })
   if (!existing) throw new AppError(404, 'Employee not found')
 
-  let deptId = data.departmentId
+  let deptId = data.departmentId ?? data.department_id
+  let posId = data.positionId ?? data.position_id
+
   if (deptId === undefined && data.department) {
     const dept = await prisma.department.findFirst({
-      where: { name: { equals: data.department, mode: 'insensitive' } },
+      where: { name: { equals: data.department.trim(), mode: 'insensitive' } },
     })
-    if (dept) deptId = dept.id
+    if (dept) {
+      deptId = dept.id
+    } else {
+      // Nếu frontend truyền tên chức vụ vào trường department
+      const foundPos = await prisma.position.findFirst({
+        where: { name: { equals: data.department.trim(), mode: 'insensitive' } },
+      })
+      if (foundPos) {
+        deptId = foundPos.departmentId
+        if (posId === undefined) posId = foundPos.id
+      }
+    }
+  }
+
+  if (posId === undefined && data.position !== undefined) {
+    if (data.position === null) {
+      posId = null
+    } else if (typeof data.position === 'number') {
+      posId = data.position
+    } else if (typeof data.position === 'string' && data.position.trim()) {
+      const parsedId = parseInt(data.position, 10)
+      if (!isNaN(parsedId)) {
+        posId = parsedId
+      } else {
+        const found = await prisma.position.findFirst({
+          where: {
+            name: { equals: data.position.trim(), mode: 'insensitive' },
+            ...(deptId ? { departmentId: deptId } : {}),
+          },
+        })
+        if (found) {
+          posId = found.id
+          if (deptId === undefined) deptId = found.departmentId
+        }
+      }
+    }
+  }
+
+  if (deptId === undefined && posId) {
+    const p = await prisma.position.findUnique({ where: { id: posId } })
+    if (p) deptId = p.departmentId
   }
 
   const rateVal = data.hourly_rate
@@ -280,7 +398,7 @@ export async function update(
     data: {
       ...(data.full_name !== undefined ? { full_name: data.full_name } : {}),
       ...(data.email !== undefined ? { email: data.email } : {}),
-      ...(data.position !== undefined ? { position: data.position } : {}),
+      ...(posId !== undefined ? { positionId: posId } : {}),
       ...(deptId !== undefined ? { departmentId: deptId } : {}),
       ...(data.status !== undefined ? { status: data.status } : {}),
       ...(data.phone !== undefined ? { phone: data.phone } : {}),
@@ -307,7 +425,7 @@ export async function update(
     old_values: {
       full_name: existing.full_name,
       email: existing.email,
-      position: existing.position,
+      positionId: existing.positionId,
       departmentId: existing.departmentId,
       status: existing.status,
       hourly_rate: existing.hourly_rate ? Number(existing.hourly_rate) : 0,
@@ -315,7 +433,7 @@ export async function update(
     new_values: {
       full_name: updated.full_name,
       email: updated.email,
-      position: updated.position,
+      positionId: updated.positionId,
       departmentId: updated.departmentId,
       status: updated.status,
       hourly_rate: updated.hourly_rate ? Number(updated.hourly_rate) : 0,
@@ -333,6 +451,20 @@ export async function remove(idOrCode: string, actorUserId?: string) {
     where: buildIdOrCodeWhere(idOrCode),
   })
   if (!existing) throw new AppError(404, 'Không tìm thấy nhân viên cần xóa')
+
+  // Tuyệt đối không xóa cứng (Hard Delete / Cascade Delete) nhân sự đã phát sinh dữ liệu chấm công/lương
+  // để bảo toàn lịch sử chấm công, bảng lương cũ và báo cáo chi phí kiểm toán (Audit).
+  const [logCount, summaryCount, payrollCount] = await Promise.all([
+    prisma.attendance_logs.count({ where: { employee_id: existing.id } }),
+    prisma.daily_attendance_summary.count({ where: { employee_id: existing.id } }),
+    prisma.payrollRecord.count({ where: { employeeId: existing.id } }),
+  ])
+
+  if (logCount > 0 || summaryCount > 0 || payrollCount > 0) {
+    throw AppError.badRequest(
+      'Không thể xóa vĩnh viễn nhân sự đã phát sinh dữ liệu chấm công hoặc bảng lương để bảo đảm toàn vẹn dữ liệu và kiểm toán (Audit). Vui lòng chuyển trạng thái nhân viên sang Đã nghỉ việc (INACTIVE)!'
+    )
+  }
 
   return prisma.$transaction(async (tx) => {
     // 1. Xóa dữ liệu sinh trắc học Face Embeddings

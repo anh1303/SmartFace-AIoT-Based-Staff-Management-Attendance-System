@@ -1,5 +1,6 @@
 import React from 'react';
 import { Calendar, Sparkles, Lock, Unlock, Download } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
 
 interface PayrollHeaderProps {
   selectedPeriod: string;
@@ -24,6 +25,7 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
   onOpenUnlockModal,
   onExportCSV,
 }) => {
+  const { role } = useAuth();
   return (
     <div className="bento-hero-gradient rounded-2xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all">
       {/* Ambient Floating & Morphing Blurred Blobs */}
@@ -79,14 +81,24 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
           </button>
 
           {isFinalized ? (
-            <button
-              type="button"
-              onClick={onOpenUnlockModal}
-              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-200 dark:border-[#272d5a] transition-colors cursor-pointer shadow-xs"
-            >
-              <Unlock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-              <span>Mở khóa sửa bảng lương</span>
-            </button>
+            role === 'admin' ? (
+              <button
+                type="button"
+                onClick={onOpenUnlockModal}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-200 dark:border-[#272d5a] transition-colors cursor-pointer shadow-xs"
+              >
+                <Unlock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                <span>Mở khóa sửa bảng lương</span>
+              </button>
+            ) : (
+              <div
+                title="Kỳ lương đã khóa sổ, chỉ Admin mới có quyền mở khóa để chỉnh sửa"
+                className="px-3.5 py-2 rounded-xl bg-slate-100/90 dark:bg-[#0f1224] text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center gap-2 border border-slate-200 dark:border-[#272d5a] shadow-xs"
+              >
+                <Lock className="w-3.5 h-3.5 text-amber-500" />
+                <span>Đã khóa sổ (Chỉ Admin mở khóa)</span>
+              </div>
+            )
           ) : (
             <button
               type="button"

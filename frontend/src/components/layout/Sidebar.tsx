@@ -54,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { label: 'Quản lý lương', path: '/app/manager/payroll', icon: Banknote },
   ];
 
-  const navItems = role === 'manager' ? managerNavItems : employeeNavItems;
+  const navItems = (role === 'admin' || role === 'manager') ? managerNavItems : employeeNavItems;
 
   return (
     <>
@@ -88,9 +88,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
           {/* Role Pill */}
           <div className="mt-4 p-2.5 rounded-xl bg-slate-50 dark:bg-[#151936] border border-slate-200/80 dark:border-[#242b5c] flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${role === 'manager' ? 'bg-purple-500 shadow-xs shadow-purple-400/50' : 'bg-emerald-500 shadow-xs shadow-emerald-400/50'}`} />
+            <div
+              className={`w-2 h-2 rounded-full ${
+                role === 'admin'
+                  ? 'bg-rose-500 shadow-xs shadow-rose-400/50'
+                  : role === 'manager'
+                  ? 'bg-purple-500 shadow-xs shadow-purple-400/50'
+                  : 'bg-emerald-500 shadow-xs shadow-emerald-400/50'
+              }`}
+            />
             <span className="text-xs text-slate-600 dark:text-slate-300">
-              Vai trò: <strong className="text-slate-900 dark:text-white capitalize">{role === 'manager' ? 'Quản lý' : 'Nhân viên'}</strong>
+              Vai trò:{' '}
+              <strong className="text-slate-900 dark:text-white">
+                {role === 'admin'
+                  ? 'Quản trị viên (Admin)'
+                  : role === 'manager'
+                  ? 'Quản lý (Manager)'
+                  : 'Nhân viên (Employee)'}
+              </strong>
             </span>
           </div>
         </div>
@@ -98,7 +113,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {/* Navigation Menu */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
           <div className="px-3 pb-2 text-[10px] font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-            {role === 'manager' ? 'Phân hệ Quản trị' : 'Phân hệ Nhân viên'}
+            {role === 'admin'
+              ? 'Phân hệ Quản trị tối cao'
+              : role === 'manager'
+              ? 'Phân hệ Quản trị'
+              : 'Phân hệ Nhân viên'}
           </div>
 
           {navItems.map(item => {

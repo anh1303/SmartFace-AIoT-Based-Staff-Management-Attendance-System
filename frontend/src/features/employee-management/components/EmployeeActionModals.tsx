@@ -41,10 +41,13 @@ export const ConfirmDeleteEmployeeModal: React.FC<ConfirmDeleteEmployeeModalProp
           <div className="space-y-1 text-[11px] text-rose-700 dark:text-rose-300/90 bg-rose-100/60 dark:bg-rose-950/60 p-3 rounded-xl border border-rose-200 dark:border-rose-900/50">
             <p>
               • Toàn bộ dữ liệu hồ sơ, tài khoản đăng nhập, vector sinh trắc học Face ID, dữ liệu vân
-              tay FAP30 và lịch sử liên quan sẽ bị <strong>XÓA VĨNH VIỄN</strong> trên cơ sở dữ liệu.
+              tay FAP30 và ca làm việc sẽ bị <strong>XÓA VĨNH VIỄN</strong> trên cơ sở dữ liệu.
             </p>
             <p className="text-rose-600 dark:text-rose-400 font-semibold">
-              • Thao tác này KHÔNG THỂ KHÔI PHỤC lại được.
+              • Chỉ xóa cứng được khi nhân viên mới tạo nhầm (chưa có dữ liệu chấm công/lương).
+            </p>
+            <p className="text-amber-700 dark:text-amber-400 font-medium">
+              • Nếu nhân viên đã phát sinh công/lương, hệ thống sẽ từ chối xóa để đảm bảo kiểm toán (Audit) — hãy sử dụng tính năng Đổi trạng thái sang Tạm ngưng/Đã nghỉ việc.
             </p>
           </div>
         </div>

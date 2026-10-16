@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
+import { isAnotherManager } from '../../utils/permissionUtils';
 import { WorkShift } from '../../types';
 import {
   ScheduleHeader,
@@ -16,6 +18,7 @@ import {
 
 export const ManagerSchedule: React.FC = () => {
   const { employees, workShifts, assignOrUpdateShift, showToast } = useApp();
+  const { currentUser, role } = useAuth();
   const [departmentFilter, setDepartmentFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingShift, setEditingShift] = useState<EditingShiftTarget | null>(null);
@@ -107,6 +110,18 @@ export const ManagerSchedule: React.FC = () => {
       return;
     }
 
+    if (role !== 'admin') {
+      const isSelf = currentUser && (empId === currentUser.employee_id || targetEmp?.email === currentUser.email);
+      if (isSelf) {
+        showToast('Không ai được tự phân ca hoặc sửa ca làm việc của chính mình. Vui lòng liên hệ Admin phê duyệt!', 'warning');
+        return;
+      }
+      if (isAnotherManager(targetEmp, currentUser)) {
+        showToast(`Quản lý không có quyền phân ca hoặc sửa đổi ca làm việc của Quản lý khác (${empName})!`, 'warning');
+        return;
+      }
+    }
+
     const existing = workShifts.find(s => s.employee_id === empId && s.date === date);
     setEditingShift({
       employeeId: empId,
@@ -168,8 +183,17 @@ export const ManagerSchedule: React.FC = () => {
       targetEmps = targetEmps.filter(e => e.employee_id === bulkTarget);
     }
 
+    // Lọc bỏ chính mình và các manager khác nếu không phải Admin
+    if (role !== 'admin') {
+      targetEmps = targetEmps.filter(e => {
+        const isSelf = currentUser && (e.employee_id === currentUser.employee_id || e.email === currentUser.email);
+        const isOtherMgr = isAnotherManager(e, currentUser);
+        return !isSelf && !isOtherMgr;
+      });
+    }
+
     if (targetEmps.length === 0) {
-      showToast('Không có nhân sự nào phù hợp với phạm vi đã chọn!', 'warning');
+      showToast('Không có nhân sự hợp lệ nào để phân ca (đã loại trừ tài khoản cá nhân và Quản lý khác)!', 'warning');
       return;
     }
 
@@ -209,7 +233,15 @@ export const ManagerSchedule: React.FC = () => {
     const dayNames = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
 
     let copiedCount = 0;
-    const activeEmps = employees.filter(e => e.status !== 'INACTIVE');
+    let activeEmps = employees.filter(e => e.status !== 'INACTIVE');
+
+    if (role !== 'admin') {
+      activeEmps = activeEmps.filter(e => {
+        const isSelf = currentUser && (e.employee_id === currentUser.employee_id || e.email === currentUser.email);
+        const isOtherMgr = isAnotherManager(e, currentUser);
+        return !isSelf && !isOtherMgr;
+      });
+    }
 
     activeEmps.forEach(emp => {
       [0, 1, 2, 3, 4, 5, 6].forEach(offset => {

@@ -5,6 +5,37 @@ import { logAction } from '../audit-logs/audit.service.js'
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 
+/**
+ * 3 Ca làm việc mặc định chuẩn của toàn hệ thống.
+ * Giờ bắt đầu và kết thúc là cố định và KHÔNG THỂ SỬA ĐỔI.
+ */
+export const STANDARD_SHIFT_CONFIGS = {
+  OFFICE_HOURS: {
+    code: 'OFFICE_HOURS',
+    name: 'Ca Hành Chính',
+    start_time: '08:00',
+    end_time: '17:30',
+  },
+  MORNING: {
+    code: 'MORNING',
+    name: 'Ca Sáng',
+    start_time: '08:30',
+    end_time: '17:30',
+  },
+  AFTERNOON: {
+    code: 'AFTERNOON',
+    name: 'Ca Chiều',
+    start_time: '13:00',
+    end_time: '21:30',
+  },
+  OFF: {
+    code: 'OFF',
+    name: 'Nghỉ ca (OFF)',
+    start_time: '00:00',
+    end_time: '00:00',
+  },
+} as const
+
 function formatTimeHHMM(val: unknown, fallback: string): string {
   if (!val) return fallback
   if (val instanceof Date) {
@@ -126,13 +157,29 @@ export async function assignOrUpdate(data: {
   const dayIndex = work_date.getUTCDay()
   const work_day = data.work_day || DAY_NAMES[dayIndex] || 'Thứ Hai'
 
-  let defaultWorkShift = await prisma.work_shifts.findFirst()
+  // Quy định: Hệ thống chỉ có 3 ca làm việc mặc định và giờ bắt đầu, kết thúc đều là cố định, KHÔNG THỂ SỬA
+  const normalizedType = (data.shift_type || 'OFFICE_HOURS').toUpperCase() as keyof typeof STANDARD_SHIFT_CONFIGS
+  const standardConfig = STANDARD_SHIFT_CONFIGS[normalizedType]
+  if (!standardConfig) {
+    throw new AppError(
+      400,
+      'Loại ca không hợp lệ! Hệ thống chỉ hỗ trợ 3 ca làm việc mặc định: Ca Hành Chính (OFFICE_HOURS: 08:00 - 17:30), Ca Sáng (MORNING: 08:30 - 17:30), Ca Chiều (AFTERNOON: 13:00 - 21:30) hoặc Nghỉ ca (OFF)'
+    )
+  }
+
+  // Luôn luôn áp dụng giờ bắt đầu và kết thúc cố định theo quy định của hệ thống
+  const startTimeDate = parseTimeStringToDate(standardConfig.start_time, '08:00')
+  const endTimeDate = parseTimeStringToDate(standardConfig.end_time, '17:30')
+
+  let defaultWorkShift = await prisma.work_shifts.findFirst({
+    where: { shift_name: standardConfig.name },
+  })
   if (!defaultWorkShift) {
     defaultWorkShift = await prisma.work_shifts.create({
       data: {
-        shift_name: 'Ca Hành Chính',
-        start_time: new Date('1970-01-01T08:00:00.000Z'),
-        end_time: new Date('1970-01-01T17:30:00.000Z'),
+        shift_name: standardConfig.name,
+        start_time: startTimeDate,
+        end_time: endTimeDate,
       },
     })
   }
@@ -144,16 +191,13 @@ export async function assignOrUpdate(data: {
     },
   })
 
-  const startTimeDate = parseTimeStringToDate(data.start_time, '08:00')
-  const endTimeDate = parseTimeStringToDate(data.end_time, '17:30')
-
   let shiftRecord
   if (existingShift) {
     shiftRecord = await prisma.employee_shifts.update({
       where: { id: existingShift.id },
       data: {
         work_day,
-        shift_type: data.shift_type,
+        shift_type: standardConfig.code,
         start_time: startTimeDate,
         end_time: endTimeDate,
         note: data.note ?? '',
@@ -171,7 +215,7 @@ export async function assignOrUpdate(data: {
         shift_id: defaultWorkShift.id,
         work_date,
         work_day,
-        shift_type: data.shift_type,
+        shift_type: standardConfig.code,
         start_time: startTimeDate,
         end_time: endTimeDate,
         note: data.note ?? '',

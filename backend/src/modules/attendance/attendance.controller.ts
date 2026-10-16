@@ -116,7 +116,7 @@ attendanceRouter.patch(
   authorize('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const body = adjustAttendanceSchema.parse(req.body);
-    const updated = await service.adjustAttendance(body, req.user?.id);
+    const updated = await service.adjustAttendance(body, req.user?.id, req.user?.role);
     successResponse(res, updated, 'Attendance adjusted successfully');
   })
 );
@@ -161,7 +161,7 @@ attendanceRouter.post(
 
 attendanceRouter.post(
   '/locks/unlock',
-  authorize('ADMIN', 'MANAGER'),
+  authorize('ADMIN'),
   asyncHandler(async (req, res) => {
     const { date } = req.body;
     if (!date) throw AppError.badRequest('Date is required');

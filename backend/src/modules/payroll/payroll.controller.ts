@@ -23,7 +23,7 @@ payrollRouter.get(
 
 payrollRouter.put(
   '/bonus-penalty',
-  authorize('ADMIN', 'MANAGER'),
+  authorize('ADMIN'),
   asyncHandler(async (req, res) => {
     const body = updateBonusPenaltySchema.parse(req.body);
     successResponse(res, await service.updateBonusPenalty(body, req.user?.id), 'Cập nhật quy định thưởng/phạt thành công');
@@ -49,7 +49,7 @@ payrollRouter.get(
       targetEmployee = req.query.employeeId;
     }
 
-    successResponse(res, await service.list(period, targetEmployee));
+    successResponse(res, await service.list(period, targetEmployee, req.user));
   })
 );
 
@@ -62,7 +62,7 @@ payrollRouter.post(
 
     successResponse(
       res,
-      await service.generate(targetPeriod, body.employeeId, req.user?.id),
+      await service.generate(targetPeriod, body.employeeId, req.user?.id, req.user),
       'Payroll generated',
       201
     );
@@ -75,7 +75,7 @@ payrollRouter.put(
   asyncHandler(async (req, res) => {
     const id = req.params.id as string;
     const updates = updatePayrollSchema.parse(req.body);
-    successResponse(res, await service.updateItem(id, updates, req.user?.id), 'Payroll updated');
+    successResponse(res, await service.updateItem(id, updates, req.user), 'Payroll updated');
   })
 );
 

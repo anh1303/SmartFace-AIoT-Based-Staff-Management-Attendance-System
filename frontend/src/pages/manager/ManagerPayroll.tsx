@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
+import { isAnotherManager } from '../../utils/permissionUtils';
 import { PayrollRecord } from '../../types';
 import { logger } from '../../utils/logger';
 import {
@@ -17,6 +19,7 @@ import {
 const payrollLogger = logger.child('ManagerPayroll');
 
 export const ManagerPayroll: React.FC = () => {
+  const { role, currentUser } = useAuth();
   const {
     payroll,
     bonusPenalty,
@@ -46,6 +49,10 @@ export const ManagerPayroll: React.FC = () => {
   });
 
   const handleOpenPolicyModal = () => {
+    if (role !== 'admin') {
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error');
+      return;
+    }
     setPolicyData({
       overtime_rate: bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000,
       late_early_penalty: bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000,
@@ -56,6 +63,11 @@ export const ManagerPayroll: React.FC = () => {
 
   const handleSavePolicy = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (role !== 'admin') {
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error');
+      setIsPolicyModalOpen(false);
+      return;
+    }
     await updateBonusPenalty(policyData);
     setIsPolicyModalOpen(false);
   };
@@ -74,9 +86,24 @@ export const ManagerPayroll: React.FC = () => {
     .reverse();
 
   // All records for the selected period (for status & total metrics)
-  const allPeriodRecords = payroll.filter(
-    (p) => p.period === selectedPeriod || p.payroll_period === selectedPeriod
-  );
+  // Chốt chặn Requirement 1: Quản lý không xem được phiếu lương hoặc thông tin lương của Quản lý khác
+  const allPeriodRecords = payroll.filter((p) => {
+    const isPeriodMatch = p.period === selectedPeriod || p.payroll_period === selectedPeriod;
+    if (!isPeriodMatch) return false;
+
+    if (role !== 'admin') {
+      const emp = employees.find((e) => e.employee_id === p.employee_id);
+      if (emp) {
+        const isSelf = Boolean(
+          currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+        );
+        if (!isSelf && isAnotherManager(emp, currentUser)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  });
   const isFinalized =
     allPeriodRecords.length > 0 && allPeriodRecords.every((p) => p.status === 'FINALIZED');
 
@@ -110,6 +137,20 @@ export const ManagerPayroll: React.FC = () => {
 
   const handleOpenEdit = (record: PayrollRecord) => {
     const emp = employees.find((e) => e.employee_id === record.employee_id);
+    if (role !== 'admin') {
+      const isSelf = Boolean(
+        emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+      );
+      if (isSelf) {
+        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error');
+        return;
+      }
+      if (isAnotherManager(emp, currentUser)) {
+        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error');
+        return;
+      }
+    }
+
     setEditingItem({
       record,
       empName: emp?.full_name || record.employee_name || record.employee_id,
@@ -124,6 +165,21 @@ export const ManagerPayroll: React.FC = () => {
   const handleConfirmEditSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
+
+    const emp = employees.find((e) => e.employee_id === editingItem.record.employee_id);
+    if (role !== 'admin') {
+      const isSelf = Boolean(
+        emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+      );
+      if (isSelf) {
+        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error');
+        return;
+      }
+      if (isAnotherManager(emp, currentUser)) {
+        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error');
+        return;
+      }
+    }
 
     updatePayrollItem(editingItem.record.payroll_id, {
       hourly_rate: editingItem.hourly_rate,
@@ -143,6 +199,11 @@ export const ManagerPayroll: React.FC = () => {
   };
 
   const handleUnlockConfirm = () => {
+    if (role !== 'admin') {
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền mở khóa bảng lương!', 'error');
+      setConfirmUnlockOpen(false);
+      return;
+    }
     unlockPayrollPeriod(selectedPeriod);
     setConfirmUnlockOpen(false);
   };

@@ -11,7 +11,16 @@ export const employeeModel = prisma.employee
 export const employeeInclude = {
   department: true,
   users: {
-    select: { id: true, username: true, is_active: true },
+    select: {
+      id: true,
+      username: true,
+      is_active: true,
+      roles: {
+        select: {
+          role_name: true,
+        },
+      },
+    },
   },
   employee_shifts: {
     include: { work_shifts: true },

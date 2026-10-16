@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { ScanFace, Fingerprint } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { isAnotherManager } from '../../utils/permissionUtils';
+import { ScanFace, Fingerprint, AlertTriangle } from 'lucide-react';
 import { CameraEkycModal, CapturedFaceSample } from '../../components/biometrics/CameraEkycModal';
 import { enrollFaceImagesApi, deleteEmployeeBiometricsApi, EnrollFaceResult } from '../../api/biometricApi';
 import { Employee } from '../../types';
@@ -24,6 +26,7 @@ const biometricLogger = logger.child('ManagerBiometrics');
 
 export const ManagerBiometrics: React.FC = () => {
   const { employees, updateEmployee, showToast } = useApp();
+  const { currentUser, role } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryEmpId = searchParams.get('employee_id') || searchParams.get('empId');
 
@@ -70,8 +73,26 @@ export const ManagerBiometrics: React.FC = () => {
 
   const currentEmp = employees.find((e) => e.employee_id === selectedEmpId) || employees[0];
 
+  // Chốt chặn Requirement 2: Bất kiêm nhiệm - không ai được tự đăng ký ảnh khuôn mặt/sinh trắc học của mình
+  // và Manager không được sửa sinh trắc học của Manager khác
+  const isSelf = Boolean(
+    currentEmp && currentUser &&
+    (currentEmp.employee_id === currentUser.employee_id || currentEmp.email === currentUser.email)
+  );
+  const isOtherMgr = isAnotherManager(currentEmp, currentUser);
+  const isEnrollmentBlocked = role !== 'admin' && (isSelf || isOtherMgr);
+
   // Handle Photo Upload (Multiple files allowed)
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isEnrollmentBlocked) {
+      showToast(
+        isSelf
+          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
+          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
+        'error'
+      );
+      return;
+    }
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -128,6 +149,15 @@ export const ManagerBiometrics: React.FC = () => {
 
   const handleConfirmFaceSave = async () => {
     if (!currentEmp || uploadedPhotos.length < 3) return;
+    if (isEnrollmentBlocked) {
+      showToast(
+        isSelf
+          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
+          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
+        'error'
+      );
+      return;
+    }
     setAnalyzingFace(true);
     try {
       const frontalPhoto = uploadedPhotos[0]?.url || currentEmp.avatar;
@@ -165,6 +195,15 @@ export const ManagerBiometrics: React.FC = () => {
   };
 
   const handleSendIoTTrigger = () => {
+    if (isEnrollmentBlocked) {
+      showToast(
+        isSelf
+          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
+          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
+        'error'
+      );
+      return;
+    }
     setFingerprintStep('SENDING');
     setTimeout(() => {
       setFingerprintStep('WAITING_TOUCH');
@@ -180,6 +219,15 @@ export const ManagerBiometrics: React.FC = () => {
 
   const handleConfirmFingerprintSave = () => {
     if (!currentEmp) return;
+    if (isEnrollmentBlocked) {
+      showToast(
+        isSelf
+          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
+          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
+        'error'
+      );
+      return;
+    }
     updateEmployee(currentEmp.employee_id, {
       fingerprint_enrolled: true,
     });
@@ -197,6 +245,20 @@ export const ManagerBiometrics: React.FC = () => {
     : null;
 
   const handleDeleteFaceId = async (emp: Employee) => {
+    const isSelfEmp = Boolean(
+      emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+    );
+    const isOtherMgrEmp = isAnotherManager(emp, currentUser);
+    if (role !== 'admin' && (isSelfEmp || isOtherMgrEmp)) {
+      showToast(
+        isSelfEmp
+          ? 'Không ai được tự xóa dữ liệu sinh trắc học của chính mình. Vui lòng liên hệ Admin!'
+          : 'Quản lý không có quyền xóa sinh trắc học của Quản lý khác!',
+        'error'
+      );
+      return;
+    }
+
     try {
       await deleteEmployeeBiometricsApi(emp.employee_id);
     } catch (err: any) {
@@ -212,6 +274,20 @@ export const ManagerBiometrics: React.FC = () => {
   };
 
   const handleDeleteFingerprint = (emp: Employee) => {
+    const isSelfEmp = Boolean(
+      emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+    );
+    const isOtherMgrEmp = isAnotherManager(emp, currentUser);
+    if (role !== 'admin' && (isSelfEmp || isOtherMgrEmp)) {
+      showToast(
+        isSelfEmp
+          ? 'Không ai được tự xóa dữ liệu sinh trắc học của chính mình. Vui lòng liên hệ Admin!'
+          : 'Quản lý không có quyền xóa sinh trắc học của Quản lý khác!',
+        'error'
+      );
+      return;
+    }
+
     updateEmployee(emp.employee_id, {
       fingerprint_enrolled: false,
     });
@@ -328,6 +404,21 @@ export const ManagerBiometrics: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {/* Chốt chặn Requirement 2 */}
+            {isEnrollmentBlocked && (
+              <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 flex items-start gap-3 text-amber-800 dark:text-amber-200 text-xs">
+                <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold">Chốt chặn an toàn (Nguyên tắc Bất kiêm nhiệm - Phê duyệt độc lập):</p>
+                  <p>
+                    {isSelf
+                      ? 'Bạn không thể tự tải ảnh, chụp eKYC hoặc đăng ký dữ liệu nhận diện của chính mình để tránh gian lận thời gian làm việc. Thay đổi này chỉ có Admin mới có quyền thực hiện.'
+                      : 'Quản lý không được phép sửa đổi hoặc đăng ký dữ liệu nhận diện của Quản lý khác.'}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* TAB 1: Face ID Multi-Photo Upload & Camera eKYC */}
             {activeTab === 'FACE' && (

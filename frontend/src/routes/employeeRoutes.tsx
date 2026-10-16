@@ -25,7 +25,7 @@ const EmployeeSalaryHistory = lazy(() =>
 export const employeeRoutes: RouteObject = {
   path: '/app/employee',
   element: (
-    <AuthGuard>
+    <AuthGuard allowedRoles={['admin', 'manager', 'employee']}>
       <AppLayout />
     </AuthGuard>
   ),

@@ -45,7 +45,7 @@ export const LoginPage: React.FC = () => {
     setLoading(false);
 
     if (res.success && res.role) {
-      navigate(res.role === 'manager' ? '/app/manager/dashboard' : '/app/employee/dashboard');
+      navigate((res.role === 'admin' || res.role === 'manager') ? '/app/manager/dashboard' : '/app/employee/dashboard');
     } else {
       setErrorMsg(res.message || 'Xác thực thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.');
     }

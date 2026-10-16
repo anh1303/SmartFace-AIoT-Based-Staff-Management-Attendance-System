@@ -31,7 +31,7 @@ const ManagerEmployeeDetail = lazy(() =>
 export const managerRoutes: RouteObject = {
   path: '/app/manager',
   element: (
-    <AuthGuard allowedRoles={['manager']}>
+    <AuthGuard allowedRoles={['admin', 'manager']}>
       <AppLayout />
     </AuthGuard>
   ),

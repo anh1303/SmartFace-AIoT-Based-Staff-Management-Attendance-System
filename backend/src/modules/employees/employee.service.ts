@@ -22,10 +22,25 @@ export interface RawEmployeeDb {
   avatar_url?: string | null
   hourly_rate?: { toString(): string } | number | string | bigint | null
   departmentId?: number | null
-  users?: { id?: string; username?: string; is_active?: boolean } | null
+  users?: {
+    id?: string
+    username?: string
+    is_active?: boolean
+    roles?: { role_name?: string } | null
+  } | null
 }
 
 export function formatEmployee(emp: RawEmployeeDb) {
+  const roleName =
+    emp.users?.roles?.role_name?.toUpperCase() ||
+    (emp.department?.name === 'Quản lý' ? 'MANAGER' : 'EMPLOYEE')
+
+  const isManager =
+    roleName === 'MANAGER' ||
+    roleName === 'ADMIN' ||
+    Boolean(emp.position && /quản lý|manager/i.test(emp.position)) ||
+    Boolean(emp.department?.name && /quản lý/i.test(emp.department.name))
+
   return {
     id: emp.id,
     employee_id: emp.employee_code || emp.id,
@@ -36,6 +51,8 @@ export function formatEmployee(emp: RawEmployeeDb) {
     phone: emp.phone || '',
     email: emp.email || '',
     status: emp.status,
+    role: roleName,
+    is_manager: isManager,
     created_at: emp.createdAt ? emp.createdAt.toISOString() : new Date().toISOString(),
     updated_at: emp.updatedAt ? emp.updatedAt.toISOString() : new Date().toISOString(),
     face_enrolled: Array.isArray(emp.face_embeddings) && emp.face_embeddings.length > 0,
@@ -333,6 +350,20 @@ export async function remove(idOrCode: string, actorUserId?: string) {
     where: buildIdOrCodeWhere(idOrCode),
   })
   if (!existing) throw new AppError(404, 'Không tìm thấy nhân viên cần xóa')
+
+  // Tuyệt đối không xóa cứng (Hard Delete / Cascade Delete) nhân sự đã phát sinh dữ liệu chấm công/lương
+  // để bảo toàn lịch sử chấm công, bảng lương cũ và báo cáo chi phí kiểm toán (Audit).
+  const [logCount, summaryCount, payrollCount] = await Promise.all([
+    prisma.attendance_logs.count({ where: { employee_id: existing.id } }),
+    prisma.daily_attendance_summary.count({ where: { employee_id: existing.id } }),
+    prisma.payrollRecord.count({ where: { employeeId: existing.id } }),
+  ])
+
+  if (logCount > 0 || summaryCount > 0 || payrollCount > 0) {
+    throw AppError.badRequest(
+      'Không thể xóa vĩnh viễn nhân sự đã phát sinh dữ liệu chấm công hoặc bảng lương để bảo đảm toàn vẹn dữ liệu và kiểm toán (Audit). Vui lòng chuyển trạng thái nhân viên sang Đã nghỉ việc (INACTIVE)!'
+    )
+  }
 
   return prisma.$transaction(async (tx) => {
     // 1. Xóa dữ liệu sinh trắc học Face Embeddings

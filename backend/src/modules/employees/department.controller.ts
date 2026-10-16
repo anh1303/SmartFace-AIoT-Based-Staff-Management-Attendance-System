@@ -17,7 +17,7 @@ departmentRouter.get(
 
 departmentRouter.post(
   '/',
-  authorize('ADMIN', 'MANAGER'),
+  authorize('ADMIN'),
   asyncHandler(async (req, res) => {
     const created = await service.createDepartment(req.body, req.user?.id);
     successResponse(res, created, 'Đã tạo chức vụ mới thành công', 201);
@@ -26,7 +26,7 @@ departmentRouter.post(
 
 departmentRouter.put(
   '/:id',
-  authorize('ADMIN', 'MANAGER'),
+  authorize('ADMIN'),
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id as string, 10);
     const updated = await service.updateDepartment(id, req.body, req.user?.id);
@@ -36,7 +36,7 @@ departmentRouter.put(
 
 departmentRouter.delete(
   '/:id',
-  authorize('ADMIN', 'MANAGER'),
+  authorize('ADMIN'),
   asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id as string, 10);
     await service.deleteDepartment(id, req.user?.id);

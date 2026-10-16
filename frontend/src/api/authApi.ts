@@ -2,11 +2,24 @@ import { apiFetch } from './client';
 import { UserSession, Role } from '../types';
 
 export const DEFAULT_USERS: Record<Role, UserSession> = {
+  admin: {
+    employee_id: 'ADMIN',
+    full_name: 'Quản trị viên',
+    email: 'admin@aiot.corp',
+    role: 'admin',
+    role_name: 'ADMIN',
+    is_manager: true,
+    position: 'Quản trị hệ thống',
+    department: 'Ban Quản Trị',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+  },
   manager: {
     employee_id: 'NV-001',
     full_name: 'Nguyễn Văn A',
     email: 'anv@aiot.corp',
     role: 'manager',
+    role_name: 'MANAGER',
+    is_manager: true,
     position: 'Quản lý chính',
     department: 'Quản lý',
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
@@ -16,6 +29,8 @@ export const DEFAULT_USERS: Record<Role, UserSession> = {
     full_name: 'Lê Hoàng Phúc',
     email: 'employee@company.com',
     role: 'employee',
+    role_name: 'EMPLOYEE',
+    is_manager: false,
     position: 'Thu ngân chính',
     department: 'Thu ngân',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
@@ -30,26 +45,28 @@ export async function loginApi(identifier: string, password?: string) {
 
   if (res.success && res.data) {
     const { user } = res.data;
-    const isManager = Boolean(
-      user.is_manager ||
-      user.role === 'ADMIN' ||
-      user.role === 'MANAGER' ||
-      user.role === 'manager' ||
-      user.role_name === 'ADMIN' ||
-      user.role_name === 'MANAGER'
-    );
-    const targetRole: Role = isManager ? 'manager' : 'employee';
+    const roleName = (user.role_name || user.role || '').toUpperCase();
+    let targetRole: Role = 'employee';
+    if (roleName === 'ADMIN') {
+      targetRole = 'admin';
+    } else if (roleName === 'MANAGER' || user.is_manager) {
+      targetRole = 'manager';
+    } else {
+      targetRole = 'employee';
+    }
+
+    const isManagerOrAdmin = targetRole === 'admin' || targetRole === 'manager';
 
     const session: UserSession = {
-      employee_id: user.employee_id || user.username || 'EMP-001',
+      employee_id: user.employee_id || user.username || (targetRole === 'admin' ? 'ADMIN' : 'EMP-001'),
       full_name: user.full_name || user.username,
       email: user.email || '',
       role: targetRole,
-      role_name: user.role_name || user.role,
-      is_manager: isManager,
-      position: user.position || (targetRole === 'manager' ? 'Manager' : 'Employee'),
-      department: user.department || 'Chung',
-      avatar: user.avatar || (targetRole === 'manager' ? DEFAULT_USERS.manager.avatar : DEFAULT_USERS.employee.avatar),
+      role_name: roleName || targetRole.toUpperCase(),
+      is_manager: isManagerOrAdmin,
+      position: user.position || (targetRole === 'admin' ? 'Quản trị viên' : targetRole === 'manager' ? 'Quản lý' : 'Nhân viên'),
+      department: user.department || (targetRole === 'admin' ? 'Ban Quản Trị' : 'Chung'),
+      avatar: user.avatar || DEFAULT_USERS[targetRole].avatar,
     };
 
     return { session, targetRole };
@@ -67,26 +84,28 @@ export async function meApi(): Promise<UserSession | null> {
     const res = await apiFetch('/api/auth/me');
     if (res.success && res.data) {
       const user = res.data;
-      const isManager = Boolean(
-        user.is_manager ||
-        user.role === 'ADMIN' ||
-        user.role === 'MANAGER' ||
-        user.role === 'manager' ||
-        user.role_name === 'ADMIN' ||
-        user.role_name === 'MANAGER'
-      );
-      const targetRole: Role = isManager ? 'manager' : 'employee';
+      const roleName = (user.role_name || user.role || '').toUpperCase();
+      let targetRole: Role = 'employee';
+      if (roleName === 'ADMIN') {
+        targetRole = 'admin';
+      } else if (roleName === 'MANAGER' || user.is_manager) {
+        targetRole = 'manager';
+      } else {
+        targetRole = 'employee';
+      }
+
+      const isManagerOrAdmin = targetRole === 'admin' || targetRole === 'manager';
 
       return {
-        employee_id: user.employee_id || user.username || 'EMP-001',
+        employee_id: user.employee_id || user.username || (targetRole === 'admin' ? 'ADMIN' : 'EMP-001'),
         full_name: user.full_name || user.username,
         email: user.email || '',
         role: targetRole,
-        role_name: user.role_name || user.role,
-        is_manager: isManager,
-        position: user.position || (targetRole === 'manager' ? 'Manager' : 'Employee'),
-        department: user.department || 'Chung',
-        avatar: user.avatar || (targetRole === 'manager' ? DEFAULT_USERS.manager.avatar : DEFAULT_USERS.employee.avatar),
+        role_name: roleName || targetRole.toUpperCase(),
+        is_manager: isManagerOrAdmin,
+        position: user.position || (targetRole === 'admin' ? 'Quản trị viên' : targetRole === 'manager' ? 'Quản lý' : 'Nhân viên'),
+        department: user.department || (targetRole === 'admin' ? 'Ban Quản Trị' : 'Chung'),
+        avatar: user.avatar || DEFAULT_USERS[targetRole].avatar,
       };
     }
   } catch {

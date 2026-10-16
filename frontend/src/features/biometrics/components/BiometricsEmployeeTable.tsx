@@ -1,6 +1,8 @@
 import React from 'react';
-import { Search, ChevronDown, Edit } from 'lucide-react';
+import { Search, ChevronDown, Edit, Lock } from 'lucide-react';
 import { Employee } from '../../../types';
+import { useAuth } from '../../../context/AuthContext';
+import { isAnotherManager } from '../../../utils/permissionUtils';
 
 export interface BiometricsEmployeeTableProps {
   employees: Employee[];
@@ -25,6 +27,7 @@ export const BiometricsEmployeeTable: React.FC<BiometricsEmployeeTableProps> = (
   positions,
   onOpenManageModal,
 }) => {
+  const { role, user: currentUser } = useAuth();
   return (
     <div className="bg-white dark:bg-[#13162b] border border-slate-300 dark:border-[#28305c] rounded-xl overflow-hidden shadow-xs transition-colors">
       {/* Top Bar 1: Toolbar Header */}
@@ -144,14 +147,38 @@ export const BiometricsEmployeeTable: React.FC<BiometricsEmployeeTableProps> = (
                     </span>
                   </td>
                   <td className="py-4 px-5 text-center">
-                    <button
-                      type="button"
-                      onClick={() => onOpenManageModal(emp)}
-                      className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] font-medium text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                    >
-                      <Edit className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Sửa</span>
-                    </button>
+                    {(() => {
+                      const isSelf = Boolean(
+                        currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+                      );
+                      const isOtherMgr = isAnotherManager(emp, currentUser);
+                      const isBlocked = role !== 'admin' && (isSelf || isOtherMgr);
+
+                      if (isBlocked) {
+                        return (
+                          <button
+                            type="button"
+                            disabled
+                            title={isSelf ? 'Chốt chặn an toàn: Không thể tự sửa dữ liệu nhận diện của chính mình' : 'Chốt chặn an toàn: Không thể sửa dữ liệu nhận diện của Quản lý khác'}
+                            className="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-400 dark:bg-[#181c38]/50 dark:text-slate-600 border border-slate-200/50 dark:border-[#272d5a]/40 font-medium text-xs inline-flex items-center gap-1.5 cursor-not-allowed opacity-60"
+                          >
+                            <Lock className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Khóa</span>
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => onOpenManageModal(emp)}
+                          className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] font-medium text-xs inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                        >
+                          <Edit className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Sửa</span>
+                        </button>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))

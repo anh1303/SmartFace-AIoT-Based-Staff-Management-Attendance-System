@@ -1,6 +1,8 @@
 import React from 'react';
-import { Search, ChevronDown, Edit } from 'lucide-react';
+import { Search, ChevronDown, Edit, Lock } from 'lucide-react';
 import { PayrollRecord, Employee } from '../../../types';
+import { useAuth } from '../../../context/AuthContext';
+import { isAnotherManager } from '../../../utils/permissionUtils';
 
 interface PayrollTableProps {
   selectedPeriod: string;
@@ -27,6 +29,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
   isFinalized,
   onOpenEdit,
 }) => {
+  const { role, user: currentUser } = useAuth();
   return (
     <div className="rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] overflow-hidden shadow-xs">
       <div className="p-4 sm:p-5 border-b border-slate-200/80 dark:border-[#21264b] flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -75,9 +78,11 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                 <option value="Thu ngân" className="bg-white dark:bg-[#13162b]">
                   Thu ngân
                 </option>
-                <option value="Quản lý" className="bg-white dark:bg-[#13162b]">
-                  Quản lý
-                </option>
+                {role === 'admin' && (
+                  <option value="Quản lý" className="bg-white dark:bg-[#13162b]">
+                    Quản lý
+                  </option>
+                )}
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -132,6 +137,12 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                 const totalOvertime = record.total_overtime ?? 0;
                 const totalLateEarly = record.total_late_early ?? 0;
                 const allowance = record.allowance || 0;
+
+                const isSelf = Boolean(
+                  emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+                );
+                const isOtherMgr = isAnotherManager(emp, currentUser);
+                const isBlockedFromEditing = role !== 'admin' && (isSelf || isOtherMgr);
 
                 return (
                   <tr
@@ -208,6 +219,16 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                         <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
                           Đã khóa
                         </span>
+                      ) : isBlockedFromEditing ? (
+                        <button
+                          type="button"
+                          disabled
+                          title={isSelf ? 'Chốt chặn an toàn: Không thể tự sửa phiếu lương của chính mình' : 'Chốt chặn an toàn: Không thể sửa phiếu lương của Quản lý khác'}
+                          className="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-400 dark:bg-[#181c38]/50 dark:text-slate-600 border border-slate-200/50 dark:border-[#272d5a]/40 font-medium text-xs inline-flex items-center gap-1.5 cursor-not-allowed opacity-60"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Khóa</span>
+                        </button>
                       ) : (
                         <button
                           type="button"

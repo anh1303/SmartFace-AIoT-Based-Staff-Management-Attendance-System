@@ -237,14 +237,51 @@ export async function adjustAttendance(
     late_early: number
     overtime: number
   },
-  actorUserId?: string
+  actorUserId?: string,
+  actorRole?: string
 ) {
   const emp = await prisma.employee.findFirst({
     where: buildIdOrCodeWhere(data.employeeId),
+    include: {
+      users: { select: { id: true, roles: { select: { role_name: true } } } },
+      department: true,
+    },
   })
   if (!emp) throw new AppError(404, 'Employee not found')
 
   const workDate = new Date(`${data.date}T00:00:00.000Z`)
+
+  // 1. Kiểm tra ngày đã khóa công (Locked) chưa. Khi đã khóa, chỉ ADMIN mới được can thiệp
+  const lock = await prisma.attendance_locks.findFirst({
+    where: { work_date: workDate, is_locked: true },
+  })
+  if (lock && actorRole?.toUpperCase() !== 'ADMIN') {
+    throw AppError.forbidden(
+      'Dữ liệu công ngày này đã bị khóa (Locked). Chỉ Quản trị viên (Admin) mới có quyền mở khóa để chỉnh sửa!'
+    )
+  }
+
+  // 2. Chốt chặn phân quyền: Không ai được tự chỉnh sửa dữ liệu kiểm soát/xóa lỗi đi trễ của chính mình
+  if (actorRole?.toUpperCase() !== 'ADMIN' && emp.user_id && emp.user_id === actorUserId) {
+    throw AppError.forbidden(
+      'Không ai được tự sửa dữ liệu kiểm soát của chính mình (chỉnh sửa công/xóa lỗi đi trễ). Vui lòng liên hệ Quản trị viên (Admin) phê duyệt!'
+    )
+  }
+
+  // 3. Manager không được chỉnh sửa dữ liệu công của Manager khác
+  if (actorRole?.toUpperCase() === 'MANAGER') {
+    const targetRole = emp.users?.roles?.role_name?.toUpperCase()
+    const isTargetManager = Boolean(
+      targetRole === 'MANAGER' ||
+      targetRole === 'ADMIN' ||
+      (emp.position && /quản lý|manager|trưởng phòng|giám đốc/i.test(emp.position)) ||
+      (emp.department?.name && /quản lý/i.test(emp.department.name))
+    )
+    if (isTargetManager && emp.user_id !== actorUserId) {
+      throw AppError.forbidden('Quản lý không có quyền chỉnh sửa dữ liệu chấm công của quản lý khác!')
+    }
+  }
+
   // Đơn vị chuẩn hóa toàn hệ thống: GIỜ (HOURS), làm tròn theo nấc 0.5 giờ (tương đương 30 phút)
   const roundedLateEarly = Math.round(Math.max(0, Number(data.late_early) || 0) * 2) / 2
   const roundedOvertime = Math.round(Math.max(0, Number(data.overtime) || 0) * 2) / 2

@@ -85,7 +85,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(session);
       localStorage.setItem('userSession', JSON.stringify(session));
 
-      showToast(`Đăng nhập thành công! Vai trò: ${targetRole === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Employee)'}`, 'success');
+      const roleLabel =
+        targetRole === 'admin'
+          ? 'Quản trị viên (Admin)'
+          : targetRole === 'manager'
+          ? 'Quản lý (Manager)'
+          : 'Nhân viên (Employee)';
+      showToast(`Đăng nhập thành công! Vai trò: ${roleLabel}`, 'success');
       return { success: true, role: targetRole };
     } catch (error: unknown) {
       authLogger.error('Login error:', error);
@@ -118,6 +124,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 2. Lock switchRole in production builds using import.meta.env.DEV
     if (!import.meta.env.DEV) {
       showToast('Tính năng chuyển đổi vai trò chỉ khả dụng ở môi trường Development!', 'warning');
+      return;
+    }
+
+    if (newRole === 'admin') {
+      setCurrentUser(DEFAULT_USERS.admin);
+      localStorage.setItem('userSession', JSON.stringify(DEFAULT_USERS.admin));
+      showToast('[DEV ONLY] Đã chuyển đổi sang vai trò: Quản trị viên (Admin)', 'info');
       return;
     }
 

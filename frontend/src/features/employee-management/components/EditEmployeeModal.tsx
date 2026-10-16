@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { Employee } from '../../../types';
+import { useAuth } from '../../../context/AuthContext';
 
 interface EditEmployeeModalProps {
   editEmployee: Employee | null;
@@ -19,6 +20,9 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   onSubmit,
   onTriggerDelete,
 }) => {
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
+
   if (!editEmployee) return null;
 
   return (
@@ -139,13 +143,15 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
           >
             Hủy bỏ
           </button>
-          <button
-            type="button"
-            onClick={() => onTriggerDelete(editEmployee)}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 dark:bg-rose-600/20 dark:hover:bg-rose-600 dark:text-rose-300 dark:hover:text-white dark:border-rose-500/30 transition-all cursor-pointer"
-          >
-            Xóa nhân viên
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => onTriggerDelete(editEmployee)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 dark:bg-rose-600/20 dark:hover:bg-rose-600 dark:text-rose-300 dark:hover:text-white dark:border-rose-500/30 transition-all cursor-pointer"
+            >
+              Xóa nhân viên
+            </button>
+          )}
           <button
             type="submit"
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-xs transition-all cursor-pointer"

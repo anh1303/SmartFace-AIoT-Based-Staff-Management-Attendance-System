@@ -27,7 +27,7 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Thay đổi quy định Thưởng / Phạt"
-      subtitle="Thiết lập hệ số tăng ca (OT) và định mức vi phạm đi trễ / về sớm"
+      subtitle="Thiết lập hệ số tăng ca (OT) và định mức vi phạm đi trễ / về sớm (Quyền hạn: Admin)"
     >
       <form onSubmit={onSavePolicy} className="space-y-4">
         <div>

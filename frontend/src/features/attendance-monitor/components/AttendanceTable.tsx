@@ -19,19 +19,19 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
   return (
     <div className="bg-white dark:bg-[#13162b] border border-slate-300 dark:border-[#28305c] rounded-xl overflow-hidden shadow-xs transition-colors">
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse table-fixed min-w-[1150px]">
           <thead>
             <tr className="border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Nhân viên</th>
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Ca làm việc</th>
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Sự kiện</th>
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Thời gian</th>
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Phương thức</th>
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Độ tin cậy</th>
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Trạng thái</th>
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Trễ / Sớm</th>
-              <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Tăng ca</th>
-              <th className="py-3.5 px-4 text-center">Thao tác</th>
+              <th className="py-3.5 px-4 w-[220px] border-r border-slate-300 dark:border-[#222956] text-center">Nhân viên</th>
+              <th className="py-3.5 px-4 w-[150px] border-r border-slate-300 dark:border-[#222956] text-center">Ca làm việc</th>
+              <th className="py-3.5 px-4 w-[120px] border-r border-slate-300 dark:border-[#222956] text-center">Sự kiện</th>
+              <th className="py-3.5 px-4 w-[100px] border-r border-slate-300 dark:border-[#222956] text-center">Thời gian</th>
+              <th className="py-3.5 px-4 w-[130px] border-r border-slate-300 dark:border-[#222956] text-center">Phương thức</th>
+              <th className="py-3.5 px-4 w-[90px] border-r border-slate-300 dark:border-[#222956] text-center">Độ tin cậy</th>
+              <th className="py-3.5 px-4 w-[110px] border-r border-slate-300 dark:border-[#222956] text-center">Trạng thái</th>
+              <th className="py-3.5 px-4 w-[100px] border-r border-slate-300 dark:border-[#222956] text-center">Trễ / Sớm</th>
+              <th className="py-3.5 px-4 w-[100px] border-r border-slate-300 dark:border-[#222956] text-center">Tăng ca</th>
+              <th className="py-3.5 px-4 w-[90px] text-center">Thao tác</th>
             </tr>
           </thead>
           <tbody className="text-xs">
@@ -55,22 +55,22 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                     {/* Row 1: Check-in */}
                     <tr className="hover:bg-slate-50/90 dark:hover:bg-[#1a1e3a]/50 transition-colors border-b border-slate-200 dark:border-[#202752]">
                       {/* Employee Info - rowSpan 2 */}
-                      <td rowSpan={2} className="py-3 px-4 align-top border-r border-b-2 border-slate-300 dark:border-[#28305c] bg-white dark:bg-[#13162b]">
-                        <div className="flex items-center gap-3">
+                      <td rowSpan={2} className="py-3 px-4 align-top border-r border-b-2 border-slate-300 dark:border-[#28305c] bg-white dark:bg-[#13162b] max-w-[220px]">
+                        <div className="flex items-center gap-3 min-w-0" title={employee.full_name}>
                           {employee.avatar ? (
                             <img
                               src={employee.avatar}
                               alt={employee.full_name}
-                              className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                              className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
                             />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700/50 flex items-center justify-center font-bold text-purple-600 dark:text-purple-300">
+                            <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700/50 flex items-center justify-center font-bold text-purple-600 dark:text-purple-300 shrink-0">
                               {employee.full_name.charAt(0)}
                             </div>
                           )}
-                          <div>
-                            <p className="font-semibold text-slate-900 dark:text-white">{employee.full_name}</p>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-slate-900 dark:text-white truncate" title={employee.full_name}>{employee.full_name}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate" title={`${employee.employee_id} • ${employee.department}`}>
                               {employee.employee_id} • {employee.department}
                             </p>
                           </div>
@@ -78,11 +78,11 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                       </td>
 
                       {/* Shift Info - rowSpan 2 */}
-                      <td rowSpan={2} className="py-3 px-4 align-top border-r border-b-2 border-slate-300 dark:border-[#28305c] bg-white dark:bg-[#13162b]">
-                        <p className="font-medium text-slate-800 dark:text-slate-200">{shift.name}</p>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{shift.timeRange}</p>
+                      <td rowSpan={2} className="py-3 px-4 align-top border-r border-b-2 border-slate-300 dark:border-[#28305c] bg-white dark:bg-[#13162b] max-w-[150px]">
+                        <p className="font-medium text-slate-800 dark:text-slate-200 truncate" title={shift.name}>{shift.name}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate" title={shift.timeRange}>{shift.timeRange}</p>
                         {startDate !== endDate && (
-                          <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#0f1224] text-[10px] font-mono text-purple-600 dark:text-purple-400 border border-slate-200 dark:border-[#272d5a]">
+                          <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#0f1224] text-[10px] font-mono text-purple-600 dark:text-purple-400 border border-slate-200 dark:border-[#272d5a] truncate max-w-full" title={item.date}>
                             {item.date}
                           </span>
                         )}
@@ -128,7 +128,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                       </td>
 
                       {/* Late/Early - rowSpan 2 */}
-                      <td rowSpan={2} className="py-3 px-4 align-middle font-mono font-bold border-r border-b-2 border-slate-300 dark:border-[#28305c] bg-white dark:bg-[#13162b] text-center">
+                      <td rowSpan={2} className="py-3 px-4 align-middle font-mono font-bold border-r border-b-2 border-slate-300 dark:border-[#28305c] bg-white dark:bg-[#13162b] text-center truncate" title={item.currentLateEarlySec > 0 ? lateEarlyStr : '00:00:00'}>
                         {item.currentLateEarlySec > 0 ? (
                           <span className="text-rose-600 dark:text-rose-400">{lateEarlyStr}</span>
                         ) : (
@@ -137,7 +137,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                       </td>
 
                       {/* Overtime - rowSpan 2 */}
-                      <td rowSpan={2} className="py-3 px-4 align-middle font-mono font-bold border-r border-b-2 border-slate-300 dark:border-[#28305c] bg-white dark:bg-[#13162b] text-center">
+                      <td rowSpan={2} className="py-3 px-4 align-middle font-mono font-bold border-r border-b-2 border-slate-300 dark:border-[#28305c] bg-white dark:bg-[#13162b] text-center truncate" title={overtimeStr}>
                         {item.currentOTSec > 0 ? (
                           <span className="text-emerald-600 dark:text-emerald-400">{overtimeStr}</span>
                         ) : (

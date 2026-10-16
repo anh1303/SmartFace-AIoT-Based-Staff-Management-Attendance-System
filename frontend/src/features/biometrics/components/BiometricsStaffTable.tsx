@@ -31,9 +31,6 @@ export const BiometricsStaffTable: React.FC<BiometricsStaffTableProps> = ({
           <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
             Danh Sách Trạng Thái Sinh Trắc Học Nhân Viên
           </h2>
-          <span className="px-3 py-1 rounded-full bg-white dark:bg-[#13162b] border border-slate-200 dark:border-[#272d5a] text-purple-600 dark:text-purple-400 font-mono text-xs font-bold shadow-xs">
-            {filteredEmployees.length} / {employees.length}
-          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -75,15 +72,15 @@ export const BiometricsStaffTable: React.FC<BiometricsStaffTableProps> = ({
 
       {/* Bar 2: Table Section */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
+        <table className="w-full text-left text-xs border-collapse table-fixed min-w-[950px]">
           <thead>
             <tr className="border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-mono">
-              <th className="py-4 px-5 border-r border-slate-300 dark:border-[#222956] text-center">Nhân sự</th>
-              <th className="py-4 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Mã NV</th>
-              <th className="py-4 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Chức vụ</th>
-              <th className="py-4 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Khuôn mặt (Face ID)</th>
-              <th className="py-4 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Vân tay (FAP30)</th>
-              <th className="py-4 px-5 text-center font-bold">Thao tác</th>
+              <th className="py-4 px-5 w-[240px] border-r border-slate-300 dark:border-[#222956] text-center">Nhân sự</th>
+              <th className="py-4 px-4 w-[130px] border-r border-slate-300 dark:border-[#222956] text-center">Mã NV</th>
+              <th className="py-4 px-4 w-[180px] border-r border-slate-300 dark:border-[#222956] text-center">Chức vụ</th>
+              <th className="py-4 px-4 w-[160px] border-r border-slate-300 dark:border-[#222956] text-center">Khuôn mặt (Face ID)</th>
+              <th className="py-4 px-4 w-[160px] border-r border-slate-300 dark:border-[#222956] text-center">Vân tay (FAP30)</th>
+              <th className="py-4 px-5 w-[100px] text-center font-bold">Thao tác</th>
             </tr>
           </thead>
           <tbody className="text-slate-700 dark:text-slate-300">
@@ -99,28 +96,30 @@ export const BiometricsStaffTable: React.FC<BiometricsStaffTableProps> = ({
                   key={emp.employee_id}
                   className="hover:bg-purple-50/40 dark:hover:bg-[#181c38]/50 transition-colors border-b border-slate-200 dark:border-[#202752]"
                 >
-                  <td className="py-4 px-5 border-r border-slate-200 dark:border-[#202752]">
-                    <div className="flex items-center gap-3.5">
+                  <td className="py-4 px-5 border-r border-slate-200 dark:border-[#202752] max-w-[240px]">
+                    <div className="flex items-center gap-3.5 min-w-0" title={emp.full_name}>
                       <img
                         src={
                           emp.avatar ||
                           'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
                         }
                         alt={emp.full_name}
-                        className="w-9 h-9 rounded-full object-cover border border-purple-200 dark:border-[#272d5a]"
+                        className="w-9 h-9 rounded-full object-cover border border-purple-200 dark:border-[#272d5a] shrink-0"
                       />
-                      <span className="font-semibold text-slate-900 dark:text-white">
+                      <span className="font-semibold text-slate-900 dark:text-white truncate flex-1" title={emp.full_name}>
                         {emp.full_name}
                       </span>
                     </div>
                   </td>
                   <td className="py-4 px-4 border-r border-slate-200 dark:border-[#202752] text-center">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50 truncate inline-block max-w-full" title={emp.employee_id}>
                       {emp.employee_id}
                     </span>
                   </td>
-                  <td className="py-4 px-4 text-slate-700 dark:text-slate-300 font-medium border-r border-slate-200 dark:border-[#202752] text-center">
-                    {emp.position || emp.department}
+                  <td className="py-4 px-4 text-slate-700 dark:text-slate-300 font-medium border-r border-slate-200 dark:border-[#202752] text-center max-w-[180px]">
+                    <span className="truncate block" title={emp.position || emp.department || ''}>
+                      {emp.position || emp.department}
+                    </span>
                   </td>
                   <td className="py-4 px-4 border-r border-slate-200 dark:border-[#202752] text-center">
                     <span

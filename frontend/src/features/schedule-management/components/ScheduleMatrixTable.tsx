@@ -42,10 +42,10 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
     }
 
     return (
-      <div className={`p-2.5 rounded-xl border text-xs text-left transition-all shadow-xs ${colorClass}`}>
-        <p className="font-bold tracking-tight">{typeName}</p>
-        <p className="font-mono text-xs text-slate-700 dark:text-slate-200 mt-0.5">{shift.start_time} - {shift.end_time}</p>
-        {shift.note && <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{shift.note}</p>}
+      <div className={`p-2.5 rounded-xl border text-xs text-left transition-all shadow-xs ${colorClass} max-w-full overflow-hidden`}>
+        <p className="font-bold tracking-tight truncate" title={typeName}>{typeName}</p>
+        <p className="font-mono text-xs text-slate-700 dark:text-slate-200 mt-0.5 truncate" title={`${shift.start_time} - ${shift.end_time}`}>{shift.start_time} - {shift.end_time}</p>
+        {shift.note && <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5" title={shift.note}>{shift.note}</p>}
       </div>
     );
   };
@@ -73,23 +73,23 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
               return (
                 <tr key={emp.employee_id} className={`transition-colors ${isInactive ? 'bg-slate-50/50 dark:bg-[#0b0d19]/40 opacity-70' : 'hover:bg-slate-50/80 dark:hover:bg-[#1a1e3a]/40'}`}>
                   {/* Employee Fixed Column */}
-                  <td className="py-3.5 px-4 sticky left-0 bg-white dark:bg-[#13162b] z-10 border-r border-slate-200/80 dark:border-[#21264b]">
-                    <div className="flex items-center gap-2.5">
+                  <td className="py-3.5 px-4 sticky left-0 bg-white dark:bg-[#13162b] z-10 border-r border-slate-200/80 dark:border-[#21264b] w-56 max-w-[224px]">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <img
                         src={emp.avatar}
                         alt={emp.full_name}
                         className={`w-8 h-8 rounded-full object-cover border shrink-0 ${isInactive ? 'border-amber-500/50 grayscale' : 'border-slate-200 dark:border-slate-700'}`}
                       />
-                      <div className="overflow-hidden">
-                        <div className="flex items-center gap-1.5">
-                          <p className="font-semibold text-slate-900 dark:text-white truncate text-xs">{emp.full_name}</p>
+                      <div className="overflow-hidden min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="font-semibold text-slate-900 dark:text-white truncate text-xs flex-1" title={emp.full_name}>{emp.full_name}</p>
                           {isInactive && (
                             <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 shrink-0">
                               TẠM NGƯNG
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] font-mono text-purple-600 dark:text-purple-400 truncate">{emp.employee_id} • {emp.department}</p>
+                        <p className="text-[10px] font-mono text-purple-600 dark:text-purple-400 truncate" title={`${emp.employee_id} • ${emp.department}`}>{emp.employee_id} • {emp.department}</p>
                       </div>
                     </div>
                   </td>

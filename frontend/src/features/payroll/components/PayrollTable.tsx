@@ -86,31 +86,31 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
+        <table className="w-full text-left text-xs border-collapse table-fixed min-w-[1010px]">
           <thead>
             <tr className="border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-mono">
-              <th className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
+              <th className="py-3.5 px-4 w-[200px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
                 Nhân sự
               </th>
-              <th className="py-3.5 px-3 min-w-[130px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
+              <th className="py-3.5 px-3 w-[130px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
                 Lương theo giờ
               </th>
-              <th className="py-3.5 px-3 min-w-[100px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
+              <th className="py-3.5 px-3 w-[100px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
                 Tổng giờ làm
               </th>
-              <th className="py-3.5 px-3 min-w-[110px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
+              <th className="py-3.5 px-3 w-[110px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
                 Số giờ tăng ca
               </th>
-              <th className="py-3.5 px-3 min-w-[130px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
+              <th className="py-3.5 px-3 w-[130px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
                 Số giờ đi trễ/về sớm
               </th>
-              <th className="py-3.5 px-3 min-w-[110px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
+              <th className="py-3.5 px-3 w-[110px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
                 Phụ cấp
               </th>
-              <th className="py-3.5 px-4 min-w-[130px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
+              <th className="py-3.5 px-4 w-[130px] font-semibold text-slate-900 dark:text-white border-r border-slate-300 dark:border-[#222956] text-center">
                 Thực lĩnh
               </th>
-              <th className="py-3.5 px-4 text-center font-bold text-slate-900 dark:text-white">
+              <th className="py-3.5 px-4 w-[100px] text-center font-bold text-slate-900 dark:text-white">
                 Thao tác
               </th>
             </tr>
@@ -125,6 +125,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
             ) : (
               currentRecords.map((record) => {
                 const emp = employees.find((e) => e.employee_id === record.employee_id);
+                const empName = emp?.full_name || record.employee_name || record.employee_id;
                 const hourlyRate = record.hourly_rate || 0;
                 const netSalary = record.net_salary || 0;
                 const totalWorkingHours = record.total_working_hours || 176;
@@ -138,21 +139,21 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                     className="hover:bg-slate-50/90 dark:hover:bg-[#1a1e3a]/50 transition-colors border-b border-slate-200 dark:border-[#202752]"
                   >
                     {/* 1. Nhân sự */}
-                    <td className="py-3.5 px-4 border-r border-slate-200 dark:border-[#202752]">
-                      <div className="flex items-center gap-2.5">
+                    <td className="py-3.5 px-4 border-r border-slate-200 dark:border-[#202752] max-w-[200px]">
+                      <div className="flex items-center gap-2.5 min-w-0" title={empName}>
                         <img
                           src={
                             emp?.avatar ||
                             'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'
                           }
-                          alt={emp?.full_name || record.employee_name || record.employee_id}
-                          className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                          alt={empName}
+                          className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
                         />
-                        <div>
-                          <p className="font-semibold text-slate-900 dark:text-white truncate">
-                            {emp?.full_name || record.employee_name || record.employee_id}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-slate-900 dark:text-white truncate" title={empName}>
+                            {empName}
                           </p>
-                          <p className="text-[10px] font-mono text-purple-600 dark:text-purple-400">
+                          <p className="text-[10px] font-mono text-purple-600 dark:text-purple-400 truncate" title={record.employee_id}>
                             {record.employee_id}
                           </p>
                         </div>
@@ -160,17 +161,17 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                     </td>
 
                     {/* 2. Lương theo giờ */}
-                    <td className="py-3.5 px-3 font-mono text-slate-900 dark:text-white font-medium border-r border-slate-200 dark:border-[#202752] text-center">
+                    <td className="py-3.5 px-3 font-mono text-slate-900 dark:text-white font-medium border-r border-slate-200 dark:border-[#202752] text-center truncate" title={`${hourlyRate.toLocaleString('vi-VN')} ₫`}>
                       {hourlyRate.toLocaleString('vi-VN')} ₫
                     </td>
 
                     {/* 3. Tổng giờ làm */}
-                    <td className="py-3.5 px-3 font-mono text-slate-700 dark:text-slate-200 border-r border-slate-200 dark:border-[#202752] text-center">
+                    <td className="py-3.5 px-3 font-mono text-slate-700 dark:text-slate-200 border-r border-slate-200 dark:border-[#202752] text-center truncate" title={`${totalWorkingHours}h`}>
                       {totalWorkingHours}h
                     </td>
 
                     {/* 4. Số giờ tăng ca */}
-                    <td className="py-3.5 px-3 font-mono border-r border-slate-200 dark:border-[#202752] text-center">
+                    <td className="py-3.5 px-3 font-mono border-r border-slate-200 dark:border-[#202752] text-center truncate" title={totalOvertime > 0 ? `+${totalOvertime}h` : '0h'}>
                       {totalOvertime > 0 ? (
                         <span className="text-amber-600 dark:text-amber-400 font-semibold font-mono">
                           +{totalOvertime}h
@@ -181,7 +182,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                     </td>
 
                     {/* 5. Số giờ đi trễ/về sớm */}
-                    <td className="py-3.5 px-3 font-mono border-r border-slate-200 dark:border-[#202752] text-center">
+                    <td className="py-3.5 px-3 font-mono border-r border-slate-200 dark:border-[#202752] text-center truncate" title={totalLateEarly > 0 ? `-${totalLateEarly}h` : '0h'}>
                       {totalLateEarly > 0 ? (
                         <span className="text-rose-600 dark:text-rose-400 font-semibold font-mono">
                           -{totalLateEarly}h
@@ -192,12 +193,12 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                     </td>
 
                     {/* 6. Phụ cấp */}
-                    <td className="py-3.5 px-3 font-mono text-emerald-600 dark:text-emerald-400 font-medium border-r border-slate-200 dark:border-[#202752] text-center">
+                    <td className="py-3.5 px-3 font-mono text-emerald-600 dark:text-emerald-400 font-medium border-r border-slate-200 dark:border-[#202752] text-center truncate" title={allowance > 0 ? `+${allowance.toLocaleString('vi-VN')} ₫` : '0 ₫'}>
                       {allowance > 0 ? `+${allowance.toLocaleString('vi-VN')} ₫` : '0 ₫'}
                     </td>
 
                     {/* 7. Thực lĩnh */}
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white text-sm border-r border-slate-200 dark:border-[#202752] text-center">
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white text-sm border-r border-slate-200 dark:border-[#202752] text-center truncate" title={`${netSalary.toLocaleString('vi-VN')} ₫`}>
                       {netSalary.toLocaleString('vi-VN')} ₫
                     </td>
 

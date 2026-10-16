@@ -179,13 +179,13 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
       {/* Schedule Table */}
       <div className="bg-white dark:bg-[#13162b] border border-slate-300 dark:border-[#28305c] rounded-xl overflow-hidden shadow-xs transition-colors">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs border-collapse table-fixed min-w-[700px]">
             <thead>
               <tr className="border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-mono">
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Thứ</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Ngày làm việc</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Ca làm việc</th>
-                <th className="py-3.5 px-4 text-center">Ghi chú</th>
+                <th className="py-3.5 px-4 w-[140px] border-r border-slate-300 dark:border-[#222956] text-center">Thứ</th>
+                <th className="py-3.5 px-4 w-[150px] border-r border-slate-300 dark:border-[#222956] text-center">Ngày làm việc</th>
+                <th className="py-3.5 px-4 w-[210px] border-r border-slate-300 dark:border-[#222956] text-center">Ca làm việc</th>
+                <th className="py-3.5 px-4 w-[200px] text-center">Ghi chú</th>
               </tr>
             </thead>
             <tbody className="text-slate-700 dark:text-slate-300">
@@ -198,37 +198,47 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredShifts.map((shift, idx) => (
-                  <tr key={shift.shift_id || idx} className="hover:bg-slate-50/90 dark:hover:bg-[#1a1e3a]/50 transition-colors border-b border-slate-200 dark:border-[#202752]">
-                    <td className="py-3.5 px-4 font-medium text-slate-800 dark:text-slate-200 border-r border-slate-200 dark:border-[#202752]">
-                      {shift.work_day || getDayOfWeekVN(shift.date)}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white border-r border-slate-200 dark:border-[#202752]">
-                      {formatVNDate(shift.date)}
-                    </td>
-                    <td className="py-3.5 px-4 border-r border-slate-200 dark:border-[#202752]">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-slate-800 dark:text-slate-200">
-                          {shift.shift_type === 'MORNING'
-                            ? 'Ca sáng'
-                            : shift.shift_type === 'AFTERNOON'
-                              ? 'Ca chiều'
-                              : shift.shift_type === 'OFF'
-                                ? 'Nghỉ phép'
-                                : 'Ca hành chính'}
-                        </span>
-                        {shift.shift_type !== 'OFF' && shift.start_time && shift.end_time && (
-                          <span className="font-mono text-[11px] text-purple-600 dark:text-purple-400 font-semibold">
-                            ({shift.start_time} – {shift.end_time})
+                filteredShifts.map((shift, idx) => {
+                  const dayStr = shift.work_day || getDayOfWeekVN(shift.date);
+                  const dateStr = formatVNDate(shift.date);
+                  const typeLabel = shift.shift_type === 'MORNING'
+                    ? 'Ca sáng'
+                    : shift.shift_type === 'AFTERNOON'
+                      ? 'Ca chiều'
+                      : shift.shift_type === 'OFF'
+                        ? 'Nghỉ phép'
+                        : 'Ca hành chính';
+                  const shiftTime = shift.shift_type !== 'OFF' && shift.start_time && shift.end_time
+                    ? ` (${shift.start_time} – ${shift.end_time})`
+                    : '';
+                  const fullShiftInfo = `${typeLabel}${shiftTime}`;
+
+                  return (
+                    <tr key={shift.shift_id || idx} className="hover:bg-slate-50/90 dark:hover:bg-[#1a1e3a]/50 transition-colors border-b border-slate-200 dark:border-[#202752]">
+                      <td className="py-3.5 px-4 font-medium text-slate-800 dark:text-slate-200 border-r border-slate-200 dark:border-[#202752] truncate" title={dayStr}>
+                        {dayStr}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white border-r border-slate-200 dark:border-[#202752] truncate" title={dateStr}>
+                        {dateStr}
+                      </td>
+                      <td className="py-3.5 px-4 border-r border-slate-200 dark:border-[#202752] truncate max-w-[210px]" title={fullShiftInfo}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium text-slate-800 dark:text-slate-200 shrink-0">
+                            {typeLabel}
                           </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400">
-                      {shift.note || '-'}
-                    </td>
-                  </tr>
-                ))
+                          {shiftTime && (
+                            <span className="font-mono text-[11px] text-purple-600 dark:text-purple-400 font-semibold truncate">
+                              {shiftTime}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400 truncate max-w-[200px]" title={shift.note || '-'}>
+                        {shift.note || '-'}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

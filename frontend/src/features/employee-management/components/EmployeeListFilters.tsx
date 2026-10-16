@@ -5,8 +5,8 @@ interface EmployeeListFiltersProps {
   searchTerm: string;
   onSearchChange: (val: string) => void;
   onClearSearch: () => void;
-  filteredCount: number;
-  totalCount: number;
+  filteredCount?: number;
+  totalCount?: number;
   departmentFilter: string;
   onDepartmentFilterChange: (val: string) => void;
   positionOptions: string[];
@@ -18,8 +18,6 @@ export const EmployeeListFilters: React.FC<EmployeeListFiltersProps> = ({
   searchTerm,
   onSearchChange,
   onClearSearch,
-  filteredCount,
-  totalCount,
   departmentFilter,
   onDepartmentFilterChange,
   positionOptions,
@@ -28,29 +26,24 @@ export const EmployeeListFilters: React.FC<EmployeeListFiltersProps> = ({
 }) => {
   return (
     <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 flex flex-col lg:flex-row items-center justify-between gap-4 shadow-xs transition-colors">
-      <div className="relative w-full lg:w-96 flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Tìm theo tên, mã NV, email, vị trí, SĐT..."
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={onClearSearch}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white p-0.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-        <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 shrink-0 bg-slate-100 dark:bg-[#0f1224] px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-[#21264b]">
-          {filteredCount} / {totalCount}
-        </span>
+      <div className="relative w-full lg:w-96">
+        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          type="text"
+          placeholder="Tìm theo tên, mã NV, email, vị trí, SĐT..."
+          value={searchTerm}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
+        />
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={onClearSearch}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white p-0.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">

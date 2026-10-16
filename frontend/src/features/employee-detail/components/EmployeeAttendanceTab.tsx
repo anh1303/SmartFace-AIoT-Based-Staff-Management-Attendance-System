@@ -213,16 +213,16 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs border-collapse table-fixed min-w-[900px]">
             <thead>
               <tr className="border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-mono">
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Thời gian</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Sự kiện</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Phương thức</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Thiết bị AIoT</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Điểm AI</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Tuân thủ giờ</th>
-                <th className="py-3.5 px-4 text-center">Trạng thái</th>
+                <th className="py-3.5 px-4 w-[160px] border-r border-slate-300 dark:border-[#222956] text-center">Thời gian</th>
+                <th className="py-3.5 px-4 w-[130px] border-r border-slate-300 dark:border-[#222956] text-center">Sự kiện</th>
+                <th className="py-3.5 px-4 w-[150px] border-r border-slate-300 dark:border-[#222956] text-center">Phương thức</th>
+                <th className="py-3.5 px-4 w-[170px] border-r border-slate-300 dark:border-[#222956] text-center">Thiết bị AIoT</th>
+                <th className="py-3.5 px-4 w-[100px] border-r border-slate-300 dark:border-[#222956] text-center">Điểm AI</th>
+                <th className="py-3.5 px-4 w-[120px] border-r border-slate-300 dark:border-[#222956] text-center">Tuân thủ giờ</th>
+                <th className="py-3.5 px-4 w-[100px] text-center">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="text-slate-700 dark:text-slate-300">
@@ -237,50 +237,51 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
                   const isCheckIn = log.type === 'CHECK_IN';
                   const score = Number(log.verification_score || 0.98);
                   const isFace = log.method === 'FACE' || !log.method;
+                  const methodName = isFace ? 'Face ID' : log.method === 'FINGERPRINT' ? 'Vân tay FAP30' : log.method || 'Thủ công';
 
                   return (
                     <tr key={log.attendance_id || log.id || index} className="hover:bg-slate-50/90 dark:hover:bg-[#1a1e3a]/50 transition-colors border-b border-slate-200 dark:border-[#202752]">
                       {/* Timestamp */}
                       <td className="py-3.5 px-4 font-mono border-r border-slate-200 dark:border-[#202752]">
-                        <p className="font-bold text-slate-900 dark:text-white">
+                        <p className="font-bold text-slate-900 dark:text-white truncate" title={formatVNTime(log.timestamp, true)}>
                           {formatVNTime(log.timestamp, true)}
                         </p>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate" title={formatVNDate(log.timestamp)}>
                           {formatVNDate(log.timestamp)}
                         </p>
                       </td>
 
                       {/* Event Type */}
-                      <td className="py-3.5 px-4 border-r border-slate-200 dark:border-[#202752]">
+                      <td className="py-3.5 px-4 border-r border-slate-200 dark:border-[#202752] text-center">
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono ${isCheckIn
                             ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
                             : 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700/50'
                             }`}
                         >
-                          <Clock className="w-3 h-3" />
-                          {isCheckIn ? 'VÀO CA (IN)' : 'TAN CA (OUT)'}
+                          <Clock className="w-3 h-3 shrink-0" />
+                          <span>{isCheckIn ? 'VÀO CA (IN)' : 'TAN CA (OUT)'}</span>
                         </span>
                       </td>
 
                       {/* Method */}
                       <td className="py-3.5 px-4 border-r border-slate-200 dark:border-[#202752]">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0" title={methodName}>
                           {isFace ? (
-                            <ScanFace className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                            <ScanFace className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
                           ) : log.method === 'FINGERPRINT' ? (
-                            <Fingerprint className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            <Fingerprint className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                           ) : (
-                            <Clock className="w-4 h-4 text-slate-400" />
+                            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
                           )}
-                          <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300">
-                            {isFace ? 'Face ID' : log.method === 'FINGERPRINT' ? 'Vân tay FAP30' : log.method || 'Thủ công'}
+                          <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300 truncate">
+                            {methodName}
                           </span>
                         </div>
                       </td>
 
                       {/* Device */}
-                      <td className="py-3.5 px-4 font-mono text-[11px] text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-[#202752]">
+                      <td className="py-3.5 px-4 font-mono text-[11px] text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-[#202752] truncate max-w-[170px]" title={log.device_id || 'FaceCam-01 (Cổng)'}>
                         {log.device_id || 'FaceCam-01 (Cổng)'}
                       </td>
 

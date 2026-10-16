@@ -161,7 +161,7 @@ attendanceRouter.post(
 
 attendanceRouter.post(
   '/locks/unlock',
-  authorize('ADMIN'),
+  authorize('ADMIN', 'MANAGER'),
   asyncHandler(async (req, res) => {
     const { date } = req.body;
     if (!date) throw AppError.badRequest('Date is required');

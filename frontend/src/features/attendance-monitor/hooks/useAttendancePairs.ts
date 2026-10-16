@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Employee, WorkShift, AttendanceRecord } from '../../../types';
-import { formatVNDate, formatVNTime } from '../../../utils/dateUtils';
+import { formatVNDateISO, formatVNTime } from '../../../utils/dateUtils';
 import {
   calculateRawLateEarlySec,
   calculateRawInitialOTSec,
@@ -85,9 +85,9 @@ export function useAttendancePairs(
       const shiftTimeRange = `${empShift.start_time} – ${empShift.end_time}`;
 
       const empLogs = attendance.filter(log => {
-        if (log.employee_id !== emp.employee_id) return false;
-        const vnDateParts = formatVNDate(log.timestamp).split('/');
-        const logDateStr = vnDateParts.length === 3 ? `${vnDateParts[2]}-${vnDateParts[1]}-${vnDateParts[0]}` : '';
+        const isEmpMatch = log.employee_id === emp.employee_id || (emp.id && log.employee_id === emp.id);
+        if (!isEmpMatch) return false;
+        const logDateStr = formatVNDateISO(log.timestamp);
         return logDateStr === shiftDate;
       });
 

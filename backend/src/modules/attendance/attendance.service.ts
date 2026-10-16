@@ -149,10 +149,33 @@ export async function list(query: Record<string, unknown>) {
     where.employee_id = emp ? emp.id : empIdFilter
   }
 
-  if (typeof query.date === 'string') {
+  const startDate = (typeof query.startDate === 'string' && query.startDate)
+    ? query.startDate
+    : (typeof query.from === 'string' && query.from ? query.from : undefined)
+
+  const endDate = (typeof query.endDate === 'string' && query.endDate)
+    ? query.endDate
+    : (typeof query.to === 'string' && query.to ? query.to : undefined)
+
+  const singleDate = typeof query.date === 'string' && query.date ? query.date : undefined
+
+  if (startDate && endDate) {
     where.event_time = {
-      gte: new Date(`${query.date}T00:00:00+07:00`),
-      lt: new Date(`${query.date}T23:59:59.999+07:00`),
+      gte: new Date(`${startDate}T00:00:00+07:00`),
+      lt: new Date(`${endDate}T23:59:59.999+07:00`),
+    }
+  } else if (startDate) {
+    where.event_time = {
+      gte: new Date(`${startDate}T00:00:00+07:00`),
+    }
+  } else if (endDate) {
+    where.event_time = {
+      lt: new Date(`${endDate}T23:59:59.999+07:00`),
+    }
+  } else if (singleDate) {
+    where.event_time = {
+      gte: new Date(`${singleDate}T00:00:00+07:00`),
+      lt: new Date(`${singleDate}T23:59:59.999+07:00`),
     }
   }
 
@@ -160,16 +183,20 @@ export async function list(query: Record<string, unknown>) {
     where.type = query.type
   }
 
-  // 19. Phân trang mặc định tối đa 1000 records/page để chống tràn bộ nhớ (OOM) khi có hàng triệu log
+  // Phân trang & giới hạn số lượng bản ghi:
+  // - Nếu client truyền limit='all' hoặc query.all='true', lấy tối đa 50,000 bản ghi
+  // - Nếu không truyền limit, mặc định lấy 5,000 bản ghi để đảm bảo không bị cắt cụt dữ liệu
+  const isGetAll = query.limit === 'all' || query.all === 'true' || query.all === true
   const page = Math.max(1, Number(query.page) || 1)
-  const limit = Math.min(1000, Math.max(1, Number(query.limit) || 100))
-  const skip = (page - 1) * limit
+  const defaultLimit = 5000
+  const limit = isGetAll ? 50000 : Math.min(50000, Math.max(1, Number(query.limit) || defaultLimit))
+  const skip = isGetAll ? 0 : (page - 1) * limit
 
   const logs = await prisma.attendance_logs.findMany({
     where,
     include: attendanceInclude,
     orderBy: { event_time: 'desc' },
-    skip,
+    skip: skip > 0 ? skip : undefined,
     take: limit,
   })
 
@@ -202,8 +229,31 @@ export async function getDailySummaries(query: Record<string, unknown>) {
     where.employee_id = emp ? emp.id : empIdFilter
   }
 
-  if (typeof query.date === 'string') {
-    where.work_date = new Date(`${query.date}T00:00:00.000Z`)
+  const startDate = (typeof query.startDate === 'string' && query.startDate)
+    ? query.startDate
+    : (typeof query.from === 'string' && query.from ? query.from : undefined)
+
+  const endDate = (typeof query.endDate === 'string' && query.endDate)
+    ? query.endDate
+    : (typeof query.to === 'string' && query.to ? query.to : undefined)
+
+  const singleDate = typeof query.date === 'string' && query.date ? query.date : undefined
+
+  if (startDate && endDate) {
+    where.work_date = {
+      gte: new Date(`${startDate}T00:00:00.000Z`),
+      lte: new Date(`${endDate}T00:00:00.000Z`),
+    }
+  } else if (startDate) {
+    where.work_date = {
+      gte: new Date(`${startDate}T00:00:00.000Z`),
+    }
+  } else if (endDate) {
+    where.work_date = {
+      lte: new Date(`${endDate}T00:00:00.000Z`),
+    }
+  } else if (singleDate) {
+    where.work_date = new Date(`${singleDate}T00:00:00.000Z`)
   }
 
   const summaries = await prisma.daily_attendance_summary.findMany({
@@ -245,6 +295,7 @@ export async function adjustAttendance(
     include: {
       users: { select: { id: true, roles: { select: { role_name: true } } } },
       department: true,
+      position: true,
     },
   })
   if (!emp) throw new AppError(404, 'Employee not found')
@@ -270,11 +321,14 @@ export async function adjustAttendance(
 
   // 3. Manager không được chỉnh sửa dữ liệu công của Manager khác
   if (actorRole?.toUpperCase() === 'MANAGER') {
-    const targetRole = emp.users?.roles?.role_name?.toUpperCase()
+    const targetRole = emp.users?.roles?.role_name?.toUpperCase() || ''
+    const posName = typeof (emp as any).position === 'string' ? (emp as any).position : (emp as any).position?.name || ''
+    const posLevel = typeof (emp as any).position === 'object' ? (emp as any).position?.level : undefined
     const isTargetManager = Boolean(
       targetRole === 'MANAGER' ||
       targetRole === 'ADMIN' ||
-      (emp.position && /quản lý|manager|trưởng phòng|giám đốc/i.test(emp.position)) ||
+      posLevel === 'MANAGER' ||
+      (posName && /quản lý|manager|trưởng phòng|giám đốc/i.test(posName)) ||
       (emp.department?.name && /quản lý/i.test(emp.department.name))
     )
     if (isTargetManager && emp.user_id !== actorUserId) {

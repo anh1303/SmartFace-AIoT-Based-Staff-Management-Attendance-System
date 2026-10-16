@@ -6,16 +6,21 @@ import { buildIdOrCodeWhere } from './utils.js';
  * Kiểm tra xem một nhân viên có vai trò hoặc chức vụ là Quản lý/Admin không
  */
 export function isEmployeeManager(target: {
-  position?: string | null;
+  position?: { name?: string | null; level?: string | null } | string | null;
+  positionId?: number | null;
   department?: { name?: string | null } | null;
   users?: { roles?: { role_name?: string | null } | null } | null;
 } | null | undefined): boolean {
   if (!target) return false;
   const targetRole = target.users?.roles?.role_name?.toUpperCase();
+  const posName = typeof target.position === 'string' ? target.position : target.position?.name;
+  const posLevel = typeof target.position === 'object' ? target.position?.level : undefined;
+
   return Boolean(
     targetRole === 'MANAGER' ||
     targetRole === 'ADMIN' ||
-    (target.position && /quản lý|manager|trưởng phòng|giám đốc/i.test(target.position)) ||
+    posLevel === 'MANAGER' ||
+    (posName && /quản lý|manager|trưởng phòng|giám đốc/i.test(posName)) ||
     (target.department?.name && /quản lý/i.test(target.department.name))
   );
 }

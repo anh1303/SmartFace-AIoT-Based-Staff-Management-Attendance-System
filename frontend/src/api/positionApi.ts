@@ -9,11 +9,14 @@ export interface PositionItem {
   name: string;
   employee_count: number;
   created_at?: string;
+  level?: 'MANAGER' | 'EMPLOYEE';
+  department_id?: number;
+  department_name?: string;
 }
 
 export async function fetchPositionsApi(): Promise<PositionItem[]> {
   try {
-    const data = await apiFetch('/api/departments');
+    const data = await apiFetch('/api/positions');
     if (data.success && Array.isArray(data.data)) {
       return data.data;
     }
@@ -25,7 +28,7 @@ export async function fetchPositionsApi(): Promise<PositionItem[]> {
 }
 
 export async function createPositionApi(name: string): Promise<PositionItem> {
-  const res = await apiFetch('/api/departments', {
+  const res = await apiFetch('/api/positions', {
     method: 'POST',
     body: JSON.stringify({ name: name.trim() }),
   });
@@ -33,7 +36,7 @@ export async function createPositionApi(name: string): Promise<PositionItem> {
 }
 
 export async function updatePositionApi(id: number, name: string): Promise<PositionItem> {
-  const res = await apiFetch(`/api/departments/${id}`, {
+  const res = await apiFetch(`/api/positions/${id}`, {
     method: 'PUT',
     body: JSON.stringify({ name: name.trim() }),
   });
@@ -41,7 +44,8 @@ export async function updatePositionApi(id: number, name: string): Promise<Posit
 }
 
 export async function deletePositionApi(id: number): Promise<void> {
-  await apiFetch(`/api/departments/${id}`, {
+  await apiFetch(`/api/positions/${id}`, {
     method: 'DELETE',
   });
 }
+

@@ -18,7 +18,8 @@ function safeUser(user: {
     employee_code: string
     full_name: string
     email: string | null
-    position: string | null
+    position?: { name?: string | null; id?: number } | string | null
+    positionId?: number | null
     avatar_url: string | null
     department: { name: string } | null
   } | null
@@ -26,6 +27,7 @@ function safeUser(user: {
   const roleName = user.roles.role_name.toUpperCase()
   const isManager = roleName === 'ADMIN' || roleName === 'MANAGER'
   const emp = user.employees
+  const posName = typeof emp?.position === 'string' ? emp.position : emp?.position?.name || ''
 
   return {
     id: user.id,
@@ -37,7 +39,8 @@ function safeUser(user: {
     employeeId: emp?.employee_code || user.id,
     full_name: emp?.full_name || user.username,
     email: emp?.email || '',
-    position: emp?.position || '',
+    position: posName,
+    positionId: emp?.positionId ?? (typeof emp?.position === 'object' ? emp.position?.id : null),
     department: emp?.department?.name || '',
     avatar: emp?.avatar_url || '',
   }
@@ -73,6 +76,7 @@ export async function login(input: z.infer<typeof loginSchema>) {
       employees: {
         include: {
           department: true,
+          position: true,
         },
       },
     },
@@ -145,7 +149,19 @@ export async function register(input: z.infer<typeof registerSchema>) {
     deptId = dept.id
   }
 
-  // 3. Generate collision-free unique employee_code
+  // 3. Resolve positionId if input.position provided
+  let posId: number | null = null
+  if (input.position) {
+    const foundPos = await prisma.position.findFirst({
+      where: { name: { equals: input.position.trim(), mode: 'insensitive' } },
+    })
+    if (foundPos) {
+      posId = foundPos.id
+      if (!deptId) deptId = foundPos.departmentId
+    }
+  }
+
+  // 4. Generate collision-free unique employee_code
   const finalCode = await generateUniqueEmployeeCode()
 
   return prisma.$transaction(async (tx) => {
@@ -154,7 +170,7 @@ export async function register(input: z.infer<typeof registerSchema>) {
         employee_code: finalCode,
         full_name: input.name,
         email: input.email,
-        position: input.position ?? 'Employee',
+        positionId: posId,
         departmentId: deptId,
       },
     })
@@ -171,6 +187,7 @@ export async function register(input: z.infer<typeof registerSchema>) {
         employees: {
           include: {
             department: true,
+            position: true,
           },
         },
       },

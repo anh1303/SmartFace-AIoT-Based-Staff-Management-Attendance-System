@@ -1,6 +1,6 @@
 # 🛡️ SmartFace: AIoT-Based Staff Management & Attendance System
 
-> **SmartFace** là Hệ thống Quản lý Nhân sự & Giám sát Chấm công Thông minh ứng dụng công nghệ **AIoT (Artificial Intelligence of Things)**. Nền tảng kết hợp xác thực sinh trắc học gương mặt qua Edge AI Camera, cơ chế chống giả mạo khuôn mặt **PAD (Presentation Attack Detection)**, điểm danh vân tay dự phòng (**Fingerprint Fallback**), cùng hệ thống tự động tính lương (**Payroll Engine**) theo giờ công thực tế và giám sát thời gian thực qua **WebSockets (Socket.IO)** & **MQTT**.
+> **SmartFace** là Hệ thống Quản lý Nhân sự & Giám sát Chấm công Toàn diện ứng dụng công nghệ **AIoT (Artificial Intelligence of Things)**. Nền tảng kết hợp nhận diện khuôn mặt thời gian thực qua Edge AI Camera, cơ chế chống giả mạo sinh trắc học **PAD (Presentation Attack Detection)**, điểm danh vân tay dự phòng (**Fingerprint Fallback**), động cơ tính lương tự động (**Payroll Engine**) theo giờ công thực tế, và giám sát vận hành tức thời qua **WebSockets (Socket.IO)** & **MQTT**.
 
 ---
 
@@ -10,407 +10,349 @@
 ![React](https://img.shields.io/badge/React-v19.0-61DAFB.svg?style=flat-square&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-v5.8-3178C6.svg?style=flat-square&logo=typescript)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-v16-4169E1.svg?style=flat-square&logo=postgresql)
+![pgvector](https://img.shields.io/badge/pgvector-v0.8.6-0064a5.svg?style=flat-square)
 ![Prisma](https://img.shields.io/badge/Prisma-v5.20-2D3748.svg?style=flat-square&logo=prisma)
+![Python](https://img.shields.io/badge/Python-v3.10+-3776AB.svg?style=flat-square&logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-v0.110+-009688.svg?style=flat-square&logo=fastapi)
 ![TanStack Query](https://img.shields.io/badge/TanStack_Query-v5-FF4154.svg?style=flat-square&logo=reactquery)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.1-06B6D4.svg?style=flat-square&logo=tailwindcss)
 ![Vite](https://img.shields.io/badge/Vite-v6.2-646CFF.svg?style=flat-square&logo=vite)
-![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-v4.1-06B6D4.svg?style=flat-square&logo=tailwindcss)
 ![Docker](https://img.shields.io/badge/Docker-Supported-2496ED.svg?style=flat-square&logo=docker)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)
 
 ---
 
-> 🚀 **BẮT ĐẦU NHANH CHO THÀNH VIÊN MỚI / NGƯỜI BẠN CLONE REPO:**  
-> Xem ngay tài liệu hướng dẫn cài đặt từng bước chi tiết từ A-Z tại: **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)**  
-> *(Hỗ trợ chạy test 100% bằng Webcam trên máy tính hoặc triển khai thực tế trên Raspberry Pi 4)*  
-> Xem sơ đồ luồng dữ liệu chi tiết tại: **[DATA_FLOWS.md](./DATA_FLOWS.md)**
+## 🗺️ Bản Đồ Tài Liệu Chi Tiết (Documentation Map)
+
+Dự án được tài liệu hóa chuyên sâu cho từng phân hệ độc lập:
+
+| Tài liệu phân hệ | Đường dẫn | Nội dung bao phủ chính |
+| :--- | :--- | :--- |
+| ⚡ **Backend Service (BE)** | [backend/README.md](backend/README.md) | Kiến trúc Modular Monolith, Luồng xử lý Request Lifecycle, Quy chuẩn REST API, Biến môi trường, Xử lý lỗi toàn cục |
+| 🗄️ **Database & Prisma (DB)** | [backend/prisma/README.md](backend/prisma/README.md) | Sơ đồ ERD 15 bảng, Vector 512-D `pgvector` HNSW, Quy trình Migration, Quy trình Seed Data 3 bước, Quy ước đặt tên |
+| 🎨 **Frontend Web App (FE)** | [frontend/README.md](frontend/README.md) | Kiến trúc Pragmatic Feature-Based, Quy tắc đặt file, Quản lý State TanStack Query v5 & Context, UI Kit Glassmorphism & Dark Mode |
+| 👁️ **Face Auth & AI Engine** | [face_auth/README.md](face_auth/README.md) | Thuật toán ArcFace 512-D, PAD MobileNetV3-Small, Centroid Enrollment, SCRFD / YunNet face detection |
+| 🚀 **Hướng Dẫn Triển Khai (A-Z)** | [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) | Cài đặt môi trường từ A-Z, chạy webcam test local hoặc triển khai thực tế trên Raspberry Pi 4 |
+| 🔄 **Sơ Đồ Luồng Dữ Liệu** | [DATA_FLOWS.md](DATA_FLOWS.md) | Luồng Check-in/Check-out, Luồng Đăng ký khuôn mặt, Luồng Tính lương và Đồng bộ Socket.IO |
 
 ---
 
-## 🏗️ Kiến Trúc Hệ Thống (System Architecture)
+## 🏗️ Kiến Trúc Hệ Thống (System Design)
 
-```text
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                          AIoT EDGE DEVICES / SENSORS                          │
-│  - FaceCam-01: Edge AI Camera Vào ca (YOLO Detection + MobileNetV3 PAD + ArcFace)│
-│  - FaceCam-02: Edge AI Camera Tan ca (YOLO Detection + MobileNetV3 PAD + ArcFace)│
-│  - Fingerprint-01: Máy chấm công vân tay Vào ca (Optical Sensor / ESP32 Node)  │
-│  - Fingerprint-02: Máy chấm công vân tay Tan ca (Optical Sensor / ESP32 Node)  │
-└───────────────────────────────────────┬───────────────────────────────────────┘
-                                        │ MQTT Protocols / REST API
-                                        ▼
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                           BACKEND SERVICE (Node.js)                           │
-│  - RESTful API Gateway (Express.js + Zod DTO Validation)                      │
-│  - Real-time Gateway (Socket.IO với JWT Cookie Handshake Auth & MQTT Client)   │
-│  - Security Layer (HttpOnly JWT Cookie Auth, RBAC: ADMIN/MANAGER/EMPLOYEE)    │
-│  - Biometric Engine (pgvector 512-D ArcFace Cosine Index)                     │
-│  - Business Services (Attendance, Employee, Shift Scheduling, Payroll, Audit) │
-└───────────────────────┬─────────────────────────────────┬─────────────────────┘
-                        │                                 │
-                        ▼ Prisma ORM (5.20)               ▼ WebSocket Stream
-┌──────────────────────────────────────┐        ┌──────────────────────────────┐
-│           DATABASE LAYER             │        │      FRONTEND APPLICATION    │
-│  - PostgreSQL 16 (Quan hệ & ACID)    │        │  - React 19 + TypeScript     │
-│  - pgvector (Vector Embeddings 512D) │        │  - Vite + Tailwind CSS v4    │
-│  - HNSW Index Cosine Similarity      │        │  - TanStack Query v5 Cache   │
-│  - 14 Bảng dữ liệu chuẩn hóa         │        │  - Recharts & Lucide Icons   │
-│  - Múi giờ Việt Nam (Asia/Ho_Chi_Minh│        │  - Dark Theme & Responsive   │
-└──────────────────────────────────────┘        └──────────────────────────────┘
+### 1. Sơ Đồ Kiến Trúc Tổng Thể
+
+```mermaid
+flowchart TB
+    subgraph EDGE["📡 AIoT Edge Layer (Thiết bị đầu cuối)"]
+        direction LR
+        CamIn["FaceCam-01 (Vào ca)<br/>YOLO / SCRFD + PAD + ArcFace"]
+        CamOut["FaceCam-02 (Tan ca)<br/>YOLO / SCRFD + PAD + ArcFace"]
+        FPIn["Fingerprint-01 (Vào ca)<br/>Optical Sensor / ESP32"]
+        FPOut["Fingerprint-02 (Tan ca)<br/>Optical Sensor / ESP32"]
+    end
+
+    subgraph TRANSPORT["🔄 Transport Layer"]
+        direction LR
+        MQTT["MQTT Broker (Mosquitto/EMQX)<br/>Topics: attendance/devices/+/..."]
+        WS["WebSocket (Socket.IO v4.8)<br/>JWT Handshake Auth"]
+    end
+
+    subgraph BACKEND["⚡ Backend Core Service (Node.js 20 + Express)"]
+        direction TB
+        Security["Security Layer: Helmet, CORS, Cookie-Parser, Rate-Limit"]
+        AuthMiddleware["Auth & RBAC: HttpOnly JWT Cookie, ADMIN / MANAGER / EMPLOYEE"]
+        ZodLayer["Validation Layer: Zod DTO Schemas"]
+        ModularMonolith["Modular Feature Services:<br/>• Auth & Profile • Employee & Org • Attendance & Locks<br/>• Shifts & Schedules • Payroll Engine • AI Biometrics • Audit Trail"]
+        ErrorHandler["Global Error Pipeline: AppError + Prisma Error Codes + Zod Flatten"]
+    end
+
+    subgraph AI_SERVICE["🧠 AI Biometrics Internal Service (Python 3.10 + FastAPI)"]
+        direction TB
+        FastAPIService["FastAPI Service (:5000)<br/>ArcFace 512-D Extraction"]
+        CentroidEngine["Centroid Enrollment & Outlier Filter"]
+        PADEngine["MobileNetV3-Small Liveness Detection"]
+    end
+
+    subgraph DATABASE["🗄️ Database Layer (Neon Serverless PostgreSQL 16)"]
+        direction TB
+        PGVector["Extension pgvector v0.8.6<br/>HNSW Index Cosine ops"]
+        RelationalTables["15 Bảng Dữ Liệu Chuẩn Hóa (ACID Compliant)"]
+        Locks["Khóa Chốt Ca (attendance_locks)"]
+    end
+
+    subgraph FRONTEND["🎨 Frontend Client Application (React 19 SPA)"]
+        direction TB
+        ViteApp["Vite + React 19 + TypeScript 5.8"]
+        FeatureModules["Pragmatic Features: Attendance, Employees, Payroll, Schedules, Biometrics, Reports"]
+        StateAndUI["TanStack Query v5 Cache + Tailwind CSS v4 Glassmorphism"]
+    end
+
+    EDGE -- "MQTT Telemetry & Events" --> MQTT
+    MQTT --> BACKEND
+    EDGE -. "REST API Check-in (Webcam Mode)" .-> BACKEND
+
+    BACKEND <--> "FastAPI Internal Calls (:5000)" <--> AI_SERVICE
+    BACKEND -- "Prisma ORM 5.20 (Pooled / Direct)" --> DATABASE
+    AI_SERVICE -- "Direct pgvector Cosine Query" --> DATABASE
+
+    BACKEND -- "Real-time Event Broadcast" --> WS
+    WS --> FRONTEND
+    FRONTEND -- "REST API (Credentials: include)" --> BACKEND
 ```
 
 ---
 
-## 📁 Cấu Trúc Thư Mục Dự Án (Project Layout)
+### 2. Các Phân Hệ Cốt Lõi
+
+1. **Phân hệ AIoT Edge Devices / Sensors**:
+   - **Camera AI Thông Minh (`FaceCam-01`, `FaceCam-02`)**: Sử dụng camera góc rộng tích hợp mô hình phát hiện khuôn mặt SCRFD/YunNet, phân loại độ sống động chống giả mạo **MobileNetV3-Small PAD** và trích xuất đặc trưng **ArcFace 512 chiều**.
+   - **Máy Chấm Công Vân Tay Dự Phòng (`Fingerprint-01`, `Fingerprint-02`)**: Tích hợp cảm biến quang học qua vi điều khiển ESP32, tự động fallback khi nhân viên đeo khẩu trang hoặc môi trường thiếu sáng.
+2. **Phân hệ Backend REST API & Real-time Gateway (Node.js)**:
+   - Kiến trúc **Modular Monolith (Vertical Slice)** tách biệt từng domain nghiệp vụ.
+   - Tích hợp Gateway hai chiều: **MQTT Client** nhận dữ liệu từ cảm biến và **Socket.IO Server** broadcast sự kiện tức thời về Web Client.
+   - Xác thực an toàn tuyệt đối với **HttpOnly, Secure, SameSite=Strict JWT Cookie**, phân quyền 3 cấp **RBAC (`ADMIN`, `MANAGER`, `EMPLOYEE`)**.
+3. **Phân hệ AI Biometrics Internal Service (Python)**:
+   - Dịch vụ FastAPI nội bộ (:5000) phục vụ đăng ký danh tính (**Enrollment**), tính toán vector đại diện (**Centroid Vector**) và lọc ảnh ngoại lai (**Outlier Filtering**).
+4. **Phân hệ Cơ sở Dữ liệu (PostgreSQL 16 + pgvector)**:
+   - Lưu trữ quan hệ ACID chuẩn hóa 15 bảng; quản lý vector 512 chiều bằng **`pgvector`** kết hợp chỉ mục xấp xỉ siêu tốc **HNSW Index** theo khoảng cách Cosine (`vector_cosine_ops`).
+   - Hỗ trợ triển khai linh hoạt: **Neon Cloud Serverless PostgreSQL** (Khuyên dùng) hoặc **Docker Compose Cục bộ**.
+5. **Phân hệ Web Frontend (React 19 SPA)**:
+   - Xây dựng theo mô hình **Pragmatic Feature-Based**, tối ưu render mượt mà với **React 19**, định kiểu **Tailwind CSS v4** chuẩn giao diện **Glassmorphism & Dark Mode**, quản lý Server State qua **TanStack Query v5**.
+
+---
+
+## 📁 Cấu Trúc Thư Mục Monorepo
 
 ```text
 SmartFace-AIoT-Based-Staff-Management-Attendance-System/
-├── run.bat                   # ⚡ Script tự động khởi chạy 1-click cho Windows
-├── run.sh                    # ⚡ Script tự động khởi chạy 1-click cho macOS (và Linux)
-├── .gitignore                # Cấu hình GitIgnore (loại trừ node_modules, build, cache, dataset)
-├── backend/                  # Phân hệ Máy chủ REST API & CSDL (Node.js, Express, Prisma)
-│   ├── prisma/               # Quản lý Database Schema, Migrations & Dữ liệu Seed
-│   │   ├── schema.prisma     # 14 Models CSDL chuẩn hóa (kèm attendance_locks, pgvector)
-│   │   ├── seed.ts           # Dữ liệu mẫu ban đầu (nhân viên, chức vụ, ca làm, 4 thiết bị)
-│   │   └── README.md         # 📖 Tài liệu chuyên sâu Database & Prisma
-│   ├── src/                  # Mã nguồn Backend
-│   │   ├── common/           # Tiện ích dùng chung, AppError, Response DTO, Constants
-│   │   ├── config/           # Cấu hình Database (Prisma), Env (Zod), MQTT Broker
-│   │   ├── middlewares/      # Xác thực JWT Cookie, phân quyền RBAC, validate DTO
-│   │   ├── modules/          # Các module nghiệp vụ (attendance, auth, biometrics, 
-│   │   │                     # devices, employees, payroll, shifts, audit-logs)
-│   │   ├── sockets/          # Socket.IO Gateway (giám sát chấm công & thiết bị thời gian thực)
-│   │   └── server.ts         # Khởi tạo HTTP server, tích hợp Socket.IO & MQTT
-│   └── README.md             # 📖 Tài liệu chi tiết phân hệ Backend & REST API
-├── frontend/                 # Phân hệ Giao diện Người dùng (React 19, Vite, Tailwind CSS v4)
+├── run.bat                   # ⚡ Menu script 1-Click tự động cho Windows
+├── run.sh                    # ⚡ Script 1-Click tự động cho macOS và Linux
+├── docker-compose.yml        # Docker Compose (PostgreSQL 16 + pgvector, pgAdmin, Mosquitto)
+├── docker-compose.iot.yml    # Docker Compose bổ sung dịch vụ IoT Gateway
+├── .env.compose.example      # File biến môi trường mẫu cho Docker
+├── DEPLOYMENT_GUIDE.md       # 📖 Hướng dẫn chi tiết triển khai hệ thống từ A-Z
+├── DATA_FLOWS.md             # 📖 Sơ đồ chi tiết các luồng dữ liệu nghiệp vụ
+│
+├── backend/                  # ⚡ PHÂN HỆ BACKEND SERVER (Node.js + Express + Prisma)
+│   ├── prisma/               # Quản lý Database Schema, Migrations & 3 bộ Seed độc lập
+│   │   ├── schema.prisma     # 15 Models CSDL chuẩn hóa (kèm pgvector & attendance_locks)
+│   │   ├── seed.ts           # 🌱 Bước 1: Seed Master Data (Phòng ban, Chức vụ, Tài khoản, Ca, Thiết bị)
+│   │   ├── seed-shifts.ts    # 📅 Bước 2: Seed Lịch phân ca theo tháng (Schedules)
+│   │   ├── seed-attendance.ts# ⏱️ Bước 3: Seed Lượt chấm công mô phỏng & Summary
+│   │   └── README.md         # 📖 Tài liệu chuyên sâu Cơ sở Dữ liệu & Prisma
 │   ├── src/
-│   │   ├── api/              # HTTP Client (Axios/Fetch), Auth, Employee, Attendance, Payroll APIs
-│   │   ├── components/       # Components dùng chung (Modal, Toast, AppLayout, Sidebar, Topbar)
-│   │   ├── context/          # React Context (AuthContext với HttpOnly Cookie, ToastContext)
-│   │   ├── features/         # Features module (attendance-monitor: Table, Filters, CSV Export)
-│   │   ├── hooks/            # Custom hooks tích hợp TanStack React Query v5
-│   │   ├── pages/
-│   │   │   ├── manager/      # Dành cho Quản lý (Dashboard, Giám sát chấm công, Nhân viên,
-│   │   │   │                 # Lập lịch ca, Sinh trắc học, Bảng lương, Báo cáo thống kê)
-│   │   │   ├── employee/     # Cổng nhân viên (Dashboard cá nhân, Điểm danh, Lịch làm, Ước tính lương, Hồ sơ)
-│   │   │   └── public/       # Trang công khai (Landing Page, Trang đăng nhập)
+│   │   ├── common/           # AppError, Response Formatter, Permission Helpers, Logger, Mailer
+│   │   ├── config/           # Cấu hình Env (Zod), Database (Prisma), MQTT, CORS
+│   │   ├── middlewares/      # JWT Cookie Auth, RBAC Authorization, Zod DTO Validator, ErrorHandler
+│   │   ├── modules/          # 9 Modules nghiệp vụ (auth, employees, attendance, shifts, payroll...)
+│   │   ├── sockets/          # Socket.IO Gateway (/attendance & /devices namespaces)
+│   │   └── server.ts         # Khởi tạo HTTP Server, tích hợp Socket.IO & MQTT
+│   └── README.md             # 📖 Tài liệu chuyên sâu phân hệ Backend
+│
+├── frontend/                 # 🎨 PHÂN HỆ GIAO DIỆN NGƯỜI DÙNG (React 19 + Vite + Tailwind v4)
+│   ├── src/
+│   │   ├── api/              # Axios Client cấu hình credentials HttpOnly & API endpoints
+│   │   ├── components/       # UI Reusable Primitives (common) & Application Shell (layout)
+│   │   ├── context/          # React Context (AuthContext, ThemeContext, ToastContext)
+│   │   ├── features/         # Feature Modules (attendance, employees, biometrics, payroll, schedules, reports)
+│   │   ├── hooks/            # Shared custom hooks bọc TanStack React Query v5
+│   │   ├── pages/            # Thin Route Coordinators (public, manager, employee)
+│   │   ├── providers/        # AppProviders hợp nhất (ErrorBoundary, Theme, Query, Toast, Auth)
+│   │   ├── routes/           # Hệ thống định tuyến Router & Route Guards phân quyền
 │   │   ├── types/            # Khai báo kiểu TypeScript toàn dự án
 │   │   └── utils/            # Chuẩn hóa múi giờ Việt Nam (+07:00), định dạng tiền tệ VND
-│   └── README.md             # 📖 Tài liệu chi tiết phân hệ Frontend
-├── face_auth/                # Phân hệ AI Sinh trắc học & Edge Camera (Python, InsightFace, PAD)
-│   ├── api_service.py        # Dịch vụ FastAPI nội bộ (:5000) trích xuất 512-D Embeddings & DB sync
-│   ├── app.py                # Ứng dụng Camera Edge AIoT nhận diện & chống giả mạo thời gian thực
-│   ├── config.py             # Cấu hình ngưỡng nhận diện, ArcFace, SCRFD/YunNet, PAD models
-│   ├── alignment/            # Căn chỉnh khuôn mặt 5 điểm chuẩn (Similarity Transform)
-│   ├── antispoof/            # Mô hình PAD chống giả mạo (MobileNetV3-Small E1 v5.3, 2D-DCT, E3)
-│   ├── database/             # Kết nối PostgreSQL pgvector (Connection Pool, Cosine Distance)
-│   ├── detection/            # Bộ phát hiện khuôn mặt (SCRFD / YunNet)
-│   ├── enrollment/           # Thuật toán tính Centroid embedding đại diện & lọc outlier
-│   ├── evaluation/           # Benchmarks, đánh giá độ chính xác nhận diện & LFW calibration
-│   ├── tracking/             # Bộ theo dõi khuôn mặt IOU Tracker đa mục tiêu
-│   └── README.md             # 📖 Tài liệu chi tiết phân hệ Face Authentication & AIoT Biometrics
-└── README.md                 # Tài liệu tổng quan toàn hệ thống (File này)
+│   └── README.md             # 📖 Tài liệu chuyên sâu phân hệ Frontend
+│
+├── face_auth/                # 🧠 PHÂN HỆ AI SINH TRẮC HỌC (Python + InsightFace + PAD)
+│   ├── api_service.py        # Dịch vụ FastAPI nội bộ (:5000) trích xuất 512-D ArcFace & pgvector sync
+│   ├── app.py                # Ứng dụng Camera AIoT nhận diện & chống giả mạo thời gian thực
+│   ├── config.py             # Cấu hình ngưỡng nhận diện Cosine, ArcFace model pack, PAD
+│   ├── antispoof/            # Mô hình chống giả mạo MobileNetV3-Small E1 v5.3
+│   ├── enrollment/           # Thuật toán tính Centroid embedding đại diện & loại bỏ ảnh nhiễu
+│   └── README.md             # 📖 Tài liệu chuyên sâu phân hệ AI Biometrics
+│
+└── pi_edge/                  # 🍓 Cấu hình & mã nguồn triển khai Raspberry Pi 4 Edge Node
 ```
 
 ---
 
-## 🔑 Danh Sách Tài Khoản Đăng Nhập & Mật Khẩu Đang Có
+## 🔑 Dữ Liệu Khởi Tạo & Tài Khoản Kiểm Thử (Seed Accounts)
 
-Hệ thống được thiết lập sẵn tài khoản quản trị và tài khoản riêng biệt cho từng nhân viên:
+Sau khi thực hiện quy trình nạp dữ liệu mẫu ban đầu qua lệnh `npm run prisma:seed:all`, hệ thống sẵn sàng với toàn bộ tài khoản và danh mục chuẩn hóa:
 
-### 1. Tài Khoản Quản Trị Hệ Thống
-| Tên đăng nhập (Username) | Mật khẩu | Phân quyền (Role) | Chức năng truy cập |
-| :--- | :--- | :---: | :--- |
-| **`admin`** | **`Admin@123456`** | `ADMIN` | Toàn quyền quản trị hệ thống, quản lý thiết bị, phân quyền |
-
-### 2. Danh Sách Tài Khoản Cá Nhân Từng Nhân Viên Hiện Có Trên DB
-> 💡 **Quy tắc**: Tên đăng nhập là **Mã nhân viên (`NV-xxx`)**. Mỗi nhân viên có tài khoản độc lập để theo dõi ca làm, chấm công và phiếu lương cá nhân:
-
-| Tên đăng nhập (Username) | Mật khẩu truy cập | Họ và tên nhân viên | Quyền (Role) | Chức vụ / Vị trí | Email liên kết |
-| :--- | :--- | :--- | :---: | :--- | :--- |
-| **`NV-001`** | **`92E9Dac4`** | Nguyễn Văn A | `MANAGER` | Quản lý chính | `anv@aiot.corp` |
-| **`NV-002`** | **`DuFAh34T`** | Lê Hoàng Phúc | `EMPLOYEE` | Thu ngân chính | `staff@company.com` |
-| **`NV-003`** | **`gzXWzj6P`** | Nguyễn Minh Anh | `MANAGER` | Trưởng phòng quản lý | `manager@company.com` |
-| **`NV-004`** | **`sx7TmHTs`** | Trần Thu Thảo | `EMPLOYEE` | Nhân viên bán hàng | `thao.tran@aiot.corp` |
-| **`NV-005`** | **`yRKXEeZ4`** | Nguyễn Hải Nam | `EMPLOYEE` | Nhân viên an ninh | `nam.nguyen@aiot.corp` |
-| **`NV-006`** | **`kbEnYA9i`** | Vũ Khánh Linh | `EMPLOYEE` | Thu ngân dự phòng | `linh.vu@aiot.corp` |
-| **`NV-007`** | **`G9uVKumx`** | Nguyễn Quang Anh | `MANAGER` | Quản lý | `anh@aiot.vn` |
-| **`NV-008`** | **`gdF2Biz5`** | Trịnh Minh Đạt | `EMPLOYEE` | Nhân viên | `a@abcgamil.com` |
-| **`NV-009`** | **`SWM5jTyW`** | ngovanloc | `MANAGER` | Quản lý | `test-c206@gmail.com` |
-
-> 📌 **Lưu ý**:
-> - Khi bấm **Thêm nhân viên** mới trên giao diện Web, hệ thống sẽ tự động tạo User với username là mã NV tiếp theo và gửi mật khẩu ngẫu nhiên 8 ký tự trực tiếp qua Gmail.
-> - Khi khởi tạo lại CSDL rỗng qua seed (`npm run prisma:seed`), mật khẩu mặc định của các nhân viên mẫu sẽ là **`Employee@123456`**.
+### 1. Tài Khoản Quản Trị Viên Tối Cao (Admin)
+- **Tên đăng nhập:** `admin`
+- **Mật khẩu truy cập:** `Admin@123456`
+- **Vai trò:** `ADMIN`
+- **Quyền hạn:** Toàn quyền quản trị hệ thống, thêm/sửa/xóa phòng ban và chức vụ, phân quyền tài khoản, cấu hình chính sách thưởng phạt, quản lý thiết bị AIoT và xem Audit Trail.
 
 ---
 
-### 🏢 Danh Sách 4 Chức Vụ Chuẩn Hóa
-Hệ thống sử dụng đồng bộ thuật ngữ **Chức vụ** (thay cho Phòng ban) trên toàn bộ bảng và giao diện:
-1. **Quản lý** (`Code: Manager`)
-2. **Thu ngân** (`Code: Cashier`)
-3. **Nhân viên** (`Code: Staff`)
-4. **Bảo vệ** (`Code: Security`)
+### 2. Danh Sách 6 Quản Lý Phòng Ban (`MANAGER`)
+Mỗi phòng ban có đúng **1 Quản lý** phụ trách xem và quản lý nhân viên, lịch ca và dữ liệu chấm công thuộc phòng mình:
 
-### ⏰ Danh Sách 3 Ca Làm Việc Mẫu (`work_shifts`)
-1. **Full time**: `08:00 - 18:00`
-2. **Part time: Ca sáng**: `08:00 - 12:00`
-3. **Part time: Ca chiều**: `13:00 - 18:00`
-> 💡 *Thời gian ân hạn (Grace Period): **15 phút**. Check-in sau giờ bắt đầu ca + 15 phút được tính là **Đi trễ** (`LATE`). Check-out trước giờ kết thúc ca được tính là **Về sớm** (`EARLY_LEAVE`).*
-
-### 📡 Danh Sách 4 Thiết Bị AIoT Chuẩn Hóa (`devices`)
-Hệ thống kết nối và hiển thị trạng thái thời gian thực của 4 thiết bị AIoT chuyên trách:
-1. **`FaceCam-01`**: Camera AI nhận diện Face-ID Vào ca (Cổng vào, IP: `192.168.1.101`)
-2. **`FaceCam-02`**: Camera AI nhận diện Face-ID Tan ca (Cổng ra, IP: `192.168.1.102`)
-3. **`Fingerprint-01`**: Máy quét vân tay Vào ca (Cửa chính, IP: `192.168.1.103`)
-4. **`Fingerprint-02`**: Máy quét vân tay Tan ca (Cửa ra, IP: `192.168.1.104`)
+| Tên đăng nhập | Mật khẩu mặc định | Họ và tên | Chức vụ | Phòng ban | Mức lương giờ |
+| :---: | :---: | :--- | :--- | :---: | :---: |
+| **`NV-001`** | `Employee@123456` | Trần Thị Mai | Trưởng phòng Nhân sự | Nhân sự | 160.000 ₫/h |
+| **`NV-004`** | `Employee@123456` | Hoàng Minh Tuấn | Kế toán trưởng | Kế toán | 170.000 ₫/h |
+| **`NV-007`** | `Employee@123456` | Nguyễn Tiến Dũng | Trưởng phòng Kinh doanh | Kinh doanh | 165.000 ₫/h |
+| **`NV-010`** | `Employee@123456` | Phạm Thu Thủy | Trưởng phòng Marketing | Marketing | 155.000 ₫/h |
+| **`NV-013`** | `Employee@123456` | Đặng Quốc Huy | Trưởng phòng CNTT | IT | 180.000 ₫/h |
+| **`NV-016`** | `Employee@123456` | Bùi Thanh Tùng | Trưởng phòng CSKH | CSKH | 150.000 ₫/h |
 
 ---
 
-## 📋 Yêu Cầu Tiên Quyết (Prerequisites)
+### 3. Danh Sách 12 Nhân Viên Thông Thường (`EMPLOYEE`)
+Mỗi nhân viên sở hữu tài khoản cá nhân để theo dõi ca làm, xem lịch sử chấm công và tra cứu phiếu lương cá nhân:
 
-Trước khi khởi chạy dự án, máy tính cần cài đặt sẵn:
-1. **Git**: Dùng để tải mã nguồn (`git clone`).
-2. **Node.js**: Phiên bản **v20+** hoặc **v22+ LTS** (kèm theo trình quản lý gói `npm`).
-3. **Cơ sở Dữ liệu PostgreSQL 16 + `pgvector`**:
-   - **Cách 1 (Neon Cloud — Khuyên dùng)**: Sử dụng [Neon Serverless PostgreSQL](https://neon.tech/) tích hợp sẵn `pgvector`, không tốn tài nguyên máy và dễ dàng deploy toàn cầu.
-   - **Cách 2 (Docker Compose Cục bộ)**: Khởi chạy PostgreSQL + `pgvector` qua Docker Desktop (`docker compose --env-file .env.compose --profile tools up -d`).
-4. **Python**: Phiên bản **3.10** hoặc **3.11** (dành cho phân hệ AI Face Authentication).
+| Tên đăng nhập | Mật khẩu mặc định | Họ và tên | Chức vụ | Phòng ban |
+| :---: | :---: | :--- | :--- | :---: |
+| **`NV-002`** | `Employee@123456` | Lê Thu Trang | Chuyên viên Tuyển dụng | Nhân sự |
+| **`NV-003`** | `Employee@123456` | Đỗ Văn Hùng | Chuyên viên C&B | Nhân sự |
+| **`NV-005`** | `Employee@123456` | Vũ Bích Ngọc | Kế toán tổng hợp | Kế toán |
+| **`NV-006`** | `Employee@123456` | Ngô Thành Nam | Kế toán tiền lương | Kế toán |
+| **`NV-008`** | `Employee@123456` | Đinh Phương Thảo | Chuyên viên Quản lý khách hàng | Kinh doanh |
+| **`NV-009`** | `Employee@123456` | Lương Mạnh Hải | Đại diện Kinh doanh | Kinh doanh |
+| **`NV-011`** | `Employee@123456` | Trịnh Kim Chi | Chuyên viên Nội dung | Marketing |
+| **`NV-012`** | `Employee@123456` | Hồ Hoàng Long | Chuyên viên Digital Marketing | Marketing |
+| **`NV-014`** | `Employee@123456` | Mai Đức Chung | Kỹ sư Phần mềm | IT |
+| **`NV-015`** | `Employee@123456` | Lý Quốc Bảo | Kỹ sư Hệ thống & AIoT | IT |
+| **`NV-017`** | `Employee@123456` | Đoàn Hải Yến | Chuyên viên Hỗ trợ khách hàng | CSKH |
+| **`NV-018`** | `Employee@123456` | Dương Khánh Huyền | Chuyên viên Trực tổng đài | CSKH |
+
+> [!NOTE]
+> Mật khẩu `Employee@123456` áp dụng cho dữ liệu seed ban đầu để phục vụ kiểm thử. Khi quản trị viên tạo mới nhân viên trên giao diện thực tế, hệ thống sẽ tự động tạo mật khẩu ngẫu nhiên bảo mật 8 ký tự và gửi qua email cho nhân viên.
 
 ---
 
-## ⚡ Hướng Dẫn Cài Đặt & Khởi Chạy
+### 4. Danh Mục Ca Làm Việc & Thiết Bị AIoT
+- **4 Ca làm việc chuẩn hóa (`work_shifts`)**:
+  - `Full time`: 08:00 - 18:00
+  - `Part time: Ca sáng`: 08:00 - 12:00
+  - `Part time: Ca chiều`: 13:00 - 18:00
+  - `Nghỉ (OFF)`: 00:00 - 00:00 (Áp dụng ngày Chủ Nhật hoặc ngày nghỉ)
+- **4 Thiết bị AIoT chuẩn hóa (`devices`)**:
+  - `FaceCam-01`: Camera AI nhận diện Face-ID Vào ca (Cổng vào, IP: `192.168.1.101`)
+  - `FaceCam-02`: Camera AI nhận diện Face-ID Tan ca (Cổng ra, IP: `192.168.1.102`)
+  - `Fingerprint-01`: Máy quét vân tay Vào ca (Cửa chính, IP: `192.168.1.103`)
+  - `Fingerprint-02`: Máy quét vân tay Tan ca (Cửa ra, IP: `192.168.1.104`)
 
-Hướng dẫn đầy đủ Docker profile `app`, Prisma migration/seed, enroll gallery và
-xóa danh tính test: [docs/run_full_stack.md](docs/run_full_stack.md).
-Kết quả kiểm chứng tích hợp: [docs/face_auth_verification_2026-10-01.md](docs/face_auth_verification_2026-10-01.md).
+---
 
-### 🟢 Cách 1: Tự động khởi chạy bằng 1-Click Script (Khuyên dùng)
+## ⚡ Hướng Dẫn Khởi Chạy Toàn Bộ Dự Án
 
-Dự án cung cấp script menu để tạo file `.env` mẫu nếu thiếu, cài dependencies Node, khởi chạy Docker database và mở Face Auth API, Backend, Frontend trong các cửa sổ riêng. Cài requirements Python trước khi dùng launcher.
+### 📋 Yêu Cầu Tiên Quyết (Prerequisites)
+1. **Node.js**: Phiên bản `v20.x` hoặc `v22.x LTS` (kèm `npm`).
+2. **Cơ sở dữ liệu PostgreSQL 16 + pgvector**:
+   - **Lựa chọn 1 (Khuyên dùng)**: [Neon Serverless PostgreSQL](https://neon.tech/) (Singapore `ap-southeast-1`).
+   - **Lựa chọn 2**: Cài đặt Docker Desktop để chạy PostgreSQL local.
+3. **Python (Tùy chọn)**: Phiên bản `3.10` hoặc `3.11` (nếu cần chạy dịch vụ Face Auth AI).
 
-- **Trên Windows (`run.bat`)**:
+---
+
+### 🟢 Cách 1: Khởi Chạy Nhanh Bằng 1-Click Script (Khuyên dùng)
+
+Dự án cung cấp launcher thông minh tự động hóa toàn bộ thao tác cấu hình và khởi chạy:
+
+- **Trên Windows**:
   ```cmd
   .\run.bat
   ```
-- **Trên macOS / Linux (`run.sh`)**:
+- **Trên macOS / Linux**:
   ```bash
-  chmod +x run.sh
-  ./run.sh
+  chmod +x run.sh && ./run.sh
   ```
-  *(Trên macOS, `run.sh` sử dụng AppleScript để mở 3 cửa sổ Terminal.app: Face Auth API `5000`, Backend `3000` và Frontend `5173`; `run.bat` mở 3 cửa sổ trên Windows.)*
 
-#### Quy trình thao tác lần đầu tiên sau khi clone:
-1. **Nhập `[6]`**: Tự động tạo `.env` nếu thiếu và chạy `npm install` cho cả Backend và Frontend.
-   Cài Python dependencies: `cd face_auth` rồi `python3 -m pip install -r requirements.txt` (Windows dùng `python`). Có thể dùng virtualenv `face_auth/.venv`.
-2. **Cấu hình `.env`**: Điền thông tin kết nối Database Neon Cloud vào `backend/.env` và `face_auth/.env` (hoặc cấu hình `.env.compose` nếu muốn dùng Docker local).
-3. **Nhập `[7]`**: Chạy `prisma:generate` và `prisma:migrate` để đồng bộ cấu trúc database.
-4. **Nhập `[1]` (Mặc định)**: Khởi chạy toàn bộ hệ thống (Face Auth API `:5000`, Backend `:3000`, Frontend `:5173`) kết nối trực tiếp lên Cloud DB mà không cần bật Docker!
-5. **Nhập `[8]`**: Mở trực tiếp giao diện Web đồ họa **Prisma Studio** tại `http://localhost:5555` để xem toàn bộ 14 bảng dữ liệu.
+#### Bảng Lựa Chọn Chức Năng Của Menu Script:
+| Phím chọn | Chức năng thực thi |
+| :---: | :--- |
+| **`[1]` (Mặc định)** | **Chạy toàn bộ (Backend + Frontend + Face Auth API)** kết nối tới Cloud Database |
+| **`[2]`** | **Chạy toàn bộ kèm theo Docker Database Local** (PostgreSQL + pgAdmin) |
+| **`[3]`** | **Chỉ chạy riêng Backend Service** tại cổng `http://localhost:3000` |
+| **`[4]`** | **Chỉ chạy riêng Frontend Web App** tại cổng `http://localhost:5173` |
+| **`[5]`** | **Khởi động dịch vụ Docker Database Local** (PostgreSQL + pgAdmin) |
+| **`[6]`** | **Cài đặt toàn bộ dependencies** cho cả Backend và Frontend |
+| **`[7]`** | **Thực thi Prisma Generate & Migration** cập nhật Database Schema |
+| **`[8]`** | **Mở Web GUI Prisma Studio** tại địa chỉ `http://localhost:5555` |
+| **`[0]`** | Thoát chương trình |
 
-> 💡 *Các lần tiếp theo, bạn chỉ cần mở script và nhấn **`Enter`** (chọn `[1]`) để khởi động toàn bộ hệ thống!*
+> 💡 **Quy trình chuẩn cho thành viên mới clone repo:**  
+> 1. Gõ `.\run.bat` $\rightarrow$ Chọn `[6]` để cài dependencies và tạo file `.env`.  
+> 2. Điền chuỗi kết nối Database vào file `backend/.env`.  
+> 3. Chọn `[7]` để migrate database.  
+> 4. Nhấn Enter (chọn `[1]`) để tận hưởng toàn bộ hệ thống!
 
 ---
 
-### 🟡 Cách 2: Khởi chạy thủ công từng bước (Cross-Platform: Windows / Linux / macOS)
+### 🟡 Cách 2: Khởi Chạy Thủ Công Từng Bước (Manual Setup)
 
-#### Bước 1: Tạo các file biến môi trường (`.env`)
-> [!IMPORTANT]
-> Vì lý do bảo mật, file `.env` được loại trừ trong `.gitignore`. Bạn cần tạo file `.env` cho cả Backend và Frontend trước khi khởi chạy.
-
-- **Cho Backend**:
-  - Windows PowerShell: `Copy-Item backend/.env.example backend/.env`
-  - Windows CMD: `copy backend\.env.example backend\.env`
-  - Linux / macOS / Git Bash: `cp backend/.env.example backend/.env`
-
-- **Cho Frontend**:
-  - Windows PowerShell: `Copy-Item frontend/.env.example frontend/.env`
-  - Windows CMD: `copy frontend\.env.example frontend\.env`
-  - Linux / macOS / Git Bash: `cp frontend/.env.example frontend/.env`
-
-- **Cho Docker**: Sao chép `.env.compose.example` thành `.env.compose`; đặt
-  đúng tên volume PostgreSQL PBL6 hiện có và mật khẩu hiện tại. Nếu Face Auth
-  chạy trên máy khác, cấu hình bind IP trong `.env.compose` và `POSTGRES_HOST`
-  theo địa chỉ LAN của máy chủ DB, đồng thời giới hạn port bằng firewall.
-
-#### Bước 2: Khởi động Cơ sở dữ liệu qua Docker
+#### Bước 1: Khởi tạo các file biến môi trường (`.env`)
 ```bash
-docker compose --env-file .env.compose --profile tools up -d
-```
-*Một PostgreSQL + pgvector dùng chung khởi chạy tại port `5432`; pgAdmin tại port `5050`.*
-*Trước khi chạy, `.env.compose` phải trỏ đến volume PBL6 hiện có và dùng mật khẩu đúng với database đó. Migration xóa embeddings khuôn mặt cũ nhưng giữ các bảng nghiệp vụ khác. Không chạy `npm run prisma:seed` trên database đang sử dụng vì seed xóa dữ liệu trước khi nạp lại.*
+# Backend
+cp backend/.env.example backend/.env
 
-#### Bước 3: Cấu hình, Migrate & Khởi chạy Backend
+# Frontend
+cp frontend/.env.example frontend/.env
+```
+
+#### Bước 2: Thiết lập Cơ sở Dữ liệu & Chạy Migration
 ```bash
 cd backend
-# 1. Cài đặt dependencies
 npm install
 
-# 2. Sinh Prisma Client
-npm run prisma:generate
+# 1. Sinh Prisma Client
+npx prisma generate
 
-# 3. Áp dụng các migration đã commit & Kích hoạt extension pgvector
-npm run prisma:migrate
+# 2. Áp dụng các bản SQL Migration
+npx prisma migrate deploy
 
-# Không chạy seed trên database đang sử dụng; seed xóa dữ liệu trước khi nạp mẫu.
-
-# 4. Khởi chạy Backend server
-npm run dev
-# Backend lắng nghe tại: http://localhost:3000
+# 3. Nạp dữ liệu mẫu ban đầu (Nếu database mới)
+npm run prisma:seed:all
 ```
 
-#### Bước 4: Cài đặt & Khởi chạy Frontend (Mở Terminal thứ 2)
+#### Bước 3: Khởi chạy Backend Server
+```bash
+cd backend
+npm run dev
+# Backend sẵn sàng tại: http://localhost:3000
+# Kiểm tra Health Check: GET http://localhost:3000/health
+```
+
+#### Bước 4: Khởi chạy Frontend Web App (Mở Terminal mới)
 ```bash
 cd frontend
-# 1. Cài đặt dependencies
 npm install
-
-# 2. Khởi chạy Vite Dev Server
 npm run dev
-# Ứng dụng web truy cập tại: http://localhost:5173
+# Frontend sẵn sàng tại: http://localhost:5173
+```
+
+#### Bước 5: Khởi chạy Face Auth Service (Tùy chọn - Mở Terminal mới)
+```bash
+cd face_auth
+# Kích hoạt virtualenv (nếu có)
+uvicorn api_service:app --host 0.0.0.0 --port 5000
+# Face Auth API sẵn sàng tại: http://localhost:5000
 ```
 
 ---
 
-### 🛠️ Bảng Xử Lý Sự Cố Thường Gặp (Troubleshooting)
+## 🧪 Kiểm Thử Toàn Diện (Testing & Quality Assurance)
 
-| Lỗi thường gặp | Nguyên nhân | Cách khắc phục |
-| :--- | :--- | :--- |
-| `Bind for 0.0.0.0:5432 failed: port is already allocated` | Máy tính đã cài sẵn PostgreSQL chạy dịch vụ ngầm trên Windows | Mở **Services** (`services.msc`) $\rightarrow$ Tìm service `postgresql-x64-...` $\rightarrow$ Chuột phải chọn **Stop**. Sau đó chạy lại `docker compose up -d`. |
-| `error: open \\.\pipe\docker_engine: The system cannot find the file specified` | Ứng dụng Docker Desktop chưa được bật | Khởi động ứng dụng Docker Desktop trên máy và đợi biểu tượng chuyển sang màu xanh lá (*Engine running*) rồi thử lại. |
-| `❌ Invalid environment variables: DATABASE_URL is required...` | Chưa tạo file `backend/.env` hoặc chuỗi Secret quá ngắn | Đảm bảo đã sao chép từ `backend/.env.example` thành `backend/.env`. Các khóa `JWT_SECRET`, `BIOMETRIC_ENCRYPTION_KEY` bắt buộc phải $\ge 32$ ký tự. |
-| `extension "vector" is not available` | Đang kết nối tới PostgreSQL thông thường không có pgvector | Bắt buộc phải chạy PostgreSQL thông qua Docker Compose của dự án (`pgvector/pgvector:pg16`). |
-| Không lưu phiên đăng nhập hoặc bị đăng xuất ngay | Xung đột cổng kết nối hoặc chặn Cookie | Đảm bảo Frontend chạy đúng cổng `5173` và Backend chạy cổng `3000` để các cookie `HttpOnly; SameSite` hoạt động chuẩn xác theo cấu hình CORS. |
+Hệ thống được trang bị bộ kiểm thử tự động nghiêm ngặt ở cả hai phân hệ:
 
----
+```bash
+# 1. Chạy Unit & Integration Tests của Backend (Vitest)
+cd backend && npm run test
 
----
+# 2. Chạy Component & Hook Tests của Frontend (Vitest + JSDOM)
+cd frontend && npm run test
 
-## ✨ Tính Năng Nghiệp Vụ Chính
-
-### 1. Giám Sát Chấm Công Toàn Diện Thời Gian Thực
-- **Bảng theo dõi chấm công khoa học (10 cột chuẩn)**: Nhân viên, Ca làm việc, Sự kiện (Vào ca/Hết ca), Thời gian, Phương thức (Face-ID/Vân tay), Độ tin cậy (%), Trạng thái, Trễ/Sớm, Tăng ca (OT), Thao tác chỉnh sửa.
-- **Tính năng Chốt ca điểm danh (`attendance_locks`)**: Quản lý có thể chốt số liệu điểm danh theo từng ngày. Sau khi chốt ca, dữ liệu được khóa an toàn và cho phép **Xuất Báo cáo CSV/Excel** chuẩn UTF-8 có dấu.
-- **Hiệu chỉnh thủ công an toàn**: Cho phép quản lý điều chỉnh giờ trễ/sớm và OT khi nhân viên có lý do chính đáng, tự động ghi vết vào bảng kiểm toán `audit_logs`.
-
-### 2. Sinh Trắc Học Kép AIoT (Gương Mặt & Vân Tay)
-- **Face Recognition**: Sử dụng mô hình nhận diện khuôn mặt trích xuất vector 512 chiều (ArcFace) lưu trữ trong PostgreSQL bằng extension `pgvector`, so khớp khoảng cách Cosine nhanh chóng qua chỉ mục HNSW.
-- **PAD (Chống giả mạo)**: Tích hợp cơ chế phát hiện giả mạo khuôn mặt không cho phép điểm danh bằng ảnh chụp, video phát lại trên điện thoại/máy tính bảng.
-- **Fingerprint Fallback**: Điểm danh dự phòng bằng cảm biến vân tay quang học khi nhân viên đeo khẩu trang hoặc môi trường ánh sáng yếu.
-
-### 3. Động Cơ Tính Lương Chuẩn Xác (Payroll Engine)
-- Tính toán lương tập trung tại Backend (`payroll.service.ts`) dựa trên dữ liệu tổng hợp giờ làm thực tế:
-  $$\text{Lương thực nhận (Net Salary)} = (\text{Tổng giờ làm thực tế} \times \text{Lương giờ}) + \text{Thưởng OT} - \text{Phạt đi trễ/về sớm} + \text{Phụ cấp}$$
-- **Chuẩn hóa đơn vị Giờ (`Decimal(5,2)`)**: Mọi chỉ số `total_working_hours`, `late_early`, `overtime` được làm tròn theo nấc 0.5 giờ (30 phút).
-- Hệ số thưởng OT mặc định: **100.000 ₫/giờ**. Phạt trễ/về sớm mặc định: **50.000 ₫/giờ**. Phụ cấp mặc định: **1.500.000 ₫**.
-- Quản lý có thể tạo bảng lương theo tháng (`YYYY-MM`), duyệt và cập nhật trạng thái chi trả (`PENDING` $\rightarrow$ `PAID`).
-
-### 4. Lập Lịch & Phân Ca Làm Việc
-- Phân ca linh hoạt theo tuần cho từng nhân viên hoặc theo chức vụ.
-- Hỗ trợ cả ca cố định (`Full time`) và ca bán thời gian (`Part time Ca sáng / Ca chiều`).
-- Dữ liệu phân ca được dùng làm căn cứ tự động xác định tính đúng giờ (Punctuality) cho các lần quẹt thẻ.
-
-### 5. Cổng Tự Phục Vụ Dành Cho Nhân Viên (Employee Portal)
-- Nhân viên đăng nhập tra cứu tức thì:
-  - Thông tin ca làm việc trong ngày và lịch làm việc cả tuần.
-  - Lịch sử chấm công chi tiết kèm ảnh chụp/phương thức và độ tin cậy.
-  - **Ước tính thu nhập tạm tính**: Tính trước thu nhập thực tế trong tháng theo giờ công đã tích lũy.
-  - Xem và tải phiếu lương các tháng trước.
+# 3. Kiểm tra tính toàn vẹn kiểu dữ liệu TypeScript
+cd frontend && npm run lint
+```
 
 ---
 
-## 🔒 Kiến Trúc Bảo Mật & Chuẩn Hóa Dữ Liệu
+## 📄 License & Bản Quyền
 
-1. **Xác thực JWT an toàn qua HttpOnly Cookie**:
-   - Token xác thực được lưu trữ trong Cookie với các cờ `HttpOnly; Secure; SameSite=Strict`, ngăn chặn hoàn toàn các cuộc tấn công đánh cắp phiên qua XSS.
-2. **Phân quyền người dùng (Role-Based Access Control - RBAC)**:
-   - Middleware `authenticateToken` và `authorizeRole('ADMIN', 'MANAGER')` kiểm soát chặt chẽ từng route API.
-3. **Mã hóa dữ liệu nhạy cảm**:
-   - Mật khẩu người dùng được băm an toàn bằng thuật toán **Bcrypt** với salt round 10.
-   - Vector sinh trắc học khuôn mặt được bảo vệ trong tầng cơ sở dữ liệu.
-4. **Nhật ký kiểm toán (`audit_logs`)**:
-   - Mọi thao tác trọng yếu (sửa chấm công, chốt ca, tạo bảng lương, thêm/sửa nhân viên) đều tự động ghi lại IP, User thực hiện, thời gian, giá trị cũ (`old_values`) và giá trị mới (`new_values`).
-5. **Chuẩn hóa múi giờ Việt Nam (+07:00)**:
-   - Toàn bộ backend và frontend xử lý ngày giờ qua timezone `Asia/Ho_Chi_Minh` (`en-CA`), triệt tiêu hoàn toàn lỗi lệch lùi 1 ngày do UTC vào khung giờ nửa đêm (00:00 - 06:59 AM).
-
----
-
-## 📡 API Reference Tóm Tắt
-
-### 1. Phân Hệ Backend REST API (`http://localhost:3000`)
-
-| Phương thức | Đường dẫn API | Mô tả chức năng | Quyền yêu cầu |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/login` | Đăng nhập tài khoản, thiết lập HttpOnly Cookie | Public |
-| `POST` | `/api/auth/logout` | Đăng xuất và hủy Cookie phiên làm việc | Authenticated |
-| `GET` | `/api/auth/me` | Lấy thông tin tài khoản đang đăng nhập | Authenticated |
-| `POST` | `/api/auth/register` | Đăng ký tài khoản người dùng mới | `ADMIN` |
-| `GET` | `/api/employees` | Lấy danh sách nhân viên (phân trang, lọc chức vụ, tìm kiếm) | `MANAGER`, `ADMIN` |
-| `POST` | `/api/employees` | Thêm mới hồ sơ nhân viên | `MANAGER`, `ADMIN` |
-| `PUT` | `/api/employees/:id` | Cập nhật thông tin nhân viên | `MANAGER`, `ADMIN` |
-| `DELETE` | `/api/employees/:id` | Xóa nhân viên khỏi hệ thống | `ADMIN` |
-| `GET` | `/api/attendance` | Lấy danh sách nhật ký chấm công (nhân viên xem của mình) | Authenticated |
-| `GET` | `/api/attendance/statistics` | Thống kê số lượt check-in hôm nay, thiết bị active | Authenticated |
-| `POST` | `/api/attendance/check-in` | Ghi nhận sự kiện chấm công vào (gương mặt / vân tay) | Authenticated |
-| `POST` | `/api/attendance/check-out` | Ghi nhận sự kiện chấm công ra | Authenticated |
-| `GET` | `/api/attendance/summaries` | Lấy dữ liệu tổng hợp chấm công ngày (`daily_attendance_summary`) | Authenticated |
-| `PATCH` | `/api/attendance/adjust` | Hiệu chỉnh thủ công giờ trễ/sớm và OT của nhân viên | `MANAGER`, `ADMIN` |
-| `GET` | `/api/attendance/locks` | Tra cứu danh sách trạng thái chốt ca theo ngày | Authenticated |
-| `POST` | `/api/attendance/locks/lock` | Khóa chốt dữ liệu chấm công của ngày được chọn | `MANAGER`, `ADMIN` |
-| `POST` | `/api/attendance/locks/unlock` | Mở khóa chỉnh sửa dữ liệu chấm công | `MANAGER`, `ADMIN` |
-| `POST` | `/api/attendance/aggregate` | Tổng hợp công ngày theo tháng/năm (`Decimal(5,2)` giờ) | `MANAGER`, `ADMIN` |
-| `GET` | `/api/shifts` | Danh sách ca làm việc và lịch phân ca | Authenticated |
-| `POST` | `/api/shifts` | Phân công ca làm việc cho nhân viên | `MANAGER`, `ADMIN` |
-| `GET` | `/api/payroll` | Lấy bảng lương theo kỳ (`payroll_period: YYYY-MM`) | Authenticated |
-| `POST` | `/api/payroll/generate` | Tự động tính toán bảng lương tháng theo giờ công | `MANAGER`, `ADMIN` |
-| `PUT` | `/api/payroll/:id` | Cập nhật thông số phiếu lương cá nhân | `MANAGER`, `ADMIN` |
-| `POST` | `/api/payroll/period/:period/finalize` | Chốt sổ bảng lương kỳ được chọn | `MANAGER`, `ADMIN` |
-| `POST` | `/api/payroll/period/:period/unlock` | Mở khóa lại bảng lương đã chốt | `ADMIN` |
-| `GET` | `/api/payroll/bonus-penalty` | Lấy quy định chính sách thưởng/phạt | Authenticated |
-| `PUT` | `/api/payroll/bonus-penalty` | Cập nhật chính sách thưởng OT & phạt đi trễ | `MANAGER`, `ADMIN` |
-| `GET` | `/api/biometrics/:employeeId` | Lấy thông tin vector gương mặt đã đăng ký | Authenticated |
-| `POST` | `/api/biometrics/:employeeId` | Đăng ký vector khuôn mặt 512-D sinh trắc mới | `MANAGER`, `ADMIN` |
-| `POST` | `/api/biometrics/:employeeId/enroll-images` | Gửi ảnh base64 qua Face Auth service để trích xuất vector | `MANAGER`, `ADMIN` |
-| `DELETE` | `/api/biometrics/:employeeId` | Xóa dữ liệu sinh trắc học của nhân viên | `MANAGER`, `ADMIN` |
-| `GET` | `/api/devices` | Danh sách và trạng thái các thiết bị AIoT | Authenticated |
-| `POST` | `/api/devices` | Thêm mới thiết bị AIoT | `MANAGER`, `ADMIN` |
-| `PUT` | `/api/devices/:id` | Cập nhật thông tin thiết bị AIoT | `MANAGER`, `ADMIN` |
-| `DELETE` | `/api/devices/:id` | Xóa thiết bị AIoT | `ADMIN` |
-| `GET` | `/api/audit-logs` | Xem nhật ký kiểm toán thao tác hệ thống | `ADMIN` |
-
-### 2. Phân Hệ Face Auth Internal API (`http://localhost:5000`)
-
-| Phương thức | Đường dẫn API | Mô tả chức năng | Quyền yêu cầu |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Kiểm tra trạng thái hoạt động & phiên bản embedding | Nội bộ / Backend |
-| `POST` | `/internal/enroll` | Trích xuất 512-D ArcFace embedding từ ảnh base64, tính Centroid & lưu pgvector | Nội bộ / Backend |
-| `DELETE` | `/internal/enroll/:employee_code` | Xóa toàn bộ vector khuôn mặt trong CSDL theo mã nhân viên | Nội bộ / Backend |
-
----
-
-## 🧪 Kiểm Thử Hệ Thống (Automated Testing)
-
-Dự án áp dụng bộ kiểm thử tự động toàn diện trên cả Backend và Frontend:
-
-- **Backend Tests (Vitest)**: Kiểm tra xác thực Cookie, RBAC, phân quyền API, nghiệp vụ chấm công, tính toán lương, tính lũy kế và Idempotency:
-  ```bash
-  cd backend
-  npm run test
-  # Kết quả: 37/37 tests passed (100%)
-  ```
-- **Frontend Tests (Vitest + JSDOM)**: Kiểm tra AuthContext, queryClient cache cleanup, useAttendancePairs Hook, tiện ích thời gian và bộ lọc:
-  ```bash
-  cd frontend
-  npm run test
-  # Kết quả: 15/15 tests passed (100%)
-  ```
-- **Kiểm tra TypeScript & Build Production**:
-  ```bash
-  cd frontend
-  npm run lint   # tsc --noEmit
-  npm run build  # vite build: 0 error
-  ```
-
----
-
-## 📄 License
-
-Dự án được phân phối theo giấy phép **MIT License**. Mọi đóng góp và mã nguồn đều tuân thủ các quy định bảo mật sinh trắc học và an toàn dữ liệu cá nhân.
+Dự án được phân phối chính thức theo giấy phép **MIT License**. Mọi mã nguồn và tài liệu tuân thủ nghiêm ngặt các quy chuẩn về an toàn thông tin, bảo mật sinh trắc học và đạo đức AI.

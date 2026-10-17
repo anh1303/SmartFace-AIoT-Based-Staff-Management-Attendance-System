@@ -8,7 +8,9 @@ export interface UserSession {
   role_name?: string;
   is_manager?: boolean;
   position: string;
+  positionId?: number | null;
   department: string;
+  departmentId?: number | null;
   avatar: string;
 }
 

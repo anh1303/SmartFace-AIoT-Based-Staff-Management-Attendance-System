@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { isAnotherManager } from '../../utils/permissionUtils';
@@ -14,14 +14,37 @@ import {
   getMonday,
   formatDateToYYYYMMDD,
   getISOWeekNumber
-} from '../../features/schedule-management';
+} from '@/features/schedules';
+import { useDepartmentPositions } from '../../hooks';
 
 export const ManagerSchedule: React.FC = () => {
   const { employees, workShifts, assignOrUpdateShift, showToast } = useApp();
   const { currentUser, role } = useAuth();
-  const [departmentFilter, setDepartmentFilter] = useState('ALL');
+  const isManager = role === 'manager';
+  const managerDept = currentUser?.department;
+
+  const [departmentFilter, setDepartmentFilter] = useState(() => {
+    if (role === 'manager' && currentUser?.department) {
+      return currentUser.department;
+    }
+    return 'ALL';
+  });
+  const [positionFilter, setPositionFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingShift, setEditingShift] = useState<EditingShiftTarget | null>(null);
+
+  useEffect(() => {
+    if (isManager && managerDept) {
+      setDepartmentFilter(managerDept);
+    }
+  }, [isManager, managerDept]);
+
+  const { departmentOptions, positionOptions } = useDepartmentPositions({
+    employees,
+    isManager,
+    managerDept,
+    departmentFilter,
+  });
 
   // Solar Calendar Week State (Default Monday of current week)
   const [currentMonday, setCurrentMonday] = useState<Date>(() => getMonday(new Date()));
@@ -90,8 +113,11 @@ export const ManagerSchedule: React.FC = () => {
     }
   };
 
+
+
   const filteredEmployees = employees.filter(e => {
     if (departmentFilter !== 'ALL' && e.department !== departmentFilter) return false;
+    if (positionFilter !== 'ALL' && e.position !== positionFilter) return false;
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       const matchName = e.full_name?.toLowerCase().includes(term);
@@ -282,14 +308,8 @@ export const ManagerSchedule: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* 1. Header with bulk & copy actions */}
+      {/* 1. Header with week navigator, bulk & copy actions */}
       <ScheduleHeader
-        onCopyPreviousWeek={handleCopyPreviousWeek}
-        onOpenBulkModal={() => setBulkModalOpen(true)}
-      />
-
-      {/* 2. Week Navigator & Filters */}
-      <ScheduleWeekNavigator
         currentMonday={currentMonday}
         weekNumber={weekNumber}
         startLabel={startLabel}
@@ -298,10 +318,23 @@ export const ManagerSchedule: React.FC = () => {
         onNextWeek={handleNextWeek}
         onGoCurrentWeek={handleGoCurrentWeek}
         onDateSelect={handleDateSelect}
+        onCopyPreviousWeek={handleCopyPreviousWeek}
+        onOpenBulkModal={() => setBulkModalOpen(true)}
+      />
+
+      {/* 2. Filters */}
+      <ScheduleWeekNavigator
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         departmentFilter={departmentFilter}
-        setDepartmentFilter={setDepartmentFilter}
+        onDepartmentFilterChange={(val) => {
+          setDepartmentFilter(val);
+          setPositionFilter('ALL');
+        }}
+        departmentOptions={departmentOptions}
+        positionFilter={positionFilter}
+        onPositionFilterChange={setPositionFilter}
+        positionOptions={positionOptions}
       />
 
       {/* 3. Interactive Shift Matrix Grid */}

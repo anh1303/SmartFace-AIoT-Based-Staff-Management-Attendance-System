@@ -1,28 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getTodayVNString } from '../../utils/dateUtils';
-import { useDevices } from '../../features/attendance-monitor/hooks/useDevices';
-import { useAttendanceSummaries } from '../../features/attendance-monitor/hooks/useAttendanceSummaries';
-import { useAttendanceLocks } from '../../features/attendance-monitor/hooks/useAttendanceLocks';
-import { useAttendancePairs, AttendancePairItem } from '../../features/attendance-monitor/hooks/useAttendancePairs';
-import { AttendanceHeader } from '../../features/attendance-monitor/components/AttendanceHeader';
-import { AttendanceFilters } from '../../features/attendance-monitor/components/AttendanceFilters';
-import { DeviceStatusCards } from '../../features/attendance-monitor/components/DeviceStatusCards';
-import { AttendanceTable } from '../../features/attendance-monitor/components/AttendanceTable';
-import { AttendanceEditModal } from '../../features/attendance-monitor/components/AttendanceEditModal';
-import { exportAttendanceToCSV } from '../../features/attendance-monitor/csvExport';
-import { WebRTCPlayer } from '../../features/attendance-monitor/components/WebRTCPlayer';
-import { LiveEventFeed } from '../../features/attendance-monitor/components/LiveEventFeed';
-import { useAttendanceSocket } from '../../features/attendance-monitor/hooks/useAttendanceSocket';
+import { useDepartmentPositions } from '../../hooks';
+import {
+  AttendanceHeader,
+  AttendanceFilters,
+  DeviceStatusCards,
+  AttendanceTable,
+  AttendanceEditModal,
+  WebRTCPlayer,
+  LiveEventFeed,
+  useDevices,
+  useAttendanceSummaries,
+  useAttendanceLocks,
+  useAttendanceSocket,
+  useAttendancePairs,
+  AttendancePairItem,
+  exportAttendanceToCSV,
+} from '@/features/attendance';
 
 export const ManagerAttendanceMonitor: React.FC = () => {
-  const { attendance, employees, workShifts, showToast } = useApp();
+  const { attendance, employees, workShifts, showToast, role, currentUser } = useApp();
+  const isManager = role === 'manager';
+  const managerDept = currentUser?.department;
+
   const { liveEvents, isSocketConnected, clearEvents } = useAttendanceSocket({ showToast });
 
   const [startDate, setStartDate] = useState<string>(() => getTodayVNString());
   const [endDate, setEndDate] = useState<string>(() => getTodayVNString());
   const [searchTerm, setSearchTerm] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState(() => {
+    if (role === 'manager' && currentUser?.department) {
+      return currentUser.department;
+    }
+    return 'ALL';
+  });
+  const [positionFilter, setPositionFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  useEffect(() => {
+    if (isManager && managerDept) {
+      setDepartmentFilter(managerDept);
+    }
+  }, [isManager, managerDept]);
+
+  const { departmentOptions, positionOptions } = useDepartmentPositions({
+    employees,
+    isManager,
+    managerDept,
+    departmentFilter,
+  });
 
   const { devices } = useDevices();
   const { isDateLocked, toggleLock } = useAttendanceLocks();
@@ -39,7 +66,9 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     searchTerm,
     statusFilter,
     customOvertimeMap,
-    customLateEarlyMap
+    customLateEarlyMap,
+    departmentFilter,
+    positionFilter
   );
 
   // Edit Modal State
@@ -143,7 +172,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
         </div>
       </div>
 
-      {/* Date Range & Status Filter Bar (Vùng màu xanh ngay trên bảng chấm công) */}
+      {/* Bộ lọc chấm công: Tách 2 thanh (Thanh 1: Khoảng ngày, Thanh 2: Tìm kiếm + Phòng ban + Chức vụ + Trạng thái) */}
       <AttendanceFilters
         startDate={startDate}
         setStartDate={setStartDate}
@@ -151,6 +180,12 @@ export const ManagerAttendanceMonitor: React.FC = () => {
         setEndDate={setEndDate}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
+        departmentFilter={departmentFilter}
+        setDepartmentFilter={setDepartmentFilter}
+        departmentOptions={departmentOptions}
+        positionFilter={positionFilter}
+        setPositionFilter={setPositionFilter}
+        positionOptions={positionOptions}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
       />

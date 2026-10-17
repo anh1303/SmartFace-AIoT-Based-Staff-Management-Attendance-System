@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useEmployees } from '../../hooks/useEmployees';
+import { useApp } from '../../context/AppContext';
 import {
   User,
   Mail,
@@ -18,7 +18,7 @@ import {
 
 export const EmployeeProfile: React.FC = () => {
   const { currentUser } = useAuth();
-  const { employees } = useEmployees();
+  const { employees } = useApp();
 
   const currentEmployee = employees.find(
     e => e.employee_id === currentUser?.employee_id || e.id === currentUser?.employee_id

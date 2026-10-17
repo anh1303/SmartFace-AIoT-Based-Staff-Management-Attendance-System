@@ -55,3 +55,39 @@ export function isAnotherManager(
 
   return targetIsManager;
 }
+
+/**
+ * Kiểm tra xem nhân viên mục tiêu có thuộc phòng ban khác với phòng ban mà Quản lý phụ trách không.
+ */
+export function isDifferentDepartment(
+  targetEmp: Employee | null | undefined,
+  currentUser: UserSession | null | undefined
+): boolean {
+  if (!targetEmp || !currentUser) return false;
+
+  const isAdmin =
+    currentUser.role === 'admin' ||
+    currentUser.role_name?.toUpperCase() === 'ADMIN';
+
+  if (isAdmin) return false;
+
+  const isCurrentManager =
+    currentUser.role === 'manager' ||
+    currentUser.role_name?.toUpperCase() === 'MANAGER' ||
+    Boolean(currentUser.is_manager);
+
+  if (!isCurrentManager) return false;
+
+  const isSelf =
+    (currentUser.employee_id && (targetEmp.employee_id === currentUser.employee_id || targetEmp.id === currentUser.employee_id)) ||
+    (currentUser.email && targetEmp.email?.toLowerCase() === currentUser.email?.toLowerCase());
+
+  if (isSelf) return false;
+
+  if (!currentUser.department) return false;
+
+  return Boolean(
+    targetEmp.department &&
+    targetEmp.department.toLowerCase() !== currentUser.department.toLowerCase()
+  );
+}

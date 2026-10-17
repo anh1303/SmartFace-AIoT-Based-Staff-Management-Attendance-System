@@ -16,11 +16,11 @@ import {
 export const EmployeeSalaryEstimate: React.FC = () => {
   const { currentUser, payroll, employees, bonusPenalty, attendance } = useApp();
 
-  const empCode = currentUser?.employee_id || 'NV-001';
-  const currentEmp = employees.find(e => e.employee_id === empCode);
+  const empCode = currentUser?.employee_id || '';
+  const currentEmp = empCode ? employees.find(e => e.employee_id === empCode || e.id === empCode) : null;
 
   // Dynamic periods available for this employee member
-  const myPayrolls = payroll.filter(p => p.employee_id === empCode);
+  const myPayrolls = empCode ? payroll.filter(p => p.employee_id === empCode || (currentEmp && p.employee_id === currentEmp.id)) : [];
   const availablePeriods = Array.from(
     new Set(myPayrolls.map(p => p.period || p.payroll_period).filter(Boolean) as string[])
   ).sort().reverse();

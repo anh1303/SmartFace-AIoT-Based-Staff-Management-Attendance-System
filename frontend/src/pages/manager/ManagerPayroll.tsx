@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { isAnotherManager } from '../../utils/permissionUtils';
 import { PayrollRecord } from '../../types';
 import { logger } from '../../utils/logger';
+import { useDepartmentPositions } from '../../hooks';
 import {
   PayrollHeader,
   PayrollSummaryCards,
@@ -34,11 +35,36 @@ export const ManagerPayroll: React.FC = () => {
     showToast,
   } = useApp();
 
+  const isManager = role === 'manager';
+  const managerDept = currentUser?.department;
+
   const [confirmFinalizeOpen, setConfirmFinalizeOpen] = useState(false);
   const [confirmUnlockOpen, setConfirmUnlockOpen] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('ALL');
+  const [departmentFilter, setDepartmentFilter] = useState(() => {
+    if (role === 'manager' && currentUser?.department) {
+      return currentUser.department;
+    }
+    return 'ALL';
+  });
+  const [positionFilter, setPositionFilter] = useState('ALL');
+
+  useEffect(() => {
+    if (isManager && managerDept) {
+      setDepartmentFilter(managerDept);
+    }
+  }, [isManager, managerDept]);
+
+  const {
+    departmentOptions,
+    positionOptions,
+  } = useDepartmentPositions({
+    employees,
+    isManager,
+    managerDept,
+    departmentFilter,
+  });
 
   // Modal state for Bonus Penalty Policy
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
@@ -86,18 +112,32 @@ export const ManagerPayroll: React.FC = () => {
     .reverse();
 
   // All records for the selected period (for status & total metrics)
-  // Chốt chặn Requirement 1: Quản lý không xem được phiếu lương hoặc thông tin lương của Quản lý khác
+  // Chốt chặn phân quyền: Quản lý chỉ xem được phiếu lương của chính mình và nhân viên phòng ban mình phụ trách
   const allPeriodRecords = payroll.filter((p) => {
     const isPeriodMatch = p.period === selectedPeriod || p.payroll_period === selectedPeriod;
     if (!isPeriodMatch) return false;
 
     if (role !== 'admin') {
       const emp = employees.find((e) => e.employee_id === p.employee_id);
-      if (emp) {
-        const isSelf = Boolean(
-          currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
-        );
-        if (!isSelf && isAnotherManager(emp, currentUser)) {
+      const isSelf = Boolean(
+        currentUser && (
+          p.employee_id === currentUser.employee_id ||
+          (emp && (emp.employee_id === currentUser.employee_id || emp.email?.toLowerCase() === currentUser.email?.toLowerCase()))
+        )
+      );
+
+      // Nếu là chính mình: Luôn cho phép xem lương của bản thân
+      if (isSelf) return true;
+
+      // Nếu là Manager xem người khác:
+      if (isManager && managerDept) {
+        const empDept = emp?.department || p.department;
+        // Nhân viên phòng ban khác: HOÀN TOÀN KHÔNG HIỆN
+        if (!empDept || empDept.toLowerCase() !== managerDept.toLowerCase()) {
+          return false;
+        }
+        // Quản lý khác trong cùng phòng: HOÀN TOÀN KHÔNG HIỆN
+        if (emp && isAnotherManager(emp, currentUser)) {
           return false;
         }
       }
@@ -116,7 +156,11 @@ export const ManagerPayroll: React.FC = () => {
     const dept = emp?.department || p.department || '';
     const pos = emp?.position || '';
 
-    if (departmentFilter !== 'ALL' && dept !== departmentFilter && pos !== departmentFilter) {
+    if (departmentFilter !== 'ALL' && dept !== departmentFilter) {
+      return false;
+    }
+
+    if (positionFilter !== 'ALL' && pos !== positionFilter) {
       return false;
     }
 
@@ -305,7 +349,18 @@ export const ManagerPayroll: React.FC = () => {
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         departmentFilter={departmentFilter}
-        onDepartmentFilterChange={setDepartmentFilter}
+        onDepartmentFilterChange={(val) => {
+          if (isManager && managerDept && val !== managerDept && val !== 'ALL') {
+            return;
+          }
+          setDepartmentFilter(val);
+          setPositionFilter('ALL');
+        }}
+        departmentOptions={departmentOptions}
+        allDepartmentLabel={isManager ? '' : 'Tất cả phòng ban'}
+        positionFilter={positionFilter}
+        onPositionFilterChange={setPositionFilter}
+        positionOptions={positionOptions}
         isFinalized={isFinalized}
         onOpenEdit={handleOpenEdit}
       />

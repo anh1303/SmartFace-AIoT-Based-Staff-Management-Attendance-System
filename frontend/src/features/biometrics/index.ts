@@ -5,3 +5,6 @@ export * from './components/FingerprintEnrollmentSection';
 export * from './components/BiometricsEmployeeTable';
 export * from './components/ManageBiometricsModal';
 export * from './components/BiometricsConfirmationModals';
+export * from './components/CameraEkycModal';
+export * from './components/BiometricStatusBadge';
+export * from './hooks/useBiometricEnrollment';

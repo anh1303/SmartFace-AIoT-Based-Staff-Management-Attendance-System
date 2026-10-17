@@ -21,18 +21,22 @@ export const EmployeeDashboard: React.FC = () => {
   const [explainReason, setExplainReason] = useState('');
   const [explainDate, setExplainDate] = useState(() => getTodayVNString());
 
-  const empCode = currentUser?.employee_id || 'NV-001';
-  const currentEmp = employees.find(e => e.employee_id === empCode);
+  const empCode = currentUser?.employee_id || '';
+  const currentEmp = empCode ? employees.find(e => e.employee_id === empCode || e.id === empCode) : null;
 
   // Employee's upcoming shifts
-  const myShifts = workShifts
-    .filter(s => s.employee_id === empCode)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const myShifts = empCode
+    ? workShifts
+        .filter(s => s.employee_id === empCode || (currentEmp && s.employee_id === currentEmp.id))
+        .sort((a, b) => a.date.localeCompare(b.date))
+    : [];
 
   // Employee's recent attendance
-  const myAttendance = attendance
-    .filter(a => a.employee_id === empCode)
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const myAttendance = empCode
+    ? attendance
+        .filter(a => a.employee_id === empCode || (currentEmp && a.employee_id === currentEmp.id))
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    : [];
 
   const latestPunch = myAttendance[0];
   const todayShift = myShifts.find(s => s.date === getTodayVNString()) || myShifts[0];
@@ -42,7 +46,9 @@ export const EmployeeDashboard: React.FC = () => {
   const workDaysCount = attendedDates.length;
 
   // Current period payroll record
-  const currentPayroll = payroll.find(p => p.employee_id === empCode) || payroll[0];
+  const currentPayroll = empCode
+    ? payroll.find(p => p.employee_id === empCode || (currentEmp && p.employee_id === currentEmp.id)) || null
+    : null;
   const netSalaryFormatted = currentPayroll
     ? Number(currentPayroll.net_salary || 0).toLocaleString('vi-VN') + '₫'
     : ((currentEmp?.hourly_rate || 120000) * 160).toLocaleString('vi-VN') + '₫';

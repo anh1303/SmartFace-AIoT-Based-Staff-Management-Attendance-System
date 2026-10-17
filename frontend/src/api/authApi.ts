@@ -20,8 +20,10 @@ export const DEFAULT_USERS: Record<Role, UserSession> = {
     role: 'manager',
     role_name: 'MANAGER',
     is_manager: true,
-    position: 'Quản lý chính',
-    department: 'Quản lý',
+    position: 'Trưởng phòng Nhân sự',
+    positionId: 1,
+    department: 'Nhân sự',
+    departmentId: 1,
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
   },
   employee: {
@@ -32,7 +34,9 @@ export const DEFAULT_USERS: Record<Role, UserSession> = {
     role_name: 'EMPLOYEE',
     is_manager: false,
     position: 'Thu ngân chính',
-    department: 'Thu ngân',
+    positionId: 2,
+    department: 'Nhân sự',
+    departmentId: 1,
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
   },
 };
@@ -65,7 +69,9 @@ export async function loginApi(identifier: string, password?: string) {
       role_name: roleName || targetRole.toUpperCase(),
       is_manager: isManagerOrAdmin,
       position: user.position || (targetRole === 'admin' ? 'Quản trị viên' : targetRole === 'manager' ? 'Quản lý' : 'Nhân viên'),
+      positionId: user.positionId ?? user.position_id ?? null,
       department: user.department || (targetRole === 'admin' ? 'Ban Quản Trị' : 'Chung'),
+      departmentId: user.departmentId ?? user.department_id ?? null,
       avatar: user.avatar || DEFAULT_USERS[targetRole].avatar,
     };
 
@@ -104,7 +110,9 @@ export async function meApi(): Promise<UserSession | null> {
         role_name: roleName || targetRole.toUpperCase(),
         is_manager: isManagerOrAdmin,
         position: user.position || (targetRole === 'admin' ? 'Quản trị viên' : targetRole === 'manager' ? 'Quản lý' : 'Nhân viên'),
+        positionId: user.positionId ?? user.position_id ?? null,
         department: user.department || (targetRole === 'admin' ? 'Ban Quản Trị' : 'Chung'),
+        departmentId: user.departmentId ?? user.department_id ?? null,
         avatar: user.avatar || DEFAULT_USERS[targetRole].avatar,
       };
     }

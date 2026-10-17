@@ -94,6 +94,11 @@ export async function assertCanAccessEmployeeDetail(
       return; // Quản lý được xem chính mình
     }
 
+    // Chốt chặn: Quản lý chỉ được xem nhân viên thuộc phòng ban mình phụ trách
+    if (selfEmp?.departmentId && target.departmentId && selfEmp.departmentId !== target.departmentId) {
+      throw AppError.forbidden('Quản lý chỉ có quyền xem thông tin nhân viên thuộc phòng ban mình phụ trách');
+    }
+
     // Kiểm tra nhân viên mục tiêu có phải là Quản lý không
     if (isEmployeeManager(target)) {
       throw AppError.forbidden(customForbiddenMessage);

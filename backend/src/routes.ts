@@ -1,18 +1,16 @@
 import { Router } from 'express';
-import { authRouter } from './modules/auth/auth.controller.js';
-import { employeeRouter } from './modules/employees/employee.controller.js';
-import { departmentRouter } from './modules/employees/department.controller.js';
-import { positionRouter } from './modules/employees/position.controller.js';
-import { attendanceRouter } from './modules/attendance/attendance.controller.js';
-import { biometricRouter } from './modules/biometrics/biometric.controller.js';
-import { deviceRouter } from './modules/devices/device.controller.js';
-import { payrollRouter } from './modules/payroll/payroll.controller.js';
-import { shiftRouter } from './modules/shifts/shift.controller.js';
-import { auditRouter } from './modules/audit-logs/audit.controller.js';
+import { authRouter } from './modules/auth/index.js';
+import { employeeRouter, departmentRouter, positionRouter } from './modules/employees/index.js';
+import { attendanceRouter } from './modules/attendance/index.js';
+import { biometricRouter } from './modules/biometrics/index.js';
+import { deviceRouter } from './modules/devices/index.js';
+import { payrollRouter } from './modules/payroll/index.js';
+import { shiftRouter } from './modules/shifts/index.js';
+import { auditRouter } from './modules/audit-logs/index.js';
 
 export const apiRouter = Router();
 
-// Modular API Routers
+// Modular Feature-based API Routers
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/employees', employeeRouter);
 apiRouter.use('/departments', departmentRouter);

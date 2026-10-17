@@ -5,6 +5,7 @@ import { buildIdOrCodeWhere, generateUniqueEmployeeCode, generateRandomPassword 
 import { sendAccountCredentialsEmail, type EmailSendResult } from '../../common/email.service.js'
 import { logAction } from '../audit-logs/audit.service.js'
 import { employeeInclude } from './employee.model.js'
+import { assertCanAccessEmployeeDetail } from '../../common/permission.helper.js'
 
 export interface RawEmployeeDb {
   id: string
@@ -617,5 +618,83 @@ export async function resetPassword(idOrCode: string, actorUserId?: string) {
     email_sent: emailResult.success,
     simulated: emailResult.simulated ?? false,
   }
+}
+
+export async function createWithManagerCheck(
+  body: any,
+  actorUserId?: string,
+  actorRole?: string
+) {
+  if (actorRole === 'MANAGER') {
+    const pos = typeof body.position === 'string' ? body.position.trim() : '';
+    const dept = (body.department || '').trim();
+    const posId = body.positionId || body.position_id;
+    let isTargetPosManager = /quản lý|manager|trưởng phòng|giám đốc|admin/i.test(pos);
+
+    if (posId) {
+      const p = await prisma.position.findUnique({ where: { id: posId } });
+      if (p?.level === 'MANAGER' || /quản lý|manager|trưởng phòng|giám đốc|admin/i.test(p?.name || '')) {
+        isTargetPosManager = true;
+      }
+    }
+
+    if (isTargetPosManager || /quản lý|manager/i.test(dept)) {
+      throw AppError.forbidden(
+        'Quản lý chỉ được thêm nhân viên mới có chức vụ thông thường (không được thêm chức vụ Quản lý/Trưởng phòng)'
+      );
+    }
+  }
+
+  const empData = {
+    ...body,
+    employee_code: body.employee_code || body.employee_id,
+    departmentId: body.departmentId || body.department_id,
+    positionId: body.positionId || body.position_id,
+  };
+  return create(empData, actorUserId);
+}
+
+export async function updateWithManagerCheck(
+  id: string,
+  updates: any,
+  actorUser?: { id?: string; role?: string }
+) {
+  await assertCanAccessEmployeeDetail(
+    actorUser,
+    id,
+    'Quản lý không có quyền chỉnh sửa thông tin của quản lý khác'
+  );
+
+  if (actorUser?.role === 'MANAGER') {
+    const pos = typeof updates.position === 'string' ? updates.position.trim() : '';
+    const dept = (updates.department || '').trim();
+    const posId = updates.positionId || updates.position_id;
+    let isTargetPosManager = Boolean(pos && /quản lý|manager|trưởng phòng|giám đốc|admin/i.test(pos));
+
+    if (posId) {
+      const p = await prisma.position.findUnique({ where: { id: posId } });
+      if (p?.level === 'MANAGER' || /quản lý|manager|trưởng phòng|giám đốc|admin/i.test(p?.name || '')) {
+        isTargetPosManager = true;
+      }
+    }
+
+    if (isTargetPosManager || (dept && /quản lý|manager/i.test(dept))) {
+      throw AppError.forbidden('Quản lý không được phép gán hoặc chuyển đổi sang chức vụ Quản lý');
+    }
+  }
+
+  return update(id, updates, actorUser?.id);
+}
+
+export async function getByIdWithManagerCheck(
+  id: string,
+  actorUser?: { id?: string; role?: string }
+) {
+  await assertCanAccessEmployeeDetail(
+    actorUser,
+    id,
+    'Quản lý không có quyền xem thông tin chi tiết của quản lý khác'
+  );
+  return get(id);
 }
 

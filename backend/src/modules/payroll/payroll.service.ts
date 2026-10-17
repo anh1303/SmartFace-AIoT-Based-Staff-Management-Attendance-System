@@ -163,7 +163,14 @@ export async function list(
 ) {
   const where: Prisma.PayrollRecordWhereInput = {}
   if (payroll_period) where.payroll_period = payroll_period
-  if (employeeIdOrCode) {
+
+  if (requester?.role === 'EMPLOYEE' && requester.id) {
+    const emp = await prisma.employee.findFirst({
+      where: { user_id: requester.id },
+    })
+    if (!emp) return []
+    where.employeeId = emp.id
+  } else if (employeeIdOrCode) {
     where.employee = buildIdOrCodeWhere(employeeIdOrCode)
   }
 

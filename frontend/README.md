@@ -90,7 +90,7 @@ Danh sách biến môi trường trong file `frontend/.env`:
 
 ---
 
-## 📁 Cấu Trúc Thư Mục Frontend
+## 📁 Cấu Trúc Thư Mục Chuẩn Pragmatic/Hybrid Feature-Based
 
 ```text
 frontend/
@@ -100,23 +100,29 @@ frontend/
 │   ├── App.tsx             # Định tuyến Router & Cấu hình phân luồng Layout
 │   ├── index.css           # Custom styles, Glassmorphism, Theme & Tailwind setup
 │   ├── api/                # API Client Layer (axios/fetch credentials, HttpOnly auth)
-│   ├── components/         # Các Reusable UI Components
-│   │   ├── common/         # Component dùng chung (Toast, Badge, Modal, StatCard)
-│   │   └── layout/         # Header, Topbar, Sidebar, AppLayout
-│   ├── context/            # Modular Global State Management (AuthContext & ToastContext)
-│   ├── features/           # Feature Modules (Biển diễn mô hình Feature-based)
-│   │   └── attendance-monitor/ # Feature giám sát chấm công, khóa ca & xuất báo cáo CSV
-│   ├── hooks/              # Domain-specific React Query Hooks (useEmployees, useShifts, useAttendance, usePayroll)
-│   ├── pages/              # Màn hình chức năng ứng dụng
+│   ├── components/         # Reusable UI Primitives (Tầng dùng chung không phụ thuộc feature)
+│   │   ├── common/         # Component dùng chung (Table, Modal, Toast, SearchInput, FilterBar...)
+│   │   └── layout/         # Shell giao diện (Topbar, Sidebar, AppLayout)
+│   ├── context/            # Modular Global State Management (AuthContext, ThemeContext, ToastContext...)
+│   ├── features/           # Feature Modules (Mô hình Pragmatic Feature-Based theo Business Domain)
+│   │   ├── attendance/     # Chấm công & Giám sát AIoT (WebRTC, Sockets, Locks, Bộ lọc, CSV Export)
+│   │   ├── biometrics/     # Sinh trắc học (eKYC, Face ID, Fingerprint enrollment, BiometricStatusBadge)
+│   │   ├── employees/      # Nhân sự (Danh sách, Chi tiết, Modal thêm/sửa, Phân quyền, Tabs)
+│   │   ├── payroll/        # Tính lương (Bảng lương, Chính sách thưởng phạt, Chốt/Mở khóa lương)
+│   │   ├── reports/        # Báo cáo & Thống kê (Biểu đồ Recharts, Tỷ lệ đúng giờ, Xuất báo cáo)
+│   │   └── schedules/      # Lịch làm việc (Ma trận ca làm việc, Điều chỉnh ca, Phân ca hàng loạt)
+│   ├── hooks/              # Shared cross-cutting hooks (useAttendancePairs, useDepartmentPositions...)
+│   ├── pages/              # Thin Route Coordinators (Chỉ điều phối feature & layout, không chứa logic nặng)
 │   │   ├── public/         # LandingPage, LoginPage
-│   │   ├── manager/        # Manager Dashboard, Employee Manager, Schedule, Attendance, Payroll, Reports...
-│   │   └── employee/       # Employee Dashboard, Personal Attendance, Profile, Schedule, SalaryEstimate... (tương thích ngược với staff/)
-│   ├── types/              # Interfaces & TypeScript Definitions chuẩn hóa
-│   └── utils/              # Helper functions (getTodayVNString, formatVNDateISO, Currency, Socket client)
+│   │   ├── manager/        # Manager Dashboard, EmployeeList, Detail, Attendance, Schedule, Payroll, Reports...
+│   │   └── employee/       # Employee Dashboard, Attendance, Schedule, Profile, SalaryEstimate...
+│   ├── routes/             # Cấu hình Router & Route Guards (Role-based guards)
+│   ├── types/              # Shared TypeScript Definitions & Domain Models
+│   └── utils/              # Helper functions (dateUtils, formatters, logger, permissionUtils)
 ├── index.html              # HTML Template entry point
 ├── vite.config.ts          # Cấu hình Vite Server, Port & Proxy API
 ├── package.json            # Thư viện & Scripts
-└── tsconfig.json           # Cấu hình compiler TypeScript
+└── tsconfig.json           # Cấu hình compiler TypeScript & Path Alias (@/*)
 ```
 
 ---

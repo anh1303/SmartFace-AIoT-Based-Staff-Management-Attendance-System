@@ -11,18 +11,32 @@ import {
   CreditCard
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
+import {
+  PageHeaderBanner,
+  TableContainer,
+  TableHead,
+  TableHeadRow,
+  TableHeadCell,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableEmpty,
+  ActionEditButton
+} from '../../components/common';
 import { PayrollRecord } from '../../types';
 
 export const EmployeeSalaryHistory: React.FC = () => {
   const { currentUser, payroll, bonusPenalty } = useApp();
   const [selectedSlip, setSelectedSlip] = useState<PayrollRecord | null>(null);
 
-  const empCode = currentUser?.employee_id || 'NV-001';
+  const empCode = currentUser?.employee_id || '';
 
   // Employee's payroll records sorted by period desc
-  const myPayrolls = payroll
-    .filter(p => p.employee_id === empCode)
-    .sort((a, b) => (b.period || '').localeCompare(a.period || ''));
+  const myPayrolls = empCode
+    ? payroll
+        .filter(p => p.employee_id === empCode)
+        .sort((a, b) => (b.period || '').localeCompare(a.period || ''))
+    : [];
 
   const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5;
   const penaltyRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
@@ -38,102 +52,93 @@ export const EmployeeSalaryHistory: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Bento Header Banner with Continuous Shifting Gradient & Floating Blobs */}
-      <div className="bento-hero-gradient rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
-        {/* Ambient Floating & Morphing Blurred Blobs */}
-        <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-purple-500/30 to-fuchsia-500/25 dark:from-purple-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
-        <div className="absolute -bottom-16 left-1/4 w-64 h-64 bg-gradient-to-tr from-indigo-500/30 to-blue-500/20 dark:from-indigo-600/30 dark:to-blue-600/20 rounded-full blur-3xl pointer-events-none animate-blob-2" />
-        <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
+      <PageHeaderBanner
+        title="Lịch sử Phiếu Lương Hàng Tháng"
+        badge={
+          <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono font-medium border border-emerald-500/20">
+            ĐÃ XÁC THỰC CSDL
+          </span>
+        }
+        actions={
+          <span className="text-xs font-mono text-purple-600 dark:text-purple-400 bg-white/80 dark:bg-[#0f1224]/80 backdrop-blur-sm px-3.5 py-2 rounded-xl border border-purple-200/80 dark:border-[#272d5a] shadow-xs">
+            MÃ NHÂN VIÊN: {empCode}
+          </span>
+        }
+      />
 
-        <div className="relative z-10">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
-              Lịch sử Phiếu Lương Hàng Tháng
-            </h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono font-medium border border-emerald-500/20">
-              ĐÃ XÁC THỰC CSDL
-            </span>
-          </div>
-        </div>
+      {/* Standard Design System Table */}
+      <TableContainer minWidth="950px">
+        <TableHead>
+          <TableHeadRow>
+            <TableHeadCell width="130px">Kỳ lương</TableHeadCell>
+            <TableHeadCell width="120px">Lương/giờ</TableHeadCell>
+            <TableHeadCell width="160px">Tăng ca (OT)</TableHeadCell>
+            <TableHeadCell width="160px">Trễ / Sớm</TableHeadCell>
+            <TableHeadCell width="120px">Phụ cấp</TableHeadCell>
+            <TableHeadCell width="140px">Thực lĩnh (Net)</TableHeadCell>
+            <TableHeadCell width="110px">Trạng thái</TableHeadCell>
+            <TableHeadCell width="110px" align="right" isLast>Thao tác</TableHeadCell>
+          </TableHeadRow>
+        </TableHead>
+        <TableBody>
+          {myPayrolls.length === 0 ? (
+            <TableEmpty colSpan={8} message="Không có dữ liệu phiếu lương nào." />
+          ) : (
+            myPayrolls.map((p, idx) => {
+              const hourly = Number(p.hourly_rate || 120000);
+              const ot = Number(p.total_overtime ?? 0);
+              const late = Number(p.total_late_early ?? 0);
+              const allw = Number(p.allowance ?? 0);
+              const net = Number(p.net_salary ?? 0);
+              const otAmount = getOTAmount(ot, hourly);
+              const lateAmount = getLateAmount(late, hourly);
+              const periodStr = p.period || p.payroll_period;
 
-        <span className="relative z-10 text-xs font-mono text-purple-600 dark:text-purple-400 bg-white/80 dark:bg-[#0f1224]/80 backdrop-blur-sm px-3.5 py-2 rounded-xl border border-purple-200/80 dark:border-[#272d5a] shadow-xs">
-          MÃ NHÂN VIÊN: {empCode}
-        </span>
-      </div>
-
-      {/* Bento Payroll Records Table */}
-      <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse table-fixed min-w-[950px]">
-            <thead className="bg-slate-50/80 dark:bg-[#0f1224] border-b border-slate-200 dark:border-[#21264b] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono text-[11px]">
-              <tr>
-                <th className="py-3.5 px-4 w-[130px] font-medium">Kỳ lương</th>
-                <th className="py-3.5 px-4 w-[120px] font-medium">Lương/giờ</th>
-                <th className="py-3.5 px-4 w-[160px] font-medium">Tăng ca (OT)</th>
-                <th className="py-3.5 px-4 w-[160px] font-medium">Trễ / Sớm</th>
-                <th className="py-3.5 px-4 w-[120px] font-medium">Phụ cấp</th>
-                <th className="py-3.5 px-4 w-[140px] font-medium">Thực lĩnh (Net)</th>
-                <th className="py-3.5 px-4 w-[110px] font-medium">Trạng thái</th>
-                <th className="py-3.5 px-4 w-[110px] text-right font-medium">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[#1d2243] text-slate-700 dark:text-slate-300">
-              {myPayrolls.map((p, idx) => {
-                const hourly = Number(p.hourly_rate || 120000);
-                const ot = Number(p.total_overtime ?? 0);
-                const late = Number(p.total_late_early ?? 0);
-                const allw = Number(p.allowance ?? 0);
-                const net = Number(p.net_salary ?? 0);
-                const otAmount = getOTAmount(ot, hourly);
-                const lateAmount = getLateAmount(late, hourly);
-                const periodStr = p.period || p.payroll_period;
-
-                return (
-                  <tr key={p.payroll_id || idx} className="hover:bg-slate-50/80 dark:hover:bg-[#1a1e3a]/40 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white truncate max-w-[130px]" title={periodStr}>
-                      {periodStr}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono truncate" title={`${hourly.toLocaleString('vi-VN')} ₫/h`}>
-                      {hourly.toLocaleString('vi-VN')} ₫/h
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-emerald-600 dark:text-emerald-400 truncate" title={`+${ot}h (${otAmount.toLocaleString('vi-VN')} ₫)`}>
-                      +{ot}h ({otAmount.toLocaleString('vi-VN')} ₫)
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-rose-600 dark:text-red-400 truncate" title={`-${late}h (${lateAmount.toLocaleString('vi-VN')} ₫)`}>
-                      -{late}h ({lateAmount.toLocaleString('vi-VN')} ₫)
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-emerald-600 dark:text-emerald-400 truncate" title={`+${allw.toLocaleString('vi-VN')} ₫`}>
-                      +{allw.toLocaleString('vi-VN')} ₫
-                    </td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white text-sm truncate" title={`${net.toLocaleString('vi-VN')} ₫`}>
-                      {net.toLocaleString('vi-VN')} ₫
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-mono ${p.status === 'FINALIZED'
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                          }`}
-                      >
-                        {p.status === 'FINALIZED' ? 'ĐÃ CHỐT' : 'CHỜ DUYỆT'}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSlip(p)}
-                        className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-1.5 ml-auto transition-colors shadow-xs"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Xem phiếu</span>
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              return (
+                <TableRow key={p.payroll_id || idx}>
+                  <TableCell className="font-mono font-bold text-slate-900 dark:text-white truncate" title={periodStr}>
+                    {periodStr}
+                  </TableCell>
+                  <TableCell className="font-mono truncate" title={`${hourly.toLocaleString('vi-VN')} ₫/h`}>
+                    {hourly.toLocaleString('vi-VN')} ₫/h
+                  </TableCell>
+                  <TableCell className="font-mono text-emerald-600 dark:text-emerald-400 truncate" title={`+${ot}h (${otAmount.toLocaleString('vi-VN')} ₫)`}>
+                    +{ot}h ({otAmount.toLocaleString('vi-VN')} ₫)
+                  </TableCell>
+                  <TableCell className="font-mono text-rose-600 dark:text-red-400 truncate" title={`-${late}h (${lateAmount.toLocaleString('vi-VN')} ₫)`}>
+                    -{late}h ({lateAmount.toLocaleString('vi-VN')} ₫)
+                  </TableCell>
+                  <TableCell className="font-mono text-emerald-600 dark:text-emerald-400 truncate" title={`+${allw.toLocaleString('vi-VN')} ₫`}>
+                    +{allw.toLocaleString('vi-VN')} ₫
+                  </TableCell>
+                  <TableCell className="font-mono font-bold text-slate-900 dark:text-white text-sm truncate" title={`${net.toLocaleString('vi-VN')} ₫`}>
+                    {net.toLocaleString('vi-VN')} ₫
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-mono ${p.status === 'FINALIZED'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                        }`}
+                    >
+                      {p.status === 'FINALIZED' ? 'ĐÃ CHỐT' : 'CHỜ DUYỆT'}
+                    </span>
+                  </TableCell>
+                  <TableCell isLast align="right">
+                    <ActionEditButton
+                      onClick={() => setSelectedSlip(p)}
+                      icon={Eye}
+                      label="Xem phiếu"
+                      title="Xem chi tiết phiếu lương"
+                      className="ml-auto"
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
+      </TableContainer>
 
       {/* Payslip Modal Detail */}
       <Modal

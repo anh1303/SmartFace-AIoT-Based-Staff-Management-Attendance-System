@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { useNavigate } from 'react-router-dom';
 import { formatVNTime, formatVNDate } from '../../utils/dateUtils';
 import {
   Menu,
-  LogOut,
   Calendar,
   Sun,
   Moon
@@ -16,9 +13,7 @@ interface TopbarProps {
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
-  const { role, currentUser, logout } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
-  const navigate = useNavigate();
   const [timeStr, setTimeStr] = useState<string>('');
   const [dateStr, setDateStr] = useState<string>(() => formatVNDate(new Date()));
 
@@ -32,11 +27,6 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
     const timer = setInterval(updateTime, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   return (
     <header className="h-16 bg-white/90 dark:bg-[#0f1224]/90 backdrop-blur border-b border-slate-200/80 dark:border-[#1d2243] px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 select-none transition-colors duration-200">
@@ -80,39 +70,6 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
               <span className="text-xs font-medium hidden sm:inline text-slate-700">Tối</span>
             </>
           )}
-        </button>
-
-        {/* User Profile info */}
-        <div className="flex items-center gap-3">
-          {currentUser?.avatar ? (
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.full_name}
-              className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-[#272d5a] shadow-xs"
-            />
-          ) : (
-            <div className="w-9 h-9 rounded-full bg-purple-100 dark:bg-[#181c38] border border-purple-200 dark:border-[#272d5a] flex items-center justify-center text-purple-700 dark:text-purple-300 font-bold">
-              {currentUser?.full_name?.charAt(0) || 'U'}
-            </div>
-          )}
-          <div className="hidden sm:block text-left">
-            <p className="text-xs font-semibold text-slate-900 dark:text-white leading-none">
-              {currentUser?.full_name || 'Người dùng'}
-            </p>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 capitalize leading-none">
-              {role === 'manager' ? 'Quản Lý (Manager)' : 'Nhân Viên (Employee)'}
-            </p>
-          </div>
-        </div>
-
-        {/* Logout button */}
-        <button
-          type="button"
-          onClick={handleLogout}
-          title="Đăng xuất khỏi hệ thống"
-          className="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 dark:bg-[#181c38] dark:hover:bg-rose-950/30 dark:text-slate-400 dark:hover:text-rose-400 dark:border-[#272d5a] dark:hover:border-rose-500/30 transition-colors cursor-pointer shadow-xs"
-        >
-          <LogOut className="w-4 h-4" />
         </button>
       </div>
     </header>

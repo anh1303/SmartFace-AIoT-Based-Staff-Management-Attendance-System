@@ -1,338 +1,97 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
-import { isAnotherManager } from '../../utils/permissionUtils';
+import { useDepartmentPositions } from '../../hooks';
 import { ScanFace, Fingerprint, AlertTriangle } from 'lucide-react';
-import { CameraEkycModal, CapturedFaceSample } from '../../components/biometrics/CameraEkycModal';
-import { enrollFaceImagesApi, deleteEmployeeBiometricsApi, EnrollFaceResult } from '../../api/biometricApi';
-import { Employee } from '../../types';
-import { logger } from '../../utils/logger';
 import {
   BiometricsHeader,
   EmployeeBiometricsCard,
   FaceEnrollmentSection,
-  FacePhotoItem,
   FingerprintEnrollmentSection,
-  FingerprintStep,
   BiometricsEmployeeTable,
   ManageBiometricsModal,
   FaceConfirmModal,
   FaceResultModal,
   FingerprintConfirmModal,
+  CameraEkycModal,
+  useBiometricEnrollment,
 } from '../../features/biometrics';
 
-const biometricLogger = logger.child('ManagerBiometrics');
-
 export const ManagerBiometrics: React.FC = () => {
-  const { employees, updateEmployee, showToast } = useApp();
+  const { employees } = useApp();
   const { currentUser, role } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const queryEmpId = searchParams.get('employee_id') || searchParams.get('empId');
+  const [, setSearchParams] = useSearchParams();
 
-  // Selected employee for enrollment
-  const [selectedEmpId, setSelectedEmpId] = useState<string>(
-    () => queryEmpId || employees[0]?.employee_id || 'NV-001'
-  );
-  const [activeTab, setActiveTab] = useState<'FACE' | 'FINGERPRINT'>('FACE');
+  const isManager = role === 'manager';
+  const managerDept = currentUser?.department;
 
-  // Sync selectedEmpId when URL query param changes
-  useEffect(() => {
-    if (queryEmpId && queryEmpId !== selectedEmpId) {
-      setSelectedEmpId(queryEmpId);
-    }
-  }, [queryEmpId, selectedEmpId]);
+  // 1. Biometric enrollment state & handlers encapsulated in custom hook
+  const {
+    selectedEmpId,
+    setSelectedEmpId,
+    activeTab,
+    setActiveTab,
+    currentEmp,
+    isSelf,
+    isEnrollmentBlocked,
 
-  // Face Enrollment State (Requires at least 3 photos)
-  const [uploadedPhotos, setUploadedPhotos] = useState<FacePhotoItem[]>([]);
-  const [analyzingFace, setAnalyzingFace] = useState<boolean>(false);
-  const [faceConfirmModal, setFaceConfirmModal] = useState<boolean>(false);
-  const [isEkycModalOpen, setIsEkycModalOpen] = useState<boolean>(false);
-  const [enrollResult, setEnrollResult] = useState<EnrollFaceResult | null>(null);
-  const [resultModalOpen, setResultModalOpen] = useState<boolean>(false);
+    uploadedPhotos,
+    analyzingFace,
+    faceConfirmModal,
+    setFaceConfirmModal,
+    isEkycModalOpen,
+    setIsEkycModalOpen,
+    enrollResult,
+    resultModalOpen,
+    setResultModalOpen,
+    handlePhotoUpload,
+    handleRemovePhoto,
+    handleEkycComplete,
+    handleConfirmFaceSave,
 
-  // Fingerprint Device Trigger State
-  const [selectedDevice, setSelectedDevice] = useState<string>(
-    'FaceCam-01 (Máy chấm công Face_ID Vào ca)'
-  );
-  const [selectedFinger, setSelectedFinger] = useState<string>('Ngón trỏ phải (Right Index)');
-  const [fingerprintStep, setFingerprintStep] = useState<FingerprintStep>('IDLE');
-  const [fingerQualityScore, setFingerQualityScore] = useState<number | null>(null);
-  const [fingerConfirmModal, setFingerConfirmModal] = useState<boolean>(false);
+    selectedDevice,
+    setSelectedDevice,
+    selectedFinger,
+    setSelectedFinger,
+    fingerprintStep,
+    fingerQualityScore,
+    fingerConfirmModal,
+    setFingerConfirmModal,
+    handleSendIoTTrigger,
+    handleConfirmFingerprintSave,
 
-  // Biometrics Management Popup Modal state for a specific employee
-  const [manageModalEmployee, setManageModalEmployee] = useState<Employee | null>(null);
+    setManageModalEmployee,
+    currentManageEmp,
+    handleDeleteFaceId,
+    handleDeleteFingerprint,
+    handleStartEditFace,
+    handleStartCameraEkycFromModal,
+    handleStartEditFingerprint,
+  } = useBiometricEnrollment();
 
-  // Reset photos & biometric state whenever selected employee changes
-  useEffect(() => {
-    setUploadedPhotos([]);
-    setAnalyzingFace(false);
-    setFingerprintStep('IDLE');
-    setFingerQualityScore(null);
-  }, [selectedEmpId]);
-
-  const currentEmp = employees.find((e) => e.employee_id === selectedEmpId) || employees[0];
-
-  // Chốt chặn Requirement 2: Bất kiêm nhiệm - không ai được tự đăng ký ảnh khuôn mặt/sinh trắc học của mình
-  // và Manager không được sửa sinh trắc học của Manager khác
-  const isSelf = Boolean(
-    currentEmp && currentUser &&
-    (currentEmp.employee_id === currentUser.employee_id || currentEmp.email === currentUser.email)
-  );
-  const isOtherMgr = isAnotherManager(currentEmp, currentUser);
-  const isEnrollmentBlocked = role !== 'admin' && (isSelf || isOtherMgr);
-
-  // Handle Photo Upload (Multiple files allowed)
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isEnrollmentBlocked) {
-      showToast(
-        isSelf
-          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
-          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
-        'error'
-      );
-      return;
-    }
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const fileList = Array.from(files);
-    const newPhotos: FacePhotoItem[] = [];
-    let loadedCount = 0;
-
-    fileList.forEach((file, idx) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const overallIndex = uploadedPhotos.length + newPhotos.length;
-        let defaultTag = 'Chính diện';
-        if (overallIndex === 1) defaultTag = 'Quay trái (~25°)';
-        else if (overallIndex === 2) defaultTag = 'Quay phải (~25°)';
-        else if (overallIndex > 2) defaultTag = `Góc phụ ${overallIndex + 1}`;
-
-        newPhotos.push({
-          id: `upload_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`,
-          url: reader.result as string,
-          name: file.name,
-          tag: defaultTag,
-        });
-        loadedCount++;
-
-        if (loadedCount === fileList.length) {
-          setUploadedPhotos((prev) => [...prev, ...newPhotos]);
-          setAnalyzingFace(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-
-    e.target.value = '';
-  };
-
-  const handleRemovePhoto = (id: string) => {
-    setUploadedPhotos((prev) => prev.filter((p) => p.id !== id));
-  };
-
-  const handleEkycComplete = (samples: CapturedFaceSample[]) => {
-    const newItems: FacePhotoItem[] = samples.map((s) => ({
-      id: s.id,
-      url: s.dataUrl,
-      name: `${s.label} (Camera eKYC)`,
-      tag: s.label,
-    }));
-
-    setUploadedPhotos(newItems);
-    showToast(
-      `Đã thu thập đủ 3 góc khuôn mặt chuẩn eKYC cho ${currentEmp?.full_name}!`,
-      'success'
-    );
-  };
-
-  const handleConfirmFaceSave = async () => {
-    if (!currentEmp || uploadedPhotos.length < 3) return;
-    if (isEnrollmentBlocked) {
-      showToast(
-        isSelf
-          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
-          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
-        'error'
-      );
-      return;
-    }
-    setAnalyzingFace(true);
-    try {
-      const frontalPhoto = uploadedPhotos[0]?.url || currentEmp.avatar;
-      const imagesBase64 = uploadedPhotos.map((p) => p.url);
-
-      const result = await enrollFaceImagesApi(currentEmp.employee_id, imagesBase64);
-
-      updateEmployee(currentEmp.employee_id, {
-        avatar: frontalPhoto,
-      });
-
-      const total = result?.total_images ?? uploadedPhotos.length;
-      const detected = result?.detected_faces ?? result?.n_samples_used ?? uploadedPhotos.length;
-      const rate =
-        result?.extraction_rate ?? (total > 0 ? Math.round((detected / total) * 100) : 100);
-      const used = result?.n_samples_used ?? detected;
-
-      setEnrollResult(result);
-      setFaceConfirmModal(false);
-      setResultModalOpen(true);
-
-      showToast(
-        `Đã trích xuất thành công ${detected}/${total} khung hình trong ảnh (Tỉ lệ: ${rate}%). Đã lưu ${used} vector khuôn mặt 512-D cho nhân viên ${currentEmp.full_name} (${currentEmp.employee_id})!`,
-        'success'
-      );
-    } catch (err: any) {
-      biometricLogger.error('Error updating face biometrics:', err);
-      showToast(
-        `Lỗi khi cập nhật sinh trắc học: ${err.message || 'Thao tác không thành công'}`,
-        'error'
-      );
-    } finally {
-      setAnalyzingFace(false);
-    }
-  };
-
-  const handleSendIoTTrigger = () => {
-    if (isEnrollmentBlocked) {
-      showToast(
-        isSelf
-          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
-          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
-        'error'
-      );
-      return;
-    }
-    setFingerprintStep('SENDING');
-    setTimeout(() => {
-      setFingerprintStep('WAITING_TOUCH');
-      setTimeout(() => {
-        setFingerprintStep('CAPTURED');
-        setTimeout(() => {
-          setFingerprintStep('VERIFIED');
-          setFingerQualityScore(98.5);
-        }, 1000);
-      }, 2000);
-    }, 1200);
-  };
-
-  const handleConfirmFingerprintSave = () => {
-    if (!currentEmp) return;
-    if (isEnrollmentBlocked) {
-      showToast(
-        isSelf
-          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
-          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
-        'error'
-      );
-      return;
-    }
-    updateEmployee(currentEmp.employee_id, {
-      fingerprint_enrolled: true,
-    });
-    setFingerConfirmModal(false);
-    setFingerprintStep('IDLE');
-    showToast(
-      `Đã lưu mẫu vân tay ${selectedFinger} cho ${currentEmp.full_name} từ ${selectedDevice}!`,
-      'success'
-    );
-  };
-
-  const currentManageEmp = manageModalEmployee
-    ? employees.find((e) => e.employee_id === manageModalEmployee.employee_id) ||
-      manageModalEmployee
-    : null;
-
-  const handleDeleteFaceId = async (emp: Employee) => {
-    const isSelfEmp = Boolean(
-      emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
-    );
-    const isOtherMgrEmp = isAnotherManager(emp, currentUser);
-    if (role !== 'admin' && (isSelfEmp || isOtherMgrEmp)) {
-      showToast(
-        isSelfEmp
-          ? 'Không ai được tự xóa dữ liệu sinh trắc học của chính mình. Vui lòng liên hệ Admin!'
-          : 'Quản lý không có quyền xóa sinh trắc học của Quản lý khác!',
-        'error'
-      );
-      return;
-    }
-
-    try {
-      await deleteEmployeeBiometricsApi(emp.employee_id);
-    } catch (err: any) {
-      biometricLogger.warn('Biometric delete info:', err);
-    }
-    updateEmployee(emp.employee_id, {
-      face_enrolled: false,
-    });
-    showToast(
-      `Đã xóa dữ liệu Face ID của nhân viên ${emp.full_name} (${emp.employee_id}) thành công!`,
-      'success'
-    );
-  };
-
-  const handleDeleteFingerprint = (emp: Employee) => {
-    const isSelfEmp = Boolean(
-      emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
-    );
-    const isOtherMgrEmp = isAnotherManager(emp, currentUser);
-    if (role !== 'admin' && (isSelfEmp || isOtherMgrEmp)) {
-      showToast(
-        isSelfEmp
-          ? 'Không ai được tự xóa dữ liệu sinh trắc học của chính mình. Vui lòng liên hệ Admin!'
-          : 'Quản lý không có quyền xóa sinh trắc học của Quản lý khác!',
-        'error'
-      );
-      return;
-    }
-
-    updateEmployee(emp.employee_id, {
-      fingerprint_enrolled: false,
-    });
-    showToast(
-      `Đã xóa dữ liệu vân tay của nhân viên ${emp.full_name} (${emp.employee_id}) thành công!`,
-      'success'
-    );
-  };
-
-  const handleStartEditFace = (emp: Employee) => {
-    setSelectedEmpId(emp.employee_id);
-    setSearchParams({ employee_id: emp.employee_id });
-    setActiveTab('FACE');
-    setManageModalEmployee(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleStartCameraEkycFromModal = (emp: Employee) => {
-    setSelectedEmpId(emp.employee_id);
-    setSearchParams({ employee_id: emp.employee_id });
-    setActiveTab('FACE');
-    setManageModalEmployee(null);
-    setIsEkycModalOpen(true);
-  };
-
-  const handleStartEditFingerprint = (emp: Employee) => {
-    setSelectedEmpId(emp.employee_id);
-    setSearchParams({ employee_id: emp.employee_id });
-    setActiveTab('FINGERPRINT');
-    setManageModalEmployee(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // Table search & filter states
+  // 2. Department & Position filtering via reusable hook
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [departmentFilter, setDepartmentFilter] = useState(() => {
+    if (role === 'manager' && currentUser?.department) {
+      return currentUser.department;
+    }
+    return 'ALL';
+  });
   const [positionFilter, setPositionFilter] = useState<string>('ALL');
 
-  const positions = useMemo(() => {
-    const set = new Set<string>();
-    employees.forEach((e) => {
-      const pos = e.position || e.department;
-      if (pos) set.add(pos);
-    });
-    return Array.from(set);
-  }, [employees]);
+  useEffect(() => {
+    if (isManager && managerDept) {
+      setDepartmentFilter(managerDept);
+    }
+  }, [isManager, managerDept]);
+
+  const { departmentOptions, positionOptions } = useDepartmentPositions({
+    employees,
+    isManager,
+    managerDept,
+    departmentFilter,
+  });
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
@@ -342,14 +101,21 @@ export const ManagerBiometrics: React.FC = () => {
         emp.full_name.toLowerCase().includes(q) ||
         emp.employee_id.toLowerCase().includes(q) ||
         (emp.position && emp.position.toLowerCase().includes(q)) ||
-        (emp.department && emp.department.toLowerCase().includes(q));
+        (emp.department && emp.department.toLowerCase().includes(q)) ||
+        (emp.email && emp.email.toLowerCase().includes(q)) ||
+        (emp.phone && emp.phone.includes(q));
 
-      const pos = emp.position || emp.department;
-      const matchPosition = positionFilter === 'ALL' || pos === positionFilter;
+      const matchDept =
+        departmentFilter === 'ALL' ||
+        emp.department?.toLowerCase() === departmentFilter.toLowerCase();
 
-      return matchSearch && matchPosition;
+      const matchPosition =
+        positionFilter === 'ALL' ||
+        emp.position?.toLowerCase() === positionFilter.toLowerCase();
+
+      return matchSearch && matchDept && matchPosition;
     });
-  }, [employees, searchTerm, positionFilter]);
+  }, [employees, searchTerm, departmentFilter, positionFilter]);
 
   return (
     <div className="space-y-6">
@@ -455,9 +221,15 @@ export const ManagerBiometrics: React.FC = () => {
         filteredEmployees={filteredEmployees}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
+        departmentFilter={departmentFilter}
+        onDepartmentFilterChange={(val) => {
+          setDepartmentFilter(val);
+          setPositionFilter('ALL');
+        }}
+        departmentOptions={departmentOptions}
         positionFilter={positionFilter}
         onPositionFilterChange={setPositionFilter}
-        positions={positions}
+        positionOptions={positionOptions}
         onOpenManageModal={(emp) => setManageModalEmployee(emp)}
       />
 
@@ -510,4 +282,5 @@ export const ManagerBiometrics: React.FC = () => {
     </div>
   );
 };
+
 export default ManagerBiometrics;

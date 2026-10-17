@@ -1,6 +1,7 @@
 import React from 'react';
 import { ScanFace, Fingerprint, Upload, Camera, Trash2, Radio } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
+import { BiometricStatusBadge } from './BiometricStatusBadge';
 import { Employee } from '../../../types';
 
 interface ManageBiometricsModalProps {
@@ -75,15 +76,7 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
               </div>
             </div>
 
-            <span
-              className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${
-                employee.face_enrolled
-                  ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
-                  : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
-              }`}
-            >
-              {employee.face_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
-            </span>
+            <BiometricStatusBadge enrolled={employee.face_enrolled} uppercase size="sm" />
           </div>
 
           <div className="flex items-center justify-between gap-2.5 pt-3 border-t border-slate-200/60 dark:border-[#21264b]">
@@ -139,15 +132,7 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
               </div>
             </div>
 
-            <span
-              className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${
-                employee.fingerprint_enrolled
-                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
-                  : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
-              }`}
-            >
-              {employee.fingerprint_enrolled ? 'ĐÃ ĐĂNG KÝ' : 'CHƯA ĐĂNG KÝ'}
-            </span>
+            <BiometricStatusBadge enrolled={employee.fingerprint_enrolled} uppercase size="sm" />
           </div>
 
           <div className="flex items-center justify-between gap-2.5 pt-3 border-t border-slate-200/60 dark:border-[#21264b]">

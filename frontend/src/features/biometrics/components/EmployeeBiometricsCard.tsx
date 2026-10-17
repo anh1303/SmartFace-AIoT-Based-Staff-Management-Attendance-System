@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScanFace, Fingerprint, ChevronDown, Search } from 'lucide-react';
 import { Employee } from '../../../types';
+import { BiometricStatusBadge } from './BiometricStatusBadge';
 
 interface EmployeeBiometricsCardProps {
   employees: Employee[];
@@ -167,15 +168,11 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
                 <ScanFace className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                 Face ID:
               </span>
-              <span
-                className={`font-mono text-[11px] px-2 py-0.5 rounded-md font-semibold ${
-                  currentEmp.face_enrolled
-                    ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
-                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
-                }`}
-              >
-                {currentEmp.face_enrolled ? 'ĐÃ CẬP NHẬT' : 'CHƯA ĐĂNG KÝ'}
-              </span>
+              <BiometricStatusBadge
+                enrolled={currentEmp.face_enrolled}
+                uppercase
+                rounded="md"
+              />
             </div>
 
             <div className="flex items-center justify-between">
@@ -183,15 +180,11 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
                 <Fingerprint className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 Vân tay (FAP30):
               </span>
-              <span
-                className={`font-mono text-[11px] px-2 py-0.5 rounded-md font-semibold ${
-                  currentEmp.fingerprint_enrolled
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
-                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50'
-                }`}
-              >
-                {currentEmp.fingerprint_enrolled ? 'ĐÃ CẬP NHẬT' : 'CHƯA ĐĂNG KÝ'}
-              </span>
+              <BiometricStatusBadge
+                enrolled={currentEmp.fingerprint_enrolled}
+                uppercase
+                rounded="md"
+              />
             </div>
           </div>
         </div>

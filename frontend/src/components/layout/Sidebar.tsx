@@ -47,11 +47,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { label: 'Tổng quan hệ thống', path: '/app/manager/dashboard', icon: LayoutDashboard },
     { label: 'Quản lý nhân viên', path: '/app/manager/employees', icon: Users },
     { label: 'Chi tiết nhân viên', path: '/app/manager/employee-detail', icon: UserCheck },
-    { label: 'Cập nhật sinh trắc học', path: '/app/manager/biometrics', icon: Fingerprint },
+    { label: 'Sinh trắc học', path: '/app/manager/biometrics', icon: Fingerprint },
     { label: 'Sắp xếp lịch làm', path: '/app/manager/schedule', icon: CalendarRange },
     { label: 'Theo dõi chấm công', path: '/app/manager/attendance', icon: Eye },
-    { label: 'Báo cáo & Thống kê', path: '/app/manager/reports', icon: BarChart3 },
     { label: 'Quản lý lương', path: '/app/manager/payroll', icon: Banknote },
+    { label: 'Báo cáo & Thống kê', path: '/app/manager/reports', icon: BarChart3 },
   ];
 
   const navItems = (role === 'admin' || role === 'manager') ? managerNavItems : employeeNavItems;
@@ -67,9 +67,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       )}
 
       <aside
-        className={`fixed lg:static top-0 bottom-0 left-0 z-40 w-64 bg-white dark:bg-[#0f1224] border-r border-slate-200/80 dark:border-[#1d2243] flex flex-col transition-all duration-300 shadow-sm ${
-          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+        className={`fixed lg:static top-0 bottom-0 left-0 z-40 w-64 bg-white dark:bg-[#0f1224] border-r border-slate-200/80 dark:border-[#1d2243] flex flex-col transition-all duration-300 shadow-sm ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          }`}
       >
         {/* Brand Header */}
         <div className="p-6 border-b border-slate-200/80 dark:border-[#1d2243]">
@@ -89,22 +88,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           {/* Role Pill */}
           <div className="mt-4 p-2.5 rounded-xl bg-slate-50 dark:bg-[#151936] border border-slate-200/80 dark:border-[#242b5c] flex items-center gap-2">
             <div
-              className={`w-2 h-2 rounded-full ${
-                role === 'admin'
-                  ? 'bg-rose-500 shadow-xs shadow-rose-400/50'
-                  : role === 'manager'
+              className={`w-2 h-2 rounded-full ${role === 'admin'
+                ? 'bg-rose-500 shadow-xs shadow-rose-400/50'
+                : role === 'manager'
                   ? 'bg-purple-500 shadow-xs shadow-purple-400/50'
                   : 'bg-emerald-500 shadow-xs shadow-emerald-400/50'
-              }`}
+                }`}
             />
             <span className="text-xs text-slate-600 dark:text-slate-300">
               Vai trò:{' '}
               <strong className="text-slate-900 dark:text-white">
                 {role === 'admin'
-                  ? 'Quản trị viên (Admin)'
+                  ? 'Quản trị viên'
                   : role === 'manager'
-                  ? 'Quản lý (Manager)'
-                  : 'Nhân viên (Employee)'}
+                    ? 'Quản lý'
+                    : 'Nhân viên'}
               </strong>
             </span>
           </div>
@@ -116,8 +114,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             {role === 'admin'
               ? 'Phân hệ Quản trị tối cao'
               : role === 'manager'
-              ? 'Phân hệ Quản trị'
-              : 'Phân hệ Nhân viên'}
+                ? 'Phân hệ Quản trị'
+                : 'Phân hệ Nhân viên'}
           </div>
 
           {navItems.map(item => {
@@ -128,10 +126,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 to={item.path}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-purple-50 text-purple-700 dark:bg-purple-600/20 dark:text-purple-300 font-semibold border border-purple-200/80 dark:border-purple-500/30 shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-[#181c38] hover:text-slate-900 dark:hover:text-slate-200'
+                  `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-600/20 dark:text-purple-300 font-semibold border border-purple-200/80 dark:border-purple-500/30 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-[#181c38] hover:text-slate-900 dark:hover:text-slate-200'
                   }`
                 }
               >
@@ -167,12 +164,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate text-slate-900 dark:text-white">
+              <div className="flex-1 min-w-0 flex items-center">
+                <p className="text-sm font-semibold truncate text-slate-900 dark:text-white leading-none">
                   {currentUser?.full_name || 'Khách'}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {currentUser?.email || (role === 'manager' ? 'manager@company.com' : 'employee@company.com')}
                 </p>
               </div>
             </div>
@@ -189,4 +183,4 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       </aside>
     </>
   );
-};
+};

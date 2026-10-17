@@ -15,6 +15,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
+import { PageHeaderBanner } from '../../components/common';
 
 export const EmployeeSchedule: React.FC = () => {
   const { currentUser, workShifts, employees, attendance, showToast } = useApp();
@@ -44,15 +45,15 @@ export const EmployeeSchedule: React.FC = () => {
     setCurrentMonday(next);
   };
 
-  const empCode = currentUser?.employee_id || 'NV-001';
+  const empCode = currentUser?.employee_id || '';
 
   // Current employee's shifts
-  const myShifts = workShifts.filter(s => s.employee_id === empCode);
-  const myAttendance = attendance.filter(a => a.employee_id === empCode);
+  const myShifts = empCode ? workShifts.filter(s => s.employee_id === empCode) : [];
+  const myAttendance = empCode ? attendance.filter(a => a.employee_id === empCode) : [];
 
   // Teammates in same department or on duty
   const teammates = employees.filter(
-    e => e.employee_id !== empCode && e.status === 'ACTIVE'
+    e => (!empCode || e.employee_id !== empCode) && e.status === 'ACTIVE'
   );
 
   const handleExchangeSubmit = (e: React.FormEvent) => {
@@ -91,54 +92,46 @@ export const EmployeeSchedule: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Bento Header Banner with Continuous Shifting Gradient & Floating Blobs */}
-      <div className="bento-hero-gradient rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
-        {/* Ambient Floating & Morphing Blurred Blobs */}
-        <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-purple-500/30 to-fuchsia-500/25 dark:from-purple-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
-        <div className="absolute -bottom-16 left-1/4 w-64 h-64 bg-gradient-to-tr from-indigo-500/30 to-blue-500/20 dark:from-indigo-600/30 dark:to-blue-600/20 rounded-full blur-3xl pointer-events-none animate-blob-2" />
-        <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
+      <PageHeaderBanner
+        title="Lịch trình làm việc & Phân bổ ca"
+        badge={
+          <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-mono font-medium border border-purple-200 dark:border-purple-700/50">
+            {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
+          </span>
+        }
+        actions={
+          <>
+            <div className="flex items-center bg-white/80 dark:bg-[#0f1224] border border-purple-200/80 dark:border-[#272d5a] rounded-xl p-1 shadow-inner backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={handlePrevWeek}
+                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="px-3 text-xs font-mono text-slate-700 dark:text-slate-300 font-medium">
+                {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
+              </span>
+              <button
+                type="button"
+                onClick={handleNextWeek}
+                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
 
-        <div className="relative z-10">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
-              Lịch trình làm việc & Phân bổ ca
-            </h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-mono font-medium border border-purple-200 dark:border-purple-700/50">
-              {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
-            </span>
-          </div>
-        </div>
-
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="flex items-center bg-white/80 dark:bg-[#0f1224] border border-purple-200/80 dark:border-[#272d5a] rounded-xl p-1 shadow-inner backdrop-blur-sm">
             <button
               type="button"
-              onClick={handlePrevWeek}
-              className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+              onClick={() => setExchangeModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm shadow-purple-500/20 transition-all cursor-pointer"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+              <span>Đổi ca trực</span>
             </button>
-            <span className="px-3 text-xs font-mono text-slate-700 dark:text-slate-300 font-medium">
-              {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
-            </span>
-            <button
-              type="button"
-              onClick={handleNextWeek}
-              className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setExchangeModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm shadow-purple-500/20 transition-all cursor-pointer"
-          >
-            <ArrowLeftRight className="w-3.5 h-3.5" />
-            <span>Đổi ca trực</span>
-          </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* 4 Bento Telemetry Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -154,7 +154,9 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ---
 
-## 📁 Cấu Trúc Thư Mục Backend
+## 📁 Cấu Trúc Thư Mục Backend (Modular Monolith / Feature-Based)
+
+Hệ thống Backend được tổ chức hoàn chỉnh theo kiến trúc **Modular Monolith (Feature-based)**, đồng bộ trực tiếp 1:1 với các domain tính năng bên Frontend:
 
 ```text
 backend/
@@ -163,21 +165,31 @@ backend/
 │   ├── seed.ts              # Script nạp dữ liệu mẫu khởi tạo hệ thống
 │   └── README.md            # 📖 Tài liệu chi tiết Cơ sở dữ liệu Prisma -> prisma/README.md
 ├── src/
-│   ├── server.ts            # Entry point khởi chạy Express Server, Socket.IO & MQTT Gateway
-│   ├── app.ts               # Khởi tạo Express app, cookie-parser, Middlewares & API Routes
-│   ├── config/              # Cấu hình DB, JWT, MQTT, CORS constants
-│   ├── common/              # Response Helpers, Custom Error Handler, Logger, Date Utils
-│   ├── middlewares/         # JWT Authentication, Zod Validation, Role Authorization
-│   ├── sockets/             # Socket.IO Gateway quản lý kết nối realtime
-│   └── modules/             # Các phân hệ nghiệp vụ chính (Modular Pattern)
-│       ├── attendance/      # Điểm danh, Check-in/out logs, Lock date & Tổng hợp ngày
-│       ├── audit-logs/      # Nhật ký thao tác hệ thống & sự kiện
-│       ├── auth/            # Đăng nhập, Cookie Auth, me profile, đăng ký
-│       ├── biometrics/      # Lưu trữ & mã hóa vector khuôn mặt, vân tay
-│       ├── devices/         # Quản lý danh sách & trạng thái thiết bị AIoT
-│       ├── employees/       # Quản lý danh sách & thông tin hồ sơ nhân viên
-│       ├── payroll/         # Engine tự động tính lương tập trung, thưởng/phạt & chốt phiếu lương
-│       └── shifts/          # Định nghĩa ca làm việc & phân lịch ca nhân viên
+│   ├── server.ts            # Entry point: HTTP Server, Socket.IO & MQTT Gateway
+│   ├── app.ts               # Khởi tạo Express app, Helmet, CORS, Cookie-parser, API Routes
+│   ├── routes.ts            # Central Routing: Mount toàn bộ feature module routers vào /api & /api/v1
+│   ├── config/              # Cấu hình Database (Prisma Client), JWT, MQTT, CORS, Env
+│   ├── common/              # AppError, Response Formatters, Permission Helpers, Mailer, Date Utils
+│   ├── middlewares/         # JWT Authentication, RBAC Authorization, Error & 404 Handlers, AsyncHandler
+│   ├── sockets/             # Socket.IO Gateway quản lý kết nối realtime (Attendance & Device namespaces)
+│   ├── __tests__/           # Kiểm thử tự động (Unit, Realtime Socket, Integration Tests)
+│   └── modules/             # Các phân hệ tính năng độc lập (Vertical Slice / Modular Monolith)
+│       ├── attendance/      # Check-in/out, nhật ký, khóa chốt ca, tổng hợp công & Cron job
+│       │   ├── attendance.routes.ts       # Express Router định nghĩa các HTTP endpoints
+│       │   ├── attendance.controller.ts   # HTTP Request/Response Handler (Zero DB calls)
+│       │   ├── attendance.service.ts      # Core Business Logic & Tính toán chuyên sâu
+│       │   ├── attendance.repository.ts   # Data Access Layer bọc Prisma ORM
+│       │   ├── attendance.dto.ts          # Zod validation schemas & TypeScript types
+│       │   ├── attendance.model.ts        # Prisma model selections & include definitions
+│       │   ├── attendance.cron.ts         # Tác vụ định kỳ tổng hợp dữ liệu chấm công
+│       │   └── index.ts                   # Public API barrel export của module
+│       ├── audit-logs/      # Nhật ký kiểm toán thao tác hệ thống (Audit Trail)
+│       ├── auth/            # Xác thực, Cookie HttpOnly JWT, Profile, Đổi mật khẩu
+│       ├── biometrics/      # Đăng ký & quản lý vector đặc trưng gương mặt 512-D
+│       ├── devices/         # Quản lý thiết bị AIoT Terminal, heartbeat & MQTT Handlers
+│       ├── employees/       # Quản lý nhân viên, phòng ban (Department) & chức vụ (Position)
+│       ├── payroll/         # Tính lương tự động, cấu hình thưởng/phạt & chốt/mở kỳ lương
+│       └── shifts/          # Phân lịch ca làm việc & kiểm soát quyền phân ca
 ├── .env.example             # Mẫu biến môi trường
 ├── package.json             # Danh sách dependencies & NPM scripts
 └── tsconfig.json            # Cấu hình TypeScript Compiler
@@ -185,16 +197,31 @@ backend/
 
 ---
 
-## 🧱 Modular Architecture Pattern (Mô Hình 3 Lớp)
+## 🧱 Modular Architecture Pattern & Đồng Bộ Với Frontend
 
-Mỗi module nghiệp vụ nằm trong `src/modules/` đều áp dụng thiết kế phân tách 3 lớp rõ ràng:
+### 1. Phân Lớp Nội Bộ Mỗi Module (Internal 3-Tier Layering)
+Mỗi module bên trong `src/modules/<feature>/` đóng gói trọn vẹn toàn bộ vòng đời của tính năng:
+- **Routes (`<feature>.routes.ts`)**: Tiếp nhận URL, áp dụng middleware bảo mật (`authenticate`, `authorize(role)`), chuyển tiếp request vào Controller.
+- **Controller (`<feature>.controller.ts`)**: Chỉ tập trung parse/validate DTO bằng Zod, gọi Service và định dạng HTTP Response chuẩn (`successResponse`). Tuyệt đối không chứa câu lệnh truy vấn CSDL trực tiếp.
+- **Service (`<feature>.service.ts`)**: Chứa 100% logic nghiệp vụ cốt lõi, xác thực quyền hạn chéo (Manager không được can thiệp Manager khác, không tự phân ca cho chính mình, khóa chốt ca không cho sửa,...).
+- **Repository (`<feature>.repository.ts`)**: Đóng gói các hàm truy vấn dữ liệu thông qua Prisma ORM.
+- **DTO (`<feature>.dto.ts`)**: Định nghĩa Zod Schemas và suy luận kiểu TypeScript runtime an toàn.
+- **Barrel (`index.ts`)**: Cung cấp Public Interface rõ ràng, ngăn chặn rò rỉ chi tiết cài đặt nội bộ.
 
-```text
-src/modules/employees/
-├── employee.dto.ts         # Khai báo kiểu DTO & Zod Schemas dùng cho Request Validation
-├── employee.service.ts     # Xử lý Logic nghiệp vụ cốt lõi & truy vấn Database qua Prisma
-└── employee.controller.ts  # Tiếp nhận Request, gọi Service & trả kết quả Response chuẩn hóa
-```
+### 2. Bảng Đồng Bộ Tính Năng (Backend Modules ⟷ Frontend Features)
+Backend Modular Monolith được thiết kế khớp nối 1:1 với cấu trúc Pragmatic/Hybrid Feature-based của Frontend:
+
+| Backend Module (`backend/src/modules/`) | Frontend Feature (`frontend/src/features/`) | Endpoint Base | Quyền truy cập chính |
+| :--- | :--- | :--- | :--- |
+| **`auth`** | `auth` / `context/AuthContext` | `/api/auth` | Public / Authenticated |
+| **`employees`** | `employees` | `/api/employees`, `/api/departments`, `/api/positions` | `ADMIN`, `MANAGER` |
+| **`attendance`** | `attendance` | `/api/attendance` | All Roles / AIoT Device |
+| **`biometrics`** | `biometrics` | `/api/biometrics` | `ADMIN`, `MANAGER` |
+| **`devices`** | IoT Dashboard / Terminal | `/api/devices` | `ADMIN`, `MANAGER` |
+| **`payroll`** | `payroll` | `/api/payroll` | `ADMIN`, `MANAGER`, `EMPLOYEE` (scoping) |
+| **`shifts`** | `schedules` | `/api/shifts` | `ADMIN`, `MANAGER`, `EMPLOYEE` (scoping) |
+| **`audit-logs`** | System Settings / Audit | `/api/audit-logs` | `ADMIN` |
+
 
 ---
 

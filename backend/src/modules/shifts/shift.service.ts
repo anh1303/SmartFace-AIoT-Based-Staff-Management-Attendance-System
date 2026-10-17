@@ -2,6 +2,7 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, formatVNDateISO } from '../../common/utils.js'
 import { logAction } from '../audit-logs/audit.service.js'
+import { isEmployeeManager } from '../../common/permission.helper.js'
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 
@@ -98,18 +99,29 @@ export function formatShift(s: RawShift) {
   }
 }
 
-export async function list(query: Record<string, unknown>) {
+export async function list(
+  query: Record<string, unknown>,
+  requesterUser?: { id?: string; role?: string }
+) {
   const where: Record<string, unknown> = {}
 
-  const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
-    ? query.employeeId
-    : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
-
-  if (empIdFilter) {
+  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
     const emp = await prisma.employee.findFirst({
-      where: buildIdOrCodeWhere(empIdFilter),
+      where: { user_id: requesterUser.id },
     })
-    if (emp) where.employee_id = emp.id
+    if (!emp) return []
+    where.employee_id = emp.id
+  } else {
+    const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
+      ? query.employeeId
+      : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
+
+    if (empIdFilter) {
+      const emp = await prisma.employee.findFirst({
+        where: buildIdOrCodeWhere(empIdFilter),
+      })
+      if (emp) where.employee_id = emp.id
+    }
   }
 
   if (typeof query.date === 'string' && query.date) {
@@ -252,4 +264,45 @@ export async function assignOrUpdate(data: {
   })
 
   return formatShift(shiftRecord)
+}
+
+export async function assignOrUpdateWithPermissionCheck(
+  data: {
+    employee_id: string
+    date: string
+    work_day?: string
+    shift_type: string
+    start_time?: string
+    end_time?: string
+    note?: string
+  },
+  actorUser?: { id?: string; role?: string }
+) {
+  if (actorUser?.role !== 'ADMIN') {
+    const targetEmp = await prisma.employee.findFirst({
+      where: buildIdOrCodeWhere(data.employee_id),
+      include: {
+        department: true,
+        users: {
+          select: {
+            id: true,
+            roles: { select: { role_name: true } },
+          },
+        },
+      },
+    })
+    if (!targetEmp) throw AppError.notFound('Không tìm thấy nhân viên')
+
+    if (targetEmp.user_id === actorUser?.id) {
+      throw AppError.forbidden(
+        'Không ai được tự phân ca hoặc sửa ca làm việc của chính mình. Vui lòng liên hệ Quản trị viên (Admin) phê duyệt!'
+      )
+    }
+
+    if (actorUser?.role === 'MANAGER' && isEmployeeManager(targetEmp)) {
+      throw AppError.forbidden('Quản lý không có quyền phân ca cho quản lý khác!')
+    }
+  }
+
+  return assignOrUpdate(data, actorUser?.id)
 }

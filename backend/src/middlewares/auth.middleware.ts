@@ -13,6 +13,9 @@ export type AuthUser = {
   is_manager?: boolean
   email?: string | null
   username: string
+  department?: string | null
+  departmentId?: number | null
+  department_id?: number | null
 }
 
 declare global {

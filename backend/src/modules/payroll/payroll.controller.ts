@@ -1,9 +1,5 @@
-import { Router } from 'express';
-import { authenticate } from '../../middlewares/auth.middleware.js';
-import { authorize } from '../../middlewares/rbac.middleware.js';
-import { asyncHandler } from '../../middlewares/asyncHandler.js';
+import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
-import { prisma } from '../../config/database.js';
 import * as service from './payroll.service.js';
 import {
   updateBonusPenaltySchema,
@@ -11,88 +7,45 @@ import {
   updatePayrollSchema,
 } from './payroll.dto.js';
 
-export const payrollRouter = Router();
-payrollRouter.use(authenticate);
+export const getBonusPenalty = async (_req: Request, res: Response) => {
+  successResponse(res, await service.getBonusPenalty());
+};
 
-payrollRouter.get(
-  '/bonus-penalty',
-  asyncHandler(async (_req, res) => {
-    successResponse(res, await service.getBonusPenalty());
-  })
-);
+export const updateBonusPenalty = async (req: Request, res: Response) => {
+  const body = updateBonusPenaltySchema.parse(req.body);
+  successResponse(res, await service.updateBonusPenalty(body, req.user?.id), 'Cập nhật quy định thưởng/phạt thành công');
+};
 
-payrollRouter.put(
-  '/bonus-penalty',
-  authorize('ADMIN'),
-  asyncHandler(async (req, res) => {
-    const body = updateBonusPenaltySchema.parse(req.body);
-    successResponse(res, await service.updateBonusPenalty(body, req.user?.id), 'Cập nhật quy định thưởng/phạt thành công');
-  })
-);
+export const list = async (req: Request, res: Response) => {
+  const period = typeof req.query.payroll_period === 'string' ? req.query.payroll_period : undefined;
+  const targetEmployee = typeof req.query.employeeId === 'string' ? req.query.employeeId : undefined;
+  successResponse(res, await service.list(period, targetEmployee, req.user));
+};
 
-payrollRouter.get(
-  '/',
-  asyncHandler(async (req, res) => {
-    const period = typeof req.query.payroll_period === 'string' ? req.query.payroll_period : undefined;
-    let targetEmployee: string | undefined = undefined;
+export const generate = async (req: Request, res: Response) => {
+  const body = generatePayrollSchema.parse(req.body);
+  const targetPeriod = (body.payroll_period || body.period)!;
 
-    // 18. Phân quyền chặt chẽ: Nhân viên (EMPLOYEE) chỉ xem được bảng lương của chính mình
-    if (req.user?.role === 'EMPLOYEE') {
-      const emp = await prisma.employee.findFirst({
-        where: { user_id: req.user.id },
-      });
-      if (!emp) {
-        return successResponse(res, []);
-      }
-      targetEmployee = emp.id;
-    } else if (typeof req.query.employeeId === 'string') {
-      targetEmployee = req.query.employeeId;
-    }
+  successResponse(
+    res,
+    await service.generate(targetPeriod, body.employeeId, req.user?.id, req.user),
+    'Payroll generated',
+    201
+  );
+};
 
-    successResponse(res, await service.list(period, targetEmployee, req.user));
-  })
-);
+export const updateItem = async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const updates = updatePayrollSchema.parse(req.body);
+  successResponse(res, await service.updateItem(id, updates, req.user), 'Payroll updated');
+};
 
-payrollRouter.post(
-  '/generate',
-  authorize('ADMIN', 'MANAGER'),
-  asyncHandler(async (req, res) => {
-    const body = generatePayrollSchema.parse(req.body);
-    const targetPeriod = (body.payroll_period || body.period)!;
+export const finalizePeriod = async (req: Request, res: Response) => {
+  const period = req.params.period as string;
+  successResponse(res, await service.finalizePeriod(period, req.user?.id), 'Payroll period finalized');
+};
 
-    successResponse(
-      res,
-      await service.generate(targetPeriod, body.employeeId, req.user?.id, req.user),
-      'Payroll generated',
-      201
-    );
-  })
-);
-
-payrollRouter.put(
-  '/:id',
-  authorize('ADMIN', 'MANAGER'),
-  asyncHandler(async (req, res) => {
-    const id = req.params.id as string;
-    const updates = updatePayrollSchema.parse(req.body);
-    successResponse(res, await service.updateItem(id, updates, req.user), 'Payroll updated');
-  })
-);
-
-payrollRouter.post(
-  '/period/:period/finalize',
-  authorize('ADMIN', 'MANAGER'),
-  asyncHandler(async (req, res) => {
-    const period = req.params.period as string;
-    successResponse(res, await service.finalizePeriod(period, req.user?.id), 'Payroll period finalized');
-  })
-);
-
-payrollRouter.post(
-  '/period/:period/unlock',
-  authorize('ADMIN'),
-  asyncHandler(async (req, res) => {
-    const period = req.params.period as string;
-    successResponse(res, await service.unlockPeriod(period, req.user?.id), 'Payroll period unlocked');
-  })
-);
+export const unlockPeriod = async (req: Request, res: Response) => {
+  const period = req.params.period as string;
+  successResponse(res, await service.unlockPeriod(period, req.user?.id), 'Payroll period unlocked');
+};

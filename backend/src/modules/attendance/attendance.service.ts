@@ -135,18 +135,29 @@ export function formatAttendanceRecord(log: RawAttendanceLogDb) {
   }
 }
 
-export async function list(query: Record<string, unknown>) {
+export async function list(
+  query: Record<string, unknown>,
+  requesterUser?: { id?: string; role?: string }
+) {
   const where: Record<string, unknown> = {}
 
-  const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
-    ? query.employeeId
-    : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
-
-  if (empIdFilter) {
+  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
     const emp = await prisma.employee.findFirst({
-      where: buildIdOrCodeWhere(empIdFilter),
+      where: { user_id: requesterUser.id },
     })
-    where.employee_id = emp ? emp.id : empIdFilter
+    if (!emp) return []
+    where.employee_id = emp.id
+  } else {
+    const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
+      ? query.employeeId
+      : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
+
+    if (empIdFilter) {
+      const emp = await prisma.employee.findFirst({
+        where: buildIdOrCodeWhere(empIdFilter),
+      })
+      where.employee_id = emp ? emp.id : empIdFilter
+    }
   }
 
   const startDate = (typeof query.startDate === 'string' && query.startDate)
@@ -215,12 +226,23 @@ function calcShiftWorkingHours(startTimeVal?: string | Date | null, endTimeVal?:
   return Math.round((diffMins / 60) * 100) / 100
 }
 
-export async function getDailySummaries(query: Record<string, unknown>) {
+export async function getDailySummaries(
+  query: Record<string, unknown>,
+  requesterUser?: { id?: string; role?: string }
+) {
   const where: Record<string, unknown> = {}
 
-  const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
+  let empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
     ? query.employeeId
     : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
+
+  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
+    const emp = await prisma.employee.findFirst({
+      where: { user_id: requesterUser.id },
+    })
+    if (!emp) return []
+    empIdFilter = emp.id
+  }
 
   if (empIdFilter) {
     const emp = await prisma.employee.findFirst({
@@ -415,9 +437,22 @@ export async function adjustAttendance(
   }
 }
 
-export async function checkIn(data: { employeeId: string; device_info?: string; method?: AttendanceMethod }) {
+export async function checkIn(
+  data: { employeeId?: string; employee_id?: string; device_info?: string; method?: AttendanceMethod },
+  requesterUser?: { id?: string; role?: string }
+) {
+  let targetEmployeeId = data.employeeId || data.employee_id;
+  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
+    const emp = await prisma.employee.findFirst({
+      where: { user_id: requesterUser.id },
+    });
+    if (!emp) throw new AppError(404, 'Không tìm thấy hồ sơ nhân viên tương ứng với tài khoản này');
+    targetEmployeeId = emp.id;
+  }
+  if (!targetEmployeeId) throw new AppError(400, 'employeeId is required');
+
   const employee = await prisma.employee.findFirst({
-    where: buildIdOrCodeWhere(data.employeeId),
+    where: buildIdOrCodeWhere(targetEmployeeId),
   })
   if (!employee) throw new AppError(404, 'Employee not found')
 
@@ -456,9 +491,23 @@ export async function checkIn(data: { employeeId: string; device_info?: string; 
   return formatAttendanceRecord(created)
 }
 
-export async function checkOut(employeeId: string, device_info?: string) {
+export async function checkOut(
+  employeeId?: string,
+  device_info?: string,
+  requesterUser?: { id?: string; role?: string }
+) {
+  let targetEmployeeId = employeeId;
+  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
+    const emp = await prisma.employee.findFirst({
+      where: { user_id: requesterUser.id },
+    });
+    if (!emp) throw new AppError(404, 'Không tìm thấy hồ sơ nhân viên tương ứng với tài khoản này');
+    targetEmployeeId = emp.id;
+  }
+  if (!targetEmployeeId) throw new AppError(400, 'employeeId is required');
+
   const employee = await prisma.employee.findFirst({
-    where: buildIdOrCodeWhere(employeeId),
+    where: buildIdOrCodeWhere(targetEmployeeId),
   })
   if (!employee) throw new AppError(404, 'Employee not found')
 

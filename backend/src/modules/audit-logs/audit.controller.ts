@@ -1,19 +1,8 @@
-import { Router } from 'express';
-import { authenticate } from '../../middlewares/auth.middleware.js';
-import { authorize } from '../../middlewares/rbac.middleware.js';
-import { asyncHandler } from '../../middlewares/asyncHandler.js';
+import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
-import { listLogs } from './audit.service.js';
+import * as service from './audit.service.js';
 
-export const auditRouter = Router();
-auditRouter.use(authenticate);
-
-// Audit logs — Chỉ ADMIN mới có quyền xem kiểm toán hệ thống
-auditRouter.get(
-  '/',
-  authorize('ADMIN'),
-  asyncHandler(async (req, res) => {
-    const limit = Number(req.query.limit) || 100;
-    successResponse(res, await listLogs(limit));
-  })
-);
+export const listLogs = async (req: Request, res: Response) => {
+  const limit = Number(req.query.limit) || 100;
+  successResponse(res, await service.listLogs(limit));
+};

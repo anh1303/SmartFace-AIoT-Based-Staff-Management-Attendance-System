@@ -1,6 +1,6 @@
-# HƯỚNG DẪN TRIỂN KHAI SMARTFACE TRÊN RASPBERRY PI 4
+# HƯỚNG DẪN TRIỂN KHAI SMARTFACE TRÊN RASPBERRY PI 4 (HARDWARE)
 
-Thư mục `pi_edge/` này là bản đóng gói độc lập, siêu nhẹ (**~18 MB** thay vì 1.8 GB của toàn bộ source code huấn luyện AI).
+Thư mục `hardware/` (trước đây là `pi_edge/`) này là bản đóng gói độc lập, siêu nhẹ (**~18 MB** thay vì 1.8 GB của toàn bộ source code huấn luyện AI).
 * **Đầy đủ cấu trúc Pipeline AIoT:**
   1. `detection/`   : Bộ dò khuôn mặt (SCRFD ONNX hoặc YuNet INT8 ONNX).
   2. `tracking/`    : **FaceTracker** (IOU association + Lucas-Kanade Optical Flow Cadence).
@@ -13,10 +13,10 @@ Thư mục `pi_edge/` này là bản đóng gói độc lập, siêu nhẹ (**~1
 
 ---
 
-## 1. Copy thư mục `pi_edge` sang Raspberry Pi 4
+## 1. Copy thư mục `hardware` sang Raspberry Pi 4
 Dùng lệnh SCP từ máy tính (hoặc copy qua USB drive):
 ```bash
-scp -r pi_edge pi@<IP_CỦA_PI>:~/
+scp -r hardware pi@<IP_CỦA_PI>:~/
 ```
 
 ---
@@ -29,8 +29,8 @@ Mở Terminal trên Pi và chạy các lệnh:
 sudo apt update
 sudo apt install -y ffmpeg
 
-# 2. Di chuyển vào thư mục pi_edge
-cd ~/pi_edge
+# 2. Di chuyển vào thư mục hardware
+cd ~/hardware
 
 # 3. Tạo môi trường ảo Python
 python3 -m venv venv

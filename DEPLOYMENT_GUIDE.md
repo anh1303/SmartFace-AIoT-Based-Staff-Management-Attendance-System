@@ -88,8 +88,8 @@ cp backend/.env.example backend/.env
 # File Frontend
 cp frontend/.env.example frontend/.env
 
-# File Pi Edge Client
-cp pi_edge/.env.example pi_edge/.env
+# File Pi Edge Client (Hardware)
+cp hardware/.env.example hardware/.env
 ```
 
 Kiểm tra nội dung các file cấu hình quan trọng:
@@ -220,7 +220,7 @@ Bạn có thể lựa chọn 1 trong 2 cách sau tùy theo thiết bị bạn đ
 ### Kịch bản 6A: Chạy test ngay trên Máy tính (bằng Webcam PC)
 > 🌟 **Khuyên dùng nếu bạn chưa có Raspberry Pi hoặc muốn kiểm thử code AI nhanh chóng!**
 
-1. Mở file **`pi_edge/.env`** và cấu hình các dòng sau:
+1. Mở file **`hardware/.env`** và cấu hình các dòng sau:
    ```env
    # Kết nối ThingsBoard cục bộ
    TB_HOST=127.0.0.1
@@ -244,7 +244,7 @@ Bạn có thể lựa chọn 1 trong 2 cách sau tùy theo thiết bị bạn đ
 
 2. Tạo môi trường Python và cài đặt thư viện:
    ```bash
-   cd pi_edge
+   cd hardware
 
    # Tạo môi trường ảo
    python -m venv venv
@@ -278,10 +278,10 @@ Màn hình webcam máy tính sẽ xuất hiện:
    - Cài đặt hệ điều hành **Raspberry Pi OS 64-bit** (Debian Bullseye hoặc Bookworm).
    - Kết nối Pi 4 chung mạng Wi-Fi/LAN với máy tính chạy Server.
 
-2. **Sao chép thư mục `pi_edge` sang Pi 4:**
+2. **Sao chép thư mục `hardware` sang Pi 4:**
    ```bash
    # Chạy lệnh này từ máy tính của bạn:
-   scp -r pi_edge piuser@<IP_CỦA_PI>:~/
+   scp -r hardware piuser@<IP_CỦA_PI>:~/
    ```
 
 3. **Cài đặt môi trường trên Pi 4 (qua SSH hoặc Terminal của Pi):**
@@ -289,7 +289,7 @@ Màn hình webcam máy tính sẽ xuất hiện:
    sudo apt update
    sudo apt install -y ffmpeg libcamera-tools v4l-utils
 
-   cd ~/pi_edge
+   cd ~/hardware
    python3 -m venv venv
    source venv/bin/activate
    pip install --upgrade pip
@@ -314,7 +314,7 @@ Màn hình webcam máy tính sẽ xuất hiện:
      - **CS / CE0**: Chân 24 (GPIO 8 - SPI0 CE0)
      - **BLK / BL**: Nối vào 3.3V (Đèn nền màn hình sáng liên tục)
 
-5. **Cấu hình file `~/pi_edge/.env` trên Pi 4:**
+5. **Cấu hình file `~/hardware/.env` trên Pi 4:**
    ```env
    # Trỏ về IP LAN máy tính Server của bạn (ví dụ: 192.168.1.50)
    TB_HOST=192.168.1.50

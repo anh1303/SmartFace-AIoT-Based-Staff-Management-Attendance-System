@@ -178,7 +178,7 @@ SmartFace-AIoT-Based-Staff-Management-Attendance-System/
 │   ├── enrollment/           # Thuật toán tính Centroid embedding đại diện & loại bỏ ảnh nhiễu
 │   └── README.md             # 📖 Tài liệu chuyên sâu phân hệ AI Biometrics
 │
-└── pi_edge/                  # 🍓 Cấu hình & mã nguồn triển khai Raspberry Pi 4 Edge Node
+└── hardware/                 # 🍓 Cấu hình & mã nguồn phần cứng triển khai Raspberry Pi 4 Edge Node
 ```
 
 ---

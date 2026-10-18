@@ -48,7 +48,7 @@ Mở file `.env` bằng lệnh `nano .env` và kiểm tra các thông số quan 
 * `APP_DETECTOR=scrfd` : Mô hình phát hiện mặt (`scrfd` hoặc `yunnet`)
   - `scrfd`  : Model SCRFD (`det_500m.onnx` ~2.5 MB), độ chính xác cao, bắt góc nghiêng tốt (đang đặt mặc định).
   - `yunnet` : Model YuNet INT8 (`detector_quantized.onnx` ~120 KB), siêu nhẹ, chạy nhanh nhất trên Pi.
-* `DETECTION_INTERVAL_SECONDS=0.15` : Chu kỳ chạy Detector (0.15s giúp giảm >50% tải CPU cho Pi 4 nhờ dùng Optical Flow bám mặt ở các frame xen kẽ).
+* `DETECTION_INTERVAL_SECONDS=0.2` : Chu kỳ chạy Detector (0.2s giúp giảm >50% tải CPU cho Pi 4 nhờ dùng Optical Flow bám mặt ở các frame xen kẽ).
 * `MAX_FACES_PER_FRAME=1` : Giới hạn số lượng khuôn mặt lớn nhất được track/xử lý trên 1 frame (mặc định: `1` cho cổng điểm danh ưu tiên người đứng gần nhất; đặt `0` nếu không muốn giới hạn).
 * `CONSECUTIVE_REAL_FRAMES=3` : Cần 3 votes REAL liên tiếp từ MiniFASNet để xác nhận liveness (chống spoofing).
 * `SCAN_COOLDOWN_SECONDS=5.0` : Thời gian chờ trước khi cho phép quét lại cùng một người (Track ID).

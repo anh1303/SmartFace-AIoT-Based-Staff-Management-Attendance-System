@@ -86,7 +86,7 @@ REQUIRED_CONSECUTIVE = get_env_int("CONSECUTIVE_REAL_FRAMES", 3)
 COOLDOWN_SEC = get_env_float("SCAN_COOLDOWN_SECONDS", 5.0)
 
 # Detection Cadence: chạy detector mỗi N giây; các frame ở giữa dùng optical flow tiết kiệm CPU Pi
-DETECTION_INTERVAL_SECONDS = get_env_float("DETECTION_INTERVAL_SECONDS", 0.15)
+DETECTION_INTERVAL_SECONDS = get_env_float("DETECTION_INTERVAL_SECONDS", 0.2)
 TRACK_IOU_THRESHOLD = get_env_float("TRACK_IOU_THRESHOLD", 0.3)
 TRACK_MAX_MISSING_FRAMES = get_env_int("TRACK_MAX_MISSING_FRAMES", 10)
 MAX_FACES_PER_FRAME = get_env_int("MAX_FACES_PER_FRAME", 1)
@@ -210,12 +210,12 @@ def main():
     print(f"  [OK] Face Detector : {APP_DETECTOR.upper()}")
 
     tracker = FaceTracker(
-        recognize_interval_seconds=0.5,
+        recognize_interval_seconds=1.0,
         iou_threshold=TRACK_IOU_THRESHOLD,
         max_missing_frames=TRACK_MAX_MISSING_FRAMES,
         pad_smooth_window=5,
         pad_spoof_min_ratio=0.6,
-        pad_interval_seconds=0.1,
+        pad_interval_seconds=0.2,
         pad_min_votes=REQUIRED_CONSECUTIVE,
         pad_stale_timeout=3.0,
     )
@@ -407,7 +407,7 @@ def main():
                     x1, y1, x2, y2 = [int(v) for v in bbox]
 
                     # (A) Cập nhật Anti-Spoofing theo chu kỳ của track
-                    if track.needs_pad(interval_seconds=0.1):
+                    if track.needs_pad(interval_seconds=0.2):
                         try:
                             is_real, real_prob, _ = fas_predictor.predict(frame, bbox)
                             track.update_pad(is_real, real_prob)

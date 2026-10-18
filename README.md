@@ -22,6 +22,13 @@
 
 ---
 
+> 🚀 **BẮT ĐẦU NHANH CHO THÀNH VIÊN MỚI / NGƯỜI BẠN CLONE REPO:**  
+> - Hướng dẫn cài đặt từng bước chi tiết từ A-Z: **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** *(Hỗ trợ Webcam máy tính & Raspberry Pi 4)*  
+> - Hướng dẫn tạo Widgets, kết nối Rule Chain & Prompt ThingsBoard: **[THINGSBOARD_GUIDE.md](./THINGSBOARD_GUIDE.md)**  
+> - Sơ đồ kiến trúc và các luồng dữ liệu thời gian thực: **[DATA_FLOWS.md](./DATA_FLOWS.md)**
+
+---
+
 ## 🗺️ Bản Đồ Tài Liệu Chi Tiết (Documentation Map)
 
 Dự án được tài liệu hóa chuyên sâu cho từng phân hệ độc lập:

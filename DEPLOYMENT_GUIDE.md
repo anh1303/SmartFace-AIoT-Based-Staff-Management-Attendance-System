@@ -135,6 +135,8 @@ Bạn sẽ thấy 3 container đang chạy ổn định:
 
 *(Chỉ cần thực hiện 1 lần duy nhất khi khởi tạo hệ thống mới - mất khoảng 2 phút)*
 
+> 💡 **Mẹo:** Bạn có thể xem toàn bộ hướng dẫn tạo Widgets và 1-Click Import file JSON tại tài liệu riêng: **[THINGSBOARD_GUIDE.md](./THINGSBOARD_GUIDE.md)**!
+
 1. Mở trình duyệt truy cập giao diện ThingsBoard: **`http://localhost:8080`** (hoặc `http://<IP_LAN>:8080`).
 2. Đăng nhập tài khoản Tenant mặc định:
    - **Tài khoản**: `tenant@thingsboard.org`
@@ -148,16 +150,11 @@ Bạn sẽ thấy 3 container đang chạy ổn định:
    - Điền Access token: **`ivu62ZoR6gkXyqqoDobJ`** *(Token này đã được cấu hình sẵn trong `.env`)*.
    - Nhấn **Add**.
 4. **Cấu hình Rule Chain Webhook đối soát điểm danh (Two-Way RPC)**:
-   - Vào menu: **Rule chains** $\rightarrow$ chọn **Root Rule Chain**.
-   - Kéo một node **`message type switch`** (nếu chưa có).
-   - Kéo thêm một node **`rest api call`**:
-     - **Name**: `Backend Attendance Webhook`
-     - **Endpoint URL pattern**: `http://host.docker.internal:3000/api/attendance/tb-webhook`
-     - **Request method**: `POST`
-     - **Header**: thêm Header `Content-Type: application/json`.
-   - Nối từ node `message type switch` (nhánh `RPC Request from Device`) $\rightarrow$ vào node `rest api call`.
-   - Kéo node **`rpc call reply`** và nối từ `Success` của `rest api call` $\rightarrow$ vào `rpc call reply`.
-   - Nhấn biểu tượng đĩa mềm **Save** ở góc dưới cùng bên phải để lưu Rule Chain.
+   - Cách nhanh nhất: Vào **Rule chains** $\rightarrow$ Bấm nút `Import rule chain` $\rightarrow$ Chọn file `thingsboard_config/smartface_root_rule_chain.json`.
+   - Hoặc làm thủ công: Trong **Root Rule Chain**, kéo node **`message type switch`** $\rightarrow$ nối nhánh `RPC Request from Device` vào node **`rest api call`** (Endpoint: `http://host.docker.internal:3000/api/attendance/tb-webhook`, Method: `POST`) $\rightarrow$ nối nhánh `Success` vào node **`rpc call reply`** $\rightarrow$ Nhấn **Save**.
+5. **Import Dashboard Giám sát**:
+   - Vào menu **Dashboards** $\rightarrow$ Bấm biểu tượng **`Import dashboard`** $\rightarrow$ Chọn file `thingsboard_config/smartface_dashboard.json`.
+   - Toàn bộ 5 widget giám sát (Khoảng cách siêu âm, FPS, Liveness Score, Công tắc chuyển mode, Trạng thái cổng) sẽ hiển thị ngay lập tức!
 
 ---
 

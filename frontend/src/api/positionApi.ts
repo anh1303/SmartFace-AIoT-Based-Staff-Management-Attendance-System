@@ -5,6 +5,7 @@ const positionLogger = logger.child('PositionApi');
 
 export interface PositionItem {
   id: number;
+  position_code?: string;
   department_code: string;
   name: string;
   employee_count: number;
@@ -27,18 +28,38 @@ export async function fetchPositionsApi(): Promise<PositionItem[]> {
   }
 }
 
-export async function createPositionApi(name: string): Promise<PositionItem> {
+export interface CreatePositionPayload {
+  name: string;
+  department_id?: number;
+  level?: 'MANAGER' | 'EMPLOYEE';
+  position_code?: string;
+}
+
+export interface UpdatePositionPayload {
+  name?: string;
+  department_id?: number;
+  level?: 'MANAGER' | 'EMPLOYEE';
+}
+
+export async function createPositionApi(
+  payload: string | CreatePositionPayload
+): Promise<PositionItem> {
+  const body = typeof payload === 'string' ? { name: payload.trim() } : payload;
   const res = await apiFetch('/api/positions', {
     method: 'POST',
-    body: JSON.stringify({ name: name.trim() }),
+    body: JSON.stringify(body),
   });
   return res.data;
 }
 
-export async function updatePositionApi(id: number, name: string): Promise<PositionItem> {
+export async function updatePositionApi(
+  id: number,
+  payload: string | UpdatePositionPayload
+): Promise<PositionItem> {
+  const body = typeof payload === 'string' ? { name: payload.trim() } : payload;
   const res = await apiFetch(`/api/positions/${id}`, {
     method: 'PUT',
-    body: JSON.stringify({ name: name.trim() }),
+    body: JSON.stringify(body),
   });
   return res.data;
 }

@@ -7,3 +7,5 @@ export * from './Modal';
 export * from './Toast';
 export * from './ErrorBoundary';
 export * from './LoadingScreen';
+export * from './Drawer';
+

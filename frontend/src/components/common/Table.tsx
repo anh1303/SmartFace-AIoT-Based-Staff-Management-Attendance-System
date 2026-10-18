@@ -10,6 +10,7 @@ export interface TableContainerProps extends React.HTMLAttributes<HTMLDivElement
   children: React.ReactNode;
   minWidth?: string;
   tableClassName?: string;
+  maxHeight?: string;
 }
 
 export const TableContainer: React.FC<TableContainerProps> = ({
@@ -17,6 +18,7 @@ export const TableContainer: React.FC<TableContainerProps> = ({
   className = '',
   minWidth = '1000px',
   tableClassName = '',
+  maxHeight = '620px',
   ...props
 }) => {
   return (
@@ -24,7 +26,10 @@ export const TableContainer: React.FC<TableContainerProps> = ({
       className={`bg-white dark:bg-[#13162b] border border-slate-300 dark:border-[#28305c] rounded-xl overflow-hidden shadow-xs transition-colors ${className}`}
       {...props}
     >
-      <div className="overflow-x-auto">
+      <div
+        className="overflow-x-auto overflow-y-auto"
+        style={{ maxHeight: maxHeight === 'none' ? undefined : maxHeight }}
+      >
         <table
           style={{ minWidth }}
           className={`w-full text-left text-xs border-collapse table-fixed ${tableClassName}`}
@@ -50,7 +55,7 @@ export const TableHead: React.FC<TableHeadProps> = ({
 }) => {
   return (
     <thead
-      className={`border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-mono ${className}`}
+      className={`sticky top-0 z-10 border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-mono shadow-xs ${className}`}
       {...props}
     >
       {children}
@@ -99,7 +104,7 @@ export const TableHeadCell: React.FC<TableHeadCellProps> = ({
   return (
     <th
       style={{ width, ...style }}
-      className={`py-4 px-4 font-bold ${alignClass} ${borderClass} ${className}`}
+      className={`sticky top-0 z-10 bg-slate-200 dark:bg-[#0c0f1f] border-b-2 border-slate-300 dark:border-[#28305c] py-4 px-4 font-bold ${alignClass} ${borderClass} ${className}`}
       {...props}
     >
       {children}

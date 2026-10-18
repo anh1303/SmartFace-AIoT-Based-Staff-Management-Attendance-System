@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScanFace, Fingerprint, ChevronDown, Search } from 'lucide-react';
 import { Employee } from '../../../types';
+import { useAuth } from '../../../context/AuthContext';
 import { BiometricStatusBadge } from './BiometricStatusBadge';
 
 interface EmployeeBiometricsCardProps {
@@ -16,6 +17,7 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
   onSelectEmployee,
   currentEmp,
 }) => {
+  const { currentUser, role } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -33,21 +35,28 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
   const filteredEmployees = employees.filter((emp) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
+    const isSelfMatch =
+      currentUser &&
+      (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email) &&
+      ('bản thân'.includes(q) || 'bạn'.includes(q) || 'tôi'.includes(q));
+
     return (
+      Boolean(isSelfMatch) ||
       emp.full_name.toLowerCase().includes(q) ||
       emp.employee_id.toLowerCase().includes(q) ||
-      (emp.department && emp.department.toLowerCase().includes(q))
+      (emp.department && emp.department.toLowerCase().includes(q)) ||
+      (emp.position && emp.position.toLowerCase().includes(q))
     );
   });
 
   const selectedLabel = currentEmp
-    ? `${currentEmp.employee_id} - ${currentEmp.full_name} (${currentEmp.department || 'Nhân viên'})`
+    ? `${currentEmp.employee_id} - ${currentEmp.full_name}`
     : 'Chọn nhân viên...';
 
   return (
     <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-5 shadow-xs transition-colors">
       <h2 className="text-sm font-bold text-slate-900 dark:text-white font-heading uppercase tracking-wider mb-4">
-        Chọn Nhân Sự Cần Cập Nhật
+        Chọn Nhân Viên Cần Cập Nhật
       </h2>
 
       <div className="mb-4 relative" ref={dropdownRef}>
@@ -66,16 +75,15 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
             {selectedLabel}
           </span>
           <ChevronDown
-            className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
-              isOpen ? 'rotate-180' : ''
-            }`}
+            className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''
+              }`}
           />
         </button>
 
         {/* Custom Dropdown Popup: Strictly constrained to max-w-[180px] sm:max-w-[240px] */}
         {isOpen && (
           <div className="absolute left-0 mt-1.5 w-full max-w-[180px] sm:max-w-[240px] bg-white dark:bg-[#13162b] border border-slate-200 dark:border-[#272d5a] rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-            {employees.length > 5 && (
+            {employees.length > 0 && (
               <div className="p-2 border-b border-slate-100 dark:border-[#21264b]">
                 <div className="relative">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
@@ -94,12 +102,15 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
             <div className="max-h-[180px] overflow-y-auto divide-y divide-slate-100 dark:divide-[#1d2243]">
               {filteredEmployees.length === 0 ? (
                 <div className="p-3 text-center text-xs text-slate-400">
-                  Không tìm thấy nhân viên
+                  {employees.length === 0 ? 'Không có nhân viên trong phòng ban' : 'Không tìm thấy nhân viên'}
                 </div>
               ) : (
                 filteredEmployees.map((emp) => {
-                  const label = `${emp.employee_id} - ${emp.full_name} (${emp.department || 'Nhân viên'})`;
+                  const label = `${emp.employee_id} - ${emp.full_name}`;
                   const isSelected = emp.employee_id === selectedEmpId;
+                  const isSelf = Boolean(
+                    currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+                  );
                   return (
                     <button
                       key={emp.employee_id}
@@ -109,16 +120,20 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
                         setIsOpen(false);
                         setSearchQuery('');
                       }}
-                      title={label}
-                      className={`w-full h-9 px-3 text-left text-xs transition-colors cursor-pointer flex items-center min-w-0 ${
-                        isSelected
+                      title={isSelf && role !== 'admin' ? `${label} (Chỉ xem - Không thể tự sửa)` : label}
+                      className={`w-full h-9 px-3 text-left text-xs transition-colors cursor-pointer flex items-center justify-between gap-1.5 min-w-0 ${isSelected
                           ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-semibold'
                           : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1a1e3a]'
-                      }`}
+                        }`}
                     >
                       <span className="truncate min-w-0 flex-1" title={label}>
                         {label}
                       </span>
+                      {isSelf && role !== 'admin' && (
+                        <span className="text-[10px] text-amber-500 dark:text-amber-400 font-normal shrink-0">
+                          (Bạn)
+                        </span>
+                      )}
                     </button>
                   );
                 })
@@ -129,7 +144,7 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
       </div>
 
       {/* Selected Employee Card */}
-      {currentEmp && (
+      {currentEmp ? (
         <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-4 overflow-hidden">
           <div className="flex items-center gap-3 min-w-0">
             <img
@@ -187,6 +202,10 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
               />
             </div>
           </div>
+        </div>
+      ) : (
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] text-center text-xs text-slate-400">
+          Chưa chọn nhân sự nào
         </div>
       )}
     </div>

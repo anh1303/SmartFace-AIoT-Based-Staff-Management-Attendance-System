@@ -53,17 +53,20 @@ export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
     if (!q) return employees;
     return employees.filter(
       e =>
-        e.full_name.toLowerCase().includes(q) ||
-        e.employee_id.toLowerCase().includes(q) ||
-        e.department.toLowerCase().includes(q) ||
-        e.position.toLowerCase().includes(q) ||
-        e.email.toLowerCase().includes(q) ||
-        e.phone.includes(q)
+        e.full_name?.toLowerCase().includes(q) ||
+        e.employee_id?.toLowerCase().includes(q) ||
+        e.department?.toLowerCase().includes(q) ||
+        e.position?.toLowerCase().includes(q) ||
+        e.email?.toLowerCase().includes(q) ||
+        (e.phone && e.phone.includes(q))
     );
   }, [employees, employeeSearchQuery]);
 
   return (
-    <div className="bento-hero-gradient !overflow-visible rounded-2xl p-5 transition-all relative z-20">
+    <div
+      style={{ overflow: 'visible' }}
+      className="bento-hero-gradient rounded-2xl p-5 transition-all relative z-20"
+    >
       {/* Ambient Floating & Morphing Blurred Blobs in clipped background container */}
       <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
         <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-purple-500/30 to-fuchsia-500/25 dark:from-purple-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl animate-blob-1" />
@@ -179,7 +182,7 @@ export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
                             title={
                               restricted
                                 ? `Quản lý khác (${emp.full_name}) - Không có quyền xem chi tiết`
-                                : `${emp.employee_id} - ${emp.full_name} (${emp.position || emp.department})`
+                                : `${emp.employee_id} - ${emp.full_name}`
                             }
                             className={`w-full h-9 px-2.5 flex items-center gap-2 text-left transition-colors min-w-0 ${restricted
                               ? 'opacity-50 cursor-not-allowed bg-slate-50/50 dark:bg-[#121528]'
@@ -204,8 +207,8 @@ export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
                                   </span>
                                 )}
                               </div>
-                              <p className="text-[10px] font-mono text-purple-600 dark:text-purple-400 truncate" title={`${emp.employee_id} • ${emp.position || emp.department}`}>
-                                {emp.employee_id} • {restricted ? 'Quản lý khác' : (emp.position || emp.department)}
+                              <p className="text-[10px] font-mono text-purple-600 dark:text-purple-400 truncate" title={emp.employee_id}>
+                                {emp.employee_id}
                               </p>
                             </div>
                           </button>

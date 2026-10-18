@@ -10,6 +10,7 @@ interface FingerprintEnrollmentSectionProps {
   onSelectFinger: (finger: string) => void;
   fingerprintStep: FingerprintStep;
   fingerQualityScore: number | null;
+  disabled?: boolean;
   onSendIoTTrigger: () => void;
   onOpenConfirmModal: () => void;
 }
@@ -21,6 +22,7 @@ export const FingerprintEnrollmentSection: React.FC<FingerprintEnrollmentSection
   onSelectFinger,
   fingerprintStep,
   fingerQualityScore,
+  disabled = false,
   onSendIoTTrigger,
   onOpenConfirmModal,
 }) => {
@@ -95,12 +97,21 @@ export const FingerprintEnrollmentSection: React.FC<FingerprintEnrollmentSection
           <button
             type="button"
             disabled={
+              disabled ||
               fingerprintStep === 'SENDING' ||
               fingerprintStep === 'WAITING_TOUCH' ||
               fingerprintStep === 'CAPTURED'
             }
             onClick={onSendIoTTrigger}
-            className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
+            className={`w-full py-3 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all ${
+              disabled ||
+              fingerprintStep === 'SENDING' ||
+              fingerprintStep === 'WAITING_TOUCH' ||
+              fingerprintStep === 'CAPTURED'
+                ? 'bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 cursor-pointer'
+            }`}
+            title={disabled ? 'Không thể tự cập nhật dữ liệu nhận diện của bản thân' : undefined}
           >
             <Send className="w-4 h-4" />
             <span>Gửi tín hiệu tới thiết bị để lấy mẫu (IoT Trigger)</span>
@@ -168,11 +179,11 @@ export const FingerprintEnrollmentSection: React.FC<FingerprintEnrollmentSection
       <div className="pt-4 border-t border-slate-100 dark:border-[#21264b] flex justify-end">
         <button
           type="button"
-          disabled={fingerprintStep !== 'VERIFIED'}
+          disabled={disabled || fingerprintStep !== 'VERIFIED'}
           onClick={onOpenConfirmModal}
-          className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-            fingerprintStep === 'VERIFIED'
-              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20'
+          className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all ${
+            fingerprintStep === 'VERIFIED' && !disabled
+              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 cursor-pointer'
               : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
           }`}
         >

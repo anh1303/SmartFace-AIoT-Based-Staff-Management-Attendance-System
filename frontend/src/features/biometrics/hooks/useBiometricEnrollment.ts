@@ -22,20 +22,57 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
   const [searchParams, setSearchParams] = useSearchParams();
   const queryEmpId = searchParams.get('employee_id') || searchParams.get('empId');
 
-  // Selected employee for enrollment - safely fallback to first employee or empty string without hardcoded NV-001
-  const [selectedEmpId, setSelectedEmpId] = useState<string>(
-    () => queryEmpId || employees[0]?.employee_id || ''
-  );
+  const isManager = role === 'manager';
+  const managerDept = currentUser?.department;
+
+  // Quản lý có thể tìm kiếm nhân viên trong phòng và bản thân mình, nhưng không thể sửa sinh trắc học của bản thân
+  const scopedEmployees = useMemo(() => {
+    if (isManager && managerDept) {
+      return employees.filter((e) => {
+        const isMyDept = e.department?.toLowerCase() === managerDept.toLowerCase();
+        const isSelf =
+          (currentUser?.employee_id && (e.employee_id === currentUser.employee_id || e.id === currentUser.employee_id)) ||
+          (currentUser?.email && e.email?.toLowerCase() === currentUser.email?.toLowerCase());
+        const isOtherMgr = isAnotherManager(e, currentUser);
+        // Quản lý xem và tìm kiếm được nhân viên trong phòng VÀ bản thân mình, loại trừ các quản lý khác
+        return (isMyDept || isSelf) && !isOtherMgr;
+      });
+    }
+    return employees;
+  }, [employees, isManager, managerDept, currentUser]);
+
+  // Selected employee for enrollment - safely fallback to first scoped employee (ưu tiên nhân viên có thể sửa)
+  const [selectedEmpId, setSelectedEmpId] = useState<string>(() => {
+    if (queryEmpId && scopedEmployees.some((e) => e.employee_id === queryEmpId || e.id === queryEmpId)) {
+      return queryEmpId;
+    }
+    const editable = scopedEmployees.find((e) => {
+      const isSelfEmp =
+        (currentUser?.employee_id && (e.employee_id === currentUser.employee_id || e.id === currentUser.employee_id)) ||
+        (currentUser?.email && e.email?.toLowerCase() === currentUser.email?.toLowerCase());
+      return !isSelfEmp;
+    });
+    return editable?.employee_id || scopedEmployees[0]?.employee_id || '';
+  });
   const [activeTab, setActiveTab] = useState<'FACE' | 'FINGERPRINT'>(options.defaultTab || 'FACE');
 
-  // Sync selectedEmpId when URL query param changes
+  // Sync selectedEmpId when URL query param changes or scopedEmployees updates
   useEffect(() => {
-    if (queryEmpId && queryEmpId !== selectedEmpId) {
-      setSelectedEmpId(queryEmpId);
-    } else if (!selectedEmpId && employees.length > 0) {
-      setSelectedEmpId(employees[0].employee_id);
+    if (scopedEmployees.length === 0) {
+      if (selectedEmpId !== '') {
+        setSelectedEmpId('');
+      }
+      return;
     }
-  }, [queryEmpId, selectedEmpId, employees]);
+
+    if (queryEmpId && scopedEmployees.some((e) => e.employee_id === queryEmpId || e.id === queryEmpId)) {
+      if (selectedEmpId !== queryEmpId) {
+        setSelectedEmpId(queryEmpId);
+      }
+    } else if (!scopedEmployees.some((e) => e.employee_id === selectedEmpId || e.id === selectedEmpId)) {
+      setSelectedEmpId(scopedEmployees[0].employee_id);
+    }
+  }, [queryEmpId, selectedEmpId, scopedEmployees]);
 
   // Face Enrollment State (Requires at least 3 photos)
   const [uploadedPhotos, setUploadedPhotos] = useState<FacePhotoItem[]>([]);
@@ -66,31 +103,37 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
   }, [selectedEmpId]);
 
   const currentEmp = useMemo(() => {
+    if (scopedEmployees.length === 0) return undefined;
     return (
-      employees.find((e) => e.employee_id === selectedEmpId || e.id === selectedEmpId) ||
-      employees[0] ||
-      null
+      scopedEmployees.find((e) => e.employee_id === selectedEmpId || e.id === selectedEmpId) ||
+      scopedEmployees[0]
     );
-  }, [employees, selectedEmpId]);
+  }, [scopedEmployees, selectedEmpId]);
 
-  // Chốt chặn: Bất kiêm nhiệm - không ai được tự đăng ký sinh trắc học của mình
-  // và Quản lý không được sửa sinh trắc học của Quản lý khác
+  // Chốt chặn an toàn: Bất kiêm nhiệm - không ai được tự đăng ký sinh trắc học của mình,
+  // và Quản lý chỉ có quyền xem/sửa sinh trắc học của nhân viên thuộc phòng mình phụ trách (không sửa quản lý khác)
   const isSelf = Boolean(
     currentEmp && currentUser &&
     (currentEmp.employee_id === currentUser.employee_id || currentEmp.email === currentUser.email)
   );
   const isOtherMgr = isAnotherManager(currentEmp, currentUser);
-  const isEnrollmentBlocked = role !== 'admin' && (isSelf || isOtherMgr);
+  const isDiffDept = Boolean(
+    isManager && managerDept && currentEmp && currentEmp.department?.toLowerCase() !== managerDept.toLowerCase()
+  );
+  const isEnrollmentBlocked = role !== 'admin' && (isSelf || isOtherMgr || isDiffDept || !currentEmp);
+
+  const getBlockedMessage = useCallback((action: string = 'cập nhật') => {
+    if (!currentEmp) return 'Vui lòng chọn nhân viên cần thực hiện!';
+    if (isSelf) return `Không ai được tự ${action} dữ liệu sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!`;
+    if (isDiffDept) return `Quản lý chỉ có quyền ${action} sinh trắc học của nhân viên trong phòng ban của mình!`;
+    if (isOtherMgr) return `Quản lý không có quyền ${action} sinh trắc học của Quản lý khác!`;
+    return 'Bạn không có quyền thực hiện thao tác này!';
+  }, [currentEmp, isSelf, isDiffDept, isOtherMgr]);
 
   // Handle Photo Upload (Multiple files allowed)
   const handlePhotoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (isEnrollmentBlocked) {
-      showToast(
-        isSelf
-          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
-          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
-        'error'
-      );
+      showToast(getBlockedMessage('đăng ký'), 'error');
       return;
     }
     const files = e.target.files;
@@ -150,12 +193,7 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
   const handleConfirmFaceSave = useCallback(async () => {
     if (!currentEmp || uploadedPhotos.length < 3) return;
     if (isEnrollmentBlocked) {
-      showToast(
-        isSelf
-          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
-          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
-        'error'
-      );
+      showToast(getBlockedMessage('cập nhật'), 'error');
       return;
     }
     setAnalyzingFace(true);
@@ -192,16 +230,11 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     } finally {
       setAnalyzingFace(false);
     }
-  }, [currentEmp, uploadedPhotos, isEnrollmentBlocked, isSelf, showToast, updateEmployee]);
+  }, [currentEmp, uploadedPhotos, isEnrollmentBlocked, getBlockedMessage, showToast, updateEmployee]);
 
   const handleSendIoTTrigger = useCallback(() => {
     if (isEnrollmentBlocked) {
-      showToast(
-        isSelf
-          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
-          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
-        'error'
-      );
+      showToast(getBlockedMessage('lấy mẫu vân tay'), 'error');
       return;
     }
     setFingerprintStep('SENDING');
@@ -215,17 +248,12 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
         }, 1000);
       }, 2000);
     }, 1200);
-  }, [isEnrollmentBlocked, isSelf, showToast]);
+  }, [isEnrollmentBlocked, getBlockedMessage, showToast]);
 
   const handleConfirmFingerprintSave = useCallback(() => {
     if (!currentEmp) return;
     if (isEnrollmentBlocked) {
-      showToast(
-        isSelf
-          ? 'Không ai được tự đăng ký sinh trắc học của chính mình. Vui lòng liên hệ Admin phê duyệt!'
-          : 'Quản lý không có quyền cập nhật sinh trắc học của Quản lý khác!',
-        'error'
-      );
+      showToast(getBlockedMessage('lưu vân tay'), 'error');
       return;
     }
     updateEmployee(currentEmp.employee_id, {
@@ -237,7 +265,7 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
       `Đã lưu mẫu vân tay ${selectedFinger} cho ${currentEmp.full_name} từ ${selectedDevice}!`,
       'success'
     );
-  }, [currentEmp, isEnrollmentBlocked, isSelf, showToast, updateEmployee, selectedFinger, selectedDevice]);
+  }, [currentEmp, isEnrollmentBlocked, getBlockedMessage, showToast, updateEmployee, selectedFinger, selectedDevice]);
 
   const currentManageEmp = useMemo(() => {
     if (!manageModalEmployee) return null;
@@ -249,10 +277,15 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
       emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
     );
     const isOtherMgrEmp = isAnotherManager(emp, currentUser);
-    if (role !== 'admin' && (isSelfEmp || isOtherMgrEmp)) {
+    const isDiffDeptEmp = Boolean(
+      isManager && managerDept && emp && emp.department?.toLowerCase() !== managerDept.toLowerCase()
+    );
+    if (role !== 'admin' && (isSelfEmp || isOtherMgrEmp || isDiffDeptEmp)) {
       showToast(
         isSelfEmp
           ? 'Không ai được tự xóa dữ liệu sinh trắc học của chính mình. Vui lòng liên hệ Admin!'
+          : isDiffDeptEmp
+          ? 'Quản lý chỉ có quyền xóa sinh trắc học của nhân viên trong phòng ban của mình!'
           : 'Quản lý không có quyền xóa sinh trắc học của Quản lý khác!',
         'error'
       );
@@ -271,17 +304,22 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
       `Đã xóa dữ liệu Face ID của nhân viên ${emp.full_name} (${emp.employee_id}) thành công!`,
       'success'
     );
-  }, [currentUser, role, showToast, updateEmployee]);
+  }, [currentUser, isManager, managerDept, role, showToast, updateEmployee]);
 
   const handleDeleteFingerprint = useCallback((emp: Employee) => {
     const isSelfEmp = Boolean(
       emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
     );
     const isOtherMgrEmp = isAnotherManager(emp, currentUser);
-    if (role !== 'admin' && (isSelfEmp || isOtherMgrEmp)) {
+    const isDiffDeptEmp = Boolean(
+      isManager && managerDept && emp && emp.department?.toLowerCase() !== managerDept.toLowerCase()
+    );
+    if (role !== 'admin' && (isSelfEmp || isOtherMgrEmp || isDiffDeptEmp)) {
       showToast(
         isSelfEmp
           ? 'Không ai được tự xóa dữ liệu sinh trắc học của chính mình. Vui lòng liên hệ Admin!'
+          : isDiffDeptEmp
+          ? 'Quản lý chỉ có quyền xóa sinh trắc học của nhân viên trong phòng ban của mình!'
           : 'Quản lý không có quyền xóa sinh trắc học của Quản lý khác!',
         'error'
       );
@@ -295,33 +333,88 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
       `Đã xóa dữ liệu vân tay của nhân viên ${emp.full_name} (${emp.employee_id}) thành công!`,
       'success'
     );
-  }, [currentUser, role, showToast, updateEmployee]);
+  }, [currentUser, isManager, managerDept, role, showToast, updateEmployee]);
 
   const handleStartEditFace = useCallback((emp: Employee) => {
+    const isSelfEmp = Boolean(
+      emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+    );
+    const isOtherMgrEmp = isAnotherManager(emp, currentUser);
+    const isDiffDeptEmp = Boolean(
+      isManager && managerDept && emp && emp.department?.toLowerCase() !== managerDept.toLowerCase()
+    );
+    if (role !== 'admin' && (isSelfEmp || isOtherMgrEmp || isDiffDeptEmp)) {
+      showToast(
+        isSelfEmp
+          ? 'Không ai được tự sửa dữ liệu sinh trắc học của chính mình. Vui lòng liên hệ Admin!'
+          : isDiffDeptEmp
+          ? 'Quản lý chỉ có quyền sửa sinh trắc học của nhân viên trong phòng ban của mình!'
+          : 'Quản lý không có quyền sửa sinh trắc học của Quản lý khác!',
+        'error'
+      );
+      return;
+    }
     setSelectedEmpId(emp.employee_id);
     setSearchParams({ employee_id: emp.employee_id });
     setActiveTab('FACE');
     setManageModalEmployee(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [setSearchParams]);
+  }, [currentUser, isManager, managerDept, role, setSearchParams, showToast]);
 
   const handleStartCameraEkycFromModal = useCallback((emp: Employee) => {
+    const isSelfEmp = Boolean(
+      emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+    );
+    const isOtherMgrEmp = isAnotherManager(emp, currentUser);
+    const isDiffDeptEmp = Boolean(
+      isManager && managerDept && emp && emp.department?.toLowerCase() !== managerDept.toLowerCase()
+    );
+    if (role !== 'admin' && (isSelfEmp || isOtherMgrEmp || isDiffDeptEmp)) {
+      showToast(
+        isSelfEmp
+          ? 'Không ai được tự sửa dữ liệu sinh trắc học của chính mình. Vui lòng liên hệ Admin!'
+          : isDiffDeptEmp
+          ? 'Quản lý chỉ có quyền sửa sinh trắc học của nhân viên trong phòng ban của mình!'
+          : 'Quản lý không có quyền sửa sinh trắc học của Quản lý khác!',
+        'error'
+      );
+      return;
+    }
     setSelectedEmpId(emp.employee_id);
     setSearchParams({ employee_id: emp.employee_id });
     setActiveTab('FACE');
     setManageModalEmployee(null);
     setIsEkycModalOpen(true);
-  }, [setSearchParams]);
+  }, [currentUser, isManager, managerDept, role, setSearchParams, showToast]);
 
   const handleStartEditFingerprint = useCallback((emp: Employee) => {
+    const isSelfEmp = Boolean(
+      emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+    );
+    const isOtherMgrEmp = isAnotherManager(emp, currentUser);
+    const isDiffDeptEmp = Boolean(
+      isManager && managerDept && emp && emp.department?.toLowerCase() !== managerDept.toLowerCase()
+    );
+    if (role !== 'admin' && (isSelfEmp || isOtherMgrEmp || isDiffDeptEmp)) {
+      showToast(
+        isSelfEmp
+          ? 'Không ai được tự sửa dữ liệu sinh trắc học của chính mình. Vui lòng liên hệ Admin!'
+          : isDiffDeptEmp
+          ? 'Quản lý chỉ có quyền sửa sinh trắc học của nhân viên trong phòng ban của mình!'
+          : 'Quản lý không có quyền sửa sinh trắc học của Quản lý khác!',
+        'error'
+      );
+      return;
+    }
     setSelectedEmpId(emp.employee_id);
     setSearchParams({ employee_id: emp.employee_id });
     setActiveTab('FINGERPRINT');
     setManageModalEmployee(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [setSearchParams]);
+  }, [currentUser, isManager, managerDept, role, setSearchParams, showToast]);
 
   return {
+    scopedEmployees,
     selectedEmpId,
     setSelectedEmpId,
     activeTab,

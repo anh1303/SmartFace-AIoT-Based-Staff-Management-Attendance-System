@@ -28,12 +28,13 @@ export const ManagerEmployeeDetail: React.FC = () => {
     showToast
   } = useApp();
 
-  const { currentUser } = useAuth();
+  const { currentUser, role } = useAuth();
   const navigate = useNavigate();
   const params = useParams<{ id?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const isManager = currentUser?.role === 'manager' || currentUser?.role_name?.toUpperCase() === 'MANAGER' || Boolean(currentUser?.is_manager);
+  // Chỉ áp dụng giới hạn khi người dùng thực sự là Quản lý (Manager), không áp dụng cho Admin
+  const isManager = role === 'manager';
   const managerDept = currentUser?.department;
 
   // Giới hạn danh sách nhân viên: Manager chỉ xem phòng ban mình phụ trách và bản thân
@@ -107,6 +108,7 @@ export const ManagerEmployeeDetail: React.FC = () => {
       return;
     }
     setSelectedEmpCode(emp.employee_id);
+    navigate(`/app/manager/employee-detail?id=${emp.employee_id}`, { replace: true });
     setSearchParams({ id: emp.employee_id });
   };
 

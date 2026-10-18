@@ -28,6 +28,7 @@ export const ManagerBiometrics: React.FC = () => {
 
   // 1. Biometric enrollment state & handlers encapsulated in custom hook
   const {
+    scopedEmployees,
     selectedEmpId,
     setSelectedEmpId,
     activeTab,
@@ -70,6 +71,10 @@ export const ManagerBiometrics: React.FC = () => {
     handleStartEditFingerprint,
   } = useBiometricEnrollment();
 
+  const isDiffDept = Boolean(
+    isManager && managerDept && currentEmp && currentEmp.department?.toLowerCase() !== managerDept.toLowerCase()
+  );
+
   // 2. Department & Position filtering via reusable hook
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [departmentFilter, setDepartmentFilter] = useState(() => {
@@ -95,6 +100,9 @@ export const ManagerBiometrics: React.FC = () => {
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
+      if (isManager && managerDept && emp.department?.toLowerCase() !== managerDept.toLowerCase()) {
+        return false;
+      }
       const q = searchTerm.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -115,7 +123,7 @@ export const ManagerBiometrics: React.FC = () => {
 
       return matchSearch && matchDept && matchPosition;
     });
-  }, [employees, searchTerm, departmentFilter, positionFilter]);
+  }, [employees, isManager, managerDept, searchTerm, departmentFilter, positionFilter]);
 
   return (
     <div className="space-y-6">
@@ -124,10 +132,10 @@ export const ManagerBiometrics: React.FC = () => {
 
       {/* Main Enrollment Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Choose Employee & Current Profile */}
+        {/* Left Column: Choose Employee & Current Profile (Vùng khoanh đỏ: Chỉ hiện nhân viên trong phòng, trừ bản thân) */}
         <div className="lg:col-span-4 space-y-4">
           <EmployeeBiometricsCard
-            employees={employees}
+            employees={scopedEmployees}
             selectedEmpId={selectedEmpId}
             onSelectEmployee={(empId) => {
               setSelectedEmpId(empId);
@@ -172,7 +180,7 @@ export const ManagerBiometrics: React.FC = () => {
             </div>
 
             {/* Chốt chặn Requirement 2 */}
-            {isEnrollmentBlocked && (
+            {isEnrollmentBlocked && currentEmp && (
               <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 flex items-start gap-3 text-amber-800 dark:text-amber-200 text-xs">
                 <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
                 <div className="space-y-1">
@@ -180,36 +188,48 @@ export const ManagerBiometrics: React.FC = () => {
                   <p>
                     {isSelf
                       ? 'Bạn không thể tự tải ảnh, chụp eKYC hoặc đăng ký dữ liệu nhận diện của chính mình để tránh gian lận thời gian làm việc. Thay đổi này chỉ có Admin mới có quyền thực hiện.'
+                      : isDiffDept
+                      ? 'Quản lý chỉ có quyền xem và cập nhật dữ liệu nhận diện của nhân viên trong phòng ban của mình.'
                       : 'Quản lý không được phép sửa đổi hoặc đăng ký dữ liệu nhận diện của Quản lý khác.'}
                   </p>
                 </div>
               </div>
             )}
 
-            {/* TAB 1: Face ID Multi-Photo Upload & Camera eKYC */}
-            {activeTab === 'FACE' && (
-              <FaceEnrollmentSection
-                uploadedPhotos={uploadedPhotos}
-                analyzingFace={analyzingFace}
-                onOpenEkycModal={() => setIsEkycModalOpen(true)}
-                onPhotoUpload={handlePhotoUpload}
-                onRemovePhoto={handleRemovePhoto}
-                onOpenConfirmModal={() => setFaceConfirmModal(true)}
-              />
-            )}
+            {!currentEmp ? (
+              <div className="py-12 text-center text-slate-500 dark:text-slate-400 text-xs">
+                Phòng ban hiện chưa có nhân sự nào khác để cập nhật dữ liệu sinh trắc học.
+              </div>
+            ) : (
+              <>
+                {/* TAB 1: Face ID Multi-Photo Upload & Camera eKYC */}
+                {activeTab === 'FACE' && (
+                  <FaceEnrollmentSection
+                    uploadedPhotos={uploadedPhotos}
+                    analyzingFace={analyzingFace}
+                    disabled={isEnrollmentBlocked}
+                    onOpenEkycModal={() => setIsEkycModalOpen(true)}
+                    onPhotoUpload={handlePhotoUpload}
+                    onRemovePhoto={handleRemovePhoto}
+                    onOpenConfirmModal={() => setFaceConfirmModal(true)}
+                  />
+                )}
 
-            {/* TAB 2: Fingerprint via Edge IoT Device Signal */}
-            {activeTab === 'FINGERPRINT' && (
-              <FingerprintEnrollmentSection
-                selectedDevice={selectedDevice}
-                onSelectDevice={setSelectedDevice}
-                selectedFinger={selectedFinger}
-                onSelectFinger={setSelectedFinger}
-                fingerprintStep={fingerprintStep}
-                fingerQualityScore={fingerQualityScore}
-                onSendIoTTrigger={handleSendIoTTrigger}
-                onOpenConfirmModal={() => setFingerConfirmModal(true)}
-              />
+                {/* TAB 2: Fingerprint via Edge IoT Device Signal */}
+                {activeTab === 'FINGERPRINT' && (
+                  <FingerprintEnrollmentSection
+                    selectedDevice={selectedDevice}
+                    onSelectDevice={setSelectedDevice}
+                    selectedFinger={selectedFinger}
+                    onSelectFinger={setSelectedFinger}
+                    fingerprintStep={fingerprintStep}
+                    fingerQualityScore={fingerQualityScore}
+                    disabled={isEnrollmentBlocked}
+                    onSendIoTTrigger={handleSendIoTTrigger}
+                    onOpenConfirmModal={() => setFingerConfirmModal(true)}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>

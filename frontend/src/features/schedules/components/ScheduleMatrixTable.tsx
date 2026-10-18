@@ -62,17 +62,17 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
 
   return (
     <div className="bg-white dark:bg-[#13162b] border border-slate-300 dark:border-[#28305c] rounded-xl overflow-hidden shadow-xs">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-auto max-h-[620px]">
         <table className="w-full table-fixed text-left text-xs border-collapse">
-          <thead className="bg-slate-200 dark:bg-[#0c0f1f] border-b-2 border-slate-300 dark:border-[#28305c] text-slate-800 dark:text-slate-200 font-mono text-[11px] uppercase tracking-wider font-bold">
+          <thead className="sticky top-0 z-20 bg-slate-200 dark:bg-[#0c0f1f] border-b-2 border-slate-300 dark:border-[#28305c] text-slate-800 dark:text-slate-200 font-mono text-[11px] uppercase tracking-wider font-bold">
             <tr>
-              <th className="py-3.5 px-3 w-40 sm:w-44 lg:w-48 sticky left-0 bg-slate-200 dark:bg-[#0c0f1f] z-10 border-r border-slate-300 dark:border-[#222956] text-center">
+              <th className="py-3.5 px-3 w-40 sm:w-44 lg:w-48 sticky left-0 top-0 bg-slate-200 dark:bg-[#0c0f1f] z-30 border-r border-b-2 border-slate-300 dark:border-[#222956] text-center">
                 Nhân viên
               </th>
               {daysOfWeek.map((d, index) => (
                 <th
                   key={d.date}
-                  className={`py-3.5 px-1 ${index < daysOfWeek.length - 1
+                  className={`sticky top-0 z-20 bg-slate-200 dark:bg-[#0c0f1f] border-b-2 border-slate-300 dark:border-[#28305c] py-3.5 px-1 ${index < daysOfWeek.length - 1
                       ? 'border-r border-slate-300 dark:border-[#222956]'
                       : ''
                     } text-center`}

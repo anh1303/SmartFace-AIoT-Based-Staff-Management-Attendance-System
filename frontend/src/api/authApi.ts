@@ -41,10 +41,10 @@ export const DEFAULT_USERS: Record<Role, UserSession> = {
   },
 };
 
-export async function loginApi(identifier: string, password?: string) {
+export async function loginApi(identifier: string, password?: string, rememberMe = false) {
   const res = await apiFetch('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ identifier: identifier.trim(), password }),
+    body: JSON.stringify({ identifier: identifier.trim(), password, rememberMe }),
   });
 
   if (res.success && res.data) {

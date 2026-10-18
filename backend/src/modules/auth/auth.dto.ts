@@ -5,6 +5,7 @@ export const loginSchema = z
     email: z.string().email().optional(),
     identifier: z.string().min(1).optional(),
     password: z.string().min(6),
+    rememberMe: z.boolean().optional(),
   })
   .refine((v) => v.email || v.identifier, { message: 'email or identifier is required' })
 

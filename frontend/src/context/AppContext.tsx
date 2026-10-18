@@ -21,7 +21,7 @@ export interface AppContextType {
   role: Role;
   isInitializing: boolean;
   isLoading: boolean;
-  login: (identifier: string, password?: string) => Promise<{ success: boolean; message?: string; role?: Role }>;
+  login: (identifier: string, password?: string, rememberMe?: boolean) => Promise<{ success: boolean; message?: string; role?: Role }>;
   logout: () => void;
   switchRole: (role: Role) => void;
 

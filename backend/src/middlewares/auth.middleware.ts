@@ -26,13 +26,14 @@ declare global {
   }
 }
 
-export function authenticate(req: Request, _res: Response, next: NextFunction) {
+export function authenticate(req: Request, res: Response, next: NextFunction) {
   const token = req.cookies?.token || req.headers.authorization?.replace(/^Bearer\s+/i, '')
   if (!token) return next(new AppError(401, 'Authentication token is required'))
   try {
     req.user = jwt.verify(token, env.JWT_SECRET) as AuthUser
     next()
   } catch {
+    res.clearCookie('token', { path: '/' })
     next(new AppError(401, 'Invalid or expired token'))
   }
 }

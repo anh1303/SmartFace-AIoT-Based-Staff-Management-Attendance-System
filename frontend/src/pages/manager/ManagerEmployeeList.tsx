@@ -13,7 +13,7 @@ import {
   EditEmployeeModal,
   ConfirmDeleteEmployeeModal,
   ConfirmStatusEmployeeModal,
-  PositionManagementModal,
+  DepartmentPositionDrawer,
 } from '@/features/employees';
 
 export const ManagerEmployeeList: React.FC = () => {
@@ -51,19 +51,25 @@ export const ManagerEmployeeList: React.FC = () => {
   }, [isManager, managerDept]);
 
   // Position & Department Management State via reusable hook
-  const [positionModalOpen, setPositionModalOpen] = useState(false);
+  const [deptPositionDrawerOpen, setDeptPositionDrawerOpen] = useState(false);
   const {
     rawDepartmentOptions,
     departmentOptions,
     positionOptions,
     getPositionsByDepartment,
     loadDbPositions,
+    loadDbDepartments,
   } = useDepartmentPositions({
     employees,
     isManager,
     managerDept,
     departmentFilter,
   });
+
+  const handleDeptPositionsChanged = () => {
+    loadDbPositions();
+    loadDbDepartments();
+  };
 
   useEffect(() => {
     if (querySearch) {
@@ -223,7 +229,7 @@ export const ManagerEmployeeList: React.FC = () => {
     <div className="space-y-6">
       {/* Bento Header Banner */}
       <EmployeeListHeader
-        onOpenPositionModal={() => setPositionModalOpen(true)}
+        onOpenDeptPositionDrawer={() => setDeptPositionDrawerOpen(true)}
         onOpenAddModal={handleOpenAddModal}
       />
 
@@ -306,11 +312,11 @@ export const ManagerEmployeeList: React.FC = () => {
         }}
       />
 
-      {/* Position Management Modal */}
-      <PositionManagementModal
-        isOpen={positionModalOpen}
-        onClose={() => setPositionModalOpen(false)}
-        onPositionsChanged={loadDbPositions}
+      {/* Department & Position Management Drawer */}
+      <DepartmentPositionDrawer
+        isOpen={deptPositionDrawerOpen}
+        onClose={() => setDeptPositionDrawerOpen(false)}
+        onChanged={handleDeptPositionsChanged}
       />
     </div>
   );

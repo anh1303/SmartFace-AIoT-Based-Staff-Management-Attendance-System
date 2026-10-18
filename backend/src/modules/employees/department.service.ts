@@ -184,6 +184,15 @@ export async function deleteDepartment(id: number, actorUserId?: string) {
         where: { departmentId: id },
         data: { departmentId: firstOtherDept.id },
       })
+    } else {
+      const posIds = existing.positions.map((p) => p.id)
+      await prisma.employee.updateMany({
+        where: { positionId: { in: posIds } },
+        data: { positionId: null },
+      })
+      await prisma.position.deleteMany({
+        where: { departmentId: id },
+      })
     }
   }
 

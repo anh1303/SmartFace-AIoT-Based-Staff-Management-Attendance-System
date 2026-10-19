@@ -91,7 +91,7 @@ sequenceDiagram
     Pi ->> Pi: 3. MiniFASNet R7 kiểm tra giả mạo (Anti-Spoofing)
     Note over Pi: Điểm Sigmoid Calibrated >= 0.50 (Người thật)
     Pi ->> TFT: 4. Hiển thị Khung Xanh lá + REAL (0.94) + Mode
-    Pi ->> Pi: 5. ArcFace MobileFaceNet trích xuất 512D Vector float32
+    Pi ->> Pi: 5. Queue crop → worker ArcFace riêng → queue kết quả 512D float32
     
     rect rgb(235, 248, 255)
     Note over Pi, TB: 6. Gửi Two-way RPC (TUYỆT ĐỐI KHÔNG LƯU DB ThingsBoard)

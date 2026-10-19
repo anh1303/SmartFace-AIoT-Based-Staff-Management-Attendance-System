@@ -164,19 +164,15 @@ Trước khi chạy chính bằng CSI, có thể kiểm tra bằng
 không gửi MQTT hoặc điểm danh, không khởi tạo TFT/siêu âm. Nếu SCRFD fallback sang
 YuNet, công cụ báo lỗi để bạn biết detector thực tế chưa đúng cấu hình.
 
-## Lưu ý từ luồng edge_client hiện tại
+## Pipeline CV và chế độ vận hành
 
-- Model, ngưỡng PAD, rolling votes và cách chuẩn hóa embedding được giữ nguyên.
-- Khi gửi RPC thành công, client khóa lượt gửi đến khi mất mặt/đổi track/ngủ.
-  Chưa có timeout riêng để mở khóa nếu backend không trả lời; nếu bị kẹt ở
-  “ĐANG ĐỐI SOÁT”, xem log ThingsBoard/backend và rời khung hình để reset lượt.
-- Thông báo đổi mode trực tiếp từ Pi đang gọi `http://TB_HOST:3000`. Stack Docker
-  hiện bind backend vào localhost, nên Pi không gọi được đường HTTP này. Điều đó
-  ảnh hưởng thông báo mode từ Pi/dashboard về web; đường gửi vector và nhận kết
-  quả qua ThingsBoard RPC dùng mạng Docker riêng. Chuyển mode từ web xuống Pi
-  dùng ThingsBoard shared attributes.
-- Camera đọc lỗi sẽ được thử lại liên tục trong vòng lặp chính. Dùng kiểm tra
-  `--camera` trước để phát hiện tình huống mở camera được nhưng không có frame.
+- Mặc định chọn FULL qua `PAD_RUNTIME_CONFIG_PATH=models/R7_SC_FULL_crop15_runtime_config_casia.json`; có sẵn 100K và runtime JSON đi kèm để chuyển profile. Nếu cần ghi đè ngưỡng, đặt `PAD_THRESHOLD_LOGIT` hoặc `PAD_THRESHOLD` trong `.env`; để trống dùng JSON.
+- PAD dùng tối thiểu 3 phiếu, cửa sổ 5; recognition 1,0 giây, detection/PAD 0,2 giây. Camera yêu cầu 640×480/30 FPS theo cấu hình chung; giá trị thật phụ thuộc camera/driver.
+- ArcFace chạy worker riêng, một thread ONNX; queue 2, không chờ inference trong vòng camera. Lỗi PAD xóa vote và yêu cầu xác minh lại; kết quả cũ bị chặn theo track/mode/phiên xác minh.
+- Cache danh tính trên Pi dùng cho hiển thị, không thay thế xác nhận backend. TTL 30 giây, cosine tối thiểu 0,65.
+- MQTT watchdog thử lại tối đa 3 lượt; timeout trả trạng thái chưa xác nhận. Event ID giữ ổn định cho retry. Latch chỉ khóa sau publish thành công.
+- Đồng bộ mode qua ThingsBoard; HTTP relay trực tiếp chỉ bật khi đặt `BACKEND_BASE_URL`/secret. Không mặc định gọi `TB_HOST:3000`.
+- Camera lỗi sẽ báo DEGRADED, sau 100 lần đọc lỗi liên tiếp thoát để service có thể restart. Dùng `--camera` trước khi bật dịch vụ.
 
 Chỉ bật TFT khi đã nối đúng chân và bật SPI (`sudo raspi-config` → Interface
 Options → SPI; khởi động lại nếu được yêu cầu). Đấu chân theo DEPLOYMENT_GUIDE.md.

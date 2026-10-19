@@ -19,7 +19,7 @@ def main():
         if edge.SHOW_GUI and "GUI:                           NONE" in cv2.getBuildInformation():
             raise RuntimeError("OpenCV headless: đặt SHOW_GUI=false")
 
-        model_names = ["R7_SC_100K_crop15.onnx", "w600k_mbf.onnx"]
+        model_names = ["R7_SC_FULL_crop15.onnx", "R7_SC_100K_crop15.onnx", "w600k_mbf.onnx"]
         model_names.append("det_500m.onnx" if edge.APP_DETECTOR == "scrfd" else "detector_quantized.onnx")
         for name in model_names:
             path = edge.BASE_DIR / "models" / name
@@ -33,11 +33,12 @@ def main():
                 raise RuntimeError("SCRFD khởi tạo lỗi và đã fallback YuNet. Xem log phía trên.")
         blank = np.zeros((edge.HEIGHT, edge.WIDTH, 3), dtype=np.uint8)
         detector.detect(blank)
-        pad = edge.AntiSpoofPredictor(threshold_logit=edge.FAS_LOGIT_THRESHOLD)
-        _, score, margin = pad.predict(blank, (0, 0, edge.WIDTH, edge.HEIGHT))
+        pad = edge.AntiSpoofPredictor()
+        result = pad.predict_frame(blank, (0, 0, edge.WIDTH, edge.HEIGHT))
+        score, margin = result["confidence"], result["pad_score"]
         if not np.isfinite(score) or not np.isfinite(margin):
             raise RuntimeError("PAD trả về giá trị không hữu hạn")
-        embedder = edge.FaceEmbedder()
+        embedder = edge.FaceEmbedder(intra_op_threads=edge.vision.RECOGNITION_INTRA_OP_THREADS)
         vector = embedder.extract(np.zeros((112, 112, 3), dtype=np.uint8))
         if vector is None or vector.shape != (512,) or not np.isfinite(vector).all():
             raise RuntimeError("Embedder không trả vector 512D hữu hạn")

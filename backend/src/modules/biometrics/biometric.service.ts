@@ -2,6 +2,8 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { logAction } from '../audit-logs/audit.service.js'
 import { env } from '../../config/env.js'
+import { buildIdOrCodeWhere } from '../../common/utils.js'
+import { isEmployeeManager } from '../../common/permission.helper.js'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -148,4 +150,59 @@ export async function enrollImages(idOrCode: string, imagesBase64: string[], act
     extraction_rate,
     employee_id: employeeId,
   }
+}
+
+export async function enrollImagesWithPermissionCheck(
+  employeeId: string,
+  imagesBase64: string[],
+  actorUser?: { id?: string; role?: string }
+) {
+  const targetEmp = await prisma.employee.findFirst({
+    where: buildIdOrCodeWhere(employeeId),
+    include: {
+      department: true,
+      users: { select: { id: true, roles: { select: { role_name: true } } } },
+    },
+  });
+  if (!targetEmp) throw AppError.notFound('Không tìm thấy nhân viên');
+
+  if (actorUser?.role !== 'ADMIN') {
+    if (targetEmp.user_id === actorUser?.id) {
+      throw AppError.forbidden(
+        'Không ai được tự đăng ký hoặc sửa dữ liệu khuôn mặt của chính mình. Vui lòng liên hệ Quản trị viên (Admin) phê duyệt!'
+      );
+    }
+    if (actorUser?.role === 'MANAGER' && isEmployeeManager(targetEmp)) {
+      throw AppError.forbidden('Quản lý không có quyền đăng ký sinh trắc học cho quản lý khác!');
+    }
+  }
+
+  return enrollImages(employeeId, imagesBase64, actorUser?.id);
+}
+
+export async function removeAllWithPermissionCheck(
+  employeeId: string,
+  actorUser?: { id?: string; role?: string }
+) {
+  const targetEmp = await prisma.employee.findFirst({
+    where: buildIdOrCodeWhere(employeeId),
+    include: {
+      department: true,
+      users: { select: { id: true, roles: { select: { role_name: true } } } },
+    },
+  });
+  if (!targetEmp) throw AppError.notFound('Không tìm thấy nhân viên');
+
+  if (actorUser?.role !== 'ADMIN') {
+    if (targetEmp.user_id === actorUser?.id) {
+      throw AppError.forbidden(
+        'Không ai được tự xóa dữ liệu khuôn mặt của chính mình. Vui lòng liên hệ Quản trị viên (Admin) phê duyệt!'
+      );
+    }
+    if (actorUser?.role === 'MANAGER' && isEmployeeManager(targetEmp)) {
+      throw AppError.forbidden('Quản lý không có quyền xóa dữ liệu sinh trắc học của quản lý khác!');
+    }
+  }
+
+  return removeAll(employeeId, actorUser?.id);
 }

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+export const VALID_SHIFT_TYPES = ['OFFICE_HOURS', 'MORNING', 'AFTERNOON', 'OFF'] as const
+
 export const assignShiftSchema = z
   .object({
     employee_id: z.string().optional(),
@@ -7,7 +9,16 @@ export const assignShiftSchema = z
     date: z.string().optional(),
     work_date: z.string().optional(),
     work_day: z.string().optional(),
-    shift_type: z.string().min(1),
+    shift_type: z.enum([
+      'OFFICE_HOURS',
+      'MORNING',
+      'AFTERNOON',
+      'OFF',
+      'office_hours',
+      'morning',
+      'afternoon',
+      'off',
+    ]),
     start_time: z.string().optional(),
     end_time: z.string().optional(),
     note: z.string().optional(),

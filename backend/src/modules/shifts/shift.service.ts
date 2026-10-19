@@ -2,8 +2,40 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, formatVNDateISO } from '../../common/utils.js'
 import { logAction } from '../audit-logs/audit.service.js'
+import { isEmployeeManager } from '../../common/permission.helper.js'
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
+
+/**
+ * 3 Ca làm việc mặc định chuẩn của toàn hệ thống.
+ * Giờ bắt đầu và kết thúc là cố định và KHÔNG THỂ SỬA ĐỔI.
+ */
+export const STANDARD_SHIFT_CONFIGS = {
+  OFFICE_HOURS: {
+    code: 'OFFICE_HOURS',
+    name: 'Ca Hành Chính',
+    start_time: '08:00',
+    end_time: '17:30',
+  },
+  MORNING: {
+    code: 'MORNING',
+    name: 'Ca Sáng',
+    start_time: '08:30',
+    end_time: '17:30',
+  },
+  AFTERNOON: {
+    code: 'AFTERNOON',
+    name: 'Ca Chiều',
+    start_time: '13:00',
+    end_time: '21:30',
+  },
+  OFF: {
+    code: 'OFF',
+    name: 'Nghỉ ca (OFF)',
+    start_time: '00:00',
+    end_time: '00:00',
+  },
+} as const
 
 function formatTimeHHMM(val: unknown, fallback: string): string {
   if (!val) return fallback
@@ -67,18 +99,29 @@ export function formatShift(s: RawShift) {
   }
 }
 
-export async function list(query: Record<string, unknown>) {
+export async function list(
+  query: Record<string, unknown>,
+  requesterUser?: { id?: string; role?: string }
+) {
   const where: Record<string, unknown> = {}
 
-  const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
-    ? query.employeeId
-    : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
-
-  if (empIdFilter) {
+  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
     const emp = await prisma.employee.findFirst({
-      where: buildIdOrCodeWhere(empIdFilter),
+      where: { user_id: requesterUser.id },
     })
-    if (emp) where.employee_id = emp.id
+    if (!emp) return []
+    where.employee_id = emp.id
+  } else {
+    const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
+      ? query.employeeId
+      : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
+
+    if (empIdFilter) {
+      const emp = await prisma.employee.findFirst({
+        where: buildIdOrCodeWhere(empIdFilter),
+      })
+      if (emp) where.employee_id = emp.id
+    }
   }
 
   if (typeof query.date === 'string' && query.date) {
@@ -126,13 +169,29 @@ export async function assignOrUpdate(data: {
   const dayIndex = work_date.getUTCDay()
   const work_day = data.work_day || DAY_NAMES[dayIndex] || 'Thứ Hai'
 
-  let defaultWorkShift = await prisma.work_shifts.findFirst()
+  // Quy định: Hệ thống chỉ có 3 ca làm việc mặc định và giờ bắt đầu, kết thúc đều là cố định, KHÔNG THỂ SỬA
+  const normalizedType = (data.shift_type || 'OFFICE_HOURS').toUpperCase() as keyof typeof STANDARD_SHIFT_CONFIGS
+  const standardConfig = STANDARD_SHIFT_CONFIGS[normalizedType]
+  if (!standardConfig) {
+    throw new AppError(
+      400,
+      'Loại ca không hợp lệ! Hệ thống chỉ hỗ trợ 3 ca làm việc mặc định: Ca Hành Chính (OFFICE_HOURS: 08:00 - 17:30), Ca Sáng (MORNING: 08:30 - 17:30), Ca Chiều (AFTERNOON: 13:00 - 21:30) hoặc Nghỉ ca (OFF)'
+    )
+  }
+
+  // Luôn luôn áp dụng giờ bắt đầu và kết thúc cố định theo quy định của hệ thống
+  const startTimeDate = parseTimeStringToDate(standardConfig.start_time, '08:00')
+  const endTimeDate = parseTimeStringToDate(standardConfig.end_time, '17:30')
+
+  let defaultWorkShift = await prisma.work_shifts.findFirst({
+    where: { shift_name: standardConfig.name },
+  })
   if (!defaultWorkShift) {
     defaultWorkShift = await prisma.work_shifts.create({
       data: {
-        shift_name: 'Ca Hành Chính',
-        start_time: new Date('1970-01-01T08:00:00.000Z'),
-        end_time: new Date('1970-01-01T17:30:00.000Z'),
+        shift_name: standardConfig.name,
+        start_time: startTimeDate,
+        end_time: endTimeDate,
       },
     })
   }
@@ -144,16 +203,13 @@ export async function assignOrUpdate(data: {
     },
   })
 
-  const startTimeDate = parseTimeStringToDate(data.start_time, '08:00')
-  const endTimeDate = parseTimeStringToDate(data.end_time, '17:30')
-
   let shiftRecord
   if (existingShift) {
     shiftRecord = await prisma.employee_shifts.update({
       where: { id: existingShift.id },
       data: {
         work_day,
-        shift_type: data.shift_type,
+        shift_type: standardConfig.code,
         start_time: startTimeDate,
         end_time: endTimeDate,
         note: data.note ?? '',
@@ -171,7 +227,7 @@ export async function assignOrUpdate(data: {
         shift_id: defaultWorkShift.id,
         work_date,
         work_day,
-        shift_type: data.shift_type,
+        shift_type: standardConfig.code,
         start_time: startTimeDate,
         end_time: endTimeDate,
         note: data.note ?? '',
@@ -208,4 +264,45 @@ export async function assignOrUpdate(data: {
   })
 
   return formatShift(shiftRecord)
+}
+
+export async function assignOrUpdateWithPermissionCheck(
+  data: {
+    employee_id: string
+    date: string
+    work_day?: string
+    shift_type: string
+    start_time?: string
+    end_time?: string
+    note?: string
+  },
+  actorUser?: { id?: string; role?: string }
+) {
+  if (actorUser?.role !== 'ADMIN') {
+    const targetEmp = await prisma.employee.findFirst({
+      where: buildIdOrCodeWhere(data.employee_id),
+      include: {
+        department: true,
+        users: {
+          select: {
+            id: true,
+            roles: { select: { role_name: true } },
+          },
+        },
+      },
+    })
+    if (!targetEmp) throw AppError.notFound('Không tìm thấy nhân viên')
+
+    if (targetEmp.user_id === actorUser?.id) {
+      throw AppError.forbidden(
+        'Không ai được tự phân ca hoặc sửa ca làm việc của chính mình. Vui lòng liên hệ Quản trị viên (Admin) phê duyệt!'
+      )
+    }
+
+    if (actorUser?.role === 'MANAGER' && isEmployeeManager(targetEmp)) {
+      throw AppError.forbidden('Quản lý không có quyền phân ca cho quản lý khác!')
+    }
+  }
+
+  return assignOrUpdate(data, actorUser?.id)
 }

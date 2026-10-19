@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
+import { isAnotherManager } from '../../utils/permissionUtils';
 import { PayrollRecord } from '../../types';
 import { logger } from '../../utils/logger';
+import { useDepartmentPositions } from '../../hooks';
 import {
   PayrollHeader,
   PayrollSummaryCards,
@@ -17,6 +20,7 @@ import {
 const payrollLogger = logger.child('ManagerPayroll');
 
 export const ManagerPayroll: React.FC = () => {
+  const { role, currentUser } = useAuth();
   const {
     payroll,
     bonusPenalty,
@@ -31,11 +35,36 @@ export const ManagerPayroll: React.FC = () => {
     showToast,
   } = useApp();
 
+  const isManager = role === 'manager';
+  const managerDept = currentUser?.department;
+
   const [confirmFinalizeOpen, setConfirmFinalizeOpen] = useState(false);
   const [confirmUnlockOpen, setConfirmUnlockOpen] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('ALL');
+  const [departmentFilter, setDepartmentFilter] = useState(() => {
+    if (role === 'manager' && currentUser?.department) {
+      return currentUser.department;
+    }
+    return 'ALL';
+  });
+  const [positionFilter, setPositionFilter] = useState('ALL');
+
+  useEffect(() => {
+    if (isManager && managerDept) {
+      setDepartmentFilter(managerDept);
+    }
+  }, [isManager, managerDept]);
+
+  const {
+    departmentOptions,
+    positionOptions,
+  } = useDepartmentPositions({
+    employees,
+    isManager,
+    managerDept,
+    departmentFilter,
+  });
 
   // Modal state for Bonus Penalty Policy
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
@@ -46,6 +75,10 @@ export const ManagerPayroll: React.FC = () => {
   });
 
   const handleOpenPolicyModal = () => {
+    if (role !== 'admin') {
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error');
+      return;
+    }
     setPolicyData({
       overtime_rate: bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000,
       late_early_penalty: bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000,
@@ -56,6 +89,11 @@ export const ManagerPayroll: React.FC = () => {
 
   const handleSavePolicy = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (role !== 'admin') {
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error');
+      setIsPolicyModalOpen(false);
+      return;
+    }
     await updateBonusPenalty(policyData);
     setIsPolicyModalOpen(false);
   };
@@ -74,9 +112,38 @@ export const ManagerPayroll: React.FC = () => {
     .reverse();
 
   // All records for the selected period (for status & total metrics)
-  const allPeriodRecords = payroll.filter(
-    (p) => p.period === selectedPeriod || p.payroll_period === selectedPeriod
-  );
+  // Chốt chặn phân quyền: Quản lý chỉ xem được phiếu lương của chính mình và nhân viên phòng ban mình phụ trách
+  const allPeriodRecords = payroll.filter((p) => {
+    const isPeriodMatch = p.period === selectedPeriod || p.payroll_period === selectedPeriod;
+    if (!isPeriodMatch) return false;
+
+    if (role !== 'admin') {
+      const emp = employees.find((e) => e.employee_id === p.employee_id);
+      const isSelf = Boolean(
+        currentUser && (
+          p.employee_id === currentUser.employee_id ||
+          (emp && (emp.employee_id === currentUser.employee_id || emp.email?.toLowerCase() === currentUser.email?.toLowerCase()))
+        )
+      );
+
+      // Nếu là chính mình: Luôn cho phép xem lương của bản thân
+      if (isSelf) return true;
+
+      // Nếu là Manager xem người khác:
+      if (isManager && managerDept) {
+        const empDept = emp?.department || p.department;
+        // Nhân viên phòng ban khác: HOÀN TOÀN KHÔNG HIỆN
+        if (!empDept || empDept.toLowerCase() !== managerDept.toLowerCase()) {
+          return false;
+        }
+        // Quản lý khác trong cùng phòng: HOÀN TOÀN KHÔNG HIỆN
+        if (emp && isAnotherManager(emp, currentUser)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  });
   const isFinalized =
     allPeriodRecords.length > 0 && allPeriodRecords.every((p) => p.status === 'FINALIZED');
 
@@ -89,7 +156,11 @@ export const ManagerPayroll: React.FC = () => {
     const dept = emp?.department || p.department || '';
     const pos = emp?.position || '';
 
-    if (departmentFilter !== 'ALL' && dept !== departmentFilter && pos !== departmentFilter) {
+    if (departmentFilter !== 'ALL' && dept !== departmentFilter) {
+      return false;
+    }
+
+    if (positionFilter !== 'ALL' && pos !== positionFilter) {
       return false;
     }
 
@@ -110,6 +181,20 @@ export const ManagerPayroll: React.FC = () => {
 
   const handleOpenEdit = (record: PayrollRecord) => {
     const emp = employees.find((e) => e.employee_id === record.employee_id);
+    if (role !== 'admin') {
+      const isSelf = Boolean(
+        emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+      );
+      if (isSelf) {
+        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error');
+        return;
+      }
+      if (isAnotherManager(emp, currentUser)) {
+        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error');
+        return;
+      }
+    }
+
     setEditingItem({
       record,
       empName: emp?.full_name || record.employee_name || record.employee_id,
@@ -124,6 +209,21 @@ export const ManagerPayroll: React.FC = () => {
   const handleConfirmEditSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
+
+    const emp = employees.find((e) => e.employee_id === editingItem.record.employee_id);
+    if (role !== 'admin') {
+      const isSelf = Boolean(
+        emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
+      );
+      if (isSelf) {
+        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error');
+        return;
+      }
+      if (isAnotherManager(emp, currentUser)) {
+        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error');
+        return;
+      }
+    }
 
     updatePayrollItem(editingItem.record.payroll_id, {
       hourly_rate: editingItem.hourly_rate,
@@ -143,6 +243,11 @@ export const ManagerPayroll: React.FC = () => {
   };
 
   const handleUnlockConfirm = () => {
+    if (role !== 'admin') {
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền mở khóa bảng lương!', 'error');
+      setConfirmUnlockOpen(false);
+      return;
+    }
     unlockPayrollPeriod(selectedPeriod);
     setConfirmUnlockOpen(false);
   };
@@ -244,7 +349,18 @@ export const ManagerPayroll: React.FC = () => {
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         departmentFilter={departmentFilter}
-        onDepartmentFilterChange={setDepartmentFilter}
+        onDepartmentFilterChange={(val) => {
+          if (isManager && managerDept && val !== managerDept && val !== 'ALL') {
+            return;
+          }
+          setDepartmentFilter(val);
+          setPositionFilter('ALL');
+        }}
+        departmentOptions={departmentOptions}
+        allDepartmentLabel={isManager ? '' : 'Tất cả phòng ban'}
+        positionFilter={positionFilter}
+        onPositionFilterChange={setPositionFilter}
+        positionOptions={positionOptions}
         isFinalized={isFinalized}
         onOpenEdit={handleOpenEdit}
       />
@@ -266,7 +382,7 @@ export const ManagerPayroll: React.FC = () => {
         onClose={() => setConfirmFinalizeOpen(false)}
         selectedPeriod={selectedPeriod}
         totalExpense={totalExpense}
-        staffCount={currentRecords.length}
+        employeeCount={currentRecords.length}
         onConfirm={handleFinalizeConfirm}
       />
 

@@ -1,4 +1,4 @@
-export type Role = 'manager' | 'employee';
+export type Role = 'admin' | 'manager' | 'employee';
 
 export interface UserSession {
   employee_id: string;
@@ -8,7 +8,9 @@ export interface UserSession {
   role_name?: string;
   is_manager?: boolean;
   position: string;
+  positionId?: number | null;
   department: string;
+  departmentId?: number | null;
   avatar: string;
 }
 

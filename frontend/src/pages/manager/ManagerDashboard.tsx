@@ -14,6 +14,17 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import {
+  PageHeaderBanner,
+  TableContainer,
+  TableHead,
+  TableHeadRow,
+  TableHeadCell,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableEmpty
+} from '../../components/common';
 
 export const ManagerDashboard: React.FC = () => {
   const { employees, attendance } = useApp();
@@ -88,29 +99,17 @@ export const ManagerDashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Bento Header Bar with Continuous Animated Shifting Gradient & Floating Blobs */}
-      <div className="bento-hero-gradient rounded-2xl p-6 transition-all">
-        {/* Ambient Floating & Morphing Blurred Blobs */}
-        <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-purple-500/30 to-fuchsia-500/25 dark:from-purple-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
-        <div className="absolute -bottom-16 left-1/4 w-64 h-64 bg-gradient-to-tr from-indigo-500/30 to-blue-500/20 dark:from-indigo-600/30 dark:to-blue-600/20 rounded-full blur-3xl pointer-events-none animate-blob-2" />
-        <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
-
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
-              Tổng Quan Hệ Thống
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('/app/manager/employees')}
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-xs shadow-purple-500/25 transition-all"
-            >
-              Quản lý nhân sự
-            </button>
-          </div>
-        </div>
-      </div>
+      <PageHeaderBanner
+        title="Tổng Quan Hệ Thống"
+        actions={
+          <button
+            onClick={() => navigate('/app/manager/employees')}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-xs shadow-purple-500/25 transition-all cursor-pointer"
+          >
+            Quản lý nhân sự
+          </button>
+        }
+      />
 
       {/* 4 Bento Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -253,8 +252,8 @@ export const ManagerDashboard: React.FC = () => {
       </div>
 
       {/* Bottom Bento Card: Real-time Attendance Logs */}
-      <div className="bg-white dark:bg-[#13162b] border border-slate-300 dark:border-[#28305c] rounded-xl overflow-hidden shadow-xs transition-colors">
-        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-200 dark:border-[#28305c] bg-white dark:bg-[#13162b]">
+      <div className="space-y-3">
+        <div className="p-1 flex items-center justify-between">
           <h3 className="font-bold text-slate-900 dark:text-white text-base">Nhật ký chấm công Face ID (Real-time)</h3>
           <button
             type="button"
@@ -265,84 +264,76 @@ export const ManagerDashboard: React.FC = () => {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-mono">
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Nhân viên</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Thời gian</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Thiết bị</th>
-                <th className="py-3.5 px-4 border-r border-slate-300 dark:border-[#222956] text-center">Độ chính xác</th>
-                <th className="py-3.5 px-4 text-center">Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody className="text-slate-700 dark:text-slate-300 text-center">
-              {attendance.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400 dark:text-slate-500">
-                    Chưa có dữ liệu chấm công.
-                  </td>
-                </tr>
-              ) : (
-                attendance.slice(0, 5).map(att => {
-                  const emp = employees.find(e => e.employee_id === att.employee_id);
-                  const initials = emp?.full_name
-                    ? emp.full_name.split(' ').map(w => w[0]).slice(-2).join('')
-                    : 'NV';
+        <TableContainer minWidth="700px">
+          <TableHead>
+            <TableHeadRow>
+              <TableHeadCell width="220px" align="left">Nhân viên</TableHeadCell>
+              <TableHeadCell width="110px" align="center">Thời gian</TableHeadCell>
+              <TableHeadCell width="140px">Thiết bị</TableHeadCell>
+              <TableHeadCell width="110px" align="center">Độ chính xác</TableHeadCell>
+              <TableHeadCell width="120px" align="center" isLast>Trạng thái</TableHeadCell>
+            </TableHeadRow>
+          </TableHead>
+          <TableBody>
+            {attendance.length === 0 ? (
+              <TableEmpty colSpan={5} message="Chưa có dữ liệu chấm công." />
+            ) : (
+              attendance.slice(0, 5).map(att => {
+                const emp = employees.find(e => e.employee_id === att.employee_id);
+                const empName = emp?.full_name || att.employee_id;
+                const initials = emp?.full_name
+                  ? emp.full_name.split(' ').map(w => w[0]).slice(-2).join('')
+                  : 'NV';
 
-                  return (
-                    <tr
-                      key={att.attendance_id}
-                      className="hover:bg-purple-50/40 dark:hover:bg-[#181c38]/50 transition-colors border-b border-slate-200 dark:border-[#202752]"
-                    >
-                      <td className="py-3.5 px-4 border-r border-slate-200 dark:border-[#202752]">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-[#181c38] border border-purple-200 dark:border-[#272d5a] flex items-center justify-center text-[10px] font-bold text-purple-700 dark:text-purple-300 shrink-0">
-                            {emp?.avatar ? (
-                              <img src={emp.avatar} alt={emp.full_name} className="w-full h-full rounded-full object-cover" />
-                            ) : (
-                              initials
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium text-slate-900 dark:text-white text-xs sm:text-sm">{emp?.full_name || att.employee_id}</p>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{att.employee_id} • {emp?.department}</p>
-                          </div>
+                return (
+                  <TableRow key={att.attendance_id}>
+                    <TableCell align="left" className="max-w-[220px]">
+                      <div className="flex items-center gap-3 min-w-0 text-left" title={empName}>
+                        <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-[#181c38] border border-purple-200 dark:border-[#272d5a] flex items-center justify-center text-[10px] font-bold text-purple-700 dark:text-purple-300 shrink-0">
+                          {emp?.avatar ? (
+                            <img src={emp.avatar} alt={emp.full_name} className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            initials
+                          )}
                         </div>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-xs text-slate-600 dark:text-slate-300 border-r border-slate-200 dark:border-[#202752]">
-                        {formatVNTime(att.timestamp)}
-                      </td>
-                      <td className="py-3.5 px-4 text-xs text-slate-500 dark:text-slate-400 font-mono border-r border-slate-200 dark:border-[#202752]">
-                        {att.device_id}
-                      </td>
-                      <td className="py-3.5 px-4 text-center border-r border-slate-200 dark:border-[#202752]">
-                        <span className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium">
-                          {(att.verification_score * 100).toFixed(1)}%
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        {(() => {
-                          const punc = getPunctuality(att);
-                          return (
-                            <span
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${punc === 'ON_TIME'
-                                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
-                                : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
-                                }`}
-                            >
-                              {punc === 'ON_TIME' ? 'Đúng giờ' : punc === 'EARLY_LEAVE' ? 'Về sớm' : 'Muộn ca'}
-                            </span>
-                          );
-                        })()}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        <div className="min-w-0 flex-1 text-left">
+                          <p className="font-medium text-slate-900 dark:text-white text-xs sm:text-sm truncate text-left" title={empName}>{empName}</p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate text-left" title={`${att.employee_id} • ${emp?.department}`}>{att.employee_id} • {emp?.department}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell align="center" className="font-mono text-xs text-slate-600 dark:text-slate-300 truncate" title={formatVNTime(att.timestamp)}>
+                      {formatVNTime(att.timestamp)}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate max-w-[140px]" title={att.device_id}>
+                      {att.device_id}
+                    </TableCell>
+                    <TableCell align="center">
+                      <span className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium">
+                        {(att.verification_score * 100).toFixed(1)}%
+                      </span>
+                    </TableCell>
+                    <TableCell isLast align="center">
+                      {(() => {
+                        const punc = getPunctuality(att);
+                        return (
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono ${punc === 'ON_TIME'
+                              ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
+                              : 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
+                              }`}
+                          >
+                            {punc === 'ON_TIME' ? 'Đúng giờ' : punc === 'EARLY_LEAVE' ? 'Về sớm' : 'Muộn ca'}
+                          </span>
+                        );
+                      })()}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </TableContainer>
       </div>
     </div>
   );

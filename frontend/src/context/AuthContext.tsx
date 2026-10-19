@@ -12,7 +12,7 @@ interface AuthContextType {
   role: Role;
   isInitializing: boolean;
   isLoading: boolean;
-  login: (identifier: string, password?: string) => Promise<{ success: boolean; message?: string; role?: Role }>;
+  login: (identifier: string, password?: string, rememberMe?: boolean) => Promise<{ success: boolean; message?: string; role?: Role }>;
   logout: () => void;
   switchRole: (role: Role, employeesFallback?: Employee[]) => void;
   setCurrentUserSession: (session: UserSession | null) => void;
@@ -26,7 +26,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [currentUser, setCurrentUser] = useState<UserSession | null>(() => {
     try {
-      const saved = localStorage.getItem('userSession');
+      // Dọn sạch localStorage tồn đọng để không tự động đăng nhập khi mở lại
+      localStorage.removeItem('userSession');
+      localStorage.removeItem('token');
+      const saved = sessionStorage.getItem('userSession');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -40,16 +43,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isMounted = true;
 
-    // Validate session on mount via HttpOnly cookie (Do not blindly trust localStorage)
+    // Validate session on mount via HttpOnly cookie (Do not blindly trust storage)
     meApi()
       .then(session => {
         if (!isMounted) return;
         if (session) {
           setCurrentUser(session);
-          localStorage.setItem('userSession', JSON.stringify(session));
+          sessionStorage.setItem('userSession', JSON.stringify(session));
         } else {
-          // If cookie verification fails or expires, clear stale local session
+          // If cookie verification fails or expires, clear stale session
           setCurrentUser(null);
+          sessionStorage.removeItem('userSession');
           localStorage.removeItem('userSession');
         }
       })
@@ -57,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         authLogger.warn('Session verification failed on mount:', error);
         if (!isMounted) return;
         setCurrentUser(null);
+        sessionStorage.removeItem('userSession');
         localStorage.removeItem('userSession');
       })
       .finally(() => {
@@ -70,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = useCallback(async (identifier: string, password?: string) => {
+  const login = useCallback(async (identifier: string, password?: string, rememberMe = false) => {
     if (!identifier || !password) {
       const errMsg = 'Vui lòng nhập đầy đủ thông tin đăng nhập';
       showToast(errMsg, 'error');
@@ -81,11 +86,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear any prior user's cached queries before setting up new session
       queryClient.clear();
 
-      const { session, targetRole } = await loginApi(identifier, password);
+      const { session, targetRole } = await loginApi(identifier, password, rememberMe);
       setCurrentUser(session);
-      localStorage.setItem('userSession', JSON.stringify(session));
 
-      showToast(`Đăng nhập thành công! Vai trò: ${targetRole === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Employee)'}`, 'success');
+      if (rememberMe) {
+        localStorage.setItem('userSession', JSON.stringify(session));
+      } else {
+        sessionStorage.setItem('userSession', JSON.stringify(session));
+        localStorage.removeItem('userSession');
+      }
+
+      const roleLabel =
+        targetRole === 'admin'
+          ? 'Quản trị viên (Admin)'
+          : targetRole === 'manager'
+          ? 'Quản lý (Manager)'
+          : 'Nhân viên (Employee)';
+      showToast(`Đăng nhập thành công! Vai trò: ${roleLabel}`, 'success');
       return { success: true, role: targetRole };
     } catch (error: unknown) {
       authLogger.error('Login error:', error);
@@ -109,6 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setCurrentUser(null);
+    sessionStorage.removeItem('userSession');
     localStorage.removeItem('userSession');
     localStorage.removeItem('token');
     showToast('Đã đăng xuất khỏi hệ thống', 'info');
@@ -118,6 +136,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 2. Lock switchRole in production builds using import.meta.env.DEV
     if (!import.meta.env.DEV) {
       showToast('Tính năng chuyển đổi vai trò chỉ khả dụng ở môi trường Development!', 'warning');
+      return;
+    }
+
+    if (newRole === 'admin') {
+      setCurrentUser(DEFAULT_USERS.admin);
+      sessionStorage.setItem('userSession', JSON.stringify(DEFAULT_USERS.admin));
+      showToast('[DEV ONLY] Đã chuyển đổi sang vai trò: Quản trị viên (Admin)', 'info');
       return;
     }
 
@@ -138,9 +163,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         avatar: matched.avatar || '',
       };
       setCurrentUser(session);
-      localStorage.setItem('userSession', JSON.stringify(session));
+      sessionStorage.setItem('userSession', JSON.stringify(session));
     } else {
       setCurrentUser(DEFAULT_USERS[newRole]);
+      sessionStorage.setItem('userSession', JSON.stringify(DEFAULT_USERS[newRole]));
     }
     showToast(`[DEV ONLY] Đã chuyển đổi sang giao diện: ${newRole === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Employee)'}`, 'info');
   }, [showToast]);

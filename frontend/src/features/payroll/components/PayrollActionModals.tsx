@@ -7,7 +7,8 @@ interface PayrollFinalizeModalProps {
   onClose: () => void;
   selectedPeriod: string;
   totalExpense: number;
-  staffCount: number;
+  employeeCount?: number;
+  staffCount?: number;
   onConfirm: () => void;
 }
 
@@ -16,9 +17,11 @@ export const PayrollFinalizeModal: React.FC<PayrollFinalizeModalProps> = ({
   onClose,
   selectedPeriod,
   totalExpense,
+  employeeCount,
   staffCount,
   onConfirm,
 }) => {
+  const count = employeeCount ?? staffCount ?? 0;
   return (
     <Modal
       isOpen={isOpen}
@@ -47,7 +50,7 @@ export const PayrollFinalizeModal: React.FC<PayrollFinalizeModalProps> = ({
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500 dark:text-slate-400">Số lượng nhân viên:</span>
-            <span className="font-mono text-slate-900 dark:text-white">{staffCount} người</span>
+            <span className="font-mono text-slate-900 dark:text-white">{count} người</span>
           </div>
         </div>
 

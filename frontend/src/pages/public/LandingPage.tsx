@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   ScanFace,
   ShieldCheck,
@@ -16,12 +17,23 @@ import {
   Lock,
   DollarSign,
   Sun,
-  Moon
+  Moon,
+  LogOut
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { currentUser, logout } = useAuth();
+
+  const isManagerOrAdmin =
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'manager' ||
+    currentUser?.role_name?.toUpperCase() === 'ADMIN' ||
+    currentUser?.role_name?.toUpperCase() === 'MANAGER' ||
+    Boolean(currentUser?.is_manager);
+
+  const dashboardPath = isManagerOrAdmin ? '/app/manager/dashboard' : '/app/employee/dashboard';
   const [trialName, setTrialName] = useState('');
   const [trialEmail, setTrialEmail] = useState('');
   const [trialCompany, setTrialCompany] = useState('');
@@ -63,13 +75,32 @@ export const LandingPage: React.FC = () => {
               {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-purple-600" />}
             </button>
 
-            <button
-              onClick={() => navigate('/login')}
-              className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/25 transition-all flex items-center gap-2"
-            >
-              <span>Đăng nhập hệ thống (Portal)</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            {currentUser ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => navigate(dashboardPath)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/25 transition-all flex items-center gap-2"
+                >
+                  <span>Bảng điều khiển ({currentUser.full_name || currentUser.role_name || 'Hệ thống'})</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={logout}
+                  className="p-2.5 rounded-xl border border-slate-200 dark:border-[#272d5a] bg-slate-100 hover:bg-rose-50 hover:border-rose-200 dark:bg-[#13162b] dark:hover:bg-rose-950/30 text-slate-600 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 transition-colors"
+                  title="Đăng xuất khỏi hệ thống"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => navigate('/login')}
+                className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/25 transition-all flex items-center gap-2"
+              >
+                <span>Đăng nhập</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -92,13 +123,23 @@ export const LandingPage: React.FC = () => {
 
           {/* Portal Login CTA Button */}
           <div className="pt-2 flex items-center justify-center gap-4">
-            <button
-              onClick={() => navigate('/login')}
-              className="px-6 py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-lg shadow-purple-500/20 flex items-center gap-2 group transition-all"
-            >
-              <span>Đăng nhập Cổng Quản trị & Nhân sự</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
+            {currentUser ? (
+              <button
+                onClick={() => navigate(dashboardPath)}
+                className="px-6 py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-lg shadow-purple-500/20 flex items-center gap-2 group transition-all"
+              >
+                <span>Vào bảng điều khiển ({isManagerOrAdmin ? 'Quản lý' : 'Nhân viên'})</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/login')}
+                className="px-6 py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm shadow-lg shadow-purple-500/20 flex items-center gap-2 group transition-all"
+              >
+                <span>Đăng nhập hệ thống</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+            )}
           </div>
 
           {/* Bento Metrics */}
@@ -135,7 +176,7 @@ export const LandingPage: React.FC = () => {
             <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-5">
               <Users className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3 font-heading">Cho Nhân viên (Staff)</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3 font-heading">Cho Nhân viên (Employee)</h3>
             <ul className="space-y-3 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
               <li className="flex items-start gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
@@ -234,10 +275,10 @@ export const LandingPage: React.FC = () => {
                 </ul>
               </div>
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate(currentUser ? dashboardPath : '/login')}
                 className="mt-8 w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-white border border-slate-200 dark:border-[#272d5a] font-semibold text-xs transition-colors"
               >
-                Đăng nhập dùng thử
+                {currentUser ? 'Vào bảng điều khiển' : 'Đăng nhập dùng thử'}
               </button>
             </div>
 
@@ -272,10 +313,10 @@ export const LandingPage: React.FC = () => {
                 </ul>
               </div>
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate(currentUser ? dashboardPath : '/login')}
                 className="mt-8 w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-md shadow-purple-500/25 transition-all"
               >
-                Đăng nhập gói Doanh Nghiệp
+                {currentUser ? 'Vào bảng điều khiển' : 'Đăng nhập gói Doanh Nghiệp'}
               </button>
             </div>
 
@@ -304,10 +345,10 @@ export const LandingPage: React.FC = () => {
                 </ul>
               </div>
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate(currentUser ? dashboardPath : '/login')}
                 className="mt-8 w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-white border border-slate-200 dark:border-[#272d5a] font-semibold text-xs transition-colors"
               >
-                Đăng ký tư vấn giải pháp
+                {currentUser ? 'Vào bảng điều khiển' : 'Đăng ký tư vấn giải pháp'}
               </button>
             </div>
           </div>

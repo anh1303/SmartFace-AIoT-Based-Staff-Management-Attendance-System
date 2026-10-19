@@ -19,7 +19,17 @@ const envSchema = z.object({
   FACE_AUTH_MODEL_VERSION: z.string().default('buffalo_s'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error', 'silent']).optional(),
   LOG_FORMAT: z.enum(['pretty', 'json']).default('pretty'),
+
+  // SMTP / Email Configuration for automated notifications
+  SMTP_HOST: z.string().optional().default('smtp.gmail.com'),
+  SMTP_PORT: z.string().optional().default('587').transform((val) => Number(val) || 587),
+  SMTP_SECURE: z.string().optional().default('false').transform((val) => val === 'true'),
+  SMTP_USER: z.string().optional().default(''),
+  SMTP_PASS: z.string().optional().default(''),
+  SMTP_FROM: z.string().optional().default('"SmartFace AIoT" <no-reply@smartface.aiot>'),
+  CLIENT_URL: z.string().optional().default(''),
 })
+
 
 const parsed = envSchema.safeParse(process.env)
 

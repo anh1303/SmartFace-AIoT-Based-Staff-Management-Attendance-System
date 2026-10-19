@@ -25,13 +25,17 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles, children }) 
 
   // 3. Role authorization check
   if (allowedRoles && allowedRoles.length > 0) {
-    const hasRole = allowedRoles.includes(currentUser.role);
+    const isAdmin =
+      currentUser.role === 'admin' ||
+      currentUser.role_name?.toUpperCase() === 'ADMIN';
+
+    // Admin có tất cả quyền trong hệ thống
+    const hasRole = isAdmin || allowedRoles.includes(currentUser.role);
     if (!hasRole) {
-      // If employee tries to enter manager area, bounce to staff dashboard
+      // Nhân viên chỉ được xem các trang trong /app/employee
       if (currentUser.role === 'employee') {
-        return <Navigate to="/app/staff/dashboard" replace />;
+        return <Navigate to="/app/employee/dashboard" replace />;
       }
-      // If manager tries to enter an exclusive area or other roles, redirect appropriately
       return <Navigate to="/app/manager/dashboard" replace />;
     }
   }

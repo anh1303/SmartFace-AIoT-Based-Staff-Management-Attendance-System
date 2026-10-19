@@ -1,6 +1,7 @@
 export interface Employee {
   id?: string;
   employee_id: string;      // "NV001"
+  username?: string;
   full_name: string;
   department: string;
   position: string;
@@ -13,6 +14,8 @@ export interface Employee {
   fingerprint_enrolled: boolean;
   avatar?: string;
   hourly_rate?: number;
+  role?: string;
+  is_manager?: boolean;
 }
 
 export interface Department {

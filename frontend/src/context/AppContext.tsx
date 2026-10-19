@@ -11,17 +11,17 @@ import {
 } from '../types';
 import { ToastProvider, useToast } from './ToastContext';
 import { AuthProvider, useAuth } from './AuthContext';
-import { useEmployees } from '../hooks/useEmployees';
-import { useShifts } from '../hooks/useShifts';
-import { useAttendance } from '../hooks/useAttendance';
-import { usePayroll } from '../hooks/usePayroll';
+import { EmployeeProvider, useEmployeeContext } from './EmployeeContext';
+import { ShiftProvider, useShiftContext } from './ShiftContext';
+import { AttendanceProvider, useAttendanceContext } from './AttendanceContext';
+import { PayrollProvider, usePayrollContext } from './PayrollContext';
 
 export interface AppContextType {
   currentUser: UserSession | null;
   role: Role;
   isInitializing: boolean;
   isLoading: boolean;
-  login: (identifier: string, password?: string) => Promise<{ success: boolean; message?: string; role?: Role }>;
+  login: (identifier: string, password?: string, rememberMe?: boolean) => Promise<{ success: boolean; message?: string; role?: Role }>;
   logout: () => void;
   switchRole: (role: Role) => void;
 
@@ -62,14 +62,14 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const AppConsumerBridge: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const auth = useAuth();
   const toast = useToast();
-  const employeesHook = useEmployees();
-  const shiftsHook = useShifts();
-  const attendanceHook = useAttendance();
-  const payrollHook = usePayroll();
+  const employeeCtx = useEmployeeContext();
+  const shiftCtx = useShiftContext();
+  const attendanceCtx = useAttendanceContext();
+  const payrollCtx = usePayrollContext();
 
   const switchRoleWithEmployees = useCallback((role: Role) => {
-    auth.switchRole(role, employeesHook.employees);
-  }, [auth, employeesHook.employees]);
+    auth.switchRole(role, employeeCtx.employees);
+  }, [auth, employeeCtx.employees]);
 
   const value: AppContextType = useMemo(() => ({
     // Auth
@@ -82,33 +82,33 @@ const AppConsumerBridge: React.FC<{ children: React.ReactNode }> = ({ children }
     switchRole: switchRoleWithEmployees,
 
     // Employees
-    employees: employeesHook.employees,
-    addEmployee: employeesHook.addEmployee,
-    updateEmployee: employeesHook.updateEmployee,
-    deleteEmployee: employeesHook.deleteEmployee,
-    toggleEmployeeStatus: employeesHook.toggleEmployeeStatus,
+    employees: employeeCtx.employees,
+    addEmployee: employeeCtx.addEmployee,
+    updateEmployee: employeeCtx.updateEmployee,
+    deleteEmployee: employeeCtx.deleteEmployee,
+    toggleEmployeeStatus: employeeCtx.toggleEmployeeStatus,
 
     // Shifts
-    workShifts: shiftsHook.workShifts,
-    assignOrUpdateShift: shiftsHook.assignOrUpdateShift,
+    workShifts: shiftCtx.workShifts,
+    assignOrUpdateShift: shiftCtx.assignOrUpdateShift,
 
     // Attendance
-    attendance: attendanceHook.attendance,
-    addAttendanceRecord: attendanceHook.addAttendanceRecord,
+    attendance: attendanceCtx.attendance,
+    addAttendanceRecord: attendanceCtx.addAttendanceRecord,
 
     // Payroll
-    payroll: payrollHook.payroll,
-    bonusPenalty: payrollHook.bonusPenalty,
-    selectedPeriod: payrollHook.selectedPeriod,
-    setSelectedPeriod: payrollHook.setSelectedPeriod,
+    payroll: payrollCtx.payroll,
+    bonusPenalty: payrollCtx.bonusPenalty,
+    selectedPeriod: payrollCtx.selectedPeriod,
+    setSelectedPeriod: payrollCtx.setSelectedPeriod,
     generatePayroll: async (period: string) => {
-      await payrollHook.generatePayroll(period);
+      await payrollCtx.generatePayroll(period);
     },
-    updatePayrollItem: payrollHook.updatePayrollItem,
-    finalizePayrollPeriod: payrollHook.finalizePayrollPeriod,
-    unlockPayrollPeriod: payrollHook.unlockPayrollPeriod,
+    updatePayrollItem: payrollCtx.updatePayrollItem,
+    finalizePayrollPeriod: payrollCtx.finalizePayrollPeriod,
+    unlockPayrollPeriod: payrollCtx.unlockPayrollPeriod,
     updateBonusPenalty: async (data) => {
-      await payrollHook.updateBonusPenalty(data);
+      await payrollCtx.updateBonusPenalty(data);
     },
 
     // Toasts
@@ -123,23 +123,24 @@ const AppConsumerBridge: React.FC<{ children: React.ReactNode }> = ({ children }
     auth.login,
     auth.logout,
     switchRoleWithEmployees,
-    employeesHook.employees,
-    employeesHook.addEmployee,
-    employeesHook.updateEmployee,
-    employeesHook.toggleEmployeeStatus,
-    shiftsHook.workShifts,
-    shiftsHook.assignOrUpdateShift,
-    attendanceHook.attendance,
-    attendanceHook.addAttendanceRecord,
-    payrollHook.payroll,
-    payrollHook.bonusPenalty,
-    payrollHook.selectedPeriod,
-    payrollHook.setSelectedPeriod,
-    payrollHook.generatePayroll,
-    payrollHook.updatePayrollItem,
-    payrollHook.finalizePayrollPeriod,
-    payrollHook.unlockPayrollPeriod,
-    payrollHook.updateBonusPenalty,
+    employeeCtx.employees,
+    employeeCtx.addEmployee,
+    employeeCtx.updateEmployee,
+    employeeCtx.deleteEmployee,
+    employeeCtx.toggleEmployeeStatus,
+    shiftCtx.workShifts,
+    shiftCtx.assignOrUpdateShift,
+    attendanceCtx.attendance,
+    attendanceCtx.addAttendanceRecord,
+    payrollCtx.payroll,
+    payrollCtx.bonusPenalty,
+    payrollCtx.selectedPeriod,
+    payrollCtx.setSelectedPeriod,
+    payrollCtx.generatePayroll,
+    payrollCtx.updatePayrollItem,
+    payrollCtx.finalizePayrollPeriod,
+    payrollCtx.unlockPayrollPeriod,
+    payrollCtx.updateBonusPenalty,
     toast.toasts,
     toast.showToast,
     toast.removeToast,
@@ -152,7 +153,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <ToastProvider>
       <AuthProvider>
-        <AppConsumerBridge>{children}</AppConsumerBridge>
+        <EmployeeProvider>
+          <ShiftProvider>
+            <AttendanceProvider>
+              <PayrollProvider>
+                <AppConsumerBridge>{children}</AppConsumerBridge>
+              </PayrollProvider>
+            </AttendanceProvider>
+          </ShiftProvider>
+        </EmployeeProvider>
       </AuthProvider>
     </ToastProvider>
   );
@@ -165,3 +174,11 @@ export const useApp = () => {
   }
   return context;
 };
+
+// Re-export individual domain hooks and providers for clean modular consumption
+export { useEmployeeContext, EmployeeProvider } from './EmployeeContext';
+export { useShiftContext, ShiftProvider } from './ShiftContext';
+export { useAttendanceContext, AttendanceProvider } from './AttendanceContext';
+export { usePayrollContext, PayrollProvider } from './PayrollContext';
+export { useAuth, AuthProvider } from './AuthContext';
+export { useToast, ToastProvider } from './ToastContext';

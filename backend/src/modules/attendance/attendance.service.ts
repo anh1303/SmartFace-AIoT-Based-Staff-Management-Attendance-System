@@ -135,24 +135,58 @@ export function formatAttendanceRecord(log: RawAttendanceLogDb) {
   }
 }
 
-export async function list(query: Record<string, unknown>) {
+export async function list(
+  query: Record<string, unknown>,
+  requesterUser?: { id?: string; role?: string }
+) {
   const where: Record<string, unknown> = {}
 
-  const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
-    ? query.employeeId
-    : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
-
-  if (empIdFilter) {
+  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
     const emp = await prisma.employee.findFirst({
-      where: buildIdOrCodeWhere(empIdFilter),
+      where: { user_id: requesterUser.id },
     })
-    where.employee_id = emp ? emp.id : empIdFilter
+    if (!emp) return []
+    where.employee_id = emp.id
+  } else {
+    const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
+      ? query.employeeId
+      : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
+
+    if (empIdFilter) {
+      const emp = await prisma.employee.findFirst({
+        where: buildIdOrCodeWhere(empIdFilter),
+      })
+      where.employee_id = emp ? emp.id : empIdFilter
+    }
   }
 
-  if (typeof query.date === 'string') {
+  const startDate = (typeof query.startDate === 'string' && query.startDate)
+    ? query.startDate
+    : (typeof query.from === 'string' && query.from ? query.from : undefined)
+
+  const endDate = (typeof query.endDate === 'string' && query.endDate)
+    ? query.endDate
+    : (typeof query.to === 'string' && query.to ? query.to : undefined)
+
+  const singleDate = typeof query.date === 'string' && query.date ? query.date : undefined
+
+  if (startDate && endDate) {
     where.event_time = {
-      gte: new Date(`${query.date}T00:00:00+07:00`),
-      lt: new Date(`${query.date}T23:59:59.999+07:00`),
+      gte: new Date(`${startDate}T00:00:00+07:00`),
+      lt: new Date(`${endDate}T23:59:59.999+07:00`),
+    }
+  } else if (startDate) {
+    where.event_time = {
+      gte: new Date(`${startDate}T00:00:00+07:00`),
+    }
+  } else if (endDate) {
+    where.event_time = {
+      lt: new Date(`${endDate}T23:59:59.999+07:00`),
+    }
+  } else if (singleDate) {
+    where.event_time = {
+      gte: new Date(`${singleDate}T00:00:00+07:00`),
+      lt: new Date(`${singleDate}T23:59:59.999+07:00`),
     }
   }
 
@@ -160,16 +194,20 @@ export async function list(query: Record<string, unknown>) {
     where.type = query.type
   }
 
-  // 19. Phân trang mặc định tối đa 1000 records/page để chống tràn bộ nhớ (OOM) khi có hàng triệu log
+  // Phân trang & giới hạn số lượng bản ghi:
+  // - Nếu client truyền limit='all' hoặc query.all='true', lấy tối đa 50,000 bản ghi
+  // - Nếu không truyền limit, mặc định lấy 5,000 bản ghi để đảm bảo không bị cắt cụt dữ liệu
+  const isGetAll = query.limit === 'all' || query.all === 'true' || query.all === true
   const page = Math.max(1, Number(query.page) || 1)
-  const limit = Math.min(1000, Math.max(1, Number(query.limit) || 100))
-  const skip = (page - 1) * limit
+  const defaultLimit = 5000
+  const limit = isGetAll ? 50000 : Math.min(50000, Math.max(1, Number(query.limit) || defaultLimit))
+  const skip = isGetAll ? 0 : (page - 1) * limit
 
   const logs = await prisma.attendance_logs.findMany({
     where,
     include: attendanceInclude,
     orderBy: { event_time: 'desc' },
-    skip,
+    skip: skip > 0 ? skip : undefined,
     take: limit,
   })
 
@@ -188,12 +226,23 @@ function calcShiftWorkingHours(startTimeVal?: string | Date | null, endTimeVal?:
   return Math.round((diffMins / 60) * 100) / 100
 }
 
-export async function getDailySummaries(query: Record<string, unknown>) {
+export async function getDailySummaries(
+  query: Record<string, unknown>,
+  requesterUser?: { id?: string; role?: string }
+) {
   const where: Record<string, unknown> = {}
 
-  const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
+  let empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
     ? query.employeeId
     : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
+
+  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
+    const emp = await prisma.employee.findFirst({
+      where: { user_id: requesterUser.id },
+    })
+    if (!emp) return []
+    empIdFilter = emp.id
+  }
 
   if (empIdFilter) {
     const emp = await prisma.employee.findFirst({
@@ -202,8 +251,31 @@ export async function getDailySummaries(query: Record<string, unknown>) {
     where.employee_id = emp ? emp.id : empIdFilter
   }
 
-  if (typeof query.date === 'string') {
-    where.work_date = new Date(`${query.date}T00:00:00.000Z`)
+  const startDate = (typeof query.startDate === 'string' && query.startDate)
+    ? query.startDate
+    : (typeof query.from === 'string' && query.from ? query.from : undefined)
+
+  const endDate = (typeof query.endDate === 'string' && query.endDate)
+    ? query.endDate
+    : (typeof query.to === 'string' && query.to ? query.to : undefined)
+
+  const singleDate = typeof query.date === 'string' && query.date ? query.date : undefined
+
+  if (startDate && endDate) {
+    where.work_date = {
+      gte: new Date(`${startDate}T00:00:00.000Z`),
+      lte: new Date(`${endDate}T00:00:00.000Z`),
+    }
+  } else if (startDate) {
+    where.work_date = {
+      gte: new Date(`${startDate}T00:00:00.000Z`),
+    }
+  } else if (endDate) {
+    where.work_date = {
+      lte: new Date(`${endDate}T00:00:00.000Z`),
+    }
+  } else if (singleDate) {
+    where.work_date = new Date(`${singleDate}T00:00:00.000Z`)
   }
 
   const summaries = await prisma.daily_attendance_summary.findMany({
@@ -237,14 +309,55 @@ export async function adjustAttendance(
     late_early: number
     overtime: number
   },
-  actorUserId?: string
+  actorUserId?: string,
+  actorRole?: string
 ) {
   const emp = await prisma.employee.findFirst({
     where: buildIdOrCodeWhere(data.employeeId),
+    include: {
+      users: { select: { id: true, roles: { select: { role_name: true } } } },
+      department: true,
+      position: true,
+    },
   })
   if (!emp) throw new AppError(404, 'Employee not found')
 
   const workDate = new Date(`${data.date}T00:00:00.000Z`)
+
+  // 1. Kiểm tra ngày đã khóa công (Locked) chưa. Khi đã khóa, chỉ ADMIN mới được can thiệp
+  const lock = await prisma.attendance_locks.findFirst({
+    where: { work_date: workDate, is_locked: true },
+  })
+  if (lock && actorRole?.toUpperCase() !== 'ADMIN') {
+    throw AppError.forbidden(
+      'Dữ liệu công ngày này đã bị khóa (Locked). Chỉ Quản trị viên (Admin) mới có quyền mở khóa để chỉnh sửa!'
+    )
+  }
+
+  // 2. Chốt chặn phân quyền: Không ai được tự chỉnh sửa dữ liệu kiểm soát/xóa lỗi đi trễ của chính mình
+  if (actorRole?.toUpperCase() !== 'ADMIN' && emp.user_id && emp.user_id === actorUserId) {
+    throw AppError.forbidden(
+      'Không ai được tự sửa dữ liệu kiểm soát của chính mình (chỉnh sửa công/xóa lỗi đi trễ). Vui lòng liên hệ Quản trị viên (Admin) phê duyệt!'
+    )
+  }
+
+  // 3. Manager không được chỉnh sửa dữ liệu công của Manager khác
+  if (actorRole?.toUpperCase() === 'MANAGER') {
+    const targetRole = emp.users?.roles?.role_name?.toUpperCase() || ''
+    const posName = typeof (emp as any).position === 'string' ? (emp as any).position : (emp as any).position?.name || ''
+    const posLevel = typeof (emp as any).position === 'object' ? (emp as any).position?.level : undefined
+    const isTargetManager = Boolean(
+      targetRole === 'MANAGER' ||
+      targetRole === 'ADMIN' ||
+      posLevel === 'MANAGER' ||
+      (posName && /quản lý|manager|trưởng phòng|giám đốc/i.test(posName)) ||
+      (emp.department?.name && /quản lý/i.test(emp.department.name))
+    )
+    if (isTargetManager && emp.user_id !== actorUserId) {
+      throw AppError.forbidden('Quản lý không có quyền chỉnh sửa dữ liệu chấm công của quản lý khác!')
+    }
+  }
+
   // Đơn vị chuẩn hóa toàn hệ thống: GIỜ (HOURS), làm tròn theo nấc 0.5 giờ (tương đương 30 phút)
   const roundedLateEarly = Math.round(Math.max(0, Number(data.late_early) || 0) * 2) / 2
   const roundedOvertime = Math.round(Math.max(0, Number(data.overtime) || 0) * 2) / 2
@@ -324,9 +437,22 @@ export async function adjustAttendance(
   }
 }
 
-export async function checkIn(data: { employeeId: string; device_info?: string; method?: AttendanceMethod }) {
+export async function checkIn(
+  data: { employeeId?: string; employee_id?: string; device_info?: string; method?: AttendanceMethod },
+  requesterUser?: { id?: string; role?: string }
+) {
+  let targetEmployeeId = data.employeeId || data.employee_id;
+  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
+    const emp = await prisma.employee.findFirst({
+      where: { user_id: requesterUser.id },
+    });
+    if (!emp) throw new AppError(404, 'Không tìm thấy hồ sơ nhân viên tương ứng với tài khoản này');
+    targetEmployeeId = emp.id;
+  }
+  if (!targetEmployeeId) throw new AppError(400, 'employeeId is required');
+
   const employee = await prisma.employee.findFirst({
-    where: buildIdOrCodeWhere(data.employeeId),
+    where: buildIdOrCodeWhere(targetEmployeeId),
   })
   if (!employee) throw new AppError(404, 'Employee not found')
 
@@ -365,9 +491,23 @@ export async function checkIn(data: { employeeId: string; device_info?: string; 
   return formatAttendanceRecord(created)
 }
 
-export async function checkOut(employeeId: string, device_info?: string) {
+export async function checkOut(
+  employeeId?: string,
+  device_info?: string,
+  requesterUser?: { id?: string; role?: string }
+) {
+  let targetEmployeeId = employeeId;
+  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
+    const emp = await prisma.employee.findFirst({
+      where: { user_id: requesterUser.id },
+    });
+    if (!emp) throw new AppError(404, 'Không tìm thấy hồ sơ nhân viên tương ứng với tài khoản này');
+    targetEmployeeId = emp.id;
+  }
+  if (!targetEmployeeId) throw new AppError(400, 'employeeId is required');
+
   const employee = await prisma.employee.findFirst({
-    where: buildIdOrCodeWhere(employeeId),
+    where: buildIdOrCodeWhere(targetEmployeeId),
   })
   if (!employee) throw new AppError(404, 'Employee not found')
 

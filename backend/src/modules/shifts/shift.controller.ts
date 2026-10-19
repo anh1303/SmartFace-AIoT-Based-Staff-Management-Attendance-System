@@ -1,52 +1,29 @@
-import { Router } from 'express';
-import { authenticate } from '../../middlewares/auth.middleware.js';
-import { authorize } from '../../middlewares/rbac.middleware.js';
-import { asyncHandler } from '../../middlewares/asyncHandler.js';
+import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
-import { prisma } from '../../config/database.js';
 import * as service from './shift.service.js';
 import { assignShiftSchema } from './shift.dto.js';
 
-export const shiftRouter = Router();
-shiftRouter.use(authenticate);
+export const list = async (req: Request, res: Response) => {
+  const query = { ...req.query } as Record<string, any>;
+  successResponse(res, await service.list(query, req.user));
+};
 
-shiftRouter.get(
-  '/',
-  asyncHandler(async (req, res) => {
-    const query = { ...req.query } as Record<string, any>;
+export const assignShift = async (req: Request, res: Response) => {
+  const body = assignShiftSchema.parse(req.body);
+  const empId = (body.employee_id || body.employeeId)!;
+  const dateStr = (body.date || body.work_date)!;
 
-    // Phân quyền: Nhân viên (EMPLOYEE) chỉ xem được lịch phân ca của chính mình
-    if (req.user?.role === 'EMPLOYEE') {
-      const emp = await prisma.employee.findFirst({
-        where: { user_id: req.user.id },
-      });
-      if (!emp) {
-        return successResponse(res, []);
-      }
-      query.employee_id = emp.id;
-    }
-
-    successResponse(res, await service.list(query));
-  })
-);
-
-shiftRouter.post(
-  '/',
-  authorize('ADMIN', 'MANAGER'),
-  asyncHandler(async (req, res) => {
-    const body = assignShiftSchema.parse(req.body);
-
-    const empId = (body.employee_id || body.employeeId)!;
-    const dateStr = (body.date || body.work_date)!;
-
-    const result = await service.assignOrUpdate(
-      {
-        ...body,
-        employee_id: empId,
-        date: dateStr,
-      },
-      req.user?.id
-    );
-    successResponse(res, result, 'Work shift saved', 200);
-  })
-);
+  const result = await service.assignOrUpdateWithPermissionCheck(
+    {
+      employee_id: empId,
+      date: dateStr,
+      work_day: body.work_day,
+      shift_type: body.shift_type,
+      start_time: body.start_time,
+      end_time: body.end_time,
+      note: body.note,
+    },
+    req.user
+  );
+  successResponse(res, result, 'Shift assigned successfully', 201);
+};

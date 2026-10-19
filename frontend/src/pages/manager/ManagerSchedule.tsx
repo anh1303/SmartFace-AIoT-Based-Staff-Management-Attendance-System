@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
+import { isAnotherManager } from '../../utils/permissionUtils';
 import { WorkShift } from '../../types';
 import {
   ScheduleHeader,
@@ -12,13 +14,37 @@ import {
   getMonday,
   formatDateToYYYYMMDD,
   getISOWeekNumber
-} from '../../features/schedule-management';
+} from '@/features/schedules';
+import { useDepartmentPositions } from '../../hooks';
 
 export const ManagerSchedule: React.FC = () => {
   const { employees, workShifts, assignOrUpdateShift, showToast } = useApp();
-  const [departmentFilter, setDepartmentFilter] = useState('ALL');
+  const { currentUser, role } = useAuth();
+  const isManager = role === 'manager';
+  const managerDept = currentUser?.department;
+
+  const [departmentFilter, setDepartmentFilter] = useState(() => {
+    if (role === 'manager' && currentUser?.department) {
+      return currentUser.department;
+    }
+    return 'ALL';
+  });
+  const [positionFilter, setPositionFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [editingShift, setEditingShift] = useState<EditingShiftTarget | null>(null);
+
+  useEffect(() => {
+    if (isManager && managerDept) {
+      setDepartmentFilter(managerDept);
+    }
+  }, [isManager, managerDept]);
+
+  const { departmentOptions, positionOptions } = useDepartmentPositions({
+    employees,
+    isManager,
+    managerDept,
+    departmentFilter,
+  });
 
   // Solar Calendar Week State (Default Monday of current week)
   const [currentMonday, setCurrentMonday] = useState<Date>(() => getMonday(new Date()));
@@ -87,8 +113,11 @@ export const ManagerSchedule: React.FC = () => {
     }
   };
 
+
+
   const filteredEmployees = employees.filter(e => {
     if (departmentFilter !== 'ALL' && e.department !== departmentFilter) return false;
+    if (positionFilter !== 'ALL' && e.position !== positionFilter) return false;
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       const matchName = e.full_name?.toLowerCase().includes(term);
@@ -105,6 +134,18 @@ export const ManagerSchedule: React.FC = () => {
     if (targetEmp?.status === 'INACTIVE') {
       showToast(`Nhân viên ${empName} đang ở trạng thái TẠM NGƯNG, không thể phân bổ hoặc chỉnh sửa ca làm việc!`, 'warning');
       return;
+    }
+
+    if (role !== 'admin') {
+      const isSelf = currentUser && (empId === currentUser.employee_id || targetEmp?.email === currentUser.email);
+      if (isSelf) {
+        showToast('Không ai được tự phân ca hoặc sửa ca làm việc của chính mình. Vui lòng liên hệ Admin phê duyệt!', 'warning');
+        return;
+      }
+      if (isAnotherManager(targetEmp, currentUser)) {
+        showToast(`Quản lý không có quyền phân ca hoặc sửa đổi ca làm việc của Quản lý khác (${empName})!`, 'warning');
+        return;
+      }
     }
 
     const existing = workShifts.find(s => s.employee_id === empId && s.date === date);
@@ -168,8 +209,17 @@ export const ManagerSchedule: React.FC = () => {
       targetEmps = targetEmps.filter(e => e.employee_id === bulkTarget);
     }
 
+    // Lọc bỏ chính mình và các manager khác nếu không phải Admin
+    if (role !== 'admin') {
+      targetEmps = targetEmps.filter(e => {
+        const isSelf = currentUser && (e.employee_id === currentUser.employee_id || e.email === currentUser.email);
+        const isOtherMgr = isAnotherManager(e, currentUser);
+        return !isSelf && !isOtherMgr;
+      });
+    }
+
     if (targetEmps.length === 0) {
-      showToast('Không có nhân sự nào phù hợp với phạm vi đã chọn!', 'warning');
+      showToast('Không có nhân sự hợp lệ nào để phân ca (đã loại trừ tài khoản cá nhân và Quản lý khác)!', 'warning');
       return;
     }
 
@@ -209,7 +259,15 @@ export const ManagerSchedule: React.FC = () => {
     const dayNames = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
 
     let copiedCount = 0;
-    const activeEmps = employees.filter(e => e.status !== 'INACTIVE');
+    let activeEmps = employees.filter(e => e.status !== 'INACTIVE');
+
+    if (role !== 'admin') {
+      activeEmps = activeEmps.filter(e => {
+        const isSelf = currentUser && (e.employee_id === currentUser.employee_id || e.email === currentUser.email);
+        const isOtherMgr = isAnotherManager(e, currentUser);
+        return !isSelf && !isOtherMgr;
+      });
+    }
 
     activeEmps.forEach(emp => {
       [0, 1, 2, 3, 4, 5, 6].forEach(offset => {
@@ -250,14 +308,8 @@ export const ManagerSchedule: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* 1. Header with bulk & copy actions */}
+      {/* 1. Header with week navigator, bulk & copy actions */}
       <ScheduleHeader
-        onCopyPreviousWeek={handleCopyPreviousWeek}
-        onOpenBulkModal={() => setBulkModalOpen(true)}
-      />
-
-      {/* 2. Week Navigator & Filters */}
-      <ScheduleWeekNavigator
         currentMonday={currentMonday}
         weekNumber={weekNumber}
         startLabel={startLabel}
@@ -266,10 +318,23 @@ export const ManagerSchedule: React.FC = () => {
         onNextWeek={handleNextWeek}
         onGoCurrentWeek={handleGoCurrentWeek}
         onDateSelect={handleDateSelect}
+        onCopyPreviousWeek={handleCopyPreviousWeek}
+        onOpenBulkModal={() => setBulkModalOpen(true)}
+      />
+
+      {/* 2. Filters */}
+      <ScheduleWeekNavigator
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         departmentFilter={departmentFilter}
-        setDepartmentFilter={setDepartmentFilter}
+        onDepartmentFilterChange={(val) => {
+          setDepartmentFilter(val);
+          setPositionFilter('ALL');
+        }}
+        departmentOptions={departmentOptions}
+        positionFilter={positionFilter}
+        onPositionFilterChange={setPositionFilter}
+        positionOptions={positionOptions}
       />
 
       {/* 3. Interactive Shift Matrix Grid */}

@@ -1,0 +1,359 @@
+import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
+import { getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
+import {
+  Calendar,
+  Clock,
+  CheckCircle2,
+  Users,
+  ArrowLeftRight,
+  FileText,
+  ShieldCheck,
+  CalendarDays,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
+import { Modal } from '../../components/common/Modal';
+import { PageHeaderBanner } from '../../components/common';
+
+export const EmployeeSchedule: React.FC = () => {
+  const { currentUser, workShifts, employees, attendance, showToast } = useApp();
+  const [exchangeModalOpen, setExchangeModalOpen] = useState(false);
+  const [exchangeTargetEmp, setExchangeTargetEmp] = useState('');
+  const [exchangeDate, setExchangeDate] = useState(() => getTodayVNString());
+  const [exchangeReason, setExchangeReason] = useState('');
+
+  const getMonday = (d: Date) => {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+  };
+
+  const [currentMonday, setCurrentMonday] = useState<Date>(() => getMonday(new Date()));
+
+  const handlePrevWeek = () => {
+    const prev = new Date(currentMonday);
+    prev.setDate(currentMonday.getDate() - 7);
+    setCurrentMonday(prev);
+  };
+
+  const handleNextWeek = () => {
+    const next = new Date(currentMonday);
+    next.setDate(currentMonday.getDate() + 7);
+    setCurrentMonday(next);
+  };
+
+  const empCode = currentUser?.employee_id || '';
+
+  // Current employee's shifts
+  const myShifts = empCode ? workShifts.filter(s => s.employee_id === empCode) : [];
+  const myAttendance = empCode ? attendance.filter(a => a.employee_id === empCode) : [];
+
+  // Teammates in same department or on duty
+  const teammates = employees.filter(
+    e => (!empCode || e.employee_id !== empCode) && e.status === 'ACTIVE'
+  );
+
+  const handleExchangeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    showToast('Đã gửi yêu cầu đổi ca trực đến Quản lý xét duyệt!', 'success');
+    setExchangeModalOpen(false);
+    setExchangeReason('');
+  };
+
+  const dayNames = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
+  const daysOfWeek = [0, 1, 2, 3, 4, 5, 6].map(offset => {
+    const d = new Date(currentMonday);
+    d.setDate(currentMonday.getDate() + offset);
+    const dateStr = formatVNDateISO(d);
+    const label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return {
+      name: dayNames[offset],
+      date: dateStr,
+      label,
+    };
+  });
+
+  const todayStr = getTodayVNString();
+  const weekShifts = daysOfWeek.map(d => myShifts.find(s => s.date === d.date)).filter(Boolean);
+  const totalHours = weekShifts.reduce((acc, s) => {
+    if (!s || s.shift_type === 'OFF') return acc;
+    if (s.shift_type === 'MORNING') return acc + 4;
+    if (s.shift_type === 'AFTERNOON') return acc + 5;
+    return acc + 8;
+  }, 0);
+
+  const completedShifts = weekShifts.filter(s => s && s.date <= todayStr && s.shift_type !== 'OFF').length;
+  const onTimeCount = myAttendance.filter(a => (a.punctuality || (a.status === 'VALID' ? 'ON_TIME' : a.status)) === 'ON_TIME').length;
+  const onTimeRate = myAttendance.length > 0 ? ((onTimeCount / myAttendance.length) * 100).toFixed(0) : '100';
+
+  return (
+    <div className="space-y-6">
+      {/* Bento Header Banner with Continuous Shifting Gradient & Floating Blobs */}
+      <PageHeaderBanner
+        title="Lịch trình làm việc & Phân bổ ca"
+        badge={
+          <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-mono font-medium border border-purple-200 dark:border-purple-700/50">
+            {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
+          </span>
+        }
+        actions={
+          <>
+            <div className="flex items-center bg-white/80 dark:bg-[#0f1224] border border-purple-200/80 dark:border-[#272d5a] rounded-xl p-1 shadow-inner backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={handlePrevWeek}
+                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="px-3 text-xs font-mono text-slate-700 dark:text-slate-300 font-medium">
+                {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
+              </span>
+              <button
+                type="button"
+                onClick={handleNextWeek}
+                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setExchangeModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm shadow-purple-500/20 transition-all cursor-pointer"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+              <span>Đổi ca trực</span>
+            </button>
+          </>
+        }
+      />
+
+      {/* 4 Bento Telemetry Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Tổng giờ tuần</span>
+          <div className="mt-2 text-2xl font-bold font-mono text-slate-900 dark:text-white">{totalHours.toFixed(1)}h</div>
+          <p className="text-[11px] text-purple-600 dark:text-purple-400 mt-1">{weekShifts.length} ca đã phân bổ</p>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Số ca hoàn thành</span>
+          <div className="mt-2 text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{completedShifts} / {weekShifts.length} ca</div>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Đạt {weekShifts.length > 0 ? Math.round((completedShifts / weekShifts.length) * 100) : 100}% tiến độ</p>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Tổng lượt quẹt</span>
+          <div className="mt-2 text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">{myAttendance.length} lượt</div>
+          <p className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-1">Ghi nhận qua AI Cam</p>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Tỷ lệ đúng giờ</span>
+          <div className="mt-2 text-2xl font-bold font-mono text-slate-900 dark:text-white">{onTimeRate}%</div>
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">{onTimeCount} lượt đúng giờ</p>
+        </div>
+      </div>
+
+      {/* Weekly Detailed Bento Grid */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] space-y-4 shadow-xs">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
+            Chi tiết các ca trong tuần ({daysOfWeek[0]?.label} - {daysOfWeek[6]?.label})
+          </h2>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Đồng bộ từ CSDL</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
+          {daysOfWeek.map((day) => {
+            const shift = myShifts.find(s => s.date === day.date);
+            const isToday = day.date === todayStr;
+            const isPast = day.date < todayStr;
+
+            return (
+              <div
+                key={day.date}
+                className={`p-4 rounded-xl border flex flex-col justify-between min-h-[190px] transition-all ${isToday
+                  ? 'bg-purple-50/60 dark:bg-purple-950/30 border-purple-400 dark:border-purple-500 shadow-sm shadow-purple-500/10 ring-1 ring-purple-400/40'
+                  : shift?.shift_type === 'OFF'
+                    ? 'bg-slate-50/50 dark:bg-[#0f1224]/50 border-slate-100 dark:border-[#21264b]/60 opacity-60'
+                    : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40'
+                  }`}
+              >
+                <div>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-900 dark:text-white">{day.name}</p>
+                      <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500">{day.label}</p>
+                    </div>
+                    {isToday && (
+                      <span className="text-[9px] bg-purple-600 text-white font-bold px-1.5 py-0.5 rounded-md">
+                        HÔM NAY
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3">
+                    <p className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                      {shift?.shift_type === 'OFFICE_HOURS'
+                        ? 'Ca Hành Chính'
+                        : shift?.shift_type === 'MORNING'
+                          ? 'Ca Sáng'
+                          : shift?.shift_type === 'AFTERNOON'
+                            ? 'Ca Chiều'
+                            : 'Nghỉ Ca'}
+                    </p>
+                    {shift?.shift_type !== 'OFF' && (
+                      <p className="text-[11px] font-mono text-slate-700 dark:text-slate-300 mt-1">
+                        {shift?.start_time} - {shift?.end_time}
+                      </p>
+                    )}
+                    {shift?.note && (
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 italic truncate">
+                        {shift.note}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-200/80 dark:border-[#21264b]">
+                  {isPast ? (
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Đã qua
+                    </span>
+                  ) : isToday ? (
+                    <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3 animate-pulse" /> Đang ca
+                    </span>
+                  ) : shift?.shift_type === 'OFF' ? (
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                      Nghỉ tuần
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                      Sắp diễn ra
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Lower Section: Teammates on duty today */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] space-y-4 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
+              Đồng đội cùng bộ phận & ca trực
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Danh sách nhân sự đang cùng làm việc tại trụ sở</p>
+          </div>
+          <span className="text-xs text-purple-600 dark:text-purple-400 font-mono">{teammates.length} đồng đội</span>
+        </div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {teammates.map(emp => (
+            <div
+              key={emp.employee_id}
+              className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors flex items-center justify-between shadow-xs"
+            >
+              <div className="flex items-center gap-3">
+                <img
+                  src={emp.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"}
+                  alt={emp.full_name}
+                  className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                />
+                <div>
+                  <p className="text-xs font-semibold text-slate-900 dark:text-white">{emp.full_name}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">{emp.position}</p>
+                  <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400">{emp.department}</span>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+                  {emp.status === 'ACTIVE' ? 'ONLINE' : 'OFFLINE'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Exchange Shift Modal */}
+      <Modal
+        isOpen={exchangeModalOpen}
+        onClose={() => setExchangeModalOpen(false)}
+        title="Đăng ký Đổi ca trực / Làm thay"
+        subtitle="Yêu cầu cần được sự đồng ý của cả 2 bên và Trưởng bộ phận"
+      >
+        <form onSubmit={handleExchangeSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Chọn ngày cần đổi ca</label>
+            <input
+              type="date"
+              value={exchangeDate}
+              onChange={e => setExchangeDate(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Đồng đội muốn đổi ca cùng</label>
+            <select
+              value={exchangeTargetEmp}
+              onChange={e => setExchangeTargetEmp(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer"
+            >
+              <option value="" className="bg-white dark:bg-[#13162b]">-- Chọn đồng đội --</option>
+              {teammates.map(t => (
+                <option key={t.employee_id} value={t.employee_id} className="bg-white dark:bg-[#13162b]">
+                  {t.full_name} ({t.employee_id} - {t.department})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Lý do đổi ca</label>
+            <textarea
+              rows={3}
+              required
+              value={exchangeReason}
+              onChange={e => setExchangeReason(e.target.value)}
+              placeholder="Ghi rõ lý do (ví dụ: bận việc gia đình, đã thỏa thuận trực thay ngày 12/09)..."
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          <div className="pt-2 flex justify-end gap-2 border-t border-slate-200 dark:border-[#21264b]">
+            <button
+              type="button"
+              onClick={() => setExchangeModalOpen(false)}
+              className="px-4 py-2 rounded-xl text-xs text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] border border-slate-200 dark:border-[#272d5a] cursor-pointer"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/20 cursor-pointer"
+            >
+              Gửi yêu cầu đổi ca
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+export const StaffSchedule = EmployeeSchedule;

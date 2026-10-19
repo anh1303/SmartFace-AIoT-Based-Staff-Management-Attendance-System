@@ -10,6 +10,9 @@
     "test": "vitest run",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:seed:shifts": "tsx prisma/seed-shifts.ts",
+    "prisma:seed:attendance": "tsx prisma/seed-attendance.ts",
+    "prisma:seed:all": "tsx prisma/seed.ts && tsx prisma/seed-shifts.ts && tsx prisma/seed-attendance.ts",
     "prisma:studio": "prisma studio",
     "prisma:generate": "prisma generate"
   },
@@ -25,6 +28,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "mqtt": "^5.10.1",
+    "nodemailer": "^10.1.1",
     "socket.io": "^4.8.0",
     "zod": "^3.23.8"
   },
@@ -36,6 +40,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.20.2",
+    "@types/nodemailer": "^8.0.2",
     "@types/supertest": "^7.2.1",
     "prisma": "^5.20.0",
     "socket.io-client": "^4.8.4",

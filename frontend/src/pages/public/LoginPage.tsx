@@ -22,7 +22,7 @@ export const LoginPage: React.FC = () => {
   const [emailOrId, setEmailOrId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -31,7 +31,7 @@ export const LoginPage: React.FC = () => {
     setErrorMsg('');
 
     if (!emailOrId.trim()) {
-      setErrorMsg('Vui lòng nhập Email, Username hoặc Mã nhân viên');
+      setErrorMsg('Vui lòng nhập tên đăng nhập');
       return;
     }
 
@@ -41,11 +41,11 @@ export const LoginPage: React.FC = () => {
     }
 
     setLoading(true);
-    const res = await login(emailOrId, password);
+    const res = await login(emailOrId, password, rememberMe);
     setLoading(false);
 
     if (res.success && res.role) {
-      navigate(res.role === 'manager' ? '/app/manager/dashboard' : '/app/staff/dashboard');
+      navigate((res.role === 'admin' || res.role === 'manager') ? '/app/manager/dashboard' : '/app/employee/dashboard');
     } else {
       setErrorMsg(res.message || 'Xác thực thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.');
     }
@@ -112,9 +112,6 @@ export const LoginPage: React.FC = () => {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">Đăng nhập tài khoản</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Nhập thông tin xác thực để truy cập vào hệ thống
-                </p>
               </div>
               <div className="flex items-center gap-3">
                 <button
@@ -147,7 +144,7 @@ export const LoginPage: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Email, Username hoặc Mã nhân viên
+                  Tên đăng nhập
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -156,7 +153,7 @@ export const LoginPage: React.FC = () => {
                     required
                     value={emailOrId}
                     onChange={e => setEmailOrId(e.target.value)}
-                    placeholder="Ví dụ: manager@company.com, admin, hoặc NV-001"
+                    placeholder="Vui lòng nhập tên đăng nhập"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
                   />
                 </div>
@@ -173,7 +170,7 @@ export const LoginPage: React.FC = () => {
                     required
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    placeholder="Nhập mật khẩu"
+                    placeholder="Vui lòng nhập mật khẩu"
                     className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
                   />
                   <button
@@ -207,7 +204,7 @@ export const LoginPage: React.FC = () => {
                   <span>Đang xác thực với máy chủ...</span>
                 ) : (
                   <>
-                    <span>Xác thực & Đăng nhập hệ thống</span>
+                    <span>Đăng nhập</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

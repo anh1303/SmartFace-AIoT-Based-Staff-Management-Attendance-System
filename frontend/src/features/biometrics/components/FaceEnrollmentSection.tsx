@@ -11,6 +11,7 @@ export interface FacePhotoItem {
 interface FaceEnrollmentSectionProps {
   uploadedPhotos: FacePhotoItem[];
   analyzingFace: boolean;
+  disabled?: boolean;
   onOpenEkycModal: () => void;
   onPhotoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemovePhoto: (id: string) => void;
@@ -20,6 +21,7 @@ interface FaceEnrollmentSectionProps {
 export const FaceEnrollmentSection: React.FC<FaceEnrollmentSectionProps> = ({
   uploadedPhotos,
   analyzingFace,
+  disabled = false,
   onOpenEkycModal,
   onPhotoUpload,
   onRemovePhoto,
@@ -42,8 +44,14 @@ export const FaceEnrollmentSection: React.FC<FaceEnrollmentSectionProps> = ({
 
         <button
           type="button"
+          disabled={disabled || analyzingFace}
           onClick={onOpenEkycModal}
-          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm shadow-purple-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap"
+          className={`px-4 py-2.5 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-2 transition-all whitespace-nowrap ${
+            disabled
+              ? 'bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
+              : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-sm shadow-purple-600/20 hover:scale-[1.02] active:scale-[0.98] cursor-pointer'
+          }`}
+          title={disabled ? 'Không thể tự cập nhật dữ liệu nhận diện của bản thân' : undefined}
         >
           <Camera className="w-4 h-4 text-purple-200" />
           <span>Chụp bằng Camera</span>
@@ -52,13 +60,18 @@ export const FaceEnrollmentSection: React.FC<FaceEnrollmentSectionProps> = ({
 
       {/* Upload Area / Photos Gallery */}
       {uploadedPhotos.length === 0 ? (
-        <div className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-purple-500 dark:hover:border-purple-500 rounded-xl p-8 text-center cursor-pointer transition-colors bg-slate-50/50 dark:bg-[#0f1224]/50 group">
+        <div className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+          disabled
+            ? 'border-slate-200 dark:border-slate-800 bg-slate-100/40 dark:bg-[#0a0c16]/40 opacity-60 cursor-not-allowed'
+            : 'border-slate-300 dark:border-slate-700 hover:border-purple-500 dark:hover:border-purple-500 cursor-pointer bg-slate-50/50 dark:bg-[#0f1224]/50 group'
+        }`}>
           <input
             type="file"
             accept="image/*"
             multiple
+            disabled={disabled || analyzingFace}
             onChange={onPhotoUpload}
-            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+            className={`absolute inset-0 opacity-0 w-full h-full z-10 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
           />
           <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700/50 mx-auto flex items-center justify-center text-purple-600 dark:text-purple-400 mb-3 group-hover:scale-110 transition-transform">
             <Upload className="w-6 h-6" />
@@ -154,11 +167,11 @@ export const FaceEnrollmentSection: React.FC<FaceEnrollmentSectionProps> = ({
 
         <button
           type="button"
-          disabled={uploadedPhotos.length < 3 || analyzingFace}
+          disabled={disabled || uploadedPhotos.length < 3 || analyzingFace}
           onClick={onOpenConfirmModal}
-          className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-            uploadedPhotos.length >= 3 && !analyzingFace
-              ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20'
+          className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all ${
+            uploadedPhotos.length >= 3 && !analyzingFace && !disabled
+              ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20 cursor-pointer'
               : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
           }`}
         >

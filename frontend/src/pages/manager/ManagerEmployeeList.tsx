@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { PositionManagementModal } from '../../components/employees/PositionManagementModal';
-import { PositionItem, fetchPositionsApi } from '../../api/positionApi';
 import { Employee } from '../../types';
+import { useDepartmentPositions } from '../../hooks';
 import {
   getNextEmployeeId,
   EmployeeListHeader,
@@ -14,7 +13,8 @@ import {
   EditEmployeeModal,
   ConfirmDeleteEmployeeModal,
   ConfirmStatusEmployeeModal,
-} from '../../features/employee-management';
+  DepartmentPositionDrawer,
+} from '@/features/employees';
 
 export const ManagerEmployeeList: React.FC = () => {
   const {
@@ -24,45 +24,52 @@ export const ManagerEmployeeList: React.FC = () => {
     deleteEmployee,
     toggleEmployeeStatus,
     showToast,
+    role,
+    currentUser,
   } = useApp();
+
+  const isManager = role === 'manager';
+  const managerDept = currentUser?.department;
 
   const [searchParams, setSearchParams] = useSearchParams();
   const querySearch = searchParams.get('search') || '';
 
   const [searchTerm, setSearchTerm] = useState(querySearch);
-  const [departmentFilter, setDepartmentFilter] = useState('ALL');
+  const [departmentFilter, setDepartmentFilter] = useState(() => {
+    if (role === 'manager' && currentUser?.department) {
+      return currentUser.department;
+    }
+    return 'ALL';
+  });
+  const [positionFilter, setPositionFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  // Position Management Modal State
-  const [positionModalOpen, setPositionModalOpen] = useState(false);
-  const [dbPositions, setDbPositions] = useState<PositionItem[]>([]);
-
-  const loadDbPositions = async () => {
-    try {
-      const data = await fetchPositionsApi();
-      setDbPositions(data);
-    } catch {
-      // Handled gracefully
-    }
-  };
-
   useEffect(() => {
-    loadDbPositions();
-  }, []);
-
-  const positionOptions = useMemo(() => {
-    const list = dbPositions.map((p) => p.name);
-    employees.forEach((e) => {
-      const pos = e.department || e.position;
-      if (pos && !list.includes(pos)) {
-        list.push(pos);
-      }
-    });
-    if (list.length === 0) {
-      return ['Bảo vệ', 'Nhân viên', 'Thu ngân', 'Quản lý'];
+    if (isManager && managerDept) {
+      setDepartmentFilter(managerDept);
     }
-    return list;
-  }, [dbPositions, employees]);
+  }, [isManager, managerDept]);
+
+  // Position & Department Management State via reusable hook
+  const [deptPositionDrawerOpen, setDeptPositionDrawerOpen] = useState(false);
+  const {
+    rawDepartmentOptions,
+    departmentOptions,
+    positionOptions,
+    getPositionsByDepartment,
+    loadDbPositions,
+    loadDbDepartments,
+  } = useDepartmentPositions({
+    employees,
+    isManager,
+    managerDept,
+    departmentFilter,
+  });
+
+  const handleDeptPositionsChanged = () => {
+    loadDbPositions();
+    loadDbDepartments();
+  };
 
   useEffect(() => {
     if (querySearch) {
@@ -77,30 +84,72 @@ export const ManagerEmployeeList: React.FC = () => {
   const [confirmDeleteEmployee, setConfirmDeleteEmployee] = useState<Employee | null>(null);
 
   // Form state for Add
-  const [newEmp, setNewEmp] = useState<NewEmployeeFormState>(() => ({
-    employee_id: getNextEmployeeId(employees),
-    full_name: '',
-    department: 'Nhân viên',
-    position: 'Nhân viên bán hàng',
-    phone: '',
-    email: '',
-    status: 'ACTIVE' as const,
-    face_enrolled: false,
-    fingerprint_enrolled: false,
-    hourly_rate: 50000,
-    avatar:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-  }));
+  const [newEmp, setNewEmp] = useState<NewEmployeeFormState>(() => {
+    const initialDept = role === 'manager' && currentUser?.department ? currentUser.department : 'Nhân sự';
+    return {
+      employee_id: getNextEmployeeId(employees),
+      full_name: '',
+      department: initialDept,
+      position: 'Nhân viên',
+      phone: '',
+      email: '',
+      status: 'ACTIVE' as const,
+      face_enrolled: false,
+      fingerprint_enrolled: false,
+      hourly_rate: 50000,
+      avatar:
+        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+    };
+  });
 
   const handleOpenAddModal = () => {
+    const currentDept =
+      isManager && managerDept
+        ? managerDept
+        : newEmp.department && rawDepartmentOptions.includes(newEmp.department)
+        ? newEmp.department
+        : rawDepartmentOptions[0] || 'Nhân sự';
+    let validPositions = getPositionsByDepartment(currentDept);
+    if (isManager) {
+      const nonManagerPositions = validPositions.filter(
+        (p) =>
+          !p.toLowerCase().includes('trưởng phòng') &&
+          !p.toLowerCase().includes('quản lý') &&
+          !p.toLowerCase().includes('kế toán trưởng')
+      );
+      if (nonManagerPositions.length > 0) {
+        validPositions = nonManagerPositions;
+      }
+    }
+    const currentPos =
+      newEmp.position && validPositions.includes(newEmp.position)
+        ? newEmp.position
+        : validPositions[0] || 'Nhân viên';
+
     setNewEmp((prev) => ({
       ...prev,
       employee_id: getNextEmployeeId(employees),
+      department: currentDept,
+      position: currentPos,
     }));
     setAddModalOpen(true);
   };
 
-  const filteredEmployees = employees.filter((emp) => {
+  // Manager chỉ xem được mình và nhân viên phòng ban mình phụ trách (hoàn toàn ẩn nhân viên phòng khác)
+  const scopedEmployees = useMemo(() => {
+    if (isManager && managerDept) {
+      return employees.filter((emp) => {
+        const isMyDept = emp.department?.toLowerCase() === managerDept.toLowerCase();
+        const isSelf =
+          (currentUser?.employee_id && emp.employee_id === currentUser.employee_id) ||
+          (currentUser?.email && emp.email?.toLowerCase() === currentUser.email.toLowerCase());
+        return isMyDept || isSelf;
+      });
+    }
+    return employees;
+  }, [employees, isManager, managerDept, currentUser]);
+
+  const filteredEmployees = scopedEmployees.filter((emp) => {
     const term = searchTerm.trim().toLowerCase();
     const matchSearch =
       !term ||
@@ -111,10 +160,15 @@ export const ManagerEmployeeList: React.FC = () => {
       emp.position.toLowerCase().includes(term) ||
       emp.department.toLowerCase().includes(term);
 
-    const matchDept = departmentFilter === 'ALL' || emp.department === departmentFilter;
+    const matchDept =
+      departmentFilter === 'ALL' ||
+      emp.department?.toLowerCase() === departmentFilter.toLowerCase();
+    const matchPos =
+      positionFilter === 'ALL' ||
+      emp.position?.toLowerCase() === positionFilter.toLowerCase();
     const matchStatus = statusFilter === 'ALL' || emp.status === statusFilter;
 
-    return matchSearch && matchDept && matchStatus;
+    return matchSearch && matchDept && matchPos && matchStatus;
   });
 
   const handleAddSubmit = (e: React.FormEvent) => {
@@ -135,11 +189,15 @@ export const ManagerEmployeeList: React.FC = () => {
         updated_at: new Date().toISOString(),
       },
     ];
+
+    const defaultDept = isManager && managerDept ? managerDept : (rawDepartmentOptions[0] || 'Nhân sự');
+    const defaultPos = getPositionsByDepartment(defaultDept)[0] || 'Nhân viên';
+
     setNewEmp({
       employee_id: getNextEmployeeId(updatedEmployees),
       full_name: '',
-      department: 'Nhân viên',
-      position: 'Nhân viên bán hàng',
+      department: defaultDept,
+      position: defaultPos,
       phone: '',
       email: '',
       status: 'ACTIVE',
@@ -171,7 +229,7 @@ export const ManagerEmployeeList: React.FC = () => {
     <div className="space-y-6">
       {/* Bento Header Banner */}
       <EmployeeListHeader
-        onOpenPositionModal={() => setPositionModalOpen(true)}
+        onOpenDeptPositionDrawer={() => setDeptPositionDrawerOpen(true)}
         onOpenAddModal={handleOpenAddModal}
       />
 
@@ -184,9 +242,19 @@ export const ManagerEmployeeList: React.FC = () => {
           setSearchParams({});
         }}
         filteredCount={filteredEmployees.length}
-        totalCount={employees.length}
+        totalCount={scopedEmployees.length}
         departmentFilter={departmentFilter}
-        onDepartmentFilterChange={setDepartmentFilter}
+        onDepartmentFilterChange={(val) => {
+          if (isManager && managerDept && val !== managerDept && val !== 'ALL') {
+            return;
+          }
+          setDepartmentFilter(val);
+          setPositionFilter('ALL');
+        }}
+        departmentOptions={departmentOptions}
+        allDepartmentLabel={isManager ? '' : 'Tất cả phòng ban'}
+        positionFilter={positionFilter}
+        onPositionFilterChange={setPositionFilter}
         positionOptions={positionOptions}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
@@ -205,7 +273,8 @@ export const ManagerEmployeeList: React.FC = () => {
         onClose={() => setAddModalOpen(false)}
         newEmp={newEmp}
         onChangeNewEmp={setNewEmp}
-        positionOptions={positionOptions}
+        departmentOptions={rawDepartmentOptions}
+        positionsByDepartment={getPositionsByDepartment}
         onSubmit={handleAddSubmit}
       />
 
@@ -214,7 +283,8 @@ export const ManagerEmployeeList: React.FC = () => {
         editEmployee={editEmployee}
         onClose={() => setEditEmployee(null)}
         onChangeEditEmployee={setEditEmployee}
-        positionOptions={positionOptions}
+        departmentOptions={rawDepartmentOptions}
+        positionsByDepartment={getPositionsByDepartment}
         onSubmit={handleEditSubmit}
         onTriggerDelete={(emp) => {
           setEditEmployee(null);
@@ -242,11 +312,11 @@ export const ManagerEmployeeList: React.FC = () => {
         }}
       />
 
-      {/* Position Management Modal */}
-      <PositionManagementModal
-        isOpen={positionModalOpen}
-        onClose={() => setPositionModalOpen(false)}
-        onPositionsChanged={loadDbPositions}
+      {/* Department & Position Management Drawer */}
+      <DepartmentPositionDrawer
+        isOpen={deptPositionDrawerOpen}
+        onClose={() => setDeptPositionDrawerOpen(false)}
+        onChanged={handleDeptPositionsChanged}
       />
     </div>
   );

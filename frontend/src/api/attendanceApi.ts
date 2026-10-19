@@ -1,8 +1,33 @@
 import { apiFetch } from './client';
 import { AttendanceRecord } from '../types';
 
-export async function fetchAttendanceApi(): Promise<AttendanceRecord[]> {
-  const res = await apiFetch('/api/attendance');
+export interface FetchAttendanceParams {
+  startDate?: string;
+  endDate?: string;
+  date?: string;
+  employeeId?: string;
+  type?: string;
+  limit?: number | string;
+  page?: number;
+}
+
+export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promise<AttendanceRecord[]> {
+  const searchParams = new URLSearchParams();
+  if (params?.startDate) searchParams.append('startDate', params.startDate);
+  if (params?.endDate) searchParams.append('endDate', params.endDate);
+  if (params?.date) searchParams.append('date', params.date);
+  if (params?.employeeId) searchParams.append('employeeId', params.employeeId);
+  if (params?.type) searchParams.append('type', params.type);
+  if (params?.limit !== undefined) {
+    searchParams.append('limit', String(params.limit));
+  } else {
+    searchParams.append('limit', '5000');
+  }
+  if (params?.page) searchParams.append('page', String(params.page));
+
+  const queryStr = searchParams.toString();
+  const url = queryStr ? `/api/attendance?${queryStr}` : '/api/attendance?limit=5000';
+  const res = await apiFetch(url);
   if (res.success && Array.isArray(res.data)) {
     return res.data;
   }

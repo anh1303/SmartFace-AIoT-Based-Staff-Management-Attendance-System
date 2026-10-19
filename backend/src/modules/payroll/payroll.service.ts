@@ -5,6 +5,11 @@ import { buildIdOrCodeWhere, calculateNetSalary } from '../../common/utils.js'
 import { logAction } from '../audit-logs/audit.service.js'
 import { aggregateDailyAttendance } from '../attendance/attendance.service.js'
 import type { PayrollStatus } from '../../common/constants.js'
+import {
+  isEmployeeManager,
+  assertCannotModifySelfControlData,
+  assertCannotModifyOtherManager,
+} from '../../common/permission.helper.js'
 
 
 function parseShiftHours(startTime?: string | Date | null, endTime?: string | Date | null): number {
@@ -151,22 +156,61 @@ export async function updateBonusPenalty(data: {
   })
 }
 
-export async function list(payroll_period?: string, employeeIdOrCode?: string) {
+export async function list(
+  payroll_period?: string,
+  employeeIdOrCode?: string,
+  requester?: { id?: string; role?: string }
+) {
   const where: Prisma.PayrollRecordWhereInput = {}
   if (payroll_period) where.payroll_period = payroll_period
-  if (employeeIdOrCode) {
+
+  if (requester?.role === 'EMPLOYEE' && requester.id) {
+    const emp = await prisma.employee.findFirst({
+      where: { user_id: requester.id },
+    })
+    if (!emp) return []
+    where.employeeId = emp.id
+  } else if (employeeIdOrCode) {
     where.employee = buildIdOrCodeWhere(employeeIdOrCode)
   }
+
+  // Chốt chặn Requirement 1: Quản lý không xem được phiếu lương của Quản lý khác
+  if (requester?.role === 'MANAGER' && employeeIdOrCode) {
+    const targetEmp = await prisma.employee.findFirst({
+      where: buildIdOrCodeWhere(employeeIdOrCode),
+      include: {
+        department: true,
+        users: { include: { roles: true } },
+      },
+    })
+    if (targetEmp && targetEmp.user_id !== requester.id && isEmployeeManager(targetEmp)) {
+      throw AppError.forbidden('Quản lý không có quyền xem thông tin lương của Quản lý khác!')
+    }
+  }
+
   const records = await prisma.payrollRecord.findMany({
     where,
     include: {
       employee: {
-        include: { department: true },
+        include: {
+          department: true,
+          users: { include: { roles: true } },
+        },
       },
     },
     orderBy: { payroll_period: 'desc' },
   })
-  return records.map(formatPayrollRecord)
+
+  // Nếu requester là MANAGER, ẩn hoàn toàn các phiếu lương của Quản lý khác (chỉ giữ lại chính mình và nhân sự thường)
+  let filteredRecords = records
+  if (requester?.role === 'MANAGER') {
+    filteredRecords = records.filter((rec) => {
+      if (rec.employee?.user_id === requester.id) return true
+      return !isEmployeeManager(rec.employee)
+    })
+  }
+
+  return filteredRecords.map(formatPayrollRecord)
 }
 
 export async function updateItem(
@@ -181,7 +225,7 @@ export async function updateItem(
     net_salary?: number
     status?: PayrollStatus
   },
-  actorUserId?: string,
+  actorUser?: { id?: string; role?: string },
 ) {
   // 2. Tối ưu O(1) query trực tiếp theo ID hoặc parse format PR-YYYYMM-XXX, loại bỏ fetch toàn bộ bảng
   let record = null
@@ -191,16 +235,43 @@ export async function updateItem(
     const period = `${prMatch[1]}-${prMatch[2]}`
     record = await prisma.payrollRecord.findFirst({
       where: { id: recordId, payroll_period: period },
-      include: { employee: true },
+      include: {
+        employee: {
+          include: {
+            department: true,
+            users: { include: { roles: true } },
+          },
+        },
+      },
     })
   } else if (/^\d+$/.test(idOrPayrollId)) {
     record = await prisma.payrollRecord.findUnique({
       where: { id: BigInt(idOrPayrollId) },
-      include: { employee: true },
+      include: {
+        employee: {
+          include: {
+            department: true,
+            users: { include: { roles: true } },
+          },
+        },
+      },
     })
   }
 
   if (!record) throw new AppError(404, 'Payroll record not found')
+
+  // Chốt chặn Requirement 5: Nếu kỳ lương đã Khóa (FINALIZED), chỉ Admin mới có quyền mở khóa/chỉnh sửa
+  if ((record.status === 'FINALIZED' || record.status === 'CONFIRMED') && actorUser?.role !== 'ADMIN') {
+    throw AppError.badRequest('Bảng lương kỳ này đã bị Khóa (Locked). Chỉ có Quản trị viên (Admin) mới có quyền mở khóa để chỉnh sửa!')
+  }
+
+  // Chốt chặn Requirement 1 & 2:
+  // Không ai được tự chỉnh sửa phiếu lương của chính mình (Bất kiêm nhiệm)
+  // Quản lý không được chỉnh sửa phiếu lương của Quản lý khác
+  if (actorUser?.role !== 'ADMIN') {
+    assertCannotModifySelfControlData(actorUser, record.employee.user_id, 'chỉnh sửa phiếu lương của chính mình')
+    assertCannotModifyOtherManager(actorUser, record.employee, 'chỉnh sửa phiếu lương')
+  }
 
   const hourly_rate = updates.hourly_rate !== undefined ? updates.hourly_rate : Number(record.hourly_rate)
   const allowance = updates.allowance !== undefined ? updates.allowance : Number(record.allowance)
@@ -246,7 +317,7 @@ export async function updateItem(
   })
 
   await logAction({
-    userId: actorUserId,
+    userId: actorUser?.id,
     action: 'UPDATE_PAYROLL_RECORD',
     target_table: 'payroll_records',
     record_id: String(record.id),
@@ -307,7 +378,23 @@ export async function unlockPeriod(period: string, actorUserId?: string) {
   return list(period)
 }
 
-export async function generate(payroll_period: string, employeeId?: string, actorUserId?: string) {
+export async function generate(
+  payroll_period: string,
+  employeeId?: string,
+  actorUserId?: string,
+  actorUser?: { id?: string; role?: string }
+) {
+  // Chốt chặn: Manager không được tạo/tính lương cho Manager khác
+  if (actorUser?.role === 'MANAGER' && employeeId) {
+    const targetEmp = await prisma.employee.findFirst({
+      where: buildIdOrCodeWhere(employeeId),
+      include: { department: true, users: { include: { roles: true } } },
+    });
+    if (targetEmp && targetEmp.user_id !== actorUser.id && isEmployeeManager(targetEmp)) {
+      throw AppError.forbidden('Quản lý không có quyền tạo hoặc tính lương cho Quản lý khác!');
+    }
+  }
+
   const [yearStr, monthStr] = payroll_period.split('-')
   const year = parseInt(yearStr, 10)
   const month = parseInt(monthStr, 10)

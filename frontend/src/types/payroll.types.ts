@@ -20,5 +20,8 @@ export interface PayrollRecord {
   total_late_early: number;
   allowance: number;
   net_salary: number;
-  status: 'PENDING' | 'FINALIZED';
+  status: 'PENDING' | 'FINALIZED' | 'CONFIRMED' | 'PAID';
+  reason?: string;
+  overtime_rate?: number | null;
+  late_penalty_rate?: number | null;
 }

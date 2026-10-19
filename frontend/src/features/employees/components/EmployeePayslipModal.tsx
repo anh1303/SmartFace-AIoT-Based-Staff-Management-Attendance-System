@@ -51,12 +51,12 @@ export const EmployeePayslipModal: React.FC<EmployeePayslipModalProps> = ({
             </p>
           </div>
           <span
-            className={`text-xs font-mono px-3 py-1 rounded-lg border font-medium ${payslip.status === 'FINALIZED'
+            className={`text-xs font-mono px-3 py-1 rounded-lg border font-medium ${payslip.status !== 'PENDING'
               ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/50'
               : 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/50'
               }`}
           >
-            {payslip.status === 'FINALIZED' ? 'ĐÃ CHỐT CHI TRẢ' : 'CHỜ DUYỆT'}
+            {payslip.status !== 'PENDING' ? 'ĐÃ CHỐT' : 'CHỜ DUYỆT'}
           </span>
         </div>
 

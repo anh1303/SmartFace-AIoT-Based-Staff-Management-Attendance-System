@@ -7,13 +7,6 @@ export interface DeviceInfo {
   status: 'ONLINE' | 'OFFLINE';
 }
 
-const DEFAULT_DEVICES: DeviceInfo[] = [
-  { name: 'FaceCam-01', location: 'Cổng chính - Tầng 1', status: 'ONLINE' },
-  { name: 'FaceCam-02', location: 'Cổng phòng R&D - Tầng 2', status: 'ONLINE' },
-  { name: 'Fingerprint-01', location: 'Máy chấm công vân tay Cổng A', status: 'ONLINE' },
-  { name: 'Fingerprint-02', location: 'Máy chấm công vân tay Cổng B', status: 'ONLINE' },
-];
-
 export function useDevices() {
   const query = useQuery<DeviceInfo[]>({
     queryKey: ['devices'],
@@ -30,13 +23,14 @@ export function useDevices() {
       } catch {
         // Fallback to default list if api not available
       }
-      return DEFAULT_DEVICES;
+      return [];
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 10000,
+    refetchInterval: 15000,
   });
 
   return {
-    devices: query.data || DEFAULT_DEVICES,
+    devices: query.data || [],
     isLoading: query.isLoading,
   };
 }

@@ -53,7 +53,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
 
   const { devices } = useDevices();
   const { isDateLocked, toggleLock } = useAttendanceLocks();
-  const { customOvertimeMap, customLateEarlyMap, adjustAttendance } = useAttendanceSummaries(startDate);
+  const { customOvertimeMap, customLateEarlyMap, summariesByKey, adjustAttendance } = useAttendanceSummaries(startDate, endDate);
 
   const isCurrentDateLocked = isDateLocked(startDate) || (startDate !== endDate && isDateLocked(endDate));
 
@@ -68,7 +68,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     customOvertimeMap,
     customLateEarlyMap,
     departmentFilter,
-    positionFilter
+    positionFilter, summariesByKey
   );
 
   // Edit Modal State
@@ -89,11 +89,6 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   } | null>(null);
 
   const handleOpenEditModal = (item: AttendancePairItem) => {
-    if (!item.hasCheckedIn && !item.hasCheckedOut) {
-      showToast('Không thể chỉnh sửa khi nhân viên chưa có bản ghi chấm công', 'warning');
-      return;
-    }
-
     setEditingItem({
       employee: item.employee,
       shiftName: item.shift.name,
@@ -133,6 +128,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     date: string;
     late_early: number;
     overtime: number;
+    reason: string;
   }) => {
     try {
       await adjustAttendance(payload);

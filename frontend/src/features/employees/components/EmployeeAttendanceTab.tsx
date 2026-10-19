@@ -1,3 +1,4 @@
+import { useAttendanceSummaries } from '../../attendance/hooks/useAttendanceSummaries';
 import React, { useMemo } from 'react';
 import {
   Clock,
@@ -67,6 +68,7 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
     return employees;
   }, [currentEmp, employees]);
 
+  const { summariesByKey } = useAttendanceSummaries(startDate, endDate);
   const employeePairs = useAttendancePairs(
     targetEmployees,
     workShifts,
@@ -76,7 +78,7 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
     '',
     attendanceStatusFilter,
     {},
-    {}
+    {}, 'ALL', 'ALL', summariesByKey
   );
 
   // Chỉ hiển thị khi đã chấm công ít nhất 1 lần trong ca

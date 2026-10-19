@@ -25,40 +25,41 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   streamUrl = (import.meta.env.VITE_MEDIAMTX_WHEP_URL || `http://${typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '10.74.201.36'}:8889/pi4_cam/whep`),
   deviceId = 'PI4_FRONT_GATE',
   deviceName = 'Cổng Chính — Raspberry Pi 4 Edge',
-  currentMode = 'CHECK_IN',
   onModeChange,
   showToast,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const sessionUrlRef = useRef<string | null>(null);
+  const deadlineRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [activeMode, setActiveMode] = useState<'CHECK_IN' | 'CHECK_OUT'>(currentMode);
+  const [activeMode, setActiveMode] = useState<'CHECK_IN' | 'CHECK_OUT' | undefined>(undefined);
   const [isSwitchingMode, setIsSwitchingMode] = useState(false);
-
-  useEffect(() => {
-    setActiveMode(currentMode);
-  }, [currentMode]);
 
   // Lắng nghe sự kiện đổi chế độ từ Socket.IO (khi đổi từ ThingsBoard hoặc thiết bị khác)
   useEffect(() => {
-    const socketBase = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+    const socketBase = import.meta.env.VITE_SOCKET_URL || window.location.origin;
     const socket = io(`${socketBase}/attendance`, {
       transports: ['websocket', 'polling'],
+      withCredentials: true,
     });
 
+    socket.on('connect', () => {
+      apiFetch(`/api/devices/${deviceId}/mode`).then(res => {
+        if (res.success && res.data?.confirmed) setActiveMode(res.data.mode);
+      }).catch(() => setActiveMode(undefined));
+    });
     socket.on('device-mode-changed', (data: any) => {
-      if (data && (data.deviceId === deviceId || data.deviceId === 'PI4_FRONT_GATE')) {
+      if (data && (data.deviceId === deviceId)) {
         if (data.mode === 'CHECK_IN' || data.mode === 'CHECK_OUT') {
           setActiveMode(data.mode);
           onModeChange?.(data.mode);
-          showToast?.(
-            `Cổng vừa đổi chế độ: ${data.mode === 'CHECK_IN' ? 'VÀO CA (Check-in)' : 'TAN CA (Check-out)'}`,
-            'info'
-          );
+
         }
       }
     });
@@ -69,6 +70,12 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   }, [deviceId, onModeChange, showToast]);
 
   const stopConnection = useCallback(() => {
+    requestRef.current?.abort();
+    if (deadlineRef.current) clearTimeout(deadlineRef.current);
+    if (sessionUrlRef.current) {
+      fetch(sessionUrlRef.current, { method: 'DELETE', keepalive: true }).catch(() => {});
+      sessionUrlRef.current = null;
+    }
     if (pcRef.current) {
       pcRef.current.close();
       pcRef.current = null;
@@ -85,6 +92,8 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
     setIsConnecting(true);
     setErrorMsg(null);
 
+    const request = new AbortController();
+    requestRef.current = request;
     try {
       const pc = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
@@ -97,38 +106,66 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       pc.ontrack = (event) => {
         if (videoRef.current && event.streams[0]) {
           videoRef.current.srcObject = event.streams[0];
-          setIsConnected(true);
-          setIsConnecting(false);
+
         }
       };
 
       pc.oniceconnectionstatechange = () => {
+        if (pcRef.current !== pc) return;
+        if (['connected', 'completed'].includes(pc.iceConnectionState)) {
+          if (deadlineRef.current) clearTimeout(deadlineRef.current);
+          setIsConnected(true); setIsConnecting(false);
+        }
         if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
-          setIsConnected(false);
+          setIsConnected(false);setIsConnecting(false);
+          setErrorMsg('Luồng video đã ngắt. Bấm thử kết nối lại.');
         }
       };
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
+      if (pc.iceGatheringState !== 'complete') await new Promise<void>(resolve => {
+        const finish = () => { clearTimeout(timer); pc.removeEventListener('icegatheringstatechange', check); resolve(); };
+        const check = () => { if (pc.iceGatheringState === 'complete') finish(); };
+        const timer = setTimeout(finish, 3000);
+        pc.addEventListener('icegatheringstatechange', check);
+      });
+      if (request.signal.aborted || pcRef.current !== pc) return;
+      deadlineRef.current = setTimeout(() => {
+        if (pcRef.current !== pc) return;
+        request.abort();pc.close();setIsConnecting(false);setIsConnected(false);
+        setErrorMsg('Hết thời gian kết nối video. Kiểm tra mạng và thử lại.');
+      }, 15000);
 
       const res = await fetch(streamUrl, {
+        signal: request.signal,
         method: 'POST',
         headers: {
           'Content-Type': 'application/sdp',
         },
-        body: offer.sdp,
+        body: pc.localDescription?.sdp,
       });
 
       if (!res.ok) {
         throw new Error(`MediaMTX WHEP phản hồi mã ${res.status} (${res.statusText})`);
       }
 
+      const location = res.headers.get('Location');
+      const session = location ? new URL(location, streamUrl).toString() : null;
+      if (request.signal.aborted || pcRef.current !== pc) {
+        if (session) fetch(session, { method: 'DELETE' }).catch(() => {});
+        return;
+      }
+      sessionUrlRef.current = session;
       const answerSdp = await res.text();
+      if (pcRef.current !== pc) return;
       await pc.setRemoteDescription({
         type: 'answer',
         sdp: answerSdp,
       });
     } catch (err: any) {
+      if (request.signal.aborted) return;
+      stopConnection();
       setErrorMsg(err.message || 'Không thể kết nối luồng WebRTC');
       setIsConnected(false);
       setIsConnecting(false);
@@ -156,10 +193,10 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
     setIsSwitchingMode(true);
     try {
       const res = await apiFetch(`/api/devices/${deviceId}/mode`, {
-        method: 'POST',
+        method: 'PATCH',
         body: JSON.stringify({ mode }),
       });
-      if (res.success || res.data) {
+      if (res.success && res.data?.confirmed && res.data.mode === mode) {
         setActiveMode(mode);
         onModeChange?.(mode);
         showToast?.(`Đã đổi chế độ sang ${mode === 'CHECK_IN' ? 'Check-in (Vào ca)' : 'Check-out (Tan ca)'}`, 'success');
@@ -296,7 +333,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5 font-medium text-slate-300">
             <Video className="w-3.5 h-3.5 text-blue-400" />
-            Độ trễ: <span className="text-emerald-400 font-mono">&lt; 150ms</span>
+            Độ trễ: <span className="text-emerald-400 font-mono">Theo mạng thực tế</span>
           </span>
           <span className="hidden md:inline-block">|</span>
           <span className="hidden md:flex items-center gap-1.5">
@@ -314,7 +351,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
                 : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
             }`}
           >
-            {activeMode === 'CHECK_IN' ? 'CHECK-IN' : 'CHECK-OUT'}
+            {activeMode === 'CHECK_IN' ? 'CHECK-IN' : activeMode === 'CHECK_OUT' ? 'CHECK-OUT' : 'CHƯA XÁC NHẬN'}
           </span>
         </div>
       </div>

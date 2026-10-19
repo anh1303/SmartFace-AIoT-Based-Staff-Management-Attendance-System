@@ -1,6 +1,15 @@
 # 🚀 HƯỚNG DẪN TRIỂN KHAI VÀ VẬN HÀNH HỆ THỐNG SMARTFACE AIoT
 *(Dành cho thành viên dự án và người mới tiếp cận cài đặt hệ thống từ A-Z)*
 
+> **Bản tổng hợp cấu hình đã triển khai:** [THINGSBOARD_PI_SETUP.md](../thingsboard/THINGSBOARD_PI_SETUP.md)
+> tập hợp server, ThingsBoard, Rule Chain, dashboard, Pi, lệnh chạy và kết quả kiểm tra.
+
+> **Cấu hình Pi/ThingsBoard hiện tại:** xem [pi_edge/RUN_ON_PI.md](../../../hardware/RUN_ON_PI.md).
+> ThingsBoard dùng cổng **8081** vì frontend Docker dùng 8080. Khởi động IoT bằng
+> `docker compose --env-file .env.iot -f docker-compose.iot.yml up -d` sau khi tạo
+> `.env.iot` từ mẫu và điền IP LAN. Token phải lấy từ Credentials của device,
+> không dùng token ví dụ bên dưới. Với hệ thống đã có dữ liệu, bỏ qua bước seed.
+
 Tài liệu này hướng dẫn chi tiết từng bước để một người bạn hoặc thành viên mới có thể kéo mã nguồn từ GitHub về và chạy thành công toàn bộ hệ thống **SmartFace AIoT — Staff Management & Attendance System** trên máy tính cá nhân hoặc kết hợp với Raspberry Pi 4.
 
 ---
@@ -135,7 +144,7 @@ Bạn sẽ thấy 3 container đang chạy ổn định:
 
 *(Chỉ cần thực hiện 1 lần duy nhất khi khởi tạo hệ thống mới - mất khoảng 2 phút)*
 
-> 💡 **Mẹo:** Bạn có thể xem toàn bộ hướng dẫn tạo Widgets và 1-Click Import file JSON tại tài liệu riêng: **[THINGSBOARD_GUIDE.md](./THINGSBOARD_GUIDE.md)**!
+> 💡 **Mẹo:** Bạn có thể xem toàn bộ hướng dẫn tạo Widgets và 1-Click Import file JSON tại tài liệu riêng: **[THINGSBOARD_GUIDE.md](../thingsboard/THINGSBOARD_GUIDE.md)**!
 
 1. Mở trình duyệt truy cập giao diện ThingsBoard: **`http://localhost:8080`** (hoặc `http://<IP_LAN>:8080`).
 2. Đăng nhập tài khoản Tenant mặc định:
@@ -397,3 +406,7 @@ Màn hình webcam máy tính sẽ xuất hiện:
 
 Chúc bạn cài đặt và trải nghiệm thành công hệ thống **SmartFace AIoT**! 🎉  
 Nếu gặp bất kỳ khó khăn nào trong quá trình cài đặt, vui lòng mở mục **Issues** trên GitHub hoặc liên hệ người quản trị dự án.
+
+## Chính sách công và lương cập nhật 19/10/2026
+
+Bản sửa logic backend/frontend/hardware và cách triển khai đồng bộ được tổng hợp tại [hướng dẫn triển khai bản sửa công/lương](ATTENDANCE_PAYROLL_RELEASE.md). Quy tắc nghiệp vụ dùng [COMPANY_POLICY.md](../../rule/COMPANY_POLICY.md), gồm ghép IN/OUT liền kề, giới hạn 24h, làm tròn 0 / 0,5 / 1 theo phần lẻ, OFF và duyệt OT. Migration cộng cột/chỉ mục của đợt này đã áp dụng trên Neon; chưa tự tính lại tiền lương lịch sử hoặc triển khai tiến trình mới.

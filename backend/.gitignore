@@ -47,3 +47,7 @@ yarn-error.log*
 uploads/
 temp/
 tmp/
+
+# Keep business-policy regression tests with this module.
+!validation/
+!validation/*.test.ts

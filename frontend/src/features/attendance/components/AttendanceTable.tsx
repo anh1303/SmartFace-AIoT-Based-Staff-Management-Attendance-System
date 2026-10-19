@@ -100,6 +100,10 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                           <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate w-full" title={shift.timeRange}>
                             {shift.timeRange}
                           </p>
+                          <div className="text-xs">Công: {item.workingHours} giờ</div>
+                          {item.pairIntervals.map((interval, i) => <div key={i} className="text-[10px] font-mono">{interval}</div>)}
+                          <div className="text-[10px] text-amber-600">OT {item.overtimeStatus} · Đề xuất {item.candidateHours} giờ</div>
+                          {item.reviewReason && <div className="text-[10px] text-rose-600">Cần rà soát: {item.reviewReason}</div>}
                         </div>
                       </td>
 

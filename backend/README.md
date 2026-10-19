@@ -250,7 +250,7 @@ Tất cả các ngoại lệ phát sinh trong quá trình xử lý request đề
 
 ## 📡 Cổng Giao Tiếp Real-time (WebSockets & MQTT)
 
-### 1. Socket.IO Gateway ([src/sockets/](src/sockets/))
+### 1. Socket.IO Gateway ([src/sockets/](src/sockets))
 Máy chủ hỗ trợ 2 namespaces chuyên trách với cơ chế xác thực JWT bắt buộc trong quá trình bắt tay kết nối (*Handshake*):
 
 #### Namespace `/attendance`:

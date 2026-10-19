@@ -1,13 +1,8 @@
+import type { AttendanceSummary } from '../features/attendance/hooks/useAttendanceSummaries';
+import { formatSecondsToHHMMSS } from '../utils/timeUtils';
 import { useMemo } from 'react';
 import { Employee, WorkShift, AttendanceRecord } from '../types';
-import { formatVNDateISO, formatVNTime } from '../utils/dateUtils';
-import {
-  calculateRawLateEarlySec,
-  calculateRawInitialOTSec,
-  roundTo30Minutes,
-  formatSecondsToHHMMSS,
-} from '../utils/timeUtils';
-
+import { formatVNTime } from '../utils/dateUtils';
 export interface AttendanceEventItem {
   id: string;
   type: 'CHECK_IN' | 'CHECK_OUT';
@@ -40,208 +35,59 @@ export interface AttendancePairItem {
   currentOTSec: number;
   overtimeStr: string;
   date: string;
+  workingHours: number; overtimeStatus: string; candidateHours: number; reviewReason: string | null; pairIntervals: string[];
 }
 
 export function useAttendancePairs(
-  employees: Employee[],
-  workShifts: WorkShift[],
-  attendance: AttendanceRecord[],
-  startDate: string,
-  endDate: string,
-  searchTerm: string,
-  statusFilter: string,
-  customOvertimeMap: Record<string, number>,
-  customLateEarlyMap: Record<string, number>,
-  departmentFilter: string = 'ALL',
-  positionFilter: string = 'ALL'
+  employees: Employee[], workShifts: WorkShift[], attendance: AttendanceRecord[],
+  startDate: string, endDate: string, searchTerm: string, statusFilter: string,
+  _customOvertimeMap: Record<string, number>, _customLateEarlyMap: Record<string, number>,
+  departmentFilter = 'ALL', positionFilter = 'ALL', summaries: Record<string, AttendanceSummary> = {}
 ): AttendancePairItem[] {
   return useMemo(() => {
-    const targetShifts = workShifts.filter(shift => {
-      if (shift.shift_type === 'OFF') return false;
-      if (startDate && shift.date < startDate) return false;
-      if (endDate && shift.date > endDate) return false;
-      return true;
+    const rows = workShifts.map(s => ({ employee_id: s.employee_id, date: s.date, shift: s }));
+    for (const summary of Object.values(summaries)) {
+      if (!rows.some(r => r.employee_id === summary.employee_id && r.date === summary.date))
+        rows.push({ employee_id: summary.employee_id, date: summary.date, shift: undefined as unknown as WorkShift });
+    }
+    return rows.flatMap(({ employee_id, date, shift }) => {
+      if ((startDate && date < startDate) || (endDate && date > endDate)) return [];
+      const emp = employees.find(e => e.employee_id === employee_id || e.id === employee_id);
+      if (!emp) return [];
+      if (departmentFilter !== 'ALL' && emp.department?.toLowerCase() !== departmentFilter.toLowerCase()) return [];
+      if (positionFilter !== 'ALL' && emp.position?.toLowerCase() !== positionFilter.toLowerCase()) return [];
+      if (searchTerm && !`${emp.full_name} ${emp.employee_id} ${emp.department}`.toLowerCase().includes(searchTerm.toLowerCase().trim())) return [];
+      const summary = summaries[`${emp.employee_id}_${date}`];
+      const intervals = summary?.calculation_details?.pairs || [];
+      const eventRow = (type: 'CHECK_IN' | 'CHECK_OUT', timestamp?: string | null): AttendanceEventItem => {
+        const pair = type === 'CHECK_IN' ? intervals[0] : intervals.at(-1);
+        const id = type === 'CHECK_IN' ? pair?.inId : pair?.outId;
+        const log = id ? attendance.find(l => String(l.id) === id) : undefined;
+        const recorded = Boolean(timestamp);
+        return { id: `${emp.employee_id}-${date}-${type}`, type,
+          label: type === 'CHECK_IN' ? 'Vào ca đầu' : 'Ra ca cuối', time: timestamp ? formatVNTime(timestamp) : '--:--:--',
+          isFace: log?.method === 'FACE', methodLabel: recorded ? log?.method || 'Đã ghi nhận' : 'UNRECORDED',
+          device_id: log?.device_id || '--', score: log?.verification_score ?? null,
+          status: summary?.status || 'UNRECORDED', statusText: summary?.status || 'Chờ tổng hợp' };
+      };
+      const rawEvents = summary?.calculation_details?.events || [];
+      const inTime = summary?.first_check_in || rawEvents.filter(e => e.type === 'CHECK_IN').at(-1)?.time;
+      const outTime = summary?.last_check_out || rawEvents.filter(e => e.type === 'CHECK_OUT' || e.type === 'TAN_CA').at(-1)?.time;
+      const events = [eventRow('CHECK_IN', inTime), eventRow('CHECK_OUT', outTime)];
+      if (statusFilter !== 'ALL' && !events.some(e => e.status === statusFilter || statusFilter === 'ON_TIME' && e.status === 'PRESENT')) return [];
+      const currentOTSec = Number(summary?.overtime || 0) * 3600;
+      const currentLateEarlySec = Number(summary?.late_early || 0) * 3600;
+      return [{ employee: emp, date, shift: {
+        name: shift?.shift_type === 'OFF' ? 'Ngày OFF' : !shift ? 'Chưa phân ca' : shift.shift_type === 'MORNING' ? 'Ca sáng' : shift.shift_type === 'AFTERNOON' ? 'Ca chiều' : 'Ca hành chính',
+        timeRange: shift ? `${shift.start_time} – ${shift.end_time}` : '--',
+        start_time: shift?.start_time || '', end_time: shift?.end_time || '', date },
+        events, hasCheckedIn: Boolean(inTime), hasCheckedOut: Boolean(outTime),
+        initialLateEarlySec: summary?.late_early_seconds || 0, currentLateEarlySec, lateEarlyStr: formatSecondsToHHMMSS(currentLateEarlySec),
+        initialOTSec: summary?.overtime_seconds || 0, currentOTSec, overtimeStr: formatSecondsToHHMMSS(currentOTSec),
+        workingHours: Number(summary?.total_working_hours || 0), overtimeStatus: summary?.overtime_status || 'NONE',
+        candidateHours: Number(summary?.overtime_candidate_hours || 0), reviewReason: summary?.review_reason || (summary && !summary.policy_version ? 'LEGACY_POLICY_REVIEW' : null),
+        pairIntervals: intervals.map(p => `${formatVNTime(p.start)} → ${formatVNTime(p.end)}`),
+      }];
     });
-
-    const pairs: (AttendancePairItem | null)[] = targetShifts.map(empShift => {
-      const emp = employees.find(e => e.employee_id === empShift.employee_id);
-      if (!emp) return null;
-
-      if (departmentFilter && departmentFilter !== 'ALL' && emp.department?.toLowerCase() !== departmentFilter.toLowerCase()) {
-        return null;
-      }
-
-      if (positionFilter && positionFilter !== 'ALL' && emp.position?.toLowerCase() !== positionFilter.toLowerCase()) {
-        return null;
-      }
-
-      const term = searchTerm.toLowerCase().trim();
-      if (term) {
-        const matches =
-          emp.full_name.toLowerCase().includes(term) ||
-          emp.employee_id.toLowerCase().includes(term) ||
-          emp.department.toLowerCase().includes(term);
-        if (!matches) return null;
-      }
-
-      const shiftDate = empShift.date;
-      const shiftName =
-        empShift.shift_type === 'MORNING'
-          ? 'Ca sáng'
-          : empShift.shift_type === 'AFTERNOON'
-            ? 'Ca chiều'
-            : empShift.shift_type === 'OFFICE_HOURS'
-              ? 'Ca hành chính'
-              : 'Ca hành chính';
-      const shiftTimeRange = `${empShift.start_time} – ${empShift.end_time}`;
-
-      const empLogs = attendance.filter(log => {
-        const isEmpMatch = log.employee_id === emp.employee_id || (emp.id && log.employee_id === emp.id);
-        if (!isEmpMatch) return false;
-        const logDateStr = formatVNDateISO(log.timestamp);
-        return logDateStr === shiftDate;
-      });
-
-      const checkInLog = empLogs.find(l => l.type === 'CHECK_IN') || empLogs[0];
-      const checkOutLog =
-        empLogs.find(l => l.type === 'CHECK_OUT' || l.type === 'TAN_CA') ||
-        (empLogs.length > 1 ? empLogs[1] : undefined);
-
-      const checkInTime = checkInLog ? formatVNTime(checkInLog.timestamp) : '--:--:--';
-      const checkOutTime = checkOutLog ? formatVNTime(checkOutLog.timestamp) : '--:--:--';
-
-      const hasCheckedIn = checkInLog !== undefined && checkInTime !== '--:--:--';
-      const hasCheckedOut = checkOutLog !== undefined && checkOutTime !== '--:--:--';
-
-      const isCheckInFace = checkInLog?.method === 'FACE';
-      const isCheckOutFace = checkOutLog?.method === 'FACE';
-
-      const initialLateEarlySec = hasCheckedIn
-        ? calculateRawLateEarlySec(
-          { start_time: empShift.start_time, end_time: empShift.end_time },
-          checkInLog?.timestamp || (checkInLog ? checkInTime : undefined),
-          checkOutLog?.timestamp || (checkOutLog ? checkOutTime : undefined)
-        )
-        : 0;
-
-      const initialOTSec = hasCheckedOut
-        ? calculateRawInitialOTSec(
-          { start_time: empShift.start_time, end_time: empShift.end_time },
-          checkInLog?.timestamp || (checkInLog ? checkInTime : undefined),
-          checkOutLog?.timestamp || (checkOutLog ? checkOutTime : undefined)
-        )
-        : 0;
-
-      const summaryKey = `${emp.employee_id}_${shiftDate}`;
-
-      const currentLateEarlySec =
-        customLateEarlyMap[summaryKey] !== undefined
-          ? customLateEarlyMap[summaryKey]
-          : roundTo30Minutes(initialLateEarlySec);
-      const lateEarlyStr = formatSecondsToHHMMSS(currentLateEarlySec);
-
-      const currentOTSec =
-        customOvertimeMap[summaryKey] !== undefined
-          ? customOvertimeMap[summaryKey]
-          : roundTo30Minutes(initialOTSec);
-      const overtimeStr = hasCheckedOut ? formatSecondsToHHMMSS(currentOTSec) : '--:--:--';
-
-      const normalizeDeviceId = (id?: string | null, isFace?: boolean, isCheckIn?: boolean) => {
-        if (id) {
-          const lower = id.toLowerCase();
-          if (lower.includes('fp-gate') || lower.includes('gate-02') || lower.includes('fp-02')) return 'Fingerprint-02';
-          if (lower.includes('fp-01') || lower.includes('gate-01')) return 'Fingerprint-01';
-          if (lower.includes('cam-04') || lower.includes('cam-05')) return isCheckIn ? 'FaceCam-01' : 'FaceCam-02';
-          return id;
-        }
-        if (isFace) {
-          return isCheckIn ? 'FaceCam-01' : 'FaceCam-02';
-        }
-        return isCheckIn ? 'Fingerprint-01' : 'Fingerprint-02';
-      };
-
-      const checkInRow: AttendanceEventItem = {
-        id: `${emp.employee_id}-${shiftDate}-in`,
-        type: 'CHECK_IN',
-        label: 'Vào Ca',
-        time: checkInTime,
-        isFace: isCheckInFace,
-        methodLabel: checkInLog ? (isCheckInFace ? 'Face-id' : 'Vân tay') : 'UNRECORDED',
-        device_id: checkInLog ? normalizeDeviceId(checkInLog?.device_id, isCheckInFace, true) : '--',
-        score: checkInLog?.verification_score ?? (checkInLog ? 0.99 : null),
-        status: checkInLog
-          ? checkInLog.punctuality || (checkInLog.status === 'VALID' ? 'ON_TIME' : checkInLog.status)
-          : 'UNRECORDED',
-        statusText: checkInLog
-          ? (checkInLog.punctuality || (checkInLog.status === 'VALID' ? 'ON_TIME' : checkInLog.status)) === 'LATE'
-            ? 'Đi muộn'
-            : 'Đúng giờ'
-          : 'Chưa điểm danh',
-      };
-
-      const outPunc = checkOutLog
-        ? checkOutLog.punctuality || (checkOutLog.status === 'VALID' ? 'ON_TIME' : checkOutLog.status)
-        : null;
-      const checkOutRow: AttendanceEventItem = {
-        id: `${emp.employee_id}-${shiftDate}-out`,
-        type: 'CHECK_OUT',
-        label: 'Hết ca',
-        time: checkOutTime,
-        isFace: isCheckOutFace,
-        methodLabel: checkOutLog ? (isCheckOutFace ? 'Face-id' : 'Vân tay') : 'UNRECORDED',
-        device_id: checkOutLog ? normalizeDeviceId(checkOutLog?.device_id, isCheckOutFace, false) : '--',
-        score: checkOutLog?.verification_score ?? (checkOutLog ? 0.80 : null),
-        status: checkOutLog ? outPunc || 'VALID' : checkInLog ? 'WORKING' : 'UNRECORDED',
-        statusText: checkOutLog
-          ? outPunc === 'EARLY_LEAVE'
-            ? 'Về sớm'
-            : 'Đúng giờ'
-          : checkInLog
-            ? 'Đang làm'
-            : 'Chưa điểm danh',
-      };
-
-      return {
-        employee: emp,
-        shift: {
-          name: shiftName,
-          timeRange: shiftTimeRange,
-          start_time: empShift.start_time,
-          end_time: empShift.end_time,
-          date: shiftDate,
-        },
-        events: [checkInRow, checkOutRow],
-        hasCheckedIn,
-        hasCheckedOut,
-        initialLateEarlySec,
-        currentLateEarlySec,
-        lateEarlyStr,
-        initialOTSec,
-        currentOTSec,
-        overtimeStr,
-        date: shiftDate,
-      };
-    });
-
-    const validPairs = pairs.filter((item): item is AttendancePairItem => item !== null);
-
-    if (statusFilter === 'ALL') return validPairs;
-    return validPairs.filter(item =>
-      item.events.some(
-        ev => ev.status === statusFilter || (statusFilter === 'ON_TIME' && ev.status === 'ON_TIME')
-      )
-    );
-  }, [
-    employees,
-    workShifts,
-    attendance,
-    startDate,
-    endDate,
-    searchTerm,
-    statusFilter,
-    customOvertimeMap,
-    customLateEarlyMap,
-    departmentFilter,
-    positionFilter,
-  ]);
+  }, [employees, workShifts, attendance, startDate, endDate, searchTerm, statusFilter, departmentFilter, positionFilter, summaries]);
 }

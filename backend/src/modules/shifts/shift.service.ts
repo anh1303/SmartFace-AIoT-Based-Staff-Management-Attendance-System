@@ -1,8 +1,9 @@
+import { assertEditableDay, aggregateDailyAttendance } from '../attendance/attendance.service.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, formatVNDateISO } from '../../common/utils.js'
 import { logAction } from '../audit-logs/audit.service.js'
-import { isEmployeeManager } from '../../common/permission.helper.js'
+import { isEmployeeManager, assertCanAccessEmployeeDetail } from '../../common/permission.helper.js'
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 
@@ -183,86 +184,94 @@ export async function assignOrUpdate(data: {
   const startTimeDate = parseTimeStringToDate(standardConfig.start_time, '08:00')
   const endTimeDate = parseTimeStringToDate(standardConfig.end_time, '17:30')
 
-  let defaultWorkShift = await prisma.work_shifts.findFirst({
-    where: { shift_name: standardConfig.name },
-  })
-  if (!defaultWorkShift) {
-    defaultWorkShift = await prisma.work_shifts.create({
-      data: {
-        shift_name: standardConfig.name,
-        start_time: startTimeDate,
-        end_time: endTimeDate,
-      },
+  const shiftRecord = await prisma.$transaction(async tx => {
+    await assertEditableDay(tx, data.date, emp.id)
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`shift-type:${standardConfig.code}`}))`
+    let defaultWorkShift = await tx.work_shifts.findFirst({
+      where: { shift_name: standardConfig.name },
     })
-  }
-
-  const existingShift = await prisma.employee_shifts.findFirst({
-    where: {
-      employee_id: emp.id,
-      work_date,
-    },
-  })
-
-  let shiftRecord
-  if (existingShift) {
-    shiftRecord = await prisma.employee_shifts.update({
-      where: { id: existingShift.id },
-      data: {
-        work_day,
-        shift_type: standardConfig.code,
-        start_time: startTimeDate,
-        end_time: endTimeDate,
-        note: data.note ?? '',
-      },
-      include: {
-        employees: {
-          include: { department: true },
+    if (!defaultWorkShift) {
+      defaultWorkShift = await tx.work_shifts.create({
+        data: {
+          shift_name: standardConfig.name,
+          start_time: startTimeDate,
+          end_time: endTimeDate,
         },
-      },
-    })
-  } else {
-    shiftRecord = await prisma.employee_shifts.create({
-      data: {
+      })
+    }
+
+    const existingShift = await tx.employee_shifts.findFirst({
+      where: {
         employee_id: emp.id,
-        shift_id: defaultWorkShift.id,
         work_date,
-        work_day,
-        shift_type: standardConfig.code,
-        start_time: startTimeDate,
-        end_time: endTimeDate,
-        note: data.note ?? '',
-      },
-      include: {
-        employees: {
-          include: { department: true },
-        },
       },
     })
-  }
 
-  await logAction({
-    userId: actorUserId,
-    action: existingShift ? 'UPDATE_SHIFT' : 'ASSIGN_SHIFT',
-    target_table: 'employee_shifts',
-    record_id: String(shiftRecord.id),
-    old_values: existingShift
-      ? {
-        work_date: existingShift.work_date,
-        shift_type: existingShift.shift_type,
-        start_time: formatTimeHHMM(existingShift.start_time, '08:00'),
-        end_time: formatTimeHHMM(existingShift.end_time, '17:30'),
-      }
-      : undefined,
-    new_values: {
-      employee_id: emp.id,
-      employee_code: emp.employee_code,
-      work_date,
-      shift_type: data.shift_type,
-      start_time: formatTimeHHMM(startTimeDate, '08:00'),
-      end_time: formatTimeHHMM(endTimeDate, '17:30'),
-    },
+    let shiftRecord
+    if (existingShift) {
+      shiftRecord = await tx.employee_shifts.update({
+        where: { id: existingShift.id },
+        data: {
+          shift_id: defaultWorkShift.id,
+          work_day,
+          shift_type: standardConfig.code,
+          start_time: startTimeDate,
+          end_time: endTimeDate,
+          note: data.note ?? '',
+        },
+        include: {
+          employees: {
+            include: { department: true },
+          },
+        },
+      })
+    } else {
+      shiftRecord = await tx.employee_shifts.create({
+        data: {
+          employee_id: emp.id,
+          shift_id: defaultWorkShift.id,
+          work_date,
+          work_day,
+          shift_type: standardConfig.code,
+          start_time: startTimeDate,
+          end_time: endTimeDate,
+          note: data.note ?? '',
+        },
+        include: {
+          employees: {
+            include: { department: true },
+          },
+        },
+      })
+    }
+
+    await tx.daily_attendance_summary.updateMany({ where: { employee_id: emp.id, work_date }, data: { policy_version: null, requires_review: true, review_reason: 'SHIFT_CHANGED' } })
+    await tx.auditLog.create({ data: {
+      userId: actorUserId,
+      action: existingShift ? 'UPDATE_SHIFT' : 'ASSIGN_SHIFT',
+      target_table: 'employee_shifts',
+      record_id: String(shiftRecord.id),
+      old_values: existingShift
+        ? {
+          work_date: existingShift.work_date.toISOString(),
+          shift_type: existingShift.shift_type,
+          start_time: formatTimeHHMM(existingShift.start_time, '08:00'),
+          end_time: formatTimeHHMM(existingShift.end_time, '17:30'),
+        }
+        : undefined,
+      new_values: {
+        employee_id: emp.id,
+        employee_code: emp.employee_code,
+        work_date: work_date.toISOString(),
+        shift_type: data.shift_type,
+        start_time: formatTimeHHMM(startTimeDate, '08:00'),
+        end_time: formatTimeHHMM(endTimeDate, '17:30'),
+      },
+    } })
+
+    return shiftRecord
   })
-
+  await aggregateDailyAttendance(Number(data.date.slice(5, 7)), Number(data.date.slice(0, 4)), emp.id, data.date)
   return formatShift(shiftRecord)
 }
 
@@ -279,10 +288,11 @@ export async function assignOrUpdateWithPermissionCheck(
   actorUser?: { id?: string; role?: string }
 ) {
   if (actorUser?.role !== 'ADMIN') {
+    await assertCanAccessEmployeeDetail(actorUser, data.employee_id)
     const targetEmp = await prisma.employee.findFirst({
       where: buildIdOrCodeWhere(data.employee_id),
       include: {
-        department: true,
+        department: true, position: true,
         users: {
           select: {
             id: true,

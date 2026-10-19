@@ -91,7 +91,7 @@ export const EmployeeSalaryEstimate: React.FC = () => {
               Lương Tạm Tính ({selectedEmployeePeriod ? `Kỳ ${selectedEmployeePeriod}` : 'Kỳ hiện tại'})
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono font-medium border border-amber-500/20">
-              {currentPayroll?.status === 'FINALIZED' ? 'ĐÃ CHỐT' : 'ĐANG TÍCH LŨY CÔNG'}
+              {currentPayroll?.status !== 'PENDING' ? 'ĐÃ CHỐT' : 'ĐANG TÍCH LŨY CÔNG'}
             </span>
           </div>
         </div>

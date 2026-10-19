@@ -102,7 +102,7 @@ export function usePayroll() {
     setSelectedPeriod,
     isLoadingPayroll: payrollQuery.isLoading,
     generatePayroll: (period: string) => generatePayrollMutation.mutateAsync(period),
-    updatePayrollItem: (id: string, updates: Partial<PayrollRecord>) => updatePayrollItemMutation.mutate({ id, updates }),
+    updatePayrollItem: (id: string, updates: Partial<PayrollRecord>) => updatePayrollItemMutation.mutateAsync({ id, updates }),
     finalizePayrollPeriod: (period: string) => finalizePayrollPeriodMutation.mutate(period),
     unlockPayrollPeriod: (period: string) => unlockPayrollPeriodMutation.mutate(period),
     updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => updateBonusPenaltyMutation.mutateAsync(data),

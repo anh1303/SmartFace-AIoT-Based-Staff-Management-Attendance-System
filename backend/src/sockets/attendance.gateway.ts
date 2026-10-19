@@ -1,10 +1,12 @@
 import type { Server } from 'socket.io'
+import { socketAuthMiddleware } from './socket.auth.js'
 
 let io: Server | undefined
 
 export const initializeAttendanceGateway = (server: Server) => {
   io = server
   const nsp = server.of('/attendance')
+  nsp.use(socketAuthMiddleware)
   nsp.on('connection', (socket) => {
     const user = socket.data.user
     if (user?.role) {
@@ -26,6 +28,9 @@ export const emitAttendanceEvent = (event: string, payload: unknown, room?: stri
   if (room) {
     nsp.to(room).emit(event, payload)
   } else {
-    nsp.to('ADMIN').to('MANAGER').emit(event, payload)
+    let target = nsp.to('ADMIN').to('MANAGER')
+    const userId = (payload as { employee_user_id?: string | null })?.employee_user_id
+    if (userId) target = target.to(`user:${userId}`)
+    target.emit(event, payload)
   }
 }

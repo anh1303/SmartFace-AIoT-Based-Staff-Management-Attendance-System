@@ -78,7 +78,7 @@ graph LR
 * **Name**: `Check Has Face Embedding`
 * **JavaScript code**:
   ```javascript
-  return msg.method === 'verify_face' && msg.params && (msg.params.embedding_b64 || msg.params.embedding);
+  return msg.method === 'verify_face' && msg.params != null;
   ```
 
 #### 2. Node `Forward to SmartFace Backend` (Loại: `External` $\rightarrow$ `rest api call`)
@@ -89,6 +89,10 @@ graph LR
 * **Headers**:
   - `Content-Type`: `application/json`
   - `Accept`: `application/json`
+  - `X-TB-Webhook-Secret`: giá trị secret giống `TB_WEBHOOK_SECRET` trong `backend/.env` (điền giá trị thật vào node).
+  - `X-Device-Name`: `${deviceName}`.
+
+Nếu backend và ThingsBoard ở chung mạng Compose, dùng `http://backend:3000/api/attendance/tb-webhook`. `host.docker.internal` dành cho backend chạy trực tiếp trên host. Payload RPC cần `event_id` duy nhất, `client_timestamp`, mode và điểm PAD hợp lệ; cảnh báo SPOOF có thể không có embedding. Đường đồng bộ mode dùng nhánh **SmartFace Mode Relay**, xem [hướng dẫn cập nhật](../deployment/ATTENDANCE_PAYROLL_RELEASE.md).
 * **Max in-flight requests**: `100`
 
 #### 3. Node `RPC Call Reply to Device` (Loại: `Action` $\rightarrow$ `rpc call reply`)

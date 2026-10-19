@@ -1,4 +1,4 @@
-version: '3.8'
+name: pbl6
 
 services:
   # 1. ThingsBoard IoT Platform (Bản tích hợp sẵn DB Postgres nội bộ)
@@ -7,7 +7,7 @@ services:
     container_name: smartface_thingsboard
     restart: always
     ports:
-      - "8080:9090"     # Cổng giao diện Web UI của ThingsBoard
+      - "${TB_WEB_PORT:-8081}:9090" # 8080 đang dùng cho frontend
       - "1883:1883"     # Cổng MQTT Broker để Pi 4 kết nối vào
       - "7070:7070"     # Cổng Edge RPC
     environment:
@@ -28,8 +28,8 @@ services:
       - "8889:8889"     # Cổng phát WebRTC (WHEP) lên giao diện React
       - "8189:8189/udp" # Cổng UDP tăng tốc truyền tải WebRTC
     environment:
-      MTX_PROTOCOLS: tcp
-      MTX_WEBRTCADDITIONALHOSTS: "10.74.201.36" # IP LAN máy tính Server
+      MTX_RTSPTRANSPORTS: tcp
+      MTX_WEBRTCADDITIONALHOSTS: "${IOT_SERVER_HOST:?Set IOT_SERVER_HOST in .env.iot}" # IP LAN máy server
 
 volumes:
   tb-data:

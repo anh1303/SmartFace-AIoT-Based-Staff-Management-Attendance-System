@@ -191,7 +191,7 @@ Giao diện SmartFace được xây dựng theo ngôn ngữ thẩm mỹ hiện �
 
 ---
 
-### 3. Reusable UI Components ([src/components/common/](src/components/common/))
+### 3. Reusable UI Components ([src/components/common/](src/components/common))
 - **`Table`**: Bảng dữ liệu hỗ trợ sắp xếp, phân trang, trạng thái đang tải Skeleton và hiển thị thông báo rỗng (*Empty State*).
 - **`Modal`**: Hộp thoại nổi với backdrop mờ nhòe kính, hiệu ứng transition mượt mà và hỗ trợ đóng bằng phím ESC.
 - **`SearchInput`**: Ô tìm kiếm thông minh tích hợp debounce tự động, nút xóa nhanh.
@@ -201,7 +201,7 @@ Giao diện SmartFace được xây dựng theo ngôn ngữ thẩm mỹ hiện �
 
 ---
 
-### 4. Shell Layout Giao Diện ([src/components/layout/](src/components/layout/))
+### 4. Shell Layout Giao Diện ([src/components/layout/](src/components/layout))
 - **`AppLayout`**: Khung vỏ tổng thể gồm thanh bên `Sidebar`, thanh điều hướng trên cùng `Topbar` và vùng hiển thị nội dung `Outlet`.
 - **`Sidebar`**: Menu điều hướng thông minh tự động thay đổi danh mục liên kết theo vai trò đăng nhập (`ADMIN`, `MANAGER`, `EMPLOYEE`), hỗ trợ thu nhỏ (*collapse*).
 - **`Topbar`**: Hiển thị thông tin người dùng đang đăng nhập, nút chuyển nhanh Dark/Light theme, chuông thông báo và menu Đăng xuất.

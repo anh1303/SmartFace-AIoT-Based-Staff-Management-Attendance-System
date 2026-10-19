@@ -144,8 +144,9 @@ export const ManagerPayroll: React.FC = () => {
     }
     return true;
   });
+  const controlledPeriodRecords = allPeriodRecords.filter(p => role === 'admin' || p.employee_id !== currentUser?.employee_id);
   const isFinalized =
-    allPeriodRecords.length > 0 && allPeriodRecords.every((p) => p.status === 'FINALIZED');
+    controlledPeriodRecords.length > 0 && controlledPeriodRecords.every((p) => p.status !== 'PENDING');
 
   // Compute metrics
   const totalExpense = allPeriodRecords.reduce((sum, r) => sum + (r.net_salary || 0), 0);
@@ -176,10 +177,11 @@ export const ManagerPayroll: React.FC = () => {
     return true;
   });
 
-  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5;
+  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000;
   const lateRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
 
   const handleOpenEdit = (record: PayrollRecord) => {
+    if (record.status !== 'PENDING') { showToast('Cần mở khóa kỳ trước khi sửa phiếu lương', 'warning'); return; }
     const emp = employees.find((e) => e.employee_id === record.employee_id);
     if (role !== 'admin') {
       const isSelf = Boolean(
@@ -196,17 +198,17 @@ export const ManagerPayroll: React.FC = () => {
     }
 
     setEditingItem({
-      record,
+      record, reason: '',
       empName: emp?.full_name || record.employee_name || record.employee_id,
-      hourly_rate: record.hourly_rate || 100000,
-      working_hours: record.total_working_hours || 176,
+      hourly_rate: record.hourly_rate ?? 0,
+      working_hours: record.total_working_hours ?? 0,
       total_overtime: record.total_overtime ?? 0,
       total_late_early: record.total_late_early ?? 0,
       allowance: record.allowance || 0,
     });
   };
 
-  const handleConfirmEditSave = (e: React.FormEvent) => {
+  const handleConfirmEditSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
 
@@ -225,16 +227,16 @@ export const ManagerPayroll: React.FC = () => {
       }
     }
 
-    updatePayrollItem(editingItem.record.payroll_id, {
+    try { await updatePayrollItem(editingItem.record.payroll_id, {
       hourly_rate: editingItem.hourly_rate,
       working_hours: editingItem.working_hours,
       total_overtime: editingItem.total_overtime,
       total_late_early: editingItem.total_late_early,
-      allowance: editingItem.allowance,
+      allowance: editingItem.allowance, reason: editingItem.reason,
     });
 
-    showToast(`Đã lưu thay đổi bảng lương cho ${editingItem.empName}!`, 'success');
     setEditingItem(null);
+    } catch { /* mutation displays the server error; keep the form open */ }
   };
 
   const handleFinalizeConfirm = () => {

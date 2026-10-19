@@ -1,3 +1,5 @@
+import { workDateSchema } from '../../common/date.schema.js';
+import { assertDeviceWebhook } from '../../common/device-auth.js';
 import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
 import * as service from './attendance.service.js';
@@ -10,12 +12,13 @@ import {
 } from './attendance.dto.js';
 
 export const tbWebhook = async (req: Request, res: Response) => {
+  assertDeviceWebhook(req);
   const rawData = (req.body?.params && typeof req.body.params === 'object') ? req.body.params : req.body;
-  const deviceId =
-    rawData?.device_id ||
-    req.body?.device_id ||
-    (req.headers['x-device-name'] as string) ||
-    'PI4_FRONT_GATE';
+  const originName = req.headers['x-device-name'];
+  const deviceId = rawData?.device_id;
+  if (!deviceId || (originName && originName !== deviceId)) {
+    return res.status(400).json({ success: false, message: 'Tên thiết bị không khớp originator ThingsBoard' });
+  }
   const result = await service.handleThingsBoardWebhook({
     ...rawData,
     device_id: deviceId,
@@ -34,16 +37,16 @@ export const statistics = async (_req: Request, res: Response) => {
 
 export const checkIn = async (req: Request, res: Response) => {
   const body = checkInSchema.parse(req.body);
-  const result = await service.checkIn(body, req.user);
-  emitAttendanceEvent('checked-in', result);
+  const result = await service.checkIn(body, req.user, { eventId: body.event_id });
+  if (!result.duplicate) emitAttendanceEvent('checked-in', result);
   successResponse(res, result, 'Check-in recorded', 201);
 };
 
 export const checkOut = async (req: Request, res: Response) => {
   const body = checkOutSchema.parse(req.body);
   const targetEmployeeId = body.employeeId;
-  const result = await service.checkOut(targetEmployeeId, body.device_info, req.user);
-  emitAttendanceEvent('checked-out', result);
+  const result = await service.checkOut(targetEmployeeId, body.device_info, req.user, { eventId: body.event_id });
+  if (!result.duplicate) emitAttendanceEvent('checked-out', result);
   successResponse(res, result, 'Check-out recorded', 201);
 };
 
@@ -73,7 +76,7 @@ export const getLocks = async (_req: Request, res: Response) => {
 };
 
 export const lock = async (req: Request, res: Response) => {
-  const dateStr = (req.body?.date || req.body?.work_date) as string;
+  const dateStr = workDateSchema.parse(req.body?.date || req.body?.work_date);
   if (!dateStr) {
     return res.status(400).json({ success: false, message: 'Date is required' });
   }
@@ -82,7 +85,7 @@ export const lock = async (req: Request, res: Response) => {
 };
 
 export const unlock = async (req: Request, res: Response) => {
-  const dateStr = (req.body?.date || req.body?.work_date) as string;
+  const dateStr = workDateSchema.parse(req.body?.date || req.body?.work_date);
   if (!dateStr) {
     return res.status(400).json({ success: false, message: 'Date is required' });
   }

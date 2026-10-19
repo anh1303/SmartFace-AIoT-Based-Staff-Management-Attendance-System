@@ -1,5 +1,7 @@
 # 🛡️ SmartFace: AIoT-Based Staff Management & Attendance System
 
+> Chính sách công và lương: [Quy tắc công ty và dự án](../rule/COMPANY_POLICY.md). Mục lục tài liệu: [docs/README.md](../README.md).
+
 > **SmartFace** là Hệ thống Quản lý Nhân sự & Giám sát Chấm công Toàn diện ứng dụng công nghệ **AIoT (Artificial Intelligence of Things)**. Nền tảng kết hợp nhận diện khuôn mặt thời gian thực qua Edge AI Camera, cơ chế chống giả mạo sinh trắc học **PAD (Presentation Attack Detection)**, điểm danh vân tay dự phòng (**Fingerprint Fallback**), động cơ tính lương tự động (**Payroll Engine**) theo giờ công thực tế, và giám sát vận hành tức thời qua **WebSockets (Socket.IO)** & **MQTT**.
 
 ---
@@ -23,9 +25,9 @@
 ---
 
 > 🚀 **BẮT ĐẦU NHANH CHO THÀNH VIÊN MỚI / NGƯỜI BẠN CLONE REPO:**  
-> - Hướng dẫn cài đặt từng bước chi tiết từ A-Z: **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** *(Hỗ trợ Webcam máy tính & Raspberry Pi 4)*  
-> - Hướng dẫn tạo Widgets, kết nối Rule Chain & Prompt ThingsBoard: **[THINGSBOARD_GUIDE.md](./THINGSBOARD_GUIDE.md)**  
-> - Sơ đồ kiến trúc và các luồng dữ liệu thời gian thực: **[DATA_FLOWS.md](./DATA_FLOWS.md)**
+> - Hướng dẫn cài đặt từng bước chi tiết từ A-Z: **[DEPLOYMENT_GUIDE.md](../tutorial/deployment/DEPLOYMENT_GUIDE.md)** *(Hỗ trợ Webcam máy tính & Raspberry Pi 4)*  
+> - Hướng dẫn tạo Widgets, kết nối Rule Chain & Prompt ThingsBoard: **[THINGSBOARD_GUIDE.md](../tutorial/thingsboard/THINGSBOARD_GUIDE.md)**  
+> - Sơ đồ kiến trúc và các luồng dữ liệu thời gian thực: **[DATA_FLOWS.md](DATA_FLOWS.md)**
 
 ---
 
@@ -35,11 +37,11 @@ Dự án được tài liệu hóa chuyên sâu cho từng phân hệ độc l�
 
 | Tài liệu phân hệ | Đường dẫn | Nội dung bao phủ chính |
 | :--- | :--- | :--- |
-| ⚡ **Backend Service (BE)** | [backend/README.md](backend/README.md) | Kiến trúc Modular Monolith, Luồng xử lý Request Lifecycle, Quy chuẩn REST API, Biến môi trường, Xử lý lỗi toàn cục |
-| 🗄️ **Database & Prisma (DB)** | [backend/prisma/README.md](backend/prisma/README.md) | Sơ đồ ERD 15 bảng, Vector 512-D `pgvector` HNSW, Quy trình Migration, Quy trình Seed Data 3 bước, Quy ước đặt tên |
-| 🎨 **Frontend Web App (FE)** | [frontend/README.md](frontend/README.md) | Kiến trúc Pragmatic Feature-Based, Quy tắc đặt file, Quản lý State TanStack Query v5 & Context, UI Kit Glassmorphism & Dark Mode |
-| 👁️ **Face Auth & AI Engine** | [face_auth/README.md](face_auth/README.md) | Thuật toán ArcFace 512-D, PAD MobileNetV3-Small, Centroid Enrollment, SCRFD / YunNet face detection |
-| 🚀 **Hướng Dẫn Triển Khai (A-Z)** | [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) | Cài đặt môi trường từ A-Z, chạy webcam test local hoặc triển khai thực tế trên Raspberry Pi 4 |
+| ⚡ **Backend Service (BE)** | [backend/README.md](../../backend/README.md) | Kiến trúc Modular Monolith, Luồng xử lý Request Lifecycle, Quy chuẩn REST API, Biến môi trường, Xử lý lỗi toàn cục |
+| 🗄️ **Database & Prisma (DB)** | [backend/prisma/README.md](../../backend/prisma/README.md) | Sơ đồ ERD 15 bảng, Vector 512-D `pgvector` HNSW, Quy trình Migration, Quy trình Seed Data 3 bước, Quy ước đặt tên |
+| 🎨 **Frontend Web App (FE)** | [frontend/README.md](../../frontend/README.md) | Kiến trúc Pragmatic Feature-Based, Quy tắc đặt file, Quản lý State TanStack Query v5 & Context, UI Kit Glassmorphism & Dark Mode |
+| 👁️ **Face Auth & AI Engine** | [face_auth/README.md](../../face_auth/README.md) | Thuật toán ArcFace 512-D, PAD MobileNetV3-Small, Centroid Enrollment, SCRFD / YunNet face detection |
+| 🚀 **Hướng Dẫn Triển Khai (A-Z)** | [DEPLOYMENT_GUIDE.md](../tutorial/deployment/DEPLOYMENT_GUIDE.md) | Cài đặt môi trường từ A-Z, chạy webcam test local hoặc triển khai thực tế trên Raspberry Pi 4 |
 | 🔄 **Sơ Đồ Luồng Dữ Liệu** | [DATA_FLOWS.md](DATA_FLOWS.md) | Luồng Check-in/Check-out, Luồng Đăng ký khuôn mặt, Luồng Tính lương và Đồng bộ Socket.IO |
 
 ---
@@ -137,8 +139,14 @@ SmartFace-AIoT-Based-Staff-Management-Attendance-System/
 ├── docker-compose.yml        # Docker Compose (PostgreSQL 16 + pgvector, pgAdmin, Mosquitto)
 ├── docker-compose.iot.yml    # Docker Compose bổ sung dịch vụ IoT Gateway
 ├── .env.compose.example      # File biến môi trường mẫu cho Docker
-├── DEPLOYMENT_GUIDE.md       # 📖 Hướng dẫn chi tiết triển khai hệ thống từ A-Z
-├── DATA_FLOWS.md             # 📖 Sơ đồ chi tiết các luồng dữ liệu nghiệp vụ
+├── docs/                    # 📖 Tài liệu tập trung
+│   ├── README.md            # Mục lục
+│   ├── rule/                # Chính sách công ty và nghiệp vụ
+│   ├── architecture/        # Tổng quan và luồng dữ liệu
+│   ├── tutorial/            # Triển khai, ThingsBoard và vận hành
+│   ├── changes/             # Báo cáo thay đổi theo ngày
+│   ├── reports/             # Báo cáo và đánh giá
+│   └── assets/              # Export cấu hình
 │
 ├── backend/                  # ⚡ PHÂN HỆ BACKEND SERVER (Node.js + Express + Prisma)
 │   ├── prisma/               # Quản lý Database Schema, Migrations & 3 bộ Seed độc lập

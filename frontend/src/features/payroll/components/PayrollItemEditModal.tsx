@@ -11,6 +11,7 @@ export interface EditingPayrollItem {
   total_overtime: number;
   total_late_early: number;
   allowance: number;
+  reason: string;
 }
 
 interface PayrollItemEditModalProps {
@@ -33,6 +34,8 @@ export const PayrollItemEditModal: React.FC<PayrollItemEditModalProps> = ({
   selectedPeriod,
 }) => {
   if (!editingItem) return null;
+  otRate = editingItem.record.overtime_rate ?? otRate;
+  lateRate = editingItem.record.late_penalty_rate ?? lateRate;
 
   return (
     <Modal
@@ -144,6 +147,11 @@ export const PayrollItemEditModal: React.FC<PayrollItemEditModalProps> = ({
           />
         </div>
 
+        <label className="block text-xs">Lý do điều chỉnh (bắt buộc khi sửa giờ công/OT)
+          <textarea required minLength={3} maxLength={2000} value={editingItem.reason}
+            onChange={e => onChangeEditingItem({ ...editingItem, reason: e.target.value })}
+            className="block w-full bg-transparent rounded border p-2" />
+        </label>
         {/* Live Net preview */}
         <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-1.5 text-xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-[11px]">

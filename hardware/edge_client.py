@@ -11,6 +11,8 @@ Orchestrator kết nối toàn diện các module:
 - streaming   : RTSPStreamer (FFmpeg pipe -> MediaMTX WebRTC/HLS/RTSP)
 """
 
+import queue
+import uuid
 import os
 import sys
 import time
@@ -87,6 +89,8 @@ COOLDOWN_SEC = get_env_float("SCAN_COOLDOWN_SECONDS", 5.0)
 
 # Detection Cadence: chạy detector mỗi N giây; các frame ở giữa dùng optical flow tiết kiệm CPU Pi
 DETECTION_INTERVAL_SECONDS = get_env_float("DETECTION_INTERVAL_SECONDS", 0.2)
+RECOGNIZE_INTERVAL_SECONDS = get_env_float("RECOGNIZE_INTERVAL_SECONDS", 1.0)
+PAD_INTERVAL_SECONDS = get_env_float("PAD_INTERVAL_SECONDS", 0.2)
 TRACK_IOU_THRESHOLD = get_env_float("TRACK_IOU_THRESHOLD", 0.3)
 TRACK_MAX_MISSING_FRAMES = get_env_int("TRACK_MAX_MISSING_FRAMES", 10)
 MAX_FACES_PER_FRAME = get_env_int("MAX_FACES_PER_FRAME", 1)
@@ -135,10 +139,13 @@ from peripherals import UltrasonicSensor
 
 # Trạng thái toàn cục
 current_mode = INITIAL_MODE
+mode_generation = 0
 
 
 def on_mode_change(new_mode: str):
-    global current_mode
+    global current_mode, mode_generation
+    if new_mode != current_mode:
+        mode_generation += 1
     current_mode = new_mode
     print(f"\n[MODE SWITCH] Nhận lệnh từ ThingsBoard: Đổi sang {current_mode}!\n")
 
@@ -155,6 +162,7 @@ def main():
     print(f"  RTSP URL         : {RTSP_URL} (Stream Enabled: {STREAM_ENABLED})")
     print(f"  Detector Backend : {APP_DETECTOR.upper()}")
     print(f"  Detection Cadence: Mỗi {DETECTION_INTERVAL_SECONDS}s (Optical Flow ở giữa)")
+    print(f"  Recognition Every: {RECOGNIZE_INTERVAL_SECONDS}s | PAD Every: {PAD_INTERVAL_SECONDS}s")
     print(f"  Tracking Config  : IOU={TRACK_IOU_THRESHOLD}, MaxMissing={TRACK_MAX_MISSING_FRAMES}")
     print(f"  Anti-Spoofing    : Ngưỡng logit={FAS_LOGIT_THRESHOLD}, Cần {REQUIRED_CONSECUTIVE} votes Real")
     print(f"  Max Faces/Frame  : {MAX_FACES_PER_FRAME if MAX_FACES_PER_FRAME > 0 else 'KHÔNG GIỚI HẠN (All faces)'}")
@@ -162,6 +170,8 @@ def main():
     print(f"  TFT ST7789V SPI  : {'BẬT (320x240)' if TFT_ENABLED else 'TẮT'}")
     print(f"  Ultrasonic Sensor: {'BẬT (TRIG=' + str(ULTRASONIC_TRIG_PIN) + ', ECHO=' + str(ULTRASONIC_ECHO_PIN) + ', Ngưỡng=' + str(ULTRASONIC_TRIGGER_DISTANCE) + 'cm)' if ULTRASONIC_ENABLED else 'TẮT'}")
     print("=======================================================\n")
+
+    result_queue = queue.SimpleQueue()
 
     # Callback khi nhận kết quả đối soát điểm danh Two-way RPC từ Backend
     def on_attendance_result(res: dict):
@@ -177,7 +187,8 @@ def main():
         if is_matched and is_success:
             emp = res.get("employee", {})
             emp_name = emp.get("full_name") or emp.get("employee_code") or "Nhân viên"
-            status_banner = f"{emp_name} - {mode} THÀNH CÔNG ({sim:.2f})"
+            review = res.get("attendance", {}).get("status") == "FLAGGED"
+            status_banner = f"{emp_name} - {mode}: {'ĐÃ LƯU, CẦN KIỂM TRA' if review else 'THÀNH CÔNG'} ({sim:.2f})"
             status_banner_time = time.time()
             print(f"[EDGE] 🎉 ĐIỂM DANH THÀNH CÔNG: {emp_name} ({mode}) - Similarity: {sim:.2f}")
         elif is_matched and not is_success:
@@ -200,9 +211,8 @@ def main():
         device_id=DEVICE_ID,
         initial_mode=current_mode,
         on_mode_change=on_mode_change,
-        on_attendance_result=on_attendance_result,
+        on_attendance_result=None,
     )
-    tb_client.start()
 
     # 2. Khởi tạo Pipeline AI: Detector + Tracker + AntiSpoof + Embedder
     print("[AI] Đang nạp các mô hình ONNX...")
@@ -210,12 +220,12 @@ def main():
     print(f"  [OK] Face Detector : {APP_DETECTOR.upper()}")
 
     tracker = FaceTracker(
-        recognize_interval_seconds=1.0,
+        recognize_interval_seconds=RECOGNIZE_INTERVAL_SECONDS,
         iou_threshold=TRACK_IOU_THRESHOLD,
         max_missing_frames=TRACK_MAX_MISSING_FRAMES,
         pad_smooth_window=5,
         pad_spoof_min_ratio=0.6,
-        pad_interval_seconds=0.2,
+        pad_interval_seconds=PAD_INTERVAL_SECONDS,
         pad_min_votes=REQUIRED_CONSECUTIVE,
         pad_stale_timeout=3.0,
     )
@@ -277,18 +287,34 @@ def main():
     is_awake = not ULTRASONIC_ENABLED
     last_present_time = time.time() if not ULTRASONIC_ENABLED else 0.0
     attendance_latch = False
+    last_mode_generation = mode_generation
+    presence_generation = 0
+    last_submission = None
+    camera_failures = 0
     last_face_seen_time = 0.0
     last_active_track_id = None
     last_telemetry_time = 0.0
 
+    tb_client.start()
     print("\n[RUNNING] Hệ thống đang chạy. Nhấn Ctrl+C để dừng.\n")
 
     try:
         while True:
+            if mode_generation != last_mode_generation:
+                attendance_latch = False
+                last_submission = None
+                last_mode_generation = mode_generation
             ret, frame = cap.read()
             if not ret:
+                camera_failures += 1
+                if camera_failures == 1:
+                    print('[CAMERA] Không đọc được hình; tạm dừng nhận diện.')
+                    tb_client.send_telemetry({'ai_state': 'CAMERA_ERROR', 'status': 'DEGRADED'})
+                if camera_failures >= 100:
+                    raise RuntimeError('Camera không trả hình sau 100 lần đọc; cần kiểm tra camera hoặc khởi động lại service.')
                 time.sleep(0.05)
                 continue
+            camera_failures = 0
 
             fps_counter += 1
             now_wall = time.time()
@@ -315,12 +341,16 @@ def main():
                         print(f"[EDGE] 💤 Không có người trong {ULTRASONIC_SLEEP_DELAY}s (Khoảng cách: {dist}cm) -> AI CHUYỂN SANG NGỦ!")
                         is_awake = False
                         attendance_latch = False
+                        last_submission = None
+                        presence_generation += 1
                         last_active_track_id = None
 
             # Cơ chế Hybrid Reset: Khi đang thức và đã khóa chốt, nếu mất mặt cũ trong FACE_LOST_RESET_SECONDS
             if is_awake and attendance_latch:
                 if (now_wall - last_face_seen_time) >= FACE_LOST_RESET_SECONDS:
                     attendance_latch = False
+                    last_submission = None
+                    presence_generation += 1
                     last_active_track_id = None
                     print(f"[EDGE] 🔄 Reset chốt điểm danh (Không thấy mặt cũ trong {FACE_LOST_RESET_SECONDS}s) -> Sẵn sàng đón người tiếp theo!")
 
@@ -397,6 +427,8 @@ def main():
                     current_track_id = tracked[0][1].track_id
                     if attendance_latch and last_active_track_id is not None and current_track_id != last_active_track_id:
                         attendance_latch = False
+                        last_submission = None
+                        presence_generation += 1
                         print(f"[EDGE] 🔄 Phát hiện khuôn mặt mới (Track #{current_track_id} thay cho #{last_active_track_id}) -> Mở chốt điểm danh!")
                     last_active_track_id = current_track_id
 
@@ -407,7 +439,7 @@ def main():
                     x1, y1, x2, y2 = [int(v) for v in bbox]
 
                     # (A) Cập nhật Anti-Spoofing theo chu kỳ của track
-                    if track.needs_pad(interval_seconds=0.2):
+                    if track.needs_pad(interval_seconds=PAD_INTERVAL_SECONDS):
                         try:
                             is_real, real_prob, _ = fas_predictor.predict(frame, bbox)
                             track.update_pad(is_real, real_prob)
@@ -420,32 +452,48 @@ def main():
                         status_label = f"#{track.track_id} CHECKING ({len(track._pad_window)}/{track.pad_min_votes})"
                     elif track.is_spoof:
                         color = (0, 0, 255)    # Đỏ: Giả mạo (ảnh/video)
+                        if not getattr(track, 'spoof_reported', False):
+                            track.spoof_reported = tb_client.send_spoof_event(float(track.last_pad_score or 0.0), current_mode)
                         status_label = f"#{track.track_id} SPOOF ({track.last_pad_score or 0.0:.2f})"
                     else:
                         # Người thật (REAL)
                         color = (0, 255, 0)    # Xanh lá: Hợp lệ
-                        status_label = f"#{track.track_id} REAL ({track.last_pad_score or 1.0:.2f})"
+                        status_label = f"#{track.track_id} REAL ({(track.last_pad_score if track.last_pad_score is not None else 0.0):.2f})"
 
                         # (C) Kiểm tra điều kiện gửi điểm danh (Chống Spam qua Latch Flag & Cooldown)
                         last_sent = getattr(track, "last_scan_sent", 0.0)
+                        if getattr(track, 'scan_scope', None) != (current_mode, mode_generation, presence_generation):
+                            track.scan_scope = (current_mode, mode_generation, presence_generation)
+                            track.last_scan_sent = 0.0
+                            track.scan_event_id = uuid.uuid4().hex
+                            track.scan_captured_at = None
+                            track.last_recognition_time = None
                         already_sent = getattr(track, "attendance_sent", False)
 
                         # Chỉ gửi nếu chốt chưa khóa (attendance_latch == False)
-                        if not attendance_latch:
-                            if not already_sent or (now_wall - last_sent >= COOLDOWN_SEC):
+                        if track.track_id == last_active_track_id and not attendance_latch and track.last_pad_score is not None and track.last_pad_score >= 0.5:
+                            if (now_wall - getattr(track, "last_scan_sent", 0.0) >= COOLDOWN_SEC
+                                    and track.needs_recognition(RECOGNIZE_INTERVAL_SECONDS, pad_enabled=True)):
                                 if landmarks is None or len(landmarks) != 5:
                                     last_detection_time = None
                                 else:
+                                    track.last_recognition_time = now_mono
                                     aligned_face = align_face(frame, landmarks)
                                     if aligned_face is not None:
                                         embedding = embedder.extract(aligned_face)
                                         if embedding is not None:
+                                            if track.scan_captured_at is None:
+                                                track.scan_captured_at = int(now_wall * 1000)
+                                            submission = (track.track_id, current_mode, track.scan_event_id, mode_generation, presence_generation)
                                             req_id = tb_client.send_scan_rpc(
                                                 embedding,
-                                                float(track.last_pad_score or 1.0),
-                                                current_mode
+                                                float((track.last_pad_score if track.last_pad_score is not None else 0.0)),
+                                                current_mode,
+                                                on_result=lambda response, token=submission: result_queue.put((token, response)),
+                                                event_id=track.scan_event_id, captured_at=track.scan_captured_at,
                                             )
                                             if req_id > 0:
+                                                last_submission = submission
                                                 attendance_latch = True
                                                 track.attendance_sent = True
                                                 track.last_scan_sent = now_wall
@@ -471,6 +519,16 @@ def main():
                         2,
                         cv2.LINE_AA
                     )
+
+            while not result_queue.empty():
+                submission, response = result_queue.get()
+                if submission != last_submission or submission[1] != current_mode or submission[0] != last_active_track_id or submission[3] != mode_generation or submission[4] != presence_generation or not is_awake or now_wall - last_face_seen_time > FACE_LOST_RESET_SECONDS:
+                    continue
+                on_attendance_result(response)
+                if not (response.get('success') and response.get('matched')):
+                    attendance_latch = False
+                    if not response.get('uncertain'):
+                        last_submission = None
 
             # ── 7. Vẽ Thanh Thông Tin & Banners Lên Video ────────────────────
             # Top Banner: Trạng thái thiết bị, Chế độ Check In/Out, FPS, Trạng thái AI/Siêu âm
@@ -525,7 +583,7 @@ def main():
                     if key == ord('q'):
                         break
                     elif key == ord('m'):
-                        current_mode = "CHECK_OUT" if current_mode == "CHECK_IN" else "CHECK_IN"
+                        tb_client.set_mode("CHECK_OUT" if current_mode == "CHECK_IN" else "CHECK_IN")
                         print(f"[KEYBOARD] Đã chuyển mode: {current_mode}")
                 except Exception:
                     pass

@@ -28,10 +28,18 @@ export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promis
   const queryStr = searchParams.toString();
   const url = queryStr ? `/api/attendance?${queryStr}` : '/api/attendance?limit=5000';
   const res = await apiFetch(url);
-  if (res.success && Array.isArray(res.data)) {
-    return res.data;
+  if (!res.success || !Array.isArray(res.data)) throw new Error(res.message || 'Không tải được lịch sử chấm công');
+  if (params?.limit !== undefined || params?.page !== undefined) return res.data;
+  const result = [...res.data];
+  let page = 2;
+  while (result.length % 5000 === 0 && result.length > 0) {
+    searchParams.set('page', String(page++));
+    const next = await apiFetch(`/api/attendance?${searchParams}`);
+    if (!next.success || !Array.isArray(next.data)) throw new Error('Không tải đủ lịch sử chấm công');
+    result.push(...next.data);
+    if (next.data.length < 5000) break;
   }
-  return [];
+  return result;
 }
 
 export async function addAttendanceApi(record: Omit<AttendanceRecord, 'attendance_id'>) {
@@ -40,6 +48,7 @@ export async function addAttendanceApi(record: Omit<AttendanceRecord, 'attendanc
     method: 'POST',
     body: JSON.stringify({
       employeeId: record.employee_id,
+      event_id: crypto.randomUUID(),
       device_info: record.device_id,
       method: record.method,
     }),

@@ -27,7 +27,7 @@ export class PayrollRepository {
     }
     return prisma.bonusPenalty.create({
       data: {
-        overtime_rate: data.overtime_rate ?? 1.5,
+        overtime_rate: data.overtime_rate ?? 100000,
         late_early_penalty: data.late_early_penalty ?? 50000,
         description: data.description || 'Chính sách áp dụng chuẩn từ hệ thống',
       },

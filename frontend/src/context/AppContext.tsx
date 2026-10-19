@@ -46,7 +46,7 @@ export interface AppContextType {
   selectedPeriod: string;
   setSelectedPeriod: (period: string) => void;
   generatePayroll: (period: string) => Promise<void>;
-  updatePayrollItem: (id: string, updates: Partial<PayrollRecord>) => void;
+  updatePayrollItem: (id: string, updates: Partial<PayrollRecord>) => Promise<unknown>;
   finalizePayrollPeriod: (period: string) => void;
   unlockPayrollPeriod: (period: string) => void;
   updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => Promise<void>;

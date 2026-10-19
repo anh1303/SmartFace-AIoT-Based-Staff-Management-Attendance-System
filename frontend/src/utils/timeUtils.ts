@@ -1,14 +1,9 @@
-export const parseTimeToSeconds = (timeStr?: string): number | null => {
-  if (!timeStr || timeStr === '--:--:--' || timeStr === '--') return null;
-  if (timeStr.includes('T')) {
-    const d = new Date(timeStr);
-    return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-  }
-  const parts = timeStr.split(':').map(Number);
-  if (parts.length >= 2) {
-    return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
-  }
-  return null;
+/** Draft input rounding. Backend remains authoritative for paid time. */
+export const roundPayableHours = (seconds: number): number => {
+  const duration = Math.max(0, seconds);
+  const whole = Math.floor(duration / 3600);
+  const remainder = duration - whole * 3600;
+  return whole + (remainder >= 2700 ? 1 : remainder >= 1800 ? 0.5 : 0);
 };
 
 export const formatSecondsToHHMMSS = (totalSec: number): string => {
@@ -19,57 +14,9 @@ export const formatSecondsToHHMMSS = (totalSec: number): string => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
-export const roundTo30Minutes = (totalSec: number): number => {
-  if (totalSec <= 0) return 0;
-  return Math.round(totalSec / 1800) * 1800;
-};
-
-export const calculateRawLateEarlySec = (
-  shift: { start_time: string; end_time: string },
-  inTimeStr?: string,
-  outTimeStr?: string
-): number => {
-  const startSec = parseTimeToSeconds(shift.start_time);
-  const endSec = parseTimeToSeconds(shift.end_time);
-  const inSec = parseTimeToSeconds(inTimeStr);
-  const outSec = parseTimeToSeconds(outTimeStr);
-
-  let lateSec = 0;
-  if (inSec !== null && startSec !== null && inSec > startSec) {
-    lateSec = inSec - startSec;
-  }
-
-  let earlySec = 0;
-  if (outSec !== null && endSec !== null && outSec < endSec) {
-    earlySec = endSec - outSec;
-  }
-
-  const rawTotalSec = lateSec + earlySec;
-  return rawTotalSec > 0 ? rawTotalSec : 0;
-};
-
-export const calculateRawInitialOTSec = (
-  shift: { start_time: string; end_time: string },
-  inTimeStr?: string,
-  outTimeStr?: string
-): number => {
-  const startSec = parseTimeToSeconds(shift.start_time);
-  const endSec = parseTimeToSeconds(shift.end_time);
-  const inSec = parseTimeToSeconds(inTimeStr);
-  const outSec = parseTimeToSeconds(outTimeStr);
-
-  if (startSec === null || endSec === null || inSec === null || outSec === null) {
-    return 0;
-  }
-
-  const actualWorkSec = outSec - inSec;
-  const expectedWorkSec = endSec - startSec;
-  const rawOT = actualWorkSec - expectedWorkSec;
-  return rawOT > 0 ? rawOT : 0;
-};
-
 export const getStatusBadge = (status: string) => {
   switch (status) {
+    case 'PRESENT':
     case 'ON_TIME':
       return { label: 'Đúng giờ', color: 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' };
     case 'LATE':
@@ -80,6 +27,9 @@ export const getStatusBadge = (status: string) => {
       return { label: 'Trễ & Sớm', color: 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' };
     case 'ABSENT':
       return { label: 'Vắng mặt', color: 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' };
+    case 'OFF': return { label: 'Ngày OFF', color: 'text-slate-500' };
+    case 'SCHEDULED': return { label: 'Chưa đến ca', color: 'text-slate-500' };
+    case 'INCOMPLETE': return { label: 'Thiếu cặp IN/OUT', color: 'text-amber-600' };
     case 'NO_SHIFT':
       return { label: 'Không có ca', color: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' };
     default:

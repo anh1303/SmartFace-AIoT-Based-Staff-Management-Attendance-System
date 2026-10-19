@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Clock, AlertTriangle } from 'lucide-react';
 import { AttendancePairItem } from '../../../hooks/useAttendancePairs';
-import { formatSecondsToHHMMSS, roundTo30Minutes } from '../../../utils/timeUtils';
+import { formatSecondsToHHMMSS, roundPayableHours } from '../../../utils/timeUtils';
 
 interface EditingItemState {
   employee: AttendancePairItem['employee'];
@@ -28,6 +28,7 @@ interface AttendanceEditModalProps {
     date: string;
     late_early: number;
     overtime: number;
+    reason: string;
   }) => Promise<void>;
 }
 
@@ -45,6 +46,8 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
   const [inputOTMinutes, setInputOTMinutes] = useState<number>(0);
   const [inputOTSeconds, setInputOTSeconds] = useState<number>(0);
 
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,6 +66,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
       setInputOTMinutes(otM);
       setInputOTSeconds(otS);
 
+      setReason('');
       setModalError(null);
     }
   }, [editingItem]);
@@ -80,14 +84,8 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
     const totalLE = (leH || 0) * 3600 + (leM || 0) * 60 + (leS || 0);
     const totalOT = (otH || 0) * 3600 + (otM || 0) * 60 + (otS || 0);
 
-    if (totalLE > editingItem.initialLateEarlySec) {
-      setModalError(`Thời gian đi trễ/về sớm không được vượt quá thời gian trễ/sớm thực tế (${formatSecondsToHHMMSS(editingItem.initialLateEarlySec)})`);
-      return false;
-    }
-
-    if (totalOT > editingItem.initialOTSec) {
-      setModalError(`Thời gian tăng ca không được vượt quá thời gian tăng ca thực tế (${formatSecondsToHHMMSS(editingItem.initialOTSec)})`);
-      return false;
+    if (![leH, leM, leS, otH, otM, otS].every(Number.isFinite) || totalLE < 0 || totalOT < 0 || leM > 59 || otM > 59 || leS > 59 || otS > 59) {
+      setModalError('Nhập thời gian hợp lệ, không âm; phút/giây từ 0–59.'); return false;
     }
 
     setModalError(null);
@@ -116,16 +114,19 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
       return;
     }
 
-    const roundedLEHours = Math.round(totalInputLESec / 1800) * 0.5;
-    const roundedOTHours = Math.round(totalInputOTSec / 1800) * 0.5;
+    const roundedLEHours = roundPayableHours(totalInputLESec);
+    const roundedOTHours = roundPayableHours(totalInputOTSec);
 
-    await onSave({
+    if (reason.trim().length < 3) { setModalError('Cần ghi lý do duyệt/điều chỉnh (ít nhất 3 ký tự).'); return; }
+    setSaving(true);
+    try { await onSave({
       employeeId: editingItem.employee.employee_id,
       date: editingItem.date,
       late_early: roundedLEHours,
-      overtime: roundedOTHours,
+      overtime: roundedOTHours, reason: reason.trim(),
     });
     onClose();
+    } catch (error) { setModalError(error instanceof Error ? error.message : 'Không lưu được điều chỉnh'); } finally { setSaving(false); }
   };
 
   const modalNode = (
@@ -171,6 +172,10 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
             </div>
           )}
 
+          <label className="block">Lý do duyệt/điều chỉnh (bắt buộc)
+            <textarea value={reason} onChange={e => { setReason(e.target.value); setModalError(null); }} maxLength={2000} className="block w-full rounded border p-2 bg-transparent" />
+            <span>OT có thể duyệt ít hoặc nhiều hơn ghi nhận. Phần lẻ &lt;0,5 bỏ; 0,5–&lt;0,75 tính 0,5; từ 0,75 làm tròn lên.</span>
+          </label>
           {/* Input 1: Late / Early */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
@@ -188,7 +193,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                 <input
                   type="number"
                   min={0}
-                  max={23}
+                  max={744}
                   value={inputLEHours}
                   onChange={(e) => handleLEChange(parseInt(e.target.value, 10) || 0, inputLEMinutes, inputLESeconds)}
                   className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
@@ -236,7 +241,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                 <input
                   type="number"
                   min={0}
-                  max={23}
+                  max={744}
                   value={inputOTHours}
                   onChange={(e) => handleOTChange(parseInt(e.target.value, 10) || 0, inputOTMinutes, inputOTSeconds)}
                   className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
@@ -279,7 +284,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
           <button
             type="button"
             onClick={handleSave}
-            disabled={Boolean(modalError)}
+            disabled={saving}
             className={`px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all ${
               modalError
                 ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-300 dark:border-slate-700 cursor-not-allowed'

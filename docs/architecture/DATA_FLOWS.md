@@ -1,4 +1,9 @@
 # KIẾN TRÚC VÀ CÁC LUỒNG DỮ LIỆU HỆ THỐNG SMARTFACE AIoT
+
+> Quy tắc công/lương: [Chính sách công ty và dự án](../rule/COMPANY_POLICY.md).
+> Cấu hình triển khai và lệnh vận hành hiện tại:
+> [THINGSBOARD_PI_SETUP.md](../tutorial/thingsboard/THINGSBOARD_PI_SETUP.md).
+> Bản triển khai Docker dùng ThingsBoard cổng 8081 và frontend cổng 8080.
 ## SmartFace: AIoT-Based Staff Management & Attendance System
 
 Tài liệu này mô tả chi tiết toàn bộ các luồng dữ liệu (Data Flows), giao thức truyền thông, cấu trúc gói tin và kiến trúc xử lý thời gian thực từ Thiết bị biên (Raspberry Pi 4 Edge), Nền tảng IoT (ThingsBoard), Máy chủ Media (MediaMTX), Máy chủ nghiệp vụ (Backend Node.js/PostgreSQL pgvector) đến Giao diện điều hành (Frontend Web App).
@@ -116,6 +121,7 @@ sequenceDiagram
     "current_mode": "CHECK_IN",
     "antispoof_score": 0.9352,
     "embedding_b64": "vWb7PcxqWb3NzEw9zcxMPczMTD3MzEw9...",
+    "event_id": "579d54e32d904ee7a1d0947057a00001",
     "client_timestamp": 1792012751936
   }
 }
@@ -206,59 +212,51 @@ sequenceDiagram
 ### LUỒNG 4: Đồng Bộ Chế Độ Cổng 2 Chiều (Bidirectional Mode Synchronization)
 *Giải quyết bài toán: Đổi chế độ cổng ở Web App thì ThingsBoard tự đổi, và ngược lại khi gạt Switch ở ThingsBoard thì Web App tự động nhảy nút.*
 
-#### Kịch bản A: Người Quản Lý Đổi Chế Độ Trên Web App (Frontend ➡️ ThingsBoard & Pi 4)
+#### Kịch bản A: Đổi mode từ Web App
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor Admin as Quản lý tại Web App
-    participant Web as WebRTCPlayer.tsx
-    participant Backend as Backend Express
-    participant TB_API as ThingsBoard REST API
-    participant TB_Dash as ThingsBoard Dashboard
-    participant Pi as Raspberry Pi 4 Edge
-
-    Admin ->> Web: Bấm nút 'Tan ca (Check-out)'
-    Web ->> Backend: POST /api/devices/PI4_FRONT_GATE/mode { mode: 'CHECK_OUT' }
-    Backend ->> TB_API: 1. Đăng nhập lấy JWT Tenant<br/>POST /api/auth/login
-    Backend ->> TB_API: 2. Ghi Shared Attribute<br/>POST /api/plugins/telemetry/DEVICE/{id}/SHARED_SCOPE<br/>{"attendance_mode": "CHECK_OUT"}
-    Backend ->> TB_API: 3. Ghi Timeseries<br/>POST /api/plugins/telemetry/DEVICE/{id}/timeseries/ANY<br/>{"current_mode": "CHECK_OUT", "mode": "CHECK_OUT"}
-    
-    par Đồng bộ sang ThingsBoard Dashboard
-        TB_API ->> TB_Dash: Cập nhật Timeseries & Shared Attribute<br/>-> HTML Card đổi chữ sang 'CHECK_OUT'<br/>-> Switch Control tự động gạt về OFF
-    and Đẩy tín hiệu xuống Pi 4
-        TB_API ->> Pi: MQTT Publish topic 'v1/devices/me/attributes'<br/>Payload: {"attendance_mode": "CHECK_OUT"}
-        Pi ->> Pi: Cập nhật current_mode = "CHECK_OUT"
-        Pi ->> Pi: Đổi màu Banner & Nhãn trên màn hình TFT ST7789V
-    end
+    actor Manager
+    participant Web
+    participant Backend
+    participant TB as ThingsBoard
+    participant Pi
+    Manager->>Web: Chọn CHECK_OUT
+    Web->>Backend: PATCH /api/devices/PI4_FRONT_GATE/mode
+    Backend->>TB: Two-way RPC setValue(false)
+    TB->>Pi: MQTT RPC setValue(false)
+    Pi->>Pi: Cập nhật mode và generation
+    Pi-->>TB: ACK false
+    TB-->>Backend: Kết quả RPC
+    Backend->>TB: Lưu Shared Attribute mode + revision
+    Backend-->>Web: confirmed=true và mode CHECK_OUT
+    Backend-->>Web: Socket device-mode-changed
 ```
 
----
+Không có ACK hoặc ThingsBoard trả lỗi thì API không xác nhận đổi thành công. Khi tải lại trang, frontend gọi GET mode để đọc trạng thái thật từ Pi.
 
-#### Kịch bản B: Người Quản Trị Đổi Chế Độ Trên ThingsBoard (ThingsBoard ➡️ Web App & Pi 4)
+#### Kịch bản B: Đổi mode từ ThingsBoard
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor Admin as Quản trị tại ThingsBoard
-    participant TB_Dash as ThingsBoard Dashboard (Switch Control)
-    participant Pi as Raspberry Pi 4 Edge
-    participant Backend as Backend Express
-    participant Socket as Socket.IO (/attendance)
-    participant Web as Web App (WebRTCPlayer.tsx)
-
-    Admin ->> TB_Dash: Gạt Switch Control sang BẬT (CHECK_IN)
-    TB_Dash ->> Pi: MQTT Gửi RPC Request<br/>Topic: 'v1/devices/me/rpc/request/123'<br/>Payload: {"method": "setValue", "params": true}
-    Pi ->> Pi: 1. Cập nhật current_mode = "CHECK_IN"
-    Pi ->> TB_Dash: 2. Phản hồi RPC thành công<br/>Topic: 'v1/devices/me/rpc/response/123' -> true
-    Pi ->> TB_Dash: 3. Cập nhật Telemetry {"current_mode": "CHECK_IN"}
-    
-    Note over Pi, Backend: 4. Đồng bộ tức thì về Backend qua HTTP Callback
-    Pi ->> Backend: POST /api/devices/PI4_FRONT_GATE/mode-notify<br/>Payload: {"mode": "CHECK_IN"}
-    Backend ->> Socket: 5. Broadcast sự kiện 'device-mode-changed'<br/>Payload: { deviceId: 'PI4_FRONT_GATE', mode: 'CHECK_IN' }
-    Socket ->> Web: 6. WebRTCPlayer nhận sự kiện qua WebSocket
-    Web ->> Web: 7. Tự động chuyển nút gạt sang 'Vào ca (Check-in)' & hiện Toast thông báo!
+    participant Dashboard
+    participant Pi
+    participant TB as ThingsBoard Rule Chain
+    participant Backend
+    participant Web
+    Dashboard->>Pi: RPC setValue(true)
+    Pi-->>Dashboard: ACK true
+    Pi->>TB: Telemetry current_mode + mode_changed_at
+    TB->>Backend: Mode Relay POST /mode-notify + shared secret
+    Backend->>Pi: Đọc mode qua ThingsBoard getValue
+    Pi-->>Backend: Xác nhận mode
+    Backend->>TB: Lưu Shared Attribute để phục hồi
+    Backend-->>Web: Socket device-mode-changed
 ```
+
+Mode Relay chạy trên ThingsBoard; Pi không cần truy cập cổng HTTP backend. Đường HTTP trực tiếp chỉ được bật khi cấu hình `BACKEND_BASE_URL` và secret, thực hiện trên thread riêng. Shared readback không phát relay lặp vô hạn.
+
+Webhook điểm danh/mode phải có `X-TB-Webhook-Secret`. REST node điểm danh thêm `X-Device-Name: ${deviceName}`; backend đối chiếu với body. RPC phản hồi phải giữ `event_id` tương ứng. `/attendance` và `/devices` yêu cầu JWT, hỗ trợ cookie HttpOnly; sự kiện gửi vào room đúng quyền.
 
 ---
 
@@ -296,3 +294,21 @@ sequenceDiagram
 ### 3. Đánh Giá Chống Giả Mạo Đa Khung Hình (Multi-Frame Temporal Voting)
 * Một khuôn mặt chỉ được xác thực là `REAL` khi vượt qua tối thiểu `CONSECUTIVE_REAL_FRAMES = 3` khung hình liên tiếp có điểm Sigmoid liveness $\ge 0.50$.
 * Nếu phát hiện hành vi cầm ảnh in hoặc đưa màn hình điện thoại/máy tính bảng (`pad_score < -4.2998`), trạng thái lập tức chuyển sang `SPOOF`, khung hình đổi sang màu đỏ và chặn không trích xuất vector.
+
+## 4. Luồng công và lương
+
+```mermaid
+flowchart LR
+    A[Raw log và event ID] --> B[Ghép IN-OUT liền kề tối đa 24h]
+    B --> C[Giây công thường trong ca]
+    B --> D[Giây OT sau ca]
+    C --> E[Cộng theo ngày rồi làm tròn theo ba mức phần lẻ <0,5 / 0,5–<0,75 / ≥0,75]
+    D --> F[Trên 30 phút: OT đề xuất]
+    F --> G[Quản lý rà soát và duyệt kèm lý do]
+    E --> H[Phiếu lương tạm tính]
+    G --> H
+    H --> I[Kiểm tra review và fingerprint nguồn]
+    I --> J[Chốt phiếu và giữ snapshot đơn giá]
+```
+
+OFF/no-shift không tự tạo lương thường hoặc OT. Nguồn thay đổi làm mất hiệu lực duyệt cũ; phiếu có nguồn thay đổi phải được tính/rà soát lại trước khi chốt. Bản ghi dư/thiếu vẫn được giữ. Chi tiết đơn giá, cách làm tròn và ví dụ thuộc [chính sách công ty](../rule/COMPANY_POLICY.md).

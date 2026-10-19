@@ -116,12 +116,12 @@ export const EmployeeSalaryHistory: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <span
-                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-mono ${p.status === 'FINALIZED'
+                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-mono ${p.status !== 'PENDING'
                         ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                         : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
                         }`}
                     >
-                      {p.status === 'FINALIZED' ? 'ĐÃ CHỐT' : 'CHỜ DUYỆT'}
+                      {p.status !== 'PENDING' ? 'ĐÃ CHỐT' : 'CHỜ DUYỆT'}
                     </span>
                   </TableCell>
                   <TableCell isLast align="right">
@@ -168,7 +168,7 @@ export const EmployeeSalaryHistory: React.FC = () => {
                   </p>
                 </div>
                 <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20 font-medium">
-                  {selectedSlip.status === 'FINALIZED' ? 'ĐÃ THANH TOÁN' : 'TẠM TÍNH'}
+                  {selectedSlip.status === 'PAID' ? 'ĐÃ THANH TOÁN' : selectedSlip.status !== 'PENDING' ? 'ĐÃ CHỐT' : 'TẠM TÍNH'}
                 </span>
               </div>
 

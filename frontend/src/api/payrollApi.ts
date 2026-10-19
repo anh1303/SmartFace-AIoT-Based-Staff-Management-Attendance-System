@@ -43,6 +43,7 @@ export async function updatePayrollItemApi(
       total_late_early: updates.total_late_early,
       allowance: updates.allowance,
       status: updates.status,
+      reason: updates.reason,
     }),
   });
   if (res.success && res.data) {

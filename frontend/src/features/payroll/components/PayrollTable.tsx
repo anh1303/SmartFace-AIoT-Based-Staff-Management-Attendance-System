@@ -110,7 +110,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
               const empName = emp?.full_name || record.employee_name || record.employee_id;
               const hourlyRate = record.hourly_rate || 0;
               const netSalary = record.net_salary || 0;
-              const totalWorkingHours = record.total_working_hours || 176;
+              const totalWorkingHours = record.total_working_hours ?? 0;
               const totalOvertime = record.total_overtime ?? 0;
               const totalLateEarly = record.total_late_early ?? 0;
               const allowance = record.allowance || 0;
@@ -119,7 +119,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                 emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
               );
               const isOtherMgr = isAnotherManager(emp, currentUser);
-              const isBlockedFromEditing = role !== 'admin' && (isSelf || isOtherMgr);
+              const isBlockedFromEditing = record.status !== 'PENDING' || role !== 'admin' && (isSelf || isOtherMgr);
 
               return (
                 <TableRow key={record.payroll_id}>

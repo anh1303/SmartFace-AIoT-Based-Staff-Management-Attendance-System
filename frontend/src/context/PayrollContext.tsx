@@ -9,7 +9,7 @@ export interface PayrollContextType {
   setSelectedPeriod: (period: string) => void;
   isLoadingPayroll?: boolean;
   generatePayroll: (period: string) => Promise<PayrollRecord[] | void>;
-  updatePayrollItem: (id: string, updates: Partial<PayrollRecord>) => void;
+  updatePayrollItem: (id: string, updates: Partial<PayrollRecord>) => Promise<unknown>;
   finalizePayrollPeriod: (period: string) => void;
   unlockPayrollPeriod: (period: string) => void;
   updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => Promise<BonusPenaltyPolicy | void>;

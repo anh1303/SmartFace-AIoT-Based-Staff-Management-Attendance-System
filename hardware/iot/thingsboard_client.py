@@ -135,7 +135,7 @@ class ThingsBoardClient:
             return False
 
     def send_scan_rpc(self, embedding, fas_score: float, mode: str, on_result=None,
-                      event_id=None, captured_at=None) -> int:
+                      event_id=None, captured_at=None, event_kind=None, recognition_id=None, expected_employee_id=None) -> int:
         if not self.connected or not self.client or mode not in ('CHECK_IN', 'CHECK_OUT'):
             return -1
         import numpy as np
@@ -151,6 +151,10 @@ class ThingsBoardClient:
         event_id = event_id or uuid.uuid4().hex
         params = {'device_id': self.device_id, 'mode': mode, 'antispoof_score': float(fas_score),
                   'embedding_b64': encoded, 'client_timestamp': captured_at or int(time.time() * 1000), 'event_id': event_id}
+        if event_kind is not None:
+            params.update(event_kind=event_kind, recognition_id=recognition_id)
+            if expected_employee_id is not None:
+                params['expected_employee_id'] = expected_employee_id
         info = {'payload': json.dumps({'method': 'verify_face', 'params': params}), 'event_id': event_id,
                 'callback': on_result, 'deadline': time.monotonic() + self.rpc_timeout, 'attempts': 1}
         with self._lock:

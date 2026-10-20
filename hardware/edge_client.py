@@ -311,6 +311,7 @@ def main():
     last_telemetry_time = 0.0
     frame_id = 0
     last_submission_embedding = None
+    previous_recognition_tracks = {}
 
     recognition_worker = RecognitionWorker(embedder, queue_size=vision.RECOGNITION_QUEUE_SIZE)
     identity_cache = IdentityCache(vision.RECOGNITION_CACHE_TTL_SECONDS,
@@ -326,6 +327,14 @@ def main():
             ret, frame = cap.read()
             if not ret:
                 camera_failures += 1
+                for track in previous_recognition_tracks.values():
+                    if getattr(track, 'recognition_eligible', False):
+                        track.verification_generation += 1
+                        track.invalidate_recognition()
+                        track.recognition_eligible = False
+                previous_recognition_tracks = {}
+                attendance_latch = False
+                last_submission = None
                 recognition_worker.retain(set())
                 recognition_worker.poll()
                 if camera_failures == 1:
@@ -395,6 +404,12 @@ def main():
             tracked = []
             recognition_eligible = {}
             if not is_awake:
+                for track in previous_recognition_tracks.values():
+                    if getattr(track, 'recognition_eligible', False):
+                        track.verification_generation += 1
+                        track.invalidate_recognition()
+                        track.recognition_eligible = False
+                previous_recognition_tracks = {}
                 # Trạng thái AI NGỦ: Không tốn CPU cho ONNX, chỉ hiển thị thông báo chờ
                 sleep_text = f"AI: SLEEP (CHO NGUOI <= {int(ULTRASONIC_TRIGGER_DISTANCE)}cm)"
                 if dist is not None:
@@ -458,6 +473,21 @@ def main():
                 update_track_pad(tracked, frame, fas_predictor, PAD_INTERVAL_SECONDS,
                                  frame_id, detector_due, vision.PAD_DIAGNOSTIC_LOG,
                                  crop_smoothing=vision.PAD_CROP_SMOOTHING)
+                # Match face_auth: loss of PAD/track eligibility invalidates the
+                # recognition session, without erasing the SPOOF vote window.
+                visible_tracks = {track.track_id: track for _, track in tracked}
+                all_tracks = {**previous_recognition_tracks, **visible_tracks}
+                for track_id, track in all_tracks.items():
+                    eligible = (track_id in visible_tracks and track.missing_frames == 0 and track.pad_ready and track.is_real
+                                and not track.is_spoof and not track.pad_invalid_reason)
+                    if eligible:
+                        track.recognition_eligible = True
+                    elif getattr(track, 'recognition_eligible', False):
+                        track.verification_generation += 1
+                        track.invalidate_recognition()
+                        track.stable_recognitions = 0
+                        track.recognition_eligible = False
+                previous_recognition_tracks = visible_tracks
                 inference_frame = frame
                 frame = frame.copy()  # Draw only on a display copy, never on model input.
                 if last_submission is not None and attendance_latch:
@@ -497,6 +527,8 @@ def main():
                             track.scan_event_id = uuid.uuid4().hex
                             track.scan_captured_at = None
                             track.last_recognition_time = None
+                            track.stable_recognitions = 0
+                            track.employee_id = None
                         key = (track.track_id, *scope)
                         if (track.track_id == last_active_track_id and not attendance_latch
                                 and track.missing_frames == 0 and track.last_pad_score is not None
@@ -519,6 +551,9 @@ def main():
                                         submitted = recognition_worker.submit(key, aligned_face, context)
                                         status_label += " [WAIT EMBEDDING]" if submitted else " [QUEUE FULL]"
                                     except Exception as exc:
+                                        track.stable_recognitions = 0
+                                        track.scan_event_id = uuid.uuid4().hex
+                                        track.scan_captured_at = None
                                         status_label += f" [ERROR {type(exc).__name__}]"
 
                         # Hiển thị trạng thái chốt trên nhãn bounding box
@@ -555,6 +590,9 @@ def main():
                 if result.error:
                     track.last_recognition_time = time.monotonic()
                     track.recognition_error = True
+                    track.stable_recognitions = 0
+                    track.scan_event_id = uuid.uuid4().hex
+                    track.scan_captured_at = None
                     track.recognition_status = f"ERROR {result.error}"
                     status_banner = f"RECOGNITION ERROR: {result.error}"
                     status_banner_time = now_wall
@@ -566,18 +604,24 @@ def main():
                                                   vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
                     track.recognition_status = "CACHE (DISPLAY ONLY)"
                 event_id, captured_at, pad_score = result.context
-                submission = (track.track_id, result.key[2], event_id, result.key[3], result.key[4], result.key[1])
+                expected_employee = getattr(track, 'employee_id', None)
+                commit = (getattr(track, 'stable_recognitions', 0) >= vision.ATTENDANCE_STABLE_COUNT - 1
+                          and bool(expected_employee))
+                event_kind = 'CONFIRMED_SCAN' if commit else 'VERIFY_ONLY'
+                submission = (track.track_id, result.key[2], event_id, result.key[3], result.key[4], result.key[1], event_kind)
                 track.scan_captured_at = captured_at
                 req_id = tb_client.send_scan_rpc(
                     result.embedding, pad_score, result.key[2],
                     on_result=lambda response, token=submission: result_queue.put((token, response)),
                     event_id=event_id, captured_at=captured_at,
+                    event_kind=event_kind, recognition_id=uuid.uuid4().hex,
+                    expected_employee_id=expected_employee if commit else None,
                 )
                 if req_id > 0:
                     last_submission = submission
                     last_submission_embedding = result.embedding.copy()
                     attendance_latch = True
-                    track.attendance_sent = True
+                    track.attendance_sent = commit
                     track.last_scan_sent = now_wall
                     status_banner = f"TRACK #{track.track_id}: ĐANG ĐỐI SOÁT RPC..."
                     status_banner_time = now_wall
@@ -615,6 +659,15 @@ def main():
                     response_track.update_display_identity((None, 'UNKNOWN', 0.0),
                                                            vision.RECOGNITION_LABEL_CONFIRMATIONS,
                                                            vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
+                if response.get('verification_only') and response.get('matched') and response.get('success'):
+                    count = max(0, int(response.get('confirmation_count', 0)))
+                    response_track.stable_recognitions = count
+                    attendance_latch = False
+                    last_submission = None
+                    response_track.last_scan_sent = 0.0
+                    status_banner = f"{identity[1]}: XAC NHAN {min(count, vision.ATTENDANCE_STABLE_COUNT)}/{vision.ATTENDANCE_STABLE_COUNT} - CHUA GHI CONG"
+                    status_banner_time = now_wall
+                    continue
                 on_attendance_result(response)
                 if not (response.get('success') and response.get('matched')):
                     attendance_latch = False

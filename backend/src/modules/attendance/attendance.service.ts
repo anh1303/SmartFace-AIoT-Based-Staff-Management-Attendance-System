@@ -1,3 +1,4 @@
+import { observeRecognition } from './recognition-confirmation.js';
 import { Prisma } from '@prisma/client'
 import { createHash } from 'node:crypto'
 import { calculateDay, pairAttendance, vnDay, ATTENDANCE_POLICY_VERSION, MAX_PAIR_MS, roundHours } from './attendance.policy.js'
@@ -583,6 +584,8 @@ export interface ThingsBoardWebhookPayload {
   embedding_b64?: string
   event_id?: string
   event_kind?: string
+  recognition_id?: string
+  expected_employee_id?: string
   client_timestamp?: number | string
 }
 
@@ -596,6 +599,9 @@ export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) 
 
   // Anti-spoofing check
   if (typeof antispoof_score === 'number' && antispoof_score < 0.5) {
+    if (typeof data.recognition_id === 'string' && /^[a-zA-Z0-9_-]{8,120}$/.test(data.recognition_id)) {
+      observeRecognition(device_id, `${mode}:${data.event_id}`, data.recognition_id, null)
+    }
     emitAttendanceEvent('attendance-spoof-blocked', {
       device_id, event_id: data.event_id,
       antispoof_score,
@@ -610,7 +616,15 @@ export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) 
     }
   }
 
-  if (data.event_kind) throw AppError.badRequest('Loại sự kiện không hợp lệ')
+  const isConfirmation = ['VERIFY_ONLY', 'CONFIRMED_SCAN'].includes(data.event_kind || '')
+  if (!isConfirmation) throw AppError.badRequest('Face attendance requires consecutive recognition confirmations; update edge client')
+  if (data.event_kind && !isConfirmation) throw AppError.badRequest('Loại sự kiện không hợp lệ')
+  if (isConfirmation && (typeof data.recognition_id !== 'string' || !/^[a-zA-Z0-9_-]{8,120}$/.test(data.recognition_id))) {
+    throw AppError.badRequest('Cần recognition_id duy nhất cho từng lượt nhận diện')
+  }
+  if (data.event_kind === 'CONFIRMED_SCAN' && (typeof data.expected_employee_id !== 'string' || !data.expected_employee_id.trim())) {
+    throw AppError.badRequest('Cần expected_employee_id khi xác nhận điểm danh')
+  }
 
   // Giải mã vector: Hỗ trợ cả Base64 Float32 (tối ưu ~2.7KB) và Array JSON truyền thống
   let vector: ArrayLike<number> | null = null
@@ -680,6 +694,7 @@ export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) 
   `
 
   if (!rows || rows.length === 0 || rows[0].similarity < MATCH_THRESHOLD) {
+    if (isConfirmation) observeRecognition(device_id, `${mode}:${data.event_id}`, data.recognition_id!, null)
     const bestSim = rows.length > 0 ? Number(rows[0].similarity.toFixed(4)) : 0
     emitAttendanceEvent('attendance-unknown', {
       device_id, event_id: data.event_id,
@@ -698,6 +713,20 @@ export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) 
   const match = rows[0]
   const normalizedMode = (mode || 'CHECK_IN').toUpperCase()
   const isCheckOut = normalizedMode === 'CHECK_OUT'
+
+  if (isConfirmation) {
+    const confirmation = observeRecognition(device_id, `${mode}:${data.event_id}`, data.recognition_id!, match.emp_id)
+    if (data.event_kind === 'VERIFY_ONLY' || !confirmation.ready || data.expected_employee_id !== match.emp_id) {
+      return {
+        success: true, matched: true, verification_only: true, event_id: data.event_id,
+        mode: normalizedMode, recognition_id: data.recognition_id,
+        confirmation_count: confirmation.count, confirmation_required: confirmation.required,
+        employee: {id: match.emp_id, employee_code: match.employee_code, full_name: match.full_name, avatar_url: match.avatar_url},
+        similarity: Number(match.similarity.toFixed(4)),
+        message: `Xác minh ${normalizedMode} ${Math.min(confirmation.count, confirmation.required)}/${confirmation.required}; chưa ghi điểm danh`,
+      }
+    }
+  }
 
   try {
     let attendanceRecord

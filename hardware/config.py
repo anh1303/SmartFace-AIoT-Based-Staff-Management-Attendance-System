@@ -507,3 +507,5 @@ def validate_config():
 
 
 validate_config()
+
+ATTENDANCE_STABLE_COUNT = max(1, _get_env_int("ATTENDANCE_STABLE_COUNT", 3))

@@ -61,4 +61,29 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
     await expect(payroll.generate(period,emp.id,admin.id,{id:admin.id,role:'ADMIN'})).rejects.toThrow()
     expect((await db.payrollRecord.findUnique({where:{id:current.id}})).status).toBe('FINALIZED')
   })
+  it('writes IN and OUT only after three distinct matching face recognitions', async () => {
+    const employee = await db.employee.create({data:{employee_code:`FACE-${randomUUID().slice(0,8)}`,full_name:'Face Confirmation Test',hourly_rate:100000}})
+    const embedding = Array(512).fill(1 / Math.sqrt(512))
+    const vector = '[' + embedding.join(',') + ']'
+    await db.$executeRaw`INSERT INTO face_embeddings (employee_id, embedding, model_version, embedding_type)
+      VALUES (${employee.id}::uuid, ${vector}::vector, 'buffalo_s', 'CENTROID')`
+    for (const [mode, time] of [['CHECK_IN','08:12:00'], ['CHECK_OUT','17:45:00']]) {
+      const event = randomUUID()
+      const payload = {device_id:'FACE_CONFIRM_PI',mode,event_id:event,client_timestamp:at(time),antispoof_score:.9,embedding}
+      const before = await db.attendance_logs.count({where:{employee_id:employee.id}})
+      const first = await service.handleThingsBoardWebhook({...payload,event_kind:'VERIFY_ONLY',recognition_id:event+'-1'})
+      expect(first).toMatchObject({verification_only:true,confirmation_count:1})
+      // Retrying the same physical recognition must not advance confirmation.
+      expect(await service.handleThingsBoardWebhook({...payload,event_kind:'VERIFY_ONLY',recognition_id:event+'-1'})).toMatchObject({confirmation_count:1})
+      const second = await service.handleThingsBoardWebhook({...payload,event_kind:'VERIFY_ONLY',recognition_id:event+'-2'})
+      expect(second).toMatchObject({verification_only:true,confirmation_count:2})
+      expect(await db.attendance_logs.count({where:{employee_id:employee.id}})).toBe(before)
+      const commit = {...payload,event_kind:'CONFIRMED_SCAN',recognition_id:event+'-3',expected_employee_id:employee.id}
+      expect(await service.handleThingsBoardWebhook(commit)).toMatchObject({success:true,matched:true})
+      expect(await db.attendance_logs.count({where:{employee_id:employee.id}})).toBe(before+1)
+      expect(await service.handleThingsBoardWebhook(commit)).toMatchObject({success:true,matched:true})
+      expect(await db.attendance_logs.count({where:{employee_id:employee.id}})).toBe(before+1)
+    }
+  })
+
 })

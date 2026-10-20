@@ -60,6 +60,16 @@ Một lần quét vật lý có một `event_id` duy nhất và một timestamp 
 
 Mọi raw log phải được giữ để đối chiếu, gồm IN/OUT dư, ngày OFF, sự kiện không ghép được và sự kiện bị FLAGGED.
 
+### 2.4. Xác nhận điểm danh khuôn mặt
+
+CHECK_IN và CHECK_OUT cùng yêu cầu **3 kết quả recognition liên tiếp khớp cùng một nhân viên**, trong cùng phiên track/mode và khi PAD hợp lệ, trước khi backend ghi một sự kiện điểm danh. Hai lần đầu chỉ xác minh. Retry cùng một lượt recognition không tăng bộ đếm. Một lượt quét dùng chung event ID/timestamp capture cho tới khi được xác nhận; từng lượt recognition có ID riêng để loại retry.
+
+Đổi người, kết quả UNKNOWN, lỗi recognition, mất track/PAD hoặc đổi mode yêu cầu bắt đầu lại chuỗi xác nhận. Bộ đếm là số kết quả, không phải số giây. Interval recognition 1 giây vẫn chịu thời gian inference/mạng nên không cam kết hoàn tất chính xác sau 3 giây. Số vote PAD (tối thiểu 3 trong cửa sổ 5) và số lần ổn định nhãn UI là các cơ chế riêng.
+
+Khi verdict PAD sau vote là SPOOF hoặc mất track, toàn bộ số lần recognition đã tích lũy bị hủy. Nhận lại cùng track ID vẫn phải bắt đầu từ 1/3; kết quả bất đồng bộ của phiên cũ không được dùng. Một phiếu SPOOF thô đơn lẻ chưa làm verdict sau vote thành SPOOF không tự hủy chuỗi; cửa sổ PAD tiếp tục lọc nhiễu theo tỉ lệ đã quy định.
+
+Điểm danh thủ công qua API quản lý giữ phân quyền và cơ chế riêng. Script face_auth chỉ cung cấp trạng thái sẵn sàng sau 3 lần khớp, không tự ghi attendance_logs; backend là writer duy nhất.
+
 ## 3. Công thường, OFF và chưa phân ca
 
 Với mỗi cặp hợp lệ trong một ngày có ca làm việc:

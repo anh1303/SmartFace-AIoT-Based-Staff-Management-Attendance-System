@@ -33,3 +33,19 @@ Cả `hardware/config.py` và `face_auth/config.py` áp dụng thứ tự: thres
 Regression test `hardware/validation/test_threshold_override.py` tạo `.env` tạm và import config trong tiến trình mới cho cả hai bản: profile FULL/100K, để trống, logit 0/âm/dương, xác suất, cặp nhất quán/mâu thuẫn, NaN/Infinity/sai định dạng. Predictor ONNX thực tế của cả hai bản được kiểm tra nhận threshold 0 và phân loại đúng ở hai phía ranh giới. Các kiểm tra không sửa `.env` thật hay artifact model/JSON.
 
 Kiểm chứng bổ sung cho override: 6 test threshold mới và 9 test parity đạt; 16 test runtime face_auth đạt. Bốn test legacy trong `tests.test_pad_predictor` không hoàn tất vì thiếu các ONNX MiniFASNetV2SE/MobileNet cũ; không phải lỗi nạp FULL/100K đang chọn. Không tạo artifact thay thế để làm các test legacy này qua.
+
+## Xác nhận check-in/out liên tiếp (20/10)
+
+Dùng chung `ATTENDANCE_STABLE_COUNT=3` cho CHECK_IN và CHECK_OUT; đã cập nhật `.env` và `.env.example` của face_auth, hardware và backend. Không dùng biến mới trùng nghĩa `ATTENDANCE_RECOGNITION_CONFIRMATIONS`. Giá trị trước đây 5 trong face_auth chỉ nằm ở nhánh ghi công đã comment, không phải bộ đếm 5 giây đang áp dụng.
+
+Hardware gửi hai RPC `event_kind=VERIFY_ONLY` để xác minh danh tính mà không ghi công; lần kế tiếp đủ mốc gửi `CONFIRMED_SCAN` với employee ID đã khớp. Mỗi inference có recognition_id riêng, retry giữ nguyên payload/ID. Backend đếm ba lượt khác nhau cho cùng device/mode/event và cùng nhân viên; lần cuối vẫn phải khớp expected_employee_id. UNKNOWN/đổi nhân viên bắt đầu lại; phần trạng thái xác minh tạm có TTL 30 giây, giới hạn 512 phiên và 64 recognition ID/phiên. Restart backend làm mất bộ đếm và yêu cầu xác minh lại, không tự ghi sớm.
+
+Chỉ khi đã xác nhận đủ mới đi vào writer giao dịch/idempotency trước đây. Probe không tạo raw log/summary công; retry lần ghi cuối vẫn dùng event ID/capture cũ để không tạo thêm bản ghi. Bản ghi/cơ chế tính công, lương và dữ liệu Neon không bị sửa bởi các test. Trong face_auth, cùng biến điều khiển trạng thái CONFIRM 1/3 → 2/3 → sẵn sàng; không bật lại Python ghi DB trực tiếp. Số 2 của RECOGNITION_LABEL_CONFIRMATIONS vẫn chỉ ổn định việc đổi tên UI, không quyết định ghi công.
+
+**Triển khai backend và hardware cùng phiên bản.** Backend mới từ chối face RPC kiểu cũ thiếu xác nhận; backend cũ từ chối các event_kind mới thay vì âm thầm ghi probe. Rule Chain phải chuyển nguyên params (event_kind, recognition_id, expected_employee_id) như các trường vector/event ID hiện tại. Chưa triển khai bản này lên server/Pi.
+
+Kiểm chứng: build backend, unit counter/webhook; integration PostgreSQL tạm kiểm tra cả IN và OUT hai lần đầu có zero bản ghi, lần thứ ba thêm đúng một và retry không thêm bản ghi; mô phỏng camera/RPC với Track thật kiểm tra hai probe trước commit cho cả hai mode. Regression runtime/UI/worker tiếp tục đạt. Test database chỉ dùng localhost/policy_check, không dùng Neon; chưa kiểm chứng trên Pi/MQTT thực tế.
+
+Cập nhật mốc xác nhận ngày 20/10: `ATTENDANCE_STABLE_COUNT=4` trong .env/.env.example và giá trị dự phòng của cả ba dịch vụ. Ba lượt đầu chỉ xác minh; lượt thứ tư mới ghi công. Mốc 3 trong mô tả triển khai ban đầu phía trên được thay bằng 4; PAD vẫn tối thiểu 3 phiếu trong cửa sổ 5.
+
+Chốt lại ngày 20/10 theo yêu cầu: `ATTENDANCE_STABLE_COUNT=3` cho cả IN/OUT, đồng bộ .env/.env.example và fallback của face_auth/hardware/backend. Hai lượt đầu chỉ xác minh, lượt thứ ba cùng nhân viên mới ghi công. Giữ reset khi verdict PAD sau vote là SPOOF hoặc mất track; không thay cơ chế PAD vote/thông số model. Face_auth lưu tập track đã thấy ở frame trước để xóa chuỗi xác nhận và tăng verification_generation ngay cả khi danh sách tracked tạm rỗng; nhận lại cùng ID cũng bắt đầu 1/3. Test sau 2 kết quả khớp rồi SPOOF/mất track yêu cầu đủ 3 kết quả mới, không tiếp tục bộ đếm cũ. Face_auth vẫn là demo nhận diện/readiness, không bật lại writer DB trực tiếp.

@@ -129,3 +129,9 @@ PAD_THRESHOLD=
 ```
 
 Hoặc đặt `PAD_THRESHOLD` trong khoảng (0,1); code tự tính logit tương ứng. Để cả hai trống sẽ dùng ngưỡng trong runtime JSON. Nếu đặt cả hai, xác suất phải bằng sigmoid(logit), sai khác sẽ báo lỗi. NaN/Infinity/giá trị không phải số cũng báo lỗi. Restart tiến trình sau khi sửa `.env`. Biến môi trường đã export vào tiến trình vẫn ưu tiên hơn file `.env` theo python-dotenv; CLI threshold của face_auth vẫn được áp dụng sau cấu hình.
+
+## Số lần nhận diện trước khi ghi điểm danh
+
+`ATTENDANCE_STABLE_COUNT=3` áp dụng cho cả CHECK_IN/CHECK_OUT. Hai lượt đầu chỉ xác minh qua RPC, lượt thứ ba khớp cùng employee mới ghi công. Mỗi recognition có ID riêng, retry không được tính thêm lần; event ID và timestamp capture của lượt điểm danh giữ nguyên. Đổi track/PAD/mode hoặc không khớp sẽ yêu cầu xác nhận lại. Con số này không phải thời gian giây và không phải `RECOGNITION_LABEL_CONFIRMATIONS` của UI.
+
+Cần triển khai backend hỗ trợ VERIFY_ONLY/CONFIRMED_SCAN trước khi chạy hardware mới; không thể dùng client/server khác phiên bản để điểm danh. Face_auth chỉ hiển thị sẵn sàng sau cùng mốc 3, không trực tiếp ghi attendance_logs.

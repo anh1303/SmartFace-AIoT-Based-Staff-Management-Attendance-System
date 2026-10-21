@@ -665,7 +665,7 @@ def main():
                     attendance_latch = False
                     last_submission = None
                     response_track.last_scan_sent = 0.0
-                    status_banner = f"{identity[1]}: XAC NHAN {min(count, vision.ATTENDANCE_STABLE_COUNT)}/{vision.ATTENDANCE_STABLE_COUNT} - CHUA GHI CONG"
+                    status_banner = f"{identity[1]}: DA NHAN DIEN - CHUA GHI CONG"
                     status_banner_time = now_wall
                     continue
                 on_attendance_result(response)

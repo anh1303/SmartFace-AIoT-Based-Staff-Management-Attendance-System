@@ -135,3 +135,10 @@ Chốt lại ngày 20/10 theo yêu cầu: `ATTENDANCE_STABLE_COUNT=3` cho cả I
 - `.env` bật `PAD_ADAPTIVE_ENABLED=true` và chọn `R7_SC_FULL_local98_shadow_runtime.json`; `.env.example` trỏ đến profile mới (bật adaptive khi sử dụng).
 - Crop 1.45; gamma chuyển mượt 0.40–0.55 theo chênh lệch sáng toàn crop/vùng giữa; Gaussian 3×3 sigma 0.6 trộn 50%. Threshold gốc -2.809873753070831 cộng offset theo độ sáng vùng giữa và chênh lệch với toàn crop, giới hạn ±3. Đo độ sáng trước tiền xử lý. Một lượt PAD mỗi crop.
 - Hiệu chỉnh trên toàn bộ 98 ảnh (61 real, 37 fake), không có tập giữ riêng: 0 fake lọt qua, 1 real bị từ chối. Đây là kết quả trên dữ liệu hiệu chỉnh, cần kiểm tra camera thực tế. Giữ profile local80 để quay lại.
+
+### PAD: profile local842 từ ảnh camera đã làm sạch
+
+- Thêm `wb_gamma` và `wb_exposure_gamma`: cân bằng màu giới hạn gain, gamma LUT cố định hoặc chuẩn hoá độ sáng vùng giữa. Một lượt PAD/crop; các profile trước giữ hành vi cũ.
+- Lưu `R7_SC_FULL_local842_real_runtime.json` (crop1.2, 0 fake lọt/35 real bị chặn) và `R7_SC_FULL_local842_balanced_runtime.json` (crop1.1, 2 fake lọt/16 real bị chặn), cùng comment chọn profile trong `.env.example`; chưa đổi profile active.
+- Hiệu chỉnh trên toàn bộ842 ảnh camera, 605real/237fake, sau khi người dùng yêu cầu xoá16crop không qua gate hình học vốn có. Không có holdout. Synthetic bbox/JPEG còn gây fake lọt, nên đây là ứng viên hiệu chỉnh miền cần test camera, không phải bảo đảm chống spoof tổng quát.
+- Cả face_auth/hardware đã replay đủ842crop bằng config/predictor thực, xác nhận các số trên. Test whitebalance/exposuregamma xác minh parity, ảnh nguồn không bị sửa và validation tham số.

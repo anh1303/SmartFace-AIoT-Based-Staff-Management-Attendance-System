@@ -49,3 +49,37 @@ Kiểm chứng: build backend, unit counter/webhook; integration PostgreSQL tạ
 Cập nhật mốc xác nhận ngày 20/10: `ATTENDANCE_STABLE_COUNT=4` trong .env/.env.example và giá trị dự phòng của cả ba dịch vụ. Ba lượt đầu chỉ xác minh; lượt thứ tư mới ghi công. Mốc 3 trong mô tả triển khai ban đầu phía trên được thay bằng 4; PAD vẫn tối thiểu 3 phiếu trong cửa sổ 5.
 
 Chốt lại ngày 20/10 theo yêu cầu: `ATTENDANCE_STABLE_COUNT=3` cho cả IN/OUT, đồng bộ .env/.env.example và fallback của face_auth/hardware/backend. Hai lượt đầu chỉ xác minh, lượt thứ ba cùng nhân viên mới ghi công. Giữ reset khi verdict PAD sau vote là SPOOF hoặc mất track; không thay cơ chế PAD vote/thông số model. Face_auth lưu tập track đã thấy ở frame trước để xóa chuỗi xác nhận và tăng verification_generation ngay cả khi danh sách tracked tạm rỗng; nhận lại cùng ID cũng bắt đầu 1/3. Test sau 2 kết quả khớp rồi SPOOF/mất track yêu cầu đủ 3 kết quả mới, không tiếp tục bộ đếm cũ. Face_auth vẫn là demo nhận diện/readiness, không bật lại writer DB trực tiếp.
+
+### Giới hạn mặt và thu ảnh lỗi ánh sáng PAD (2026-10-21)
+
+- `MAX_FACES_PER_FRAME=3` trong `.env`/`.env.example`; chọn tối đa 3 mặt lớn nhất trước tracker và giới hạn lại trước PAD/recognition trên frame optical flow.
+- `app_capture.py` dùng nguyên app realtime, thêm C để lưu crop expand native, crop đầu vào model và metadata chưa gán nhãn; thu cả REAL/SPOOF và ảnh PAD không trả kết quả. Không đổi tiền xử lý đang chạy.
+- Hướng dẫn thu thập, gán nhãn và ứng viên thuật toán nhẹ: [PAD_LIGHTING_CAPTURE](../../tutorial/face_auth/PAD_LIGHTING_CAPTURE.md).
+- Kiểm tra offline face_auth: 38 tests pass; camera/GUI và chất lượng PAD thực tế chưa nghiệm thu.
+
+### Tách file nhãn PAD và metadata (2026-10-21)
+
+- Mỗi phiên capture dùng `labels.json` (tên crop → null/real/fake) và `metadata.json` (tên crop → thông số); không còn tạo JSON riêng từng ảnh.
+- Các lần chụp tiếp theo đọc lại labels để giữ nhãn đã gán; ghi JSON qua file tạm rồi replace; JSON sai cú pháp báo lỗi trước khi lưu ảnh.
+- Chỉ thay định dạng lưu dữ liệu, không thay model hoặc tiền xử lý PAD.
+
+### Thử nghiệm PAD camera local80 và adaptive threshold (2026-10-21)
+
+- Thêm profile lighting và adaptive threshold tùy chọn trong runtime JSON; profile mặc định không đổi. Gamma LUT được dùng tách khỏi gamma cũ để tránh áp dụng hai lần.
+- Track giữ threshold từng crop; face_auth hiển thị đúng d-t; hardware dùng threshold thực khi chuyển liveness sang [0,1] gửi backend.
+- Thêm profile portable `R7_SC_FULL_local80_candidate_runtime.json` cho model FULL, crop1.45, gamma0.4, adaptive brightness threshold; env active chưa chuyển, env/example có dòng hướng dẫn.
+- Fit toàn bộ44real/36fake theo yêu cầu: clean FA0/FR7, ACER7.95%; đây là kết quả fit, chưa nghiệm thu camera/Pi. JPEG stress vẫn còn fake lọt.
+- [Kế hoạch và báo cáo đầy đủ](../../experiments/2026-10-21-pad-domain/RESULTS.md).
+- Capture mới lưu frame nguyên bản cho mỗi lượt C và liên kết frame_file, dùng chung giữa nhiều mặt; các capture cũ không bị sửa.
+
+### Công tắc profile adaptive và subset tuning realtime (2026-10-21)
+
+- Thêm `PAD_ADAPTIVE_ENABLED=false` và `PAD_ADAPTIVE_CONFIG_PATH` trong env/example của cả face_auth/hardware. Khi bật, chọn profile adaptive và ưu tiên threshold/crop/gamma trong profile hơn env; khi tắt giữ logic cũ. Profile lỗi không âm thầm fallback.
+- Profile mặc định vẫn là local80 thử nghiệm, công tắc để false; có thể trỏ sang adaptive_runtime.json mới sau khi tải và đặt cạnh model ONNX tương ứng. Không tự áp dụng kết quả tuning.
+- Notebook23 độc lập: fit15K CelebA Train phân tầng spoof/lighting/brightness, chọn cấu hình bằng subset5K CelebA Test và600LCC evaluation với mean ACER hai miền; C/P3/R7 best.pth. Test labels dùng để chọn tham số theo yêu cầu realtime, không gọi là independent evaluation. Xuất report.md, CSV/JSON/PNG và profile R7 riêng.
+
+### PAD: cấu hình local98 cho vận hành
+
+- `.env` bật `PAD_ADAPTIVE_ENABLED=true` và chọn `R7_SC_FULL_local98_shadow_runtime.json`; `.env.example` trỏ đến profile mới (bật adaptive khi sử dụng).
+- Crop 1.45; gamma chuyển mượt 0.40–0.55 theo chênh lệch sáng toàn crop/vùng giữa; Gaussian 3×3 sigma 0.6 trộn 50%. Threshold gốc -2.809873753070831 cộng offset theo độ sáng vùng giữa và chênh lệch với toàn crop, giới hạn ±3. Đo độ sáng trước tiền xử lý. Một lượt PAD mỗi crop.
+- Hiệu chỉnh trên toàn bộ 98 ảnh (61 real, 37 fake), không có tập giữ riêng: 0 fake lọt qua, 1 real bị từ chối. Đây là kết quả trên dữ liệu hiệu chỉnh, cần kiểm tra camera thực tế. Giữ profile local80 để quay lại.

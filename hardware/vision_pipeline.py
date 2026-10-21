@@ -3,6 +3,13 @@ import math
 import time
 import config
 
+def limit_faces(detections):
+    """Select largest faces; stable sorting preserves detector order for ties."""
+    if len(detections) <= config.MAX_FACES_PER_FRAME:
+        return list(detections)
+    return sorted(detections, key=lambda d: max(0, d['bbox'][2] - d['bbox'][0])
+                  * max(0, d['bbox'][3] - d['bbox'][1]), reverse=True)[:config.MAX_FACES_PER_FRAME]
+
 def _pad_face_skip_reason(detection, frame_shape):
     """Reject low-confidence or incomplete faces near the camera-frame edge."""
     try:
@@ -117,6 +124,9 @@ def update_track_pad(
             if not isinstance(res.get("is_real"), bool):
                 raise ValueError("PAD result has no boolean is_real verdict")
             score = float(res.get("pad_score", res.get("logit_diff", float("nan"))))
+            threshold = res.get("threshold_logit")
+            if threshold is not None and not math.isfinite(float(threshold)):
+                raise ValueError("PAD result has a non-finite threshold")
             if not math.isfinite(score):
                 raise ValueError("PAD result has a non-finite score")
     except Exception as exc:
@@ -127,7 +137,7 @@ def update_track_pad(
 
     for (detection, track, crop_bbox), res in zip(due, results):
         score = float(res.get("pad_score", res.get("logit_diff")))
-        track.update_pad(res["is_real"], score)
+        track.update_pad(res["is_real"], score, res.get("threshold_logit"))
         if diagnostic_log:
             exp_score = math.exp(-abs(score))
             p_real = 1.0 / (1.0 + exp_score) if score >= 0 else exp_score / (1.0 + exp_score)
@@ -144,5 +154,4 @@ def update_track_pad(
                 f"raw={'REAL' if res['is_real'] else 'SPOOF'} smoothed={track.pad_status}"
             )
     return len(results)
-
 

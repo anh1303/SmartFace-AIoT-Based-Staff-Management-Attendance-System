@@ -94,7 +94,7 @@ RECOGNIZE_INTERVAL_SECONDS = vision.RECOGNIZE_INTERVAL_SECONDS
 PAD_INTERVAL_SECONDS = vision.PAD_INTERVAL_SECONDS
 TRACK_IOU_THRESHOLD = vision.TRACK_IOU_THRESHOLD
 TRACK_MAX_MISSING_FRAMES = vision.TRACK_MAX_MISSING_FRAMES
-MAX_FACES_PER_FRAME = get_env_int("MAX_FACES_PER_FRAME", 1)
+MAX_FACES_PER_FRAME = vision.MAX_FACES_PER_FRAME
 
 SHOW_GUI = get_env_bool("SHOW_GUI", False)
 
@@ -134,7 +134,7 @@ from antispoof import AntiSpoofPredictor
 from alignment import align_face
 from recognition import FaceEmbedder
 from recognition.worker import RecognitionWorker, IdentityCache
-from vision_pipeline import update_track_pad
+from vision_pipeline import update_track_pad, limit_faces
 from alignment.aligner import get_input_face
 from iot import ThingsBoardClient
 from streaming import RTSPStreamer
@@ -154,9 +154,9 @@ def on_mode_change(new_mode: str):
     print(f"\n[MODE SWITCH] Nhận lệnh từ ThingsBoard: Đổi sang {current_mode}!\n")
 
 
-def liveness_score(logit):
+def liveness_score(logit, threshold=None):
     """Map raw PAD margin to backend's existing [0,1] transport contract."""
-    delta = float(logit) - vision.PAD_THRESHOLD_LOGIT
+    delta = float(logit) - (vision.PAD_THRESHOLD_LOGIT if threshold is None else float(threshold))
     return float(1 / (1 + np.exp(-max(-60.0, min(60.0, delta)))))
 
 
@@ -437,14 +437,7 @@ def main():
                     tracked = tracker.update([], frame=frame, detector_called=False)
                 else:
                     try:
-                        detections = detector.detect(frame)
-                        # Ưu tiên các khuôn mặt có diện tích lớn nhất (gần camera nhất)
-                        if MAX_FACES_PER_FRAME > 0 and len(detections) > MAX_FACES_PER_FRAME:
-                            detections.sort(
-                                key=lambda d: (d["bbox"][2] - d["bbox"][0]) * (d["bbox"][3] - d["bbox"][1]),
-                                reverse=True,
-                            )
-                            detections = detections[:MAX_FACES_PER_FRAME]
+                        detections = limit_faces(detector.detect(frame))
                     except Exception as e:
                         print(f"[Detector Error] {e}")
                         detections = []
@@ -452,12 +445,8 @@ def main():
                     tracked = tracker.update(detections, frame=frame, detector_called=True)
 
                 # Giới hạn số lượng track được xử lý
-                if MAX_FACES_PER_FRAME > 0 and len(tracked) > MAX_FACES_PER_FRAME:
-                    tracked.sort(
-                        key=lambda item: (item[1].bbox[2] - item[1].bbox[0]) * (item[1].bbox[3] - item[1].bbox[1]),
-                        reverse=True,
-                    )
-                    tracked = tracked[:MAX_FACES_PER_FRAME]
+                selected_ids = {id(d) for d in limit_faces([d for d, _ in tracked])}
+                tracked = [(d, t) for d, t in tracked if id(d) in selected_ids]
 
                 # Cập nhật thời điểm nhìn thấy mặt và kiểm tra đổi người (Track ID mới)
                 if len(tracked) > 0:
@@ -512,7 +501,7 @@ def main():
                     elif track.is_spoof:
                         color = (0, 0, 255)    # Đỏ: Giả mạo (ảnh/video)
                         if not getattr(track, 'spoof_reported', False):
-                            track.spoof_reported = tb_client.send_spoof_event(liveness_score(track.last_pad_score), current_mode)
+                            track.spoof_reported = tb_client.send_spoof_event(liveness_score(track.last_pad_score, track.last_pad_threshold), current_mode)
                         status_label = f"#{track.track_id} SPOOF ({track.last_pad_score or 0.0:.2f})"
                     else:
                         # Người thật (REAL)
@@ -547,7 +536,7 @@ def main():
                                         if aligned_face is None:
                                             raise ValueError("Alignment failed")
                                         captured_at = track.scan_captured_at or int(now_wall * 1000)
-                                        context = (track.scan_event_id, captured_at, liveness_score(track.last_pad_score))
+                                        context = (track.scan_event_id, captured_at, liveness_score(track.last_pad_score, track.last_pad_threshold))
                                         submitted = recognition_worker.submit(key, aligned_face, context)
                                         status_label += " [WAIT EMBEDDING]" if submitted else " [QUEUE FULL]"
                                     except Exception as exc:

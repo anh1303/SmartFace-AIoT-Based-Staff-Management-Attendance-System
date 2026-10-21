@@ -22,6 +22,7 @@ class ThresholdOverrideTests(unittest.TestCase):
             shutil.copyfile(base / 'config.py', path / 'config.py')
             (path / '.env').write_text(f'PAD_RUNTIME_CONFIG_PATH={contract}\nPAD_THRESHOLD={probability}\nPAD_THRESHOLD_LOGIT={logit}\n')
             env = os.environ.copy()
+            env["PAD_ADAPTIVE_ENABLED"] = "false"
             for key in ('PAD_RUNTIME_CONFIG_PATH', 'PAD_THRESHOLD', 'PAD_THRESHOLD_LOGIT'):
                 env.pop(key, None)
             code = '''import config,json

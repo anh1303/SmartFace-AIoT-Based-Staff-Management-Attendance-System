@@ -115,7 +115,7 @@ class CameraIntegrationTests(unittest.TestCase):
                                 update_display_identity=Mock(), update_result=Mock(), invalidate_recognition=Mock(),
                                 display_result=lambda *a: ("UNKNOWN", 0.0, False),
                                 _pad_window=[], pad_min_votes=3,
-                                last_pad_score=.9, needs_pad=lambda **kw: False,
+                                last_pad_score=.9, last_pad_threshold=None, needs_pad=lambda **kw: False,
                                 needs_recognition=lambda *a, **kw: True)
         tracker = Mock()
         tracker.needs_redetection.return_value = False

@@ -24,6 +24,31 @@ def detection(score=.95):
 
 
 class PipelineTests(unittest.TestCase):
+    def test_liveness_transport_uses_effective_per_crop_threshold(self):
+        from edge_client import liveness_score
+        self.assertEqual(liveness_score(1.,1.),.5)
+        self.assertLess(liveness_score(1.,2.),.5)
+        self.assertGreater(liveness_score(1.,0.),.5)
+
+    def test_crop_factor_env_overrides_json_and_empty_or_none_falls_back(self):
+        for folder, subdir in (('hardware', 'models'), ('face_auth', 'antispoof/models')):
+            runtime = f'{subdir}/R7_SC_FULL_crop15_runtime_config_casia.json'
+            expected = json.loads((ROOT.parent / folder / runtime).read_text())['bbox_expansion_factor']
+            for value in ('2.0', '', 'None', ' none ', 'invalid', '0', '-1', 'nan', 'inf'):
+                with self.subTest(folder=folder, value=value):
+                    env = os.environ.copy()
+                    env.update(PAD_RUNTIME_CONFIG_PATH=runtime, PAD_BBOX_EXPANSION_FACTOR=value, PAD_ADAPTIVE_ENABLED="false")
+                    result = subprocess.run(
+                        [sys.executable, '-c', 'import config; print(config.PAD_BBOX_EXPANSION_FACTOR)'],
+                        cwd=ROOT.parent / folder, env=env, text=True, capture_output=True,
+                    )
+                    if value in ('invalid', '0', '-1', 'nan', 'inf'):
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn('PAD_BBOX_EXPANSION_FACTOR', result.stderr)
+                    else:
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertEqual(float(result.stdout), 2.0 if value == '2.0' else expected)
+
     def test_three_votes_required_and_window_remains_bounded_at_five(self):
         track = Track(1, (80, 60, 180, 160), pad_min_votes=3, pad_smooth_window=5)
         track.update_pad(True, 2)
@@ -92,7 +117,8 @@ class PipelineTests(unittest.TestCase):
                 'PAD_MIN_DETECTOR_CONFIDENCE', 'DETECTION_INTERVAL_SECONDS', 'PAD_INTERVAL_SECONDS',
                 'RECOGNIZE_INTERVAL_SECONDS', 'DETECTOR_MIN_FACE_SIZE', 'DETECTOR_CONF_THRESH',
                 'RECOGNITION_QUEUE_SIZE', 'RECOGNITION_INTRA_OP_THREADS', 'RECOGNITION_CACHE_TTL_SECONDS',
-                'RECOGNITION_CACHE_THRESHOLD', 'MATCH_THRESHOLD')
+                'RECOGNITION_CACHE_THRESHOLD', 'MATCH_THRESHOLD', 'MAX_FACES_PER_FRAME',
+                'PAD_LIGHTING_PROFILE', 'PAD_ADAPTIVE_THRESHOLD_PROFILE')
         code = 'import config,json; print(json.dumps({k:getattr(config,k) for k in ' + repr(keys) + '}))'
         for variant in ('FULL', '100K'):
             outputs = []
@@ -100,6 +126,7 @@ class PipelineTests(unittest.TestCase):
                 env = os.environ.copy()
                 for key in keys:
                     env.pop(key, None)
+                env['PAD_ADAPTIVE_ENABLED'] = 'false'
                 env['PAD_RUNTIME_CONFIG_PATH'] = f'{subdir}/R7_SC_{variant}_crop15_runtime_config_casia.json'
                 result = subprocess.run([sys.executable, '-c', code], cwd=ROOT.parent/folder, env=env,
                                         text=True, capture_output=True, check=True)

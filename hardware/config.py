@@ -48,9 +48,18 @@ def _get_env_bool(key: str, default: bool) -> bool:
     return val.lower() in ("true", "1", "yes", "y", "on")
 
 
+# Explicit experiment switch: the selected adaptive profile overrides env tuning.
+PAD_ADAPTIVE_ENABLED = _get_env_bool("PAD_ADAPTIVE_ENABLED", False)
+PAD_ADAPTIVE_CONFIG_PATH = _get_env_str("PAD_ADAPTIVE_CONFIG_PATH", 'models/R7_SC_FULL_local80_candidate_runtime.json')
+
+
 def _load_pad_runtime_config():
     raw_path = _get_env_str("PAD_RUNTIME_CONFIG_PATH", "models/R7_SC_FULL_crop15_runtime_config_casia.json")
+    if PAD_ADAPTIVE_ENABLED:
+        raw_path = PAD_ADAPTIVE_CONFIG_PATH
     if raw_path is None or raw_path.lower() in ("none", "null"):
+        if PAD_ADAPTIVE_ENABLED:
+            raise ValueError("PAD_ADAPTIVE_CONFIG_PATH không được để None khi bật adaptive")
         return None, {}, None
 
     path = Path(raw_path).expanduser()
@@ -63,6 +72,8 @@ def _load_pad_runtime_config():
         raise ValueError(f"Không thể đọc PAD runtime config '{path}': {exc}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"PAD runtime config phải là JSON object: '{path}'")
+    if PAD_ADAPTIVE_ENABLED and not isinstance(data.get("adaptive_threshold"), dict):
+        raise ValueError("PAD_ADAPTIVE_ENABLED=true yêu cầu profile có adaptive_threshold")
     return str(path), data, path.parent
 
 
@@ -136,6 +147,8 @@ def _get_env_float_vector(key: str, default):
 
 
 PAD_RUNTIME_CONFIG_PATH, _PAD_RUNTIME_CONFIG, _PAD_RUNTIME_CONFIG_DIR = _load_pad_runtime_config()
+PAD_LIGHTING_PROFILE = _PAD_RUNTIME_CONFIG.get("lighting")
+PAD_ADAPTIVE_THRESHOLD_PROFILE = _PAD_RUNTIME_CONFIG.get("adaptive_threshold")
 
 
 def _pad_contract_value(runtime_key, env_key, runtime_reader, env_reader, default):
@@ -242,8 +255,8 @@ _runtime_pad_threshold_logit = _runtime_float(
     "calibrated_logit_threshold",
     math.log(_runtime_pad_threshold / (1.0 - _runtime_pad_threshold)),
 )
-_pad_threshold_env = _get_env_str("PAD_THRESHOLD", None)
-_pad_threshold_logit_env = _get_env_str("PAD_THRESHOLD_LOGIT", None)
+_pad_threshold_env = None if PAD_ADAPTIVE_ENABLED else _get_env_str("PAD_THRESHOLD", None)
+_pad_threshold_logit_env = None if PAD_ADAPTIVE_ENABLED else _get_env_str("PAD_THRESHOLD_LOGIT", None)
 
 
 def _threshold_override(name, raw):
@@ -282,6 +295,8 @@ else:
     PAD_THRESHOLD = _runtime_pad_threshold
     PAD_THRESHOLD_LOGIT = _runtime_pad_threshold_logit
     PAD_THRESHOLD_SOURCE = "runtime_json" if (_has_runtime_probability or _has_runtime_logit) else "default"
+    if PAD_ADAPTIVE_ENABLED:
+        PAD_THRESHOLD_SOURCE = "adaptive_profile"
 
 if not math.isfinite(PAD_THRESHOLD_LOGIT):
     raise ValueError("PAD_THRESHOLD_LOGIT phải là một số hữu hạn")
@@ -322,7 +337,7 @@ PAD_GAMMA_ENABLED = _pad_contract_value(
     "apply_gamma", "PAD_GAMMA_ENABLED", _runtime_bool, _get_env_bool, False,
 )
 # Explicit experiment override: bypasses a runtime JSON apply_gamma=false value.
-FORCE_GAMMA = _get_env_bool("FORCE_GAMMA", False)
+FORCE_GAMMA = False if PAD_ADAPTIVE_ENABLED else _get_env_bool("FORCE_GAMMA", False)
 if FORCE_GAMMA:
     PAD_GAMMA_ENABLED = True
 
@@ -331,10 +346,18 @@ if FORCE_GAMMA:
 PAD_GAMMA_TARGET  = _get_env_float("PAD_GAMMA_TARGET", 110.0)
 
 # Hệ số mở rộng bbox khi crop khuôn mặt đưa vào PAD.
-PAD_BBOX_EXPANSION_FACTOR = _pad_contract_value(
-    "bbox_expansion_factor", "PAD_BBOX_EXPANSION_FACTOR",
-    _runtime_float, _get_env_float, 1.55,
-)
+_pad_crop_factor_env = None if PAD_ADAPTIVE_ENABLED else _clean_env_val(os.getenv("PAD_BBOX_EXPANSION_FACTOR"))
+if _pad_crop_factor_env is None or _pad_crop_factor_env.lower() in ("", "none"):
+    PAD_BBOX_EXPANSION_FACTOR = _runtime_float(
+        _PAD_RUNTIME_CONFIG, "bbox_expansion_factor", 1.55,
+    )
+else:
+    try:
+        PAD_BBOX_EXPANSION_FACTOR = float(_pad_crop_factor_env)
+    except ValueError as exc:
+        raise ValueError("PAD_BBOX_EXPANSION_FACTOR phải là số dương, để trống hoặc None") from exc
+if not math.isfinite(PAD_BBOX_EXPANSION_FACTOR) or PAD_BBOX_EXPANSION_FACTOR <= 0:
+    raise ValueError("PAD_BBOX_EXPANSION_FACTOR phải là số dương hữu hạn")
 PAD_CROP_MODE = _pad_contract_value(
     "crop_mode", "PAD_CROP_MODE", _runtime_str, _get_env_str,
     "square_reflect_v1",
@@ -429,6 +452,7 @@ PAD_SPOOF_MIN_RATIO = _get_env_float("PAD_SPOOF_MIN_RATIO", 0.6)
 # khi người dùng rời khỏi frame rồi quay lại (gương/ảnh mới).
 PAD_STALE_TIMEOUT_SECONDS = _get_env_float("PAD_STALE_TIMEOUT_SECONDS", 3.0)
 PAD_DIAGNOSTIC_LOG = _get_env_bool("PAD_DIAGNOSTIC_LOG", False)
+
 # Experiment: stabilize small PAD crop jitter without altering tracking/cadence.
 PAD_CROP_SMOOTHING = _pad_contract_value(
     "crop_smoothing", "PAD_CROP_SMOOTHING", _runtime_bool, _get_env_bool,
@@ -509,3 +533,8 @@ def validate_config():
 validate_config()
 
 ATTENDANCE_STABLE_COUNT = max(1, _get_env_int("ATTENDANCE_STABLE_COUNT", 3))
+
+# Maximum selected faces passed to tracking, PAD and recognition.
+MAX_FACES_PER_FRAME = _get_env_int("MAX_FACES_PER_FRAME", 3)
+if MAX_FACES_PER_FRAME < 1:
+    raise ValueError("MAX_FACES_PER_FRAME phải >= 1")

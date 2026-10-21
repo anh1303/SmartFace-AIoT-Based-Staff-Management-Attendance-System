@@ -109,3 +109,29 @@ Cập nhật mốc xác nhận ngày 20/10: `ATTENDANCE_STABLE_COUNT=4` trong .e
 Bổ sung reset chuỗi xác nhận khi PAD đã kết luận SPOOF, mất track (kể cả cả danh sách tracked rỗng), camera lỗi hoặc AI ngủ. Vòng camera giữ tham chiếu các track đủ điều kiện của frame trước để tăng verification_generation và xóa recognition khi chúng biến mất; giữ nguyên cửa sổ PAD để vẫn hiển thị SPOOF. Khi trở lại cùng track ID, scan scope/event ID mới bắt đầu từ 1/4; callback/job cũ bị loại. Không thay threshold, số vote hay interval. Test camera/RPC với Track thật xác nhận chuỗi A1,A2,SPOOF/mất track,A1,A2,A3,A4 chỉ commit ở lượt cuối, cho cả IN/OUT. Toàn bộ 43 test hardware đạt; chưa nghiệm thu bản sửa trên Pi thật.
 
 Chốt lại ngày 20/10 theo yêu cầu: `ATTENDANCE_STABLE_COUNT=3` cho cả IN/OUT, đồng bộ .env/.env.example và fallback của face_auth/hardware/backend. Hai lượt đầu chỉ xác minh, lượt thứ ba cùng nhân viên mới ghi công. Giữ reset khi verdict PAD sau vote là SPOOF hoặc mất track; không thay cơ chế PAD vote/thông số model. Face_auth lưu tập track đã thấy ở frame trước để xóa chuỗi xác nhận và tăng verification_generation ngay cả khi danh sách tracked tạm rỗng; nhận lại cùng ID cũng bắt đầu 1/3. Test sau 2 kết quả khớp rồi SPOOF/mất track yêu cầu đủ 3 kết quả mới, không tiếp tục bộ đếm cũ. Face_auth vẫn là demo nhận diện/readiness, không bật lại writer DB trực tiếp.
+
+### Đồng bộ giới hạn mặt (2026-10-21)
+
+- `MAX_FACES_PER_FRAME=3` trong `.env`/`.env.example`, đọc qua config chung; giá trị phải >=1.
+- Cùng quy tắc chọn 3 mặt lớn nhất với face_auth, giới hạn trước tracker và trước PAD/recognition; detector vẫn quét toàn khung.
+- Helper crop MiniFASNet hỗ trợ lấy crop native bằng kích thước None phục vụ thu ảnh; đường inference truyền kích thước model vẫn giữ nguyên.
+- Hardware validation: 44 tests pass; chưa đo FPS hoặc chạy camera trên Pi.
+
+### Thử nghiệm PAD camera local80 và adaptive threshold (2026-10-21)
+
+- Thêm profile lighting và adaptive threshold tùy chọn trong runtime JSON; profile mặc định không đổi. Gamma LUT được dùng tách khỏi gamma cũ để tránh áp dụng hai lần.
+- Track giữ threshold từng crop; face_auth hiển thị đúng d-t; hardware dùng threshold thực khi chuyển liveness sang [0,1] gửi backend.
+- Thêm profile portable `R7_SC_FULL_local80_candidate_runtime.json` cho model FULL, crop1.45, gamma0.4, adaptive brightness threshold; env active chưa chuyển, env/example có dòng hướng dẫn.
+- Fit toàn bộ44real/36fake theo yêu cầu: clean FA0/FR7, ACER7.95%; đây là kết quả fit, chưa nghiệm thu camera/Pi. JPEG stress vẫn còn fake lọt.
+- [Kế hoạch và báo cáo đầy đủ](../../experiments/2026-10-21-pad-domain/RESULTS.md).
+
+### Công tắc profile adaptive và subset tuning realtime (2026-10-21)
+
+- Thêm `PAD_ADAPTIVE_ENABLED=false` và `PAD_ADAPTIVE_CONFIG_PATH` trong env/example của cả face_auth/hardware. Khi bật, chọn profile adaptive và ưu tiên threshold/crop/gamma trong profile hơn env; khi tắt giữ logic cũ. Profile lỗi không âm thầm fallback.
+- Profile mặc định vẫn là local80 thử nghiệm, công tắc để false; có thể trỏ sang adaptive_runtime.json mới sau khi tải và đặt cạnh model ONNX tương ứng. Không tự áp dụng kết quả tuning.
+
+### PAD: cấu hình local98 cho vận hành
+
+- `.env` bật `PAD_ADAPTIVE_ENABLED=true` và chọn `R7_SC_FULL_local98_shadow_runtime.json`; `.env.example` trỏ đến profile mới (bật adaptive khi sử dụng).
+- Crop 1.45; gamma chuyển mượt 0.40–0.55 theo chênh lệch sáng toàn crop/vùng giữa; Gaussian 3×3 sigma 0.6 trộn 50%. Threshold gốc -2.809873753070831 cộng offset theo độ sáng vùng giữa và chênh lệch với toàn crop, giới hạn ±3. Đo độ sáng trước tiền xử lý. Một lượt PAD mỗi crop.
+- Hiệu chỉnh trên toàn bộ 98 ảnh (61 real, 37 fake), không có tập giữ riêng: 0 fake lọt qua, 1 real bị từ chối. Đây là kết quả trên dữ liệu hiệu chỉnh, cần kiểm tra camera thực tế. Giữ profile local80 để quay lại.

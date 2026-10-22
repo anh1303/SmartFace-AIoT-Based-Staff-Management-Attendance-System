@@ -108,7 +108,7 @@ TFT_DC_PIN = get_env_int("TFT_DC_PIN", 25)
 TFT_RESET_PIN = get_env_int("TFT_RESET_PIN", 24)
 TFT_BGR = get_env_bool("TFT_BGR", False)
 TFT_INVERT = get_env_bool("TFT_INVERT", False)
-TFT_DISPLAY_FPS = get_env_float("TFT_DISPLAY_FPS", 15.0)
+TFT_DISPLAY_FPS = get_env_float("TFT_DISPLAY_FPS", 10.0)
 
 # Cấu hình Cảm biến siêu âm Wake-on-Presence (Tiết kiệm CPU & Chống Spam)
 ULTRASONIC_ENABLED = get_env_bool("ULTRASONIC_ENABLED", True)
@@ -158,6 +158,20 @@ def liveness_score(logit, threshold=None):
     """Map raw PAD margin to backend's existing [0,1] transport contract."""
     delta = float(logit) - (vision.PAD_THRESHOLD_LOGIT if threshold is None else float(threshold))
     return float(1 / (1 + np.exp(-max(-60.0, min(60.0, delta)))))
+
+
+def face_status_label(track):
+    """Display only; never use a held identity to override the PAD verdict."""
+    if track.pad_invalid_reason:
+        return "INVALID", (0, 165, 255)
+    if track.missing_frames or not track.pad_ready:
+        return "CHECKING", (0, 255, 255)
+    if track.is_spoof:
+        return "SPOOF", (0, 0, 255)
+    if not track.is_real:
+        return "CHECKING", (0, 255, 255)
+    name, _, _ = track.display_result(vision.RECOGNITION_LABEL_HOLD_SECONDS)
+    return f"REAL - {name}", (0, 255, 0)
 
 
 def main():
@@ -350,12 +364,16 @@ def main():
             fps_counter += 1
             now_wall = time.time()
             now_mono = time.monotonic()
+            tft_due = tft_display.wants_frame()
+            render_output = SHOW_GUI or STREAM_ENABLED or tft_due
 
             # Heartbeat định kỳ 10 giây một lần gửi lên ThingsBoard
             if now_wall - last_hb_time >= 10.0:
                 current_fps = fps_counter / (now_wall - last_hb_time)
                 fps_counter = 0
                 last_hb_time = now_wall
+                if vision.SHOW_FPS:
+                    print(f"[FPS] {current_fps:.1f} (average over 10s)")
 
             # ── 4.1. Đánh giá Trạng thái Siêu âm (Wake-on-Presence) ───────────
             dist = ultrasonic.get_distance() if ULTRASONIC_ENABLED else None
@@ -411,19 +429,17 @@ def main():
                         track.recognition_eligible = False
                 previous_recognition_tracks = {}
                 # Trạng thái AI NGỦ: Không tốn CPU cho ONNX, chỉ hiển thị thông báo chờ
-                sleep_text = f"AI: SLEEP (CHO NGUOI <= {int(ULTRASONIC_TRIGGER_DISTANCE)}cm)"
-                if dist is not None:
-                    sleep_text += f" | d: {dist:.0f}cm"
-                cv2.putText(
-                    frame,
-                    sleep_text,
-                    (20, HEIGHT // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (0, 255, 255),
-                    2,
-                    cv2.LINE_AA,
-                )
+                if render_output:
+                    cv2.putText(
+                        frame,
+                        "SLEEP",
+                        (20, HEIGHT // 2),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.65,
+                        (0, 255, 255),
+                        2,
+                        cv2.LINE_AA,
+                    )
             else:
                 # Trạng thái AI THỨC: Chạy SCRFD theo chu kỳ và optical flow ở giữa
                 detector_due = (
@@ -478,7 +494,8 @@ def main():
                         track.recognition_eligible = False
                 previous_recognition_tracks = visible_tracks
                 inference_frame = frame
-                frame = frame.copy()  # Draw only on a display copy, never on model input.
+                if render_output:
+                    frame = frame.copy()  # Never draw on model input.
                 if last_submission is not None and attendance_latch:
                     same_session = any(track.track_id == last_submission[0]
                                        and track.verification_generation == last_submission[5]
@@ -495,18 +512,11 @@ def main():
                     x1, y1, x2, y2 = [int(v) for v in bbox]
 
                     # (B) Đánh giá trạng thái PAD đa frame
-                    if not track.pad_ready:
-                        color = (0, 255, 255)  # Vàng: Đang tích lũy votes
-                        status_label = f"#{track.track_id} CHECKING ({len(track._pad_window)}/{track.pad_min_votes})"
-                    elif track.is_spoof:
-                        color = (0, 0, 255)    # Đỏ: Giả mạo (ảnh/video)
+                    if track.pad_ready and track.is_spoof:
                         if not getattr(track, 'spoof_reported', False):
                             track.spoof_reported = tb_client.send_spoof_event(liveness_score(track.last_pad_score, track.last_pad_threshold), current_mode)
-                        status_label = f"#{track.track_id} SPOOF ({track.last_pad_score or 0.0:.2f})"
-                    else:
+                    elif track.pad_ready:
                         # Người thật (REAL)
-                        color = (0, 255, 0)    # Xanh lá: Hợp lệ
-                        status_label = f"#{track.track_id} REAL ({(track.last_pad_score if track.last_pad_score is not None else 0.0):.2f})"
 
                         # (C) Camera owns tracks; ArcFace runs only on the worker.
                         scope = (track.verification_generation, *frame_mode)
@@ -523,9 +533,8 @@ def main():
                                 and track.missing_frames == 0 and track.last_pad_score is not None
                                 and not track.pad_invalid_reason):
                             recognition_eligible[key] = track
-                            if key in recognition_worker.pending:
-                                status_label += " [WAIT EMBEDDING]"
-                            elif (now_wall - track.last_scan_sent >= COOLDOWN_SEC
+                            if (key not in recognition_worker.pending
+                                  and now_wall - track.last_scan_sent >= COOLDOWN_SEC
                                   and track.needs_recognition(RECOGNIZE_INTERVAL_SECONDS, pad_enabled=True)):
                                 track.last_recognition_time = now_mono
                                 if landmarks is None or len(landmarks) != 5:
@@ -537,36 +546,26 @@ def main():
                                             raise ValueError("Alignment failed")
                                         captured_at = track.scan_captured_at or int(now_wall * 1000)
                                         context = (track.scan_event_id, captured_at, liveness_score(track.last_pad_score, track.last_pad_threshold))
-                                        submitted = recognition_worker.submit(key, aligned_face, context)
-                                        status_label += " [WAIT EMBEDDING]" if submitted else " [QUEUE FULL]"
-                                    except Exception as exc:
+                                        recognition_worker.submit(key, aligned_face, context)
+                                    except Exception:
                                         track.stable_recognitions = 0
                                         track.scan_event_id = uuid.uuid4().hex
                                         track.scan_captured_at = None
-                                        status_label += f" [ERROR {type(exc).__name__}]"
-
-                        # Hiển thị trạng thái chốt trên nhãn bounding box
-                        if attendance_latch:
-                            status_label += " [DA GUI - CHO NGUOI MOI]"
-                        else:
-                            status_label += " [READY]"
-
-                    name, _, stale = track.display_result(vision.RECOGNITION_LABEL_HOLD_SECONDS)
-                    if name != "UNKNOWN" and track.is_real:
-                        status_label += f" {name}" + (" [STALE]" if stale else "")
 
                     # Vẽ Bounding Box & Nhãn Track lên khung hình
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                    cv2.putText(
-                        frame,
-                        status_label,
-                        (x1, max(18, y1 - 8)),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.52,
-                        color,
-                        2,
-                        cv2.LINE_AA
-                    )
+                    if render_output:
+                        status_label, color = face_status_label(track)
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                        cv2.putText(
+                            frame,
+                            status_label,
+                            (x1, max(18, y1 - 8)),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.52,
+                            color,
+                            2,
+                            cv2.LINE_AA
+                        )
 
             # Discard jobs as soon as PAD/track/presence continuity is lost.
             # Cancelled jobs still count towards queue capacity until consumed.
@@ -612,8 +611,6 @@ def main():
                     attendance_latch = True
                     track.attendance_sent = commit
                     track.last_scan_sent = now_wall
-                    status_banner = f"TRACK #{track.track_id}: ĐANG ĐỐI SOÁT RPC..."
-                    status_banner_time = now_wall
                     print(f"[Recognition] track={track.track_id} embedding={result.latency:.2f}s -> RPC {req_id}")
 
             live_keys = {(track.track_id, track.verification_generation, current_mode, mode_generation, presence_generation)
@@ -654,8 +651,6 @@ def main():
                     attendance_latch = False
                     last_submission = None
                     response_track.last_scan_sent = 0.0
-                    status_banner = f"{identity[1]}: DA NHAN DIEN - CHUA GHI CONG"
-                    status_banner_time = now_wall
                     continue
                 on_attendance_result(response)
                 if not (response.get('success') and response.get('matched')):
@@ -664,31 +659,30 @@ def main():
                         last_submission = None
 
             # ── 7. Vẽ Thanh Thông Tin & Banners Lên Video ────────────────────
-            # Top Banner: Trạng thái thiết bị, Chế độ Check In/Out, FPS, Trạng thái AI/Siêu âm
+            # Compact status; telemetry still carries FPS/distance for diagnostics.
             if not is_awake:
                 banner_bg = (50, 50, 50)  # Xám sẫm khi AI đang ngủ
-                dist_str = f"{dist:.0f}cm" if dist is not None else ">100cm"
-                banner_text = f"DEVICE: {DEVICE_ID} | AI: SLEEP (d: {dist_str}) | FPS: {current_fps:.1f}"
+                banner_text = f"{current_mode} | SLEEP"
             else:
                 banner_bg = (180, 100, 0) if current_mode == "CHECK_IN" else (0, 100, 200)
-                dist_str = f"{dist:.0f}cm" if dist is not None else "?cm"
-                latch_str = "LATCH: LOCKED" if attendance_latch else "LATCH: READY"
-                banner_text = f"DEVICE: {DEVICE_ID} | {current_mode} | FPS: {current_fps:.1f} | d: {dist_str} | {latch_str}"
+                latch_str = "WAIT NEXT PERSON" if attendance_latch else "READY"
+                banner_text = f"{current_mode} | {latch_str}"
 
-            cv2.rectangle(frame, (0, 0), (WIDTH, 36), banner_bg, -1)
-            cv2.putText(
-                frame,
-                banner_text,
-                (10, 24),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.55,
-                (255, 255, 255),
-                2,
-                cv2.LINE_AA
-            )
+            if render_output:
+                cv2.rectangle(frame, (0, 0), (WIDTH, 36), banner_bg, -1)
+                cv2.putText(
+                    frame,
+                    banner_text,
+                    (10, 24),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55,
+                    (255, 255, 255),
+                    2,
+                    cv2.LINE_AA
+                )
 
             # Bottom Banner: Thông báo điểm danh vừa gửi thành công
-            if status_banner and (now_wall - status_banner_time < 3.0):
+            if render_output and status_banner and (now_wall - status_banner_time < 3.0):
                 cv2.rectangle(frame, (0, HEIGHT - 32), (WIDTH, HEIGHT), (0, 180, 0), -1)
                 cv2.putText(
                     frame,
@@ -705,7 +699,7 @@ def main():
             streamer.write_frame(frame)
 
             # ── 9. Hiển thị lên Màn hình phần cứng TFT ST7789V ──────────────
-            if tft_display.is_active():
+            if tft_due:
                 tft_display.show_frame(frame)
 
             # ── 10. Hiển thị GUI nếu được bật ───────────────────────────────
@@ -733,7 +727,8 @@ def main():
             except Exception:
                 pass
         ultrasonic.stop()
-        tft_display.cleanup()
+        if tft_display.cleanup() is False:
+            print("[TFT] Worker còn chờ SPI; sẽ tự đóng tài nguyên khi driver trả về.")
         streamer.stop()
         tb_client.stop()
         print("[EXIT] Pi Edge Client đã tắt an toàn.")

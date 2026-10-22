@@ -174,6 +174,8 @@ YuNet, công cụ báo lỗi để bạn biết detector thực tế chưa đún
 - Đồng bộ mode qua ThingsBoard; HTTP relay trực tiếp chỉ bật khi đặt `BACKEND_BASE_URL`/secret. Không mặc định gọi `TB_HOST:3000`.
 - Camera lỗi sẽ báo DEGRADED, sau 100 lần đọc lỗi liên tiếp thoát để service có thể restart. Dùng `--camera` trước khi bật dịch vụ.
 
+TFT chạy worker riêng, không chờ SPI trong vòng camera. Mặc định `TFT_DISPLAY_FPS=10`; đặt `5` nếu muốn giảm tải. Driver giới hạn tối đa 10 FPS. `SHOW_FPS=true` in FPS trung bình vòng camera ở terminal mỗi 10 giây, độc lập FPS cập nhật TFT. Bản worker mới chưa có benchmark FPS trên Pi.
+
 Chỉ bật TFT khi đã nối đúng chân và bật SPI (`sudo raspi-config` → Interface
 Options → SPI; khởi động lại nếu được yêu cầu). Đấu chân theo DEPLOYMENT_GUIDE.md.
 Chỉ bật HC-SR04 sau khi nối dây; ECHO 5V phải qua phân áp xuống mức 3.3V.

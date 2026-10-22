@@ -405,7 +405,7 @@ if PAD_OUTPUT_CLASSES not in (None, 2, 3):
 LIVENESS_MODEL_PATH = PAD_MODEL_PATH
 LIVENESS_THRESHOLD  = PAD_THRESHOLD
 
-# FPS overlay trên màn hình real-time
+# FPS log ở terminal mỗi 10 giây; không vẽ số FPS lên video/TFT.
 SHOW_FPS = _get_env_bool("SHOW_FPS", True)
 # Số frame dùng để tính FPS trung bình (rolling window)
 FPS_AVG_WINDOW = _get_env_int("FPS_AVG_WINDOW", 30)

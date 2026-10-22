@@ -75,6 +75,7 @@ class ConfirmationFlowTests(unittest.TestCase):
             return True, np.zeros((480,640,3),np.uint8)
         camera.read.side_effect = read
         display = Mock();display.is_active.return_value=False
+        display.wants_frame.return_value=False
         embedder=Mock(input_size=(112,112));embedder.extract.return_value=np.ones(512,dtype=np.float32)
         detector=Mock();detector.detect.return_value=[]
         replacements=dict(FaceEmbedder=lambda **kw:embedder, FaceTracker=lambda **kw:tracker,

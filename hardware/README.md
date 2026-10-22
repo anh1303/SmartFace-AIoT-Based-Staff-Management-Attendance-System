@@ -94,9 +94,17 @@ python edge_client.py
 
 ## Phân luồng recognition
 
-Vòng camera chạy detect/tracking/PAD và căn chỉnh crop; ArcFace chạy trên một worker riêng (`recognition/worker.py`). Queue giới hạn hai job chờ, tối đa ba job chưa thu kết quả (kể cả job đã hủy). Camera không chờ embedding hoặc phản hồi RPC. Kết quả được kiểm tra lại track, mode và phiên hiện diện trước khi gửi backend; mất PAD/track sẽ hủy job cũ. TFT/video hiển thị `WAIT EMBEDDING`, `QUEUE FULL` hoặc lỗi khi phù hợp.
+Vòng camera chạy detect/tracking/PAD và căn chỉnh crop; ArcFace chạy trên một worker riêng (`recognition/worker.py`). Queue giới hạn hai job chờ, tối đa ba job chưa thu kết quả (kể cả job đã hủy). Camera không chờ embedding hoặc phản hồi RPC. Kết quả được kiểm tra lại track, mode và phiên hiện diện trước khi gửi backend; mất PAD/track sẽ hủy job cũ. Nhãn khuôn mặt chỉ hiển thị `REAL - UNKNOWN`/tên hoặc ID đã xác nhận, `SPOOF`, `CHECKING`, `INVALID`. Giữ chế độ check-in/out và kết quả điểm danh; FPS được log ở terminal mỗi 10 giây qua `SHOW_FPS=true`.
 
-Backend vẫn chịu trách nhiệm đối sánh danh tính/ghi điểm danh. Interval giữ recognition 1,0 giây, detection/PAD 0,2 giây. Chưa có số đo FPS trên Pi cho bản worker; detect/PAD, camera và TFT vẫn dùng vòng camera nên hiệu năng còn phụ thuộc phần cứng.
+Backend vẫn chịu trách nhiệm đối sánh danh tính/ghi điểm danh. Interval giữ recognition 1,0 giây, detection/PAD 0,2 giây. Detect/PAD và camera vẫn dùng vòng camera; TFT có worker riêng cho resize/chuyển màu/truyền SPI. Chưa đo FPS trực tiếp trên Pi cho bản TFT worker mới.
+
+## TFT worker và giới hạn cập nhật
+
+`TFT_DISPLAY_FPS=10` là mặc định trong `.env.example`; đặt `5` để giảm tải thêm. Driver chặn tối đa 10 FPS, kể cả `.env` cũ còn đặt 15. Chỉ một worker TFT, một frame đang gửi và tối đa một frame chờ; frame mới thay frame chờ cũ. Những frame chưa đến lượt cập nhật không bị copy/chuyển màu cho TFT. Khi chỉ TFT xuất video, vòng camera cũng bỏ copy/vẽ overlay ở frame TFT sẽ bỏ qua. GUI/stream hoạt động vẫn nhận overlay bình thường.
+
+Worker tự resize/chuyển màu/đóng gói RGB565/truyền SPI. Camera chỉ giao snapshot riêng, không chờ SPI. Khi tắt, chờ worker tối đa một giây; nếu driver SPI chưa trả về, worker daemon giữ quyền sở hữu rồi tự cleanup khi ghi xong, tránh đóng SPI trong lúc ghi. Lỗi render/SPI sẽ tắt đầu ra TFT và báo terminal một lần; AI/điểm danh vẫn tiếp tục.
+
+Test offline: `python3 -m unittest discover -s hardware/validation -v`. Các test dùng màn hình giả/SPI giả, không chứng minh FPS hay chất lượng hiển thị trên Pi. Không đổi model, profile PAD, tần suất nhận diện hoặc điều kiện điểm danh.
 
 ## Chọn model PAD đồng bộ với face_auth
 

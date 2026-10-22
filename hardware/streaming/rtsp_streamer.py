@@ -69,12 +69,13 @@ class RTSPStreamer:
             return
         if frame.shape[1] != self.width or frame.shape[0] != self.height:
             frame = cv2.resize(frame, (self.width, self.height))
+        snapshot = frame.copy()
         try:
-            self._frames.put_nowait(frame.copy())
+            self._frames.put_nowait(snapshot)
         except queue.Full:
             try: self._frames.get_nowait()
             except queue.Empty: pass
-            try: self._frames.put_nowait(frame.copy())
+            try: self._frames.put_nowait(snapshot)
             except queue.Full: pass
 
     def _run(self):

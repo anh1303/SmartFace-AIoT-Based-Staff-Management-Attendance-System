@@ -161,3 +161,21 @@ Chốt lại ngày 20/10 theo yêu cầu: `ATTENDANCE_STABLE_COUNT=3` cho cả I
 
 - Đồng bộ bản chia sẻ: `.env.example` mặc định bật adaptive và chọn `pi_all1136_balanced`; giữ `strict`/`real` dạng comment, đánh dấu profile vòng 1 là bản đối chiếu. `.env` riêng đang chạy không thay đổi.
 - Kiểm tra trước push: 55 tests hardware và 3 tests capture pass; smoke nạp balanced từ `.env.example` chạy ONNX thành công ở cảhai phía. Bốn test predictor legacy không chạy vì thiếu artifact model E1/MiniFASNet cũ; không phải model R7 FULL của profile mới.
+
+### Rút gọn hiển thị hardware — 2026-10-22
+
+- Nhãn khuôn mặt chỉ còn `REAL - UNKNOWN`/tên hoặc ID đã xác nhận, `SPOOF`, `CHECKING`, `INVALID`. Bỏ số PAD/vote/track, workerqueue và latency khỏi nhãn. INVALID ưu tiên trước nhãn cũ để không hiển thị danh tính khi crop không hợp lệ. Giữ nguyên temporal verdict, display identity hold, nhận diện và điều kiện điểm danh.
+- Header giữ chế độ check-in/out và trạng thái ready/chờ người tiếp theo/sleep; bỏ FPS/khoảng cách. Bỏ banner đối soát RPC lặp lại, giữ thông báo kết quả điểm danh/lỗi.
+- `SHOW_FPS=true` trong `.env`/`.env.example` hardware in FPS trung bình ở terminal mỗi10giây; telemetry vẫn gửi FPS/khoảng cách. Không thêm log mỗiframe.
+- Khi GUI, stream và TFT đều tắt/không hoạt động, bỏ copy/vẽ frame; inference và RPC vẫn chạy. Không đổi model/profile, interval, độ phân giải camera hay driver TFT/stream. Chưa đo FPS trên Pi; rút gọn overlay không phải bảo đảm tăng FPS cụ thể.
+
+### Worker TFT và loại bỏ xử lý thừa — 2026-10-22
+
+- TFT có một worker chuyên resize/chuyển màu/đóng gói RGB565/gửi SPI; vòng camera chỉ giao snapshot riêng. Tối đa một frame đang xử lý và một frame chờ mới nhất, không tích hàng đợi. Giới hạn mặc định10FPS trong code/`.env`/`.env.example`; có thể chọn5FPS. Driver clamp1–10FPS, nên `.env` cũ15FPS cũng không vượt10.
+- Chỉ copy frame cho TFT khi đến lượt cập nhật; worker cũng giới hạn thời điểm gửi. Khi TFT là đầu ra duy nhất, vòng camera bỏ copy/vẽ overlay trên frame TFT không nhận. Nếu mọi đầu ra tắt thì bỏ copy/vẽ toàn bộ, inference/RPC vẫn hoạt động.
+- Cleanup chờ tối đa1giây, không đóng SPI đồng thời với worker đang ghi. Nếu driver bị kẹt thì main không chờ vô hạn, worker daemon tự đóng tài nguyên khi driver trả về. Lỗi render/SPI tắt TFT và báo một lần. Không thay register/màu/rotation của ST7789V.
+- Loại bỏ copy frame lần2 khi queue stream đầy: tái dùng snapshot riêng đã tạo. Bỏ tạo/paste canvas letterbox khi ảnh resize đã đúng kích thước TFT. Không thay codec/resolution/FPS của stream hoặc camera.
+- Rà tracker: nhánh opticalflow return sớm, không có chuyển gray hai lần trong cùng lượt update. Giữ các gate hình học mỗi frame, atomic batch validation và kiểm tra track/PAD/mode/generation lúc thu worker/RPC: các lần kiểm tra này bảo vệ khỏi kết quả cũ, không phải phép tính dư có thể bỏ. Không sửa model/profile PAD hoặc logic xác nhận điểm danh.
+- Kiểm tra: 66 tests hardware pass, gồm7 test TFT về thread riêng, latestframe, giới hạnFPS, snapshot ownership, shutdown khi SPIkẹt, cleanup sau lỗi và RGB565/letterbox; thêmtest stream queuefull chỉcopy1lần. Đây là mock/offline, chưa đo FPS hoặc SPI/camera trực tiếp trên Pi.
+
+- Bản review đầy đủ các nội dung đã lược bỏ/giữ lại, thay đổi vòng đời TFT và giới hạn kiểm thử: [HARDWARE_PERFORMANCE_REVIEW.md](../2026-10-22/HARDWARE_PERFORMANCE_REVIEW.md).

@@ -109,6 +109,7 @@ class CameraIntegrationTests(unittest.TestCase):
         tb, streamer, display, ultrasonic = Mock(), Mock(), Mock(), Mock()
         tb.send_scan_rpc.return_value = publish_result
         display.is_active.return_value = False
+        display.wants_frame.return_value = False
         track = SimpleNamespace(track_id=1, bbox=(0, 0, 100, 100), landmarks=np.zeros((5, 2)),
                                 missing_frames=0, pad_ready=True, is_spoof=False, is_real=True,
                                 verification_generation=0, pad_invalid_reason=None,
@@ -199,6 +200,14 @@ class CameraIntegrationTests(unittest.TestCase):
 
     def test_camera_keeps_reading_while_embedding_waits_then_sends_rpc(self):
         self.run_camera()
+
+    def test_no_overlay_when_all_video_outputs_are_disabled(self):
+        with patch.object(edge, 'STREAM_ENABLED', False), \
+             patch.object(edge.cv2, 'putText') as text, \
+             patch.object(edge.cv2, 'rectangle') as rectangle:
+            self.run_camera()
+        text.assert_not_called()
+        rectangle.assert_not_called()
 
     def test_mode_roundtrip_discards_old_embedding(self):
         def invalidate(track):

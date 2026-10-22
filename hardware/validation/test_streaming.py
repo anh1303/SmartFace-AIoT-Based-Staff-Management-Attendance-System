@@ -15,6 +15,19 @@ spec.loader.exec_module(module)
 
 
 class StreamTests(unittest.TestCase):
+    def test_full_queue_reuses_one_private_snapshot(self):
+        streamer = module.RTSPStreamer('unused',2,2,15,enabled=False)
+        streamer.enabled = True  # Inspect the queue without starting FFmpeg.
+        streamer._frames.put_nowait(np.zeros((2,2,3), np.uint8))
+        source = np.full((2,2,3),7,np.uint8)
+        frame = Mock(shape=source.shape)
+        frame.copy.side_effect = source.copy
+        streamer.write_frame(frame)
+        frame.copy.assert_called_once()
+        source[:] = 99
+        self.assertEqual(streamer._frames.qsize(),1)
+        np.testing.assert_array_equal(streamer._frames.get_nowait(),7)
+
     def test_stalled_pipe_does_not_block_camera_submission(self):
         read_fd, write_fd = os.pipe()
         os.set_blocking(write_fd, False)

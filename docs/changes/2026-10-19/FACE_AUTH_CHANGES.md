@@ -90,3 +90,22 @@ Chốt lại ngày 20/10 theo yêu cầu: `ATTENDANCE_STABLE_COUNT=3` cho cả I
 - Lưu `R7_SC_FULL_local842_real_runtime.json` (crop1.2, 0 fake lọt/35 real bị chặn) và `R7_SC_FULL_local842_balanced_runtime.json` (crop1.1, 2 fake lọt/16 real bị chặn), cùng comment chọn profile trong `.env.example`; chưa đổi profile active.
 - Hiệu chỉnh trên toàn bộ842 ảnh camera, 605real/237fake, sau khi người dùng yêu cầu xoá16crop không qua gate hình học vốn có. Không có holdout. Synthetic bbox/JPEG còn gây fake lọt, nên đây là ứng viên hiệu chỉnh miền cần test camera, không phải bảo đảm chống spoof tổng quát.
 - Cả face_auth/hardware đã replay đủ842crop bằng config/predictor thực, xác nhận các số trên. Test whitebalance/exposuregamma xác minh parity, ảnh nguồn không bị sửa và validation tham số.
+
+### Phiên hiệu chỉnh Pi cuối — 2026-10-22
+
+- Thêm adaptive threshold `raw_color`, dùng Y/Cb/Cr của ảnh raw trước lighting, offset giới hạn; các profile cũ giữ nguyên hành vi. OpenCV dùng thứ tự Y,Cr,Cb; kiểm tra kênh và parity bằng test riêng. Không thêm model forward hoặc quality gate.
+- Lưu `R7_SC_FULL_pi_final_conservative_runtime.json` (crop1.7, 0fake/28real bị chặn) và `R7_SC_FULL_pi_final_balanced_runtime.json` (crop2.2, 1fake/1real bị chặn) trên cùng682ảnh cóframegốc=426real+256fake. Cảhai đạt0/0 trên40real+254fake Pi mới hợp lệ. Đây là dữ liệu đã dùng hiệu chỉnh, không cóholdout.
+- Thêm `R7_SC_FULL_pi_final_common_runtime.json` (crop1.2, 0fake/76real bị chặn), kiểmtra đủ1136ảnh hợp lệ=645real+491fake; Pi mới0/1. 454ảnh không cònframe không được tính vào kết quả crop rộng. Ba ảnh mới không qua gate hình học được giữ nhưng loại khỏi hiệu chỉnh.
+- Cảhai runtime đã replay đủ ảnh qua config/predictor thật, xác nhận các số trên. Syntheticbbox/JPEG còn fake lọt; không coi kết quả calibration là bảođảm vận hành. Chưa đo FPS/camera live trênPi.
+- `.env.example` có dòng chọn cả3profile ở dạngcomment; activeprofile giữ nguyên. Model, detector/recognition,tracking,vote,attendance không đổi. Artifact/script hiệu chỉnh được gitignore; JSONruntime vàtests vẫn versionable.
+
+### Chốt profile trên toàn tập — vòng 2, 2026-10-22
+
+- Tối ưu đủ1.136ảnh hợp lệ (645real/491fake); 454ảnh không cóframe gốc giới hạn crop tối đa1.5. Giữ nguyên dữ liệu và model, không thêm forward hoặc sửa pipeline.
+- Lưu ba `R7_SC_FULL_pi_all1136_{strict,balanced,real}_runtime.json` đồng bộ hai phía: strict crop1.2=0FA/76FR; balanced crop1.1=2FA/49FR; real crop1.2=4FA/31FR. Pi mới lần lượt0FA/1FR,0FA/2FR,0FA/2FR trên40real/254fake.
+- Đây là lựa chọn test mới thay thế profile rộng crop1.7/2.2; khi replay toàn tập với crop lưu trữ giới hạn1.5, profile rộng cũ cho10FA/29FR và26FA/1FR. Không dùng kết quả subset682 để khẳng định toàn tập.
+- `.env` và `.env.example` thêm comment chọn cả3profile; giữ nguyên activevalues. Khuyến nghị test balanced trước. Runtime config/predictor cảhai phía xác nhận cùng kết quả từngảnh, test priority và raw-color đều pass. Artifact/scripts search được gitignore; profile JSON có thểtrack.
+- Không có holdout. Brightness/bbox stress cònfake lọt; chưa đoPi FPS hoặc kiểm chứng camera/góc khung hình trực tiếp. Chi tiết và rawoutputs ở `face_auth/output/pad_domain/2026-10-22_final_pi/round2/`.
+
+- Đồng bộ bản chia sẻ: `.env.example` mặc định bật adaptive và chọn `pi_all1136_balanced`; giữ `strict`/`real` dạng comment, đánh dấu profile vòng 1 là bản đối chiếu. `.env` riêng đang chạy không thay đổi.
+- Kiểm tra trước push: 55 tests hardware và 3 tests capture pass; smoke nạp balanced từ `.env.example` chạy ONNX thành công ở cảhai phía. Bốn test predictor legacy không chạy vì thiếu artifact model E1/MiniFASNet cũ; không phải model R7 FULL của profile mới.

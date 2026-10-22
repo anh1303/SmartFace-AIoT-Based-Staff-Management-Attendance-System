@@ -136,3 +136,4 @@ md/
 /face_auth/tests/test_pad_target_transforms.py
 /face_auth/tests/test_pad_shadow_policy.py
 /face_auth/tests/test_pad_domain_optimization.py
+/docs/experiments/2026-10-22-pad-final/

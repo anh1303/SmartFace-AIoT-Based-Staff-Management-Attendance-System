@@ -47,6 +47,23 @@ class AdaptiveConfigTests(unittest.TestCase):
             self.assertEqual(cfg['PAD_LIGHTING_PROFILE']['method'], 'shadow_gamma')
             self.assertEqual(cfg['PAD_ADAPTIVE_THRESHOLD_PROFILE']['method'], 'face_background')
 
+    def test_final_pi_color_profile_has_priority_and_portable_models(self):
+        for folder in ('face_auth', 'hardware'):
+            prefix = 'antispoof/models/' if folder == 'face_auth' else 'models/'
+            for name, crop in (('pi_final_conservative', 1.7), ('pi_final_balanced', 2.2),
+                               ('pi_final_common', 1.2), ('pi_all1136_strict', 1.2),
+                               ('pi_all1136_balanced', 1.1), ('pi_all1136_real', 1.2)):
+                result = self.read_config(folder, PAD_ADAPTIVE_ENABLED='true',
+                                         PAD_ADAPTIVE_CONFIG_PATH=prefix+'R7_SC_FULL_'+name+'_runtime.json',
+                                         PAD_THRESHOLD_LOGIT='999', PAD_BBOX_EXPANSION_FACTOR='999', FORCE_GAMMA='true')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                cfg = json.loads(result.stdout)
+                self.assertEqual(cfg['PAD_THRESHOLD_SOURCE'], 'adaptive_profile')
+                self.assertEqual(cfg['PAD_BBOX_EXPANSION_FACTOR'], crop)
+                self.assertFalse(cfg['PAD_GAMMA_ENABLED'])
+                self.assertEqual(cfg['PAD_ADAPTIVE_THRESHOLD_PROFILE']['method'], 'raw_color')
+                self.assertNotEqual(cfg['PAD_THRESHOLD_LOGIT'], 999.)
+
     def test_disabled_preserves_env_override_then_json_fallback(self):
         for folder in ('face_auth','hardware'):
             for override in (False,True):

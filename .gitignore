@@ -2,7 +2,7 @@
 # 1. BẢO MẬT & BẢO VỆ DỮ LIỆU NHẠY CẢM (Secrets & Environment)
 # ==============================================================================
 .env
-face_auth/pad_captures/
+face_auth/pad_captures*
 .env.*
 !.env.example
 !.env.compose.example

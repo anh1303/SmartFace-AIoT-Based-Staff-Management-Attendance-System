@@ -1,19 +1,11 @@
-import type { Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, generateUniqueEmployeeCode, generateRandomPassword } from '../../common/utils.js'
 import { sendAccountCredentialsEmail, type EmailSendResult } from '../../common/email.service.js'
-import { logAction } from '../audit-logs/index.js'
-import {
-  findAuthUserByUsername,
-  createAuthUser,
-  updateAuthUser,
-  getDefaultRole,
-  deleteAuthUser,
-} from '../auth/index.js'
+import { logAction } from '../audit-logs/audit.service.js'
 import { employeeInclude } from './employee.model.js'
-import { assertCanAccessEmployeeDetail } from './employee.permission.js'
+import { assertCanAccessEmployeeDetail } from '../../common/permission.helper.js'
 
 export interface RawEmployeeDb {
   id: string
@@ -152,7 +144,6 @@ export async function create(data: {
   hourly_rate?: number
   avatar?: string | null
   avatar_url?: string | null
-  fingerprint_enrolled?: boolean | null
 }, actorUserId?: string) {
   let deptId = data.departmentId ?? data.department_id
   let posId = data.positionId ?? data.position_id
@@ -212,8 +203,8 @@ export async function create(data: {
   const existingCode = await prisma.employee.findFirst({ where: { employee_code: codeCandidate } })
   let finalCode = existingCode ? await generateUniqueEmployeeCode() : codeCandidate
 
-  // 2. Kiểm tra tên đăng nhập (username) trên bảng users trùng khớp với finalCode qua auth module
-  const existingUser = await findAuthUserByUsername(finalCode)
+  // 2. Kiểm tra tên đăng nhập (username) trên bảng users trùng khớp với finalCode
+  const existingUser = await prisma.user.findFirst({ where: { username: finalCode } })
   if (existingUser) {
     if (!data.employee_code) {
       finalCode = await generateUniqueEmployeeCode()
@@ -234,8 +225,11 @@ export async function create(data: {
   const rawPassword = generateRandomPassword(8)
   const hashedPassword = await bcrypt.hash(rawPassword, 10)
 
-  // 5. Tìm vai trò EMPLOYEE mặc định cho nhân viên mới qua auth module
-  const fallbackRole = await getDefaultRole()
+  // 5. Tìm vai trò EMPLOYEE mặc định cho nhân viên mới
+  const empRole = await prisma.roles.findFirst({
+    where: { role_name: { equals: 'EMPLOYEE', mode: 'insensitive' } },
+  })
+  const fallbackRole = empRole || (await prisma.roles.findFirst())
   if (!fallbackRole) {
     throw new AppError(500, 'Không tìm thấy vai trò (roles) trong hệ thống để gán cho người dùng mới')
   }
@@ -244,16 +238,15 @@ export async function create(data: {
 
   // 6. Thực hiện tạo User và Employee đồng thời trong transaction
   const { created, user } = await prisma.$transaction(async (tx) => {
-    // 6.1 Tạo tài khoản đăng nhập User mới qua auth module API
-    const newUser = await createAuthUser(
-      {
+    // 6.1 Tạo tài khoản đăng nhập User mới với username = finalCode
+    const newUser = await tx.user.create({
+      data: {
         username: finalCode,
         passwordHash: hashedPassword,
         role_id: fallbackRole.id,
         is_active: data.status ? data.status === 'ACTIVE' : true,
       },
-      tx
-    )
+    })
 
     // 6.2 Tạo bản ghi Employee liên kết với User qua user_id
     const newEmployee = await tx.employee.create({
@@ -268,7 +261,6 @@ export async function create(data: {
         phone: data.phone || null,
         hourly_rate: rate,
         avatar_url: data.avatar_url ?? data.avatar ?? null,
-        fingerprint_enrolled: Boolean(data.fingerprint_enrolled),
       },
       include: employeeInclude,
     })
@@ -415,13 +407,15 @@ export async function update(
         ? { avatar_url: data.avatar_url ?? data.avatar }
         : {}),
       ...(rateVal !== undefined ? { hourly_rate: rateVal } : {}),
-      ...(data.fingerprint_enrolled !== undefined ? { fingerprint_enrolled: data.fingerprint_enrolled } : {}),
     },
     include: employeeInclude,
   })
 
   if (existing.user_id && data.status !== undefined) {
-    await updateAuthUser(existing.user_id, { is_active: data.status === 'ACTIVE' }).catch(() => { })
+    await prisma.user.update({
+      where: { id: existing.user_id },
+      data: { is_active: data.status === 'ACTIVE' },
+    }).catch(() => { })
   }
 
   await logAction({
@@ -479,19 +473,36 @@ export async function remove(idOrCode: string, actorUserId?: string) {
       where: { employee_id: existing.id },
     })
 
-    // 2. Xóa ca làm việc employee_shifts
+    // 2. Xóa lịch sử chấm công attendance_logs
+    await tx.attendance_logs.deleteMany({
+      where: { employee_id: existing.id },
+    })
+
+    // 3. Xóa tổng hợp công hàng ngày daily_attendance_summary
+    await tx.daily_attendance_summary.deleteMany({
+      where: { employee_id: existing.id },
+    })
+
+    // 4. Xóa ca làm việc employee_shifts
     await tx.employee_shifts.deleteMany({
       where: { employee_id: existing.id },
     })
 
-    // 3. Xóa bản ghi nhân viên
+    // 5. Xóa dữ liệu bảng lương payroll_records
+    await tx.payrollRecord.deleteMany({
+      where: { employeeId: existing.id },
+    })
+
+    // 6. Xóa bản ghi nhân viên
     await tx.employee.delete({
       where: { id: existing.id },
     })
 
     // 7. Xóa tài khoản đăng nhập User liên kết (nếu có)
     if (existing.user_id) {
-      await deleteAuthUser(existing.user_id, tx).catch(() => { })
+      await tx.user.delete({
+        where: { id: existing.user_id },
+      }).catch(() => { })
     }
 
     // 8. Ghi log kiểm toán hành động xóa vĩnh viễn
@@ -533,22 +544,30 @@ export async function resetPassword(idOrCode: string, actorUserId?: string) {
   const hashedPassword = await bcrypt.hash(rawPassword, 10)
 
   if (userId) {
-    await updateAuthUser(userId, {
-      passwordHash: hashedPassword,
-      updated_at: new Date(),
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: hashedPassword,
+        updated_at: new Date(),
+      },
     })
   } else {
-    // Nếu nhân viên chưa có User thì tạo mới qua auth module
-    const fallbackRole = await getDefaultRole()
+    // Nếu nhân viên chưa có User thì tạo mới
+    const empRole = await prisma.roles.findFirst({
+      where: { role_name: { equals: 'EMPLOYEE', mode: 'insensitive' } },
+    })
+    const fallbackRole = empRole || (await prisma.roles.findFirst())
     if (!fallbackRole) {
       throw new AppError(500, 'Không tìm thấy vai trò (roles) trong hệ thống')
     }
 
-    const newUser = await createAuthUser({
-      username: existing.employee_code,
-      passwordHash: hashedPassword,
-      role_id: fallbackRole.id,
-      is_active: existing.status === 'ACTIVE',
+    const newUser = await prisma.user.create({
+      data: {
+        username: existing.employee_code,
+        passwordHash: hashedPassword,
+        role_id: fallbackRole.id,
+        is_active: existing.status === 'ACTIVE',
+      },
     })
     await prisma.employee.update({
       where: { id: existing.id },
@@ -678,82 +697,4 @@ export async function getByIdWithManagerCheck(
   );
   return get(id);
 }
-
-/**
- * Public Module API: Tìm một nhân viên theo UUID hoặc mã nhân viên (hỗ trợ transaction)
- */
-export async function findEmployeeByIdOrCode(idOrCode: string, tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.findFirst({
-    where: buildIdOrCodeWhere(idOrCode),
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Lấy danh sách nhân viên theo danh sách ID (Batch Query tối ưu, hỗ trợ transaction)
- */
-export async function findEmployeesByIds(ids: string[], tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.findMany({
-    where: { id: { in: ids } },
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Lấy tất cả nhân viên đang hoạt động (ACTIVE, hỗ trợ transaction)
- */
-export async function findActiveEmployees(tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.findMany({
-    where: { status: 'ACTIVE' },
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Tìm nhân viên theo user_id tài khoản (hỗ trợ transaction)
- */
-export async function findEmployeeByUserId(userId: string, tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.findFirst({
-    where: { user_id: userId },
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Tìm nhân viên theo email (hỗ trợ transaction)
- */
-export async function findEmployeeByEmail(email: string, tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.findFirst({
-    where: { email },
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Tạo nhân viên mới (dành cho module auth khi đăng ký, hỗ trợ transaction)
- */
-export async function createEmployee(
-  data: Prisma.EmployeeUncheckedCreateInput,
-  tx?: Prisma.TransactionClient
-) {
-  const client = tx ?? prisma
-  return client.employee.create({
-    data,
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Đếm tổng số nhân viên đang hoạt động (ACTIVE)
- */
-export async function countActiveEmployees(tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.count({ where: { status: 'ACTIVE' } })
-}
-
 

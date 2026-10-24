@@ -13,7 +13,6 @@ deviceRouter.use(authenticate);
 
 deviceRouter.get('/', asyncHandler(controller.list));
 deviceRouter.get('/:id', asyncHandler(controller.getById));
-deviceRouter.get('/:id/mode', asyncHandler(controller.getMode));
 deviceRouter.post('/', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.create));
 deviceRouter.put('/:id', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.update));
 deviceRouter.delete('/:id', authorize('ADMIN'), asyncHandler(controller.remove));

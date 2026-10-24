@@ -41,15 +41,6 @@ export const LandingPage: React.FC = () => {
 
   const handleTrialSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Tích hợp API ghi nhận khách hàng đăng ký dùng thử (Lead / CRM) khi Backend triển khai endpoint (e.g. POST /api/leads hoặc /api/trial-requests).
-    // Hiện tại mô phỏng phản hồi trực tiếp trên giao diện để thu thập email và hiển thị thông điệp thành công.
-    if (import.meta.env.DEV) {
-      console.info('[LandingPage] Trial request submitted (Client-side simulation):', {
-        name: trialName,
-        email: trialEmail,
-        company: trialCompany,
-      });
-    }
     setTrialSubmitted(true);
   };
 

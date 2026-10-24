@@ -9,5 +9,4 @@ export type * from './shift.types';
 export type * from './attendance.types';
 export type * from './payroll.types';
 export type * from './biometric.types';
-export type * from './department.types';
 export type * from './common.types';

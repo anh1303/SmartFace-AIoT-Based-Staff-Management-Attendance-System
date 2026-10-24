@@ -1,5 +1,3 @@
-export type PayrollStatus = 'PENDING' | 'CONFIRMED' | 'FINALIZED' | 'PAID';
-
 export interface BonusPenaltyPolicy {
   id?: number;
   overtime_rate: number;
@@ -22,8 +20,5 @@ export interface PayrollRecord {
   total_late_early: number;
   allowance: number;
   net_salary: number;
-  status: PayrollStatus;
-  reason?: string;
-  overtime_rate?: number;
-  late_early_penalty?: number;
+  status: 'PENDING' | 'FINALIZED';
 }

@@ -10,7 +10,7 @@ import {
   AlertTriangle,
   Layers,
 } from 'lucide-react';
-import { DepartmentItem } from '../../../types';
+import { DepartmentItem } from '../../../api/departmentApi';
 
 export interface DepartmentTabContentProps {
   loading: boolean;

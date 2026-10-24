@@ -10,7 +10,6 @@ export const checkInSchema = z.object({
     ATTENDANCE_METHOD.MANUAL,
     ATTENDANCE_METHOD.CARD,
   ]).optional(),
-  verification_score: z.number().min(0).max(1).optional(),
 })
 
 export const adjustAttendanceSchema = z.object({
@@ -18,19 +17,11 @@ export const adjustAttendanceSchema = z.object({
   date: z.string().min(1),
   late_early: z.number().min(0).default(0),
   overtime: z.number().min(0).default(0),
-  reason: z.string().min(1, 'Lý do điều chỉnh là bắt buộc'),
 })
 
 export const checkOutSchema = z.object({
   employeeId: z.string().min(1),
   device_info: z.string().optional(),
-  method: z.enum([
-    ATTENDANCE_METHOD.FACE,
-    ATTENDANCE_METHOD.FINGERPRINT,
-    ATTENDANCE_METHOD.MANUAL,
-    ATTENDANCE_METHOD.CARD,
-  ]).optional(),
-  verification_score: z.number().min(0).max(1).optional(),
 })
 
 export const aggregateAttendanceSchema = z.object({

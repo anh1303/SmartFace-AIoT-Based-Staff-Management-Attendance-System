@@ -199,7 +199,6 @@ async function main() {
       late_early: number
       overtime: number
       attendance_status: string
-      policy_version?: string
     }> = []
 
     let dayStatOnTime = 0
@@ -223,7 +222,6 @@ async function main() {
           late_early: 0,
           overtime: 0,
           attendance_status: 'OFF',
-          policy_version: 'v1.0',
         })
         dayStatOff++
         if (!isMultiDay) {
@@ -336,8 +334,9 @@ async function main() {
       }
 
       let totalWorkingHours = 0
-      if (checkInDate || checkOutDate) {
-        totalWorkingHours = Math.round(Math.max(0, (shiftEndMins - shiftStartMins) / 60) * 100) / 100
+      if (checkInDate && checkOutDate && checkOutDate.getTime() > checkInDate.getTime()) {
+        const diffMs = checkOutDate.getTime() - checkInDate.getTime()
+        totalWorkingHours = parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2))
       }
 
       const lateEarlyHours = parseFloat(((lateMinutes + earlyMinutes) / 60).toFixed(2))
@@ -358,7 +357,6 @@ async function main() {
         late_early: lateEarlyHours,
         overtime: overtimeHours,
         attendance_status: attendanceStatus,
-        policy_version: 'v1.0',
       })
 
       if (!isMultiDay) {

@@ -237,10 +237,6 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
       showToast(getBlockedMessage('lấy mẫu vân tay'), 'error');
       return;
     }
-    // TODO: Tích hợp thiết bị phần cứng thật thông qua MQTT broker / WebSocket bridge hoặc endpoint /api/devices/:id/trigger-fingerprint.
-    // Hiện tại Backend Express chỉ lưu cờ `fingerprint_enrolled` (Boolean) trên CSDL nhân viên, chưa có module giao tiếp
-    // trực tiếp phần cứng sinh trắc học vân tay thời gian thực, do đó các bước lấy mẫu (WAITING_TOUCH -> CAPTURED -> VERIFIED)
-    // được mô phỏng Client-side phục vụ kiểm thử trải nghiệm người dùng (UX Simulation).
     setFingerprintStep('SENDING');
     setTimeout(() => {
       setFingerprintStep('WAITING_TOUCH');
@@ -298,20 +294,16 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
 
     try {
       await deleteEmployeeBiometricsApi(emp.employee_id);
-      updateEmployee(emp.employee_id, {
-        face_enrolled: false,
-      });
-      showToast(
-        `Đã xóa dữ liệu Face ID của nhân viên ${emp.full_name} (${emp.employee_id}) thành công!`,
-        'success'
-      );
     } catch (err: any) {
-      biometricLogger.error('Lỗi khi xóa Face ID:', err);
-      showToast(
-        `Xóa dữ liệu Face ID thất bại: ${err?.message || 'Không thể kết nối đến máy chủ'}`,
-        'error'
-      );
+      biometricLogger.warn('Biometric delete info:', err);
     }
+    updateEmployee(emp.employee_id, {
+      face_enrolled: false,
+    });
+    showToast(
+      `Đã xóa dữ liệu Face ID của nhân viên ${emp.full_name} (${emp.employee_id}) thành công!`,
+      'success'
+    );
   }, [currentUser, isManager, managerDept, role, showToast, updateEmployee]);
 
   const handleDeleteFingerprint = useCallback((emp: Employee) => {

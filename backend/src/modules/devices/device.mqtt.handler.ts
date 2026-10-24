@@ -1,7 +1,8 @@
 import crypto from 'crypto'
 import { getMqttClient } from '../../config/mqtt.js'
 import { env } from '../../config/env.js'
-import { eventBus } from '../../common/event-bus.js'
+import { emitDeviceEvent } from '../../sockets/device.gateway.js'
+import { emitAttendanceEvent } from '../../sockets/attendance.gateway.js'
 import * as deviceService from './device.service.js'
 import * as attendance from '../attendance/attendance.service.js'
 import { logger } from '../../common/logger.js'
@@ -69,7 +70,7 @@ export function registerDeviceMqttHandlers() {
       if (event === 'status') {
         // Cập nhật trạng thái thiết bị (in-memory)
         const device = deviceService.updateStatus(deviceId, payload.status ?? 'OFFLINE')
-        if (device) eventBus.publish('device:status-changed', { deviceId, status: payload.status ?? 'OFFLINE', details: device })
+        if (device) emitDeviceEvent('status', device)
       }
 
       if (event === 'check-in') {
@@ -84,12 +85,13 @@ export function registerDeviceMqttHandlers() {
           }
         }
 
-        // Nhận check-in từ thiết bị IoT (camera nhận diện khuôn mặt). checkIn đã tự động publish event lên eventBus.
-        await attendance.checkIn({
+        // Nhận check-in từ thiết bị IoT (camera nhận diện khuôn mặt)
+        const record = await attendance.checkIn({
           employeeId,
           device_info: `device:${deviceId}`,
           method: 'FACE',
         })
+        emitAttendanceEvent('checked-in', record)
       }
     } catch (error) {
       mqttHandlerLogger.error('MQTT message rejected:', error)

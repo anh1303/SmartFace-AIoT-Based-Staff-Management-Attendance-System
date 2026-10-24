@@ -1,6 +1,6 @@
-import { prisma } from '../config/database.js';
-import { AppError } from './AppError.js';
-import { buildIdOrCodeWhere } from './utils.js';
+import { prisma } from '../../config/database.js';
+import { AppError } from '../../common/AppError.js';
+import { buildIdOrCodeWhere } from '../../common/utils.js';
 
 /**
  * Kiểm tra xem một nhân viên có vai trò hoặc chức vụ là Quản lý/Admin không

@@ -14,6 +14,14 @@ const vnDateISOFormatter = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
+const vnTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: VN_TIMEZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
+
 /**
  * Returns date formatted as YYYY-MM-DD in Vietnam local timezone (+07:00).
  */
@@ -29,6 +37,20 @@ export function formatVNDateISO(dateInput?: Date | string | number | null): stri
     return vnDateISOFormatter.format(d);
   } catch {
     return vnDateISOFormatter.format(new Date());
+  }
+}
+
+/**
+ * Returns time formatted as HH:mm:ss in Vietnam local timezone (+07:00).
+ */
+export function formatVNTime(dateInput?: Date | string | number | null): string {
+  if (!dateInput) return '--:--:--';
+  try {
+    const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
+    if (isNaN(d.getTime())) return '--:--:--';
+    return vnTimeFormatter.format(d);
+  } catch {
+    return '--:--:--';
   }
 }
 

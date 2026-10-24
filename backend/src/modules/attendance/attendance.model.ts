@@ -11,16 +11,9 @@ export const attendanceInclude = {
       full_name: true,
       employee_code: true,
       email: true,
+      avatar_url: true,
       position: true,
       department: true,
-      employee_shifts: {
-        select: {
-          work_date: true,
-          start_time: true,
-          end_time: true,
-          shift_type: true,
-        },
-      },
     },
   },
 } as const

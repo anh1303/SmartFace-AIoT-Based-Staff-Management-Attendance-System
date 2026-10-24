@@ -1,180 +1,257 @@
-# 🎨 SmartFace Frontend — React 19 + Vite + Tailwind CSS v4
+# 🎨 SmartFace Frontend — React 19 + Vite + Tailwind CSS v4 + TanStack Query v5
 
-> **SmartFace Frontend** là ứng dụng Web Quản trị Trung tâm (Admin / Manager Portal) và Cổng Tự Phục Vụ Nhân viên (Employee Self-Service Portal) thuộc Hệ sinh thái Quản lý Nhân sự & Chấm công Thông minh SmartFace AIoT.  
-> Được xây dựng trên nền tảng **React 19**, **Vite (v6.2)**, **TypeScript (v5.8)**, **TanStack React Query v5** và **Tailwind CSS v4** với ngôn ngữ thiết kế **Glassmorphism & Dark Mode** hiện đại, ứng dụng kết nối dữ liệu thời gian thực qua **Socket.IO** và tích hợp trình phát video độ trễ thấp **WebRTC** trực tiếp từ Edge AI Camera.
+> **SmartFace Frontend** là ứng dụng Web Quản trị Trung tâm và Cổng Tự Phục Vụ dành cho Hệ thống SmartFace AIoT. Được xây dựng trên nền tảng **React 19**, **Vite (v6.2)**, **TypeScript (v5.8)**, **TanStack Query v5**, **Tailwind CSS v4** cùng ngôn ngữ thiết kế hiện đại **Glassmorphism & Dark Mode**.
 
 ---
 
-## 🛠 Tech Stack
+## 🛠 Tech Stack Chi Tiết
 
-| Thư viện / Công nghệ | Phiên bản | Vai trò & Mục đích sử dụng |
+| Thư viện / Công nghệ | Phiên bản | Mục đích & Ứng dụng |
 | :--- | :---: | :--- |
-| **React** | `v19.0` | Thư viện UI cốt lõi, tận dụng tính năng kết xuất đồng thời (Concurrent Features) |
-| **Vite** | `v6.2` | Build tool và Dev Server với cơ chế HMR (Hot Module Replacement) tốc độ cao |
-| **TypeScript** | `v5.8` | Kiểm tra kiểu tĩnh nghiêm ngặt toàn bộ State, Props, DTOs và API Client |
-| **TanStack Query** | `v5.103` | Quản lý Server State: Caching thông minh, Background Revalidation & Query Invalidation |
-| **Tailwind CSS** | `v4.1` | Styling Framework thế hệ mới, tối ưu hóa CSS build qua `@tailwindcss/vite` |
-| **React Router DOM** | `v7.18` | Định tuyến Client-side và bảo vệ luồng truy cập với Protected Route Guards |
-| **Recharts** | `v3.10` | Trực quan hóa dữ liệu biểu đồ phân tích chấm công và xu hướng chi phí lương |
-| **Lucide React** | `v0.546` | Bộ biểu tượng SVG vector chuẩn hóa giao diện người dùng |
-| **Socket.IO Client** | `v4.8` | Kết nối WebSocket nhận thông báo chấm công và trạng thái thiết bị thời gian thực |
+| **React** | `v19.0` | Thư viện giao diện chính, render UI mượt mà với Concurrent Features |
+| **Vite** | `v6.2` | Build tool thế hệ mới, HMR (Hot Module Replacement) siêu tốc & Dev Server |
+| **TypeScript** | `v5.8` | Kiểm tra kiểu dữ liệu tĩnh nghiêm ngặt, loại bỏ hoàn toàn `any` |
+| **TanStack Query** | `v5.103` | Quản lý Async Server State, Caching, Invalidation & Automatic Retry |
+| **Tailwind CSS** | `v4.1` | Styling Framework thế hệ mới với CSS native variables và `@custom-variant dark` |
+| **React Router DOM** | `v7.18` | Định tuyến Client-side routing, hỗ trợ Protected Route Guards theo vai trò |
+| **Recharts** | `v3.10` | Biểu đồ trực quan hóa chi phí lương & tỷ lệ đi làm theo tuần từ DB |
+| **Lucide React** | `v0.546` | Bộ icon chuẩn UI/UX sắc nét, nhất quán toàn hệ thống |
+| **Socket.IO Client** | `v4.8` | Nhận tín hiệu chấm công và trạng thái thiết bị thời gian thực với JWT Handshake |
 
 ---
 
-## 🏛️ Kiến Trúc Ứng Dụng (Feature-Driven Architecture)
+## 🏛️ Kiến Trúc Pragmatic Feature-Based
 
-Dự án được cấu trúc theo mô hình **Pragmatic Feature-Driven**, phân tách ranh giới rõ ràng giữa **Tầng dùng chung (Cross-Cutting Shared Layer)** và **Tầng nghiệp vụ (Domain Features)**, đồng thời giữ các trang (Pages) ở trạng thái tinh gọn chỉ đóng vai trò điều phối layout:
+Ứng dụng Frontend áp dụng mô hình kiến trúc **Pragmatic / Hybrid Feature-Based**. Kiến trúc này phân định ranh giới rõ ràng giữa **Tầng dùng chung (Cross-Cutting Shared Primitives)** và **Tầng nghiệp vụ (Domain Features)**, đồng thời giữ các trang (Pages) ở trạng thái mỏng (*Thin Coordinators*).
+
+### 1. Sơ Đồ Cấu Trúc Thư Mục Chuẩn
 
 ```text
 frontend/src/
-├── api/                    # HTTP Client Layer (Axios instance, cấu hình HttpOnly credentials)
-├── components/             # Reusable UI Primitives (Tầng giao diện độc lập nghiệp vụ)
-│   ├── common/             # UI Components dùng chung (Table, Modal, Drawer, Toast, Search, Filter)
-│   └── layout/             # Khung sườn giao diện chính (AppLayout, Sidebar, Topbar)
-├── config/                 # Cấu hình kết nối, Socket URLs và các hằng số hệ thống
-├── context/                # Client Global State (AuthContext, ThemeContext, ToastContext, AppContext)
-├── features/               # 6 Bounded Feature Modules (Trọng tâm nghiệp vụ)
-│   ├── attendances/        # Giám sát chấm công, bảng theo dõi, chốt ca, bộ lọc, Live Feed & WebRTC Camera
-│   ├── biometrics/         # Đăng ký nhận diện khuôn mặt, Camera eKYC, quản lý vector ArcFace
-│   ├── employees/          # Quản lý nhân sự, hồ sơ chi tiết đa tabs, quản lý phòng ban & chức vụ
-│   ├── payrolls/           # Quản lý bảng lương theo kỳ, cấu hình thưởng/phạt, chốt sổ bảng lương
-│   ├── reports/            # Báo cáo thống kê, trực quan hóa biểu đồ xu hướng công và chi phí lương
-│   └── schedules/          # Lịch làm việc, ma trận phân ca theo tuần/tháng, phân ca hàng loạt
-├── hooks/                  # Shared custom hooks tích hợp TanStack React Query v5
-├── lib/                    # Cấu hình các thư viện bên thứ ba (QueryClient singleton)
-├── pages/                  # Thin Route Coordinators (Điều phối Feature Components vào Layout)
+├── api/                    # HTTP Client Layer (Axios instance, HttpOnly credentials: true)
+├── components/             # Reusable UI Primitives (Tầng dùng chung, độc lập với nghiệp vụ)
+│   ├── common/             # UI Components dùng chung (Table, Modal, Toast, SearchInput, FilterBar, ErrorBoundary)
+│   └── layout/             # Shell giao diện (AppLayout, Sidebar, Topbar)
+├── config/                 # Cấu hình tĩnh, Socket URLs, Hằng số phân trang
+├── context/                # Modular Global State (AuthContext, ThemeContext, ToastContext, AppContext)
+├── features/               # Domain Business Modules (Mô hình Feature-Based trọng tâm)
+│   ├── attendance/         # Giám sát chấm công, bảng theo dõi, chốt ca, bộ lọc ngày, xuất CSV
+│   │   ├── components/     # UI Components riêng của tính năng chấm công
+│   │   ├── hooks/          # Custom hooks riêng cho attendance
+│   │   ├── utils/          # Logic tính toán & chuẩn hóa giờ công chấm công
+│   │   └── index.ts        # Public API Barrel export của feature attendance
+│   ├── biometrics/         # Đăng ký nhận diện khuôn mặt, eKYC, Face ID status badge
+│   ├── employees/          # Quản lý nhân sự, hồ sơ, thêm/sửa, phân quyền, tabs chi tiết
+│   ├── payroll/            # Quản lý bảng lương, chính sách thưởng phạt, chốt/mở kỳ lương
+│   ├── reports/            # Báo cáo thống kê, trực quan hóa biểu đồ Recharts
+│   └── schedules/          # Lịch làm việc, ma trận phân ca, phân ca hàng loạt theo chức vụ
+├── hooks/                  # Shared cross-cutting hooks tích hợp TanStack React Query v5
+│   ├── useEmployees.ts     # Truy vấn & Mutation nhân sự với cache invalidation
+│   ├── useAttendance.ts    # Truy vấn dữ liệu chấm công thời gian thực
+│   ├── useAttendancePairs.ts # Ghép cặp Check-in / Check-out tự động
+│   ├── useDepartmentPositions.ts # Lấy danh mục 6 phòng ban & 18 chức vụ
+│   ├── usePayroll.ts       # Tính toán & chốt bảng lương
+│   └── useShifts.ts        # Quản lý ca và lịch phân ca
+├── lib/                    # Khởi tạo thư viện bên thứ 3 (queryClient singleton)
+├── pages/                  # Thin Route Coordinators (Chỉ điều phối feature & layout, không chứa logic nặng)
 │   ├── public/             # LandingPage, LoginPage
-│   ├── manager/            # Manager Dashboard, Employee List/Detail, Attendance Monitor, Schedule, Payroll...
-│   └── employee/           # Employee Dashboard, Attendance History, Schedule, Salary Estimate/History...
+│   ├── manager/            # Manager Dashboard, EmployeeList, Detail, Attendance, Schedule, Payroll, Reports
+│   └── employee/           # Employee Dashboard, Attendance, Schedule, SalaryEstimate, Profile
 ├── providers/              # Hợp nhất cây Context Providers (AppProviders.tsx)
-├── routes/                 # Hệ thống định tuyến và Protected Route Guards phân quyền RBAC
-├── types/                  # Shared TypeScript Definitions, DTOs và Domain Models
-└── utils/                  # Tiện ích bổ trợ (dateUtils, formatters, logger, timeUtils)
+├── routes/                 # Hệ thống định tuyến & Protected Route Guards theo vai trò RBAC
+├── types/                  # Shared TypeScript Definitions, DTOs & Domain Models
+└── utils/                  # Tiện ích chung (dateUtils, formatters, logger, permissionUtils)
 ```
 
 ---
 
-## ⚡ Chiến Lược Quản Lý Trạng Thái (State Management)
+### 2. Triết Lý Phân Lớp Trong Kiến Trúc
 
-Hệ thống phân định rõ ràng giữa hai tầng trạng thái chính:
+1. **Feature Module Co-location**:
+   - Mọi thành phần UI, hook hoặc utility chỉ phục vụ riêng cho một nghiệp vụ (ví dụ: `AddEmployeeModal`, `PositionManagementModal`) được đặt ngay bên trong `features/<tên_feature>/`.
+   - Mỗi feature cung cấp một file `index.ts` đóng vai trò cổng giao tiếp công khai (*Public Barrel*). Các module khác chỉ import thông qua `features/<tên_feature>`.
+2. **Thin Route Coordinators (`src/pages/`)**:
+   - Các file trong `pages/` chỉ đóng vai trò ghép nối Shell Layout (`AppLayout`), nạp component từ `features/` và truyền các tham số route (như `id`).
+   - Tuyệt đối **không viết câu lệnh query API trực tiếp hay ôm logic state phức tạp trong file page**.
+3. **Cross-Cutting Shared Layer (`src/components/common/` & `src/hooks/`)**:
+   - Chứa các viên gạch giao diện thuần túy (`Table`, `Modal`, `SearchInput`, `FilterBar`) hoàn toàn không phụ thuộc vào dữ liệu nghiệp vụ nào.
+
+---
+
+## 🏷️ Quy Tắc Đặt Tên & Tổ Chức File (Naming Conventions)
+
+| Loại tập tin | Quy chuẩn đặt tên | Phần mở rộng | Ví dụ minh họa |
+| :--- | :--- | :---: | :--- |
+| **React Components** | `PascalCase` | `.tsx` | `EmployeeTable.tsx`, `AddEmployeeModal.tsx`, `AppLayout.tsx` |
+| **Page Coordinators** | `PascalCase` (kèm hậu tố Page nếu cần) | `.tsx` | `ManagerDashboard.tsx`, `EmployeeProfile.tsx`, `LoginPage.tsx` |
+| **Custom Hooks** | `camelCase` (bắt đầu bằng tiền tố `use`) | `.ts` | `useEmployees.ts`, `useAttendancePairs.ts`, `usePayroll.ts` |
+| **Types / Interfaces** | `camelCase` (hoặc hậu tố `.types`) | `.ts` | `employee.types.ts`, `attendance.types.ts`, `auth.types.ts` |
+| **Utilities & Helpers** | `camelCase` | `.ts` | `dateUtils.ts`, `formatters.ts`, `permissionUtils.ts` |
+| **Context Providers** | `PascalCase` (kèm hậu tố `Context` / `Provider`) | `.tsx` | `AuthContext.tsx`, `ThemeContext.tsx`, `AppProviders.tsx` |
+| **Barrel Export Files**| `lowercase` | `.ts` | `index.ts` |
+
+---
+
+## ⚡ Quản Lý Trạng Thái Toàn Diện (State Management Architecture)
+
+Hệ thống phân định ranh giới rõ ràng giữa 3 loại trạng thái:
+
+```mermaid
+flowchart TD
+    subgraph SERVER_STATE["🌐 Server Cache State (TanStack Query v5)"]
+        direction TB
+        QClient["QueryClient Singleton"]
+        QHooks["Custom Hooks: useEmployees, useShifts, useAttendance, usePayroll"]
+        QFeatures["Features: Caching 5min, Background Revalidation, Deduplication, Retry"]
+    end
+
+    subgraph CLIENT_GLOBAL["🔐 Client Global State (React Context)"]
+        direction TB
+        AuthCtx["AuthContext: user, isAuthenticated, roles, HttpOnly cookie session"]
+        ThemeCtx["ThemeContext: theme 'dark' | 'light', CSS class sync"]
+        ToastCtx["ToastContext: global notifications (success, error, info)"]
+    end
+
+    subgraph LOCAL_STATE["🧩 Component Local State (React Hooks)"]
+        direction TB
+        CompState["useState / useReducer: modalIsOpen, activeTab, formInput, filterCriteria"]
+    end
+
+    QClient -. "clear() on Logout" .-> AuthCtx
+```
 
 ### 1. Server Cache State (TanStack Query v5)
-Toàn bộ dữ liệu bất đồng bộ từ máy chủ được quản lý thông qua TanStack Query với các quy chuẩn:
-- **Tối ưu hóa tài nguyên mạng**: Tự động lưu cache, loại bỏ các yêu cầu trùng lặp (*Request Deduplication*) và tự động làm mới ngầm khi cửa sổ được kích hoạt lại.
+- Thay thế hoàn toàn mô hình lưu trữ Server State trong Redux hoặc God Object cũ.
+- Sử dụng singleton `queryClient` cấu hình trong [src/lib/queryClient.ts](src/lib/queryClient.ts).
 - **Quy chuẩn Query Keys**:
   - `['employees']`, `['employees', id]`
   - `['departments']`, `['positions']`
   - `['attendance', { date, departmentId }]`
-  - `['attendance-summaries', { month, year, employeeId }]`
   - `['shifts', { month, year }]`
   - `['payroll', { period }]`
-- **Bảo Vệ Dữ Liệu Khi Đăng Xuất**:  
-  Khi người dùng đăng xuất hoặc phiên làm việc chấm dứt, hàm `logout()` sẽ thực thi `queryClient.clear()` nhằm xóa sạch toàn bộ dữ liệu nhạy cảm khỏi bộ nhớ trình duyệt, ngăn chặn nguy cơ rò rỉ thông tin.
+- **Bảo Vệ Rò Rỉ Dữ Liệu Khi Đăng Xuất**:
+  - Khi người dùng đăng xuất hoặc chuyển tài khoản, hàm `logout()` trong `AuthContext` tự động gọi lệnh:
+    ```typescript
+    queryClient.clear();
+    ```
+    Hành động này xóa sạch toàn bộ cache dữ liệu của phiên làm việc cũ khỏi bộ nhớ, ngăn chặn người dùng sau xem trộm dữ liệu nhạy cảm.
+
+---
 
 ### 2. Client Global State (React Context Layer)
-- **`AuthContext`**: Quản lý trạng thái phiên làm việc (xác thực qua HttpOnly Cookie), thông tin người dùng hiện tại và các helper phân quyền (`isAdmin`, `isManager`).
-- **`ThemeContext`**: Quản lý chế độ hiển thị Dark/Light mode, lưu cấu hình vào `localStorage` và đồng bộ class `.dark` trên thẻ gốc `<html>`.
-- **`ToastContext`**: Hệ thống thông báo toast toàn cục hỗ trợ hiển thị các trạng thái thành công, cảnh báo và lỗi.
-- **`AppProviders`**: Đóng gói toàn bộ cây Provider vào một điểm duy nhất, giữ cho `main.tsx` và `App.tsx` luôn trong sáng và dễ bảo trì.
+1. **`AuthContext` ([src/context/AuthContext.tsx](src/context/AuthContext.tsx))**:
+   - Quản lý trạng thái phiên đăng nhập của người dùng qua `HttpOnly Cookie`.
+   - Cung cấp các hàm kiểm tra quyền hạn tiện lợi: `isAdmin`, `isManager`, `hasRole('ADMIN')`.
+   - Tính năng đổi vai trò giả lập `switchRole` được khóa chặt, chỉ cho phép thực thi trong môi trường Development (`import.meta.env.DEV`).
+2. **`ThemeContext` ([src/context/ThemeContext.tsx](src/context/ThemeContext.tsx))**:
+   - Quản lý chế độ hiển thị `dark` / `light` và lưu lựa chọn vào `localStorage`.
+   - Tự động đồng bộ class `.dark` trên thẻ `<html>` và cập nhật các biến CSS màu sắc.
+3. **`ToastContext` ([src/context/ToastContext.tsx](src/context/ToastContext.tsx))**:
+   - Hệ thống hiển thị thông báo góc màn hình (Toast) với 4 mức: `success`, `error`, `warning`, `info`.
+4. **Hợp Nhất Cây Providers Qua `AppProviders.tsx` ([src/providers/AppProviders.tsx](src/providers/AppProviders.tsx))**:
+   - Gom gọn toàn bộ cây Provider lồng nhau vào một component sạch sẽ duy nhất:
+     ```tsx
+     <ErrorBoundary>
+       <ThemeProvider>
+         <QueryClientProvider client={queryClient}>
+           <AppProvider>
+             <BrowserRouter>
+               {children}
+             </BrowserRouter>
+           </AppProvider>
+         </QueryClientProvider>
+       </ThemeProvider>
+     </ErrorBoundary>
+     ```
 
 ---
 
-## 🛡️ Hệ Thống Phân Quyền & Phân Hệ Giao Diện (RBAC)
+## 🎨 UI Kit, Design System & Phong Cách Glassmorphism
 
-Ứng dụng chia tách phân luồng rõ rệt giữa hai phân hệ người dùng:
+Giao diện SmartFace được xây dựng theo ngôn ngữ thẩm mỹ hiện đại với sự hòa quyện giữa **Tailwind CSS v4** và phong cách **Glassmorphism & Dark Mode**:
 
-### 1. Cổng Quản Trị — Manager Portal (`/manager/*`)
-Dành cho người dùng có vai trò `ADMIN` hoặc `MANAGER`, bảo vệ bởi `ManagerGuard`:
-- **Dashboard Tổng Quan**: Theo dõi tỷ lệ đi làm hôm nay, biểu đồ nhân sự và cảnh báo thiết bị.
-- **Quản Lý Nhân Sự**: Danh sách nhân viên, bộ lọc nâng cao, quản lý phòng ban và chức vụ qua Drawer.
-- **Chi Tiết Hồ Sơ Nhân Viên**: Giao diện chi tiết đa tab (Thông tin cá nhân, Lịch làm việc, Lịch sử chấm công, Bảng lương, Dữ liệu sinh trắc học).
-- **Giám Sát Chấm Công & Camera**: Bảng theo dõi quẹt thẻ thời gian thực, Live Event Feed và màn hình phát video trực tiếp qua WebRTC từ Edge Camera.
-- **Ma Trận Phân Ca**: Bảng phân ca làm việc trực quan theo tuần và tháng, hỗ trợ gán ca hàng loạt cho phòng ban.
-- **Quản Lý Tính Lương**: Tự động tính lương tháng từ dữ liệu chấm công, điều chỉnh thưởng/phạt và chốt sổ kỳ lương.
-- **Sinh Trắc Học & eKYC**: Chụp ảnh trực tiếp từ camera để đăng ký vector nhận diện khuôn mặt Centroid.
-- **Báo Cáo & Phân Tích**: Trực quan hóa xu hướng giờ làm việc và cơ cấu chi phí lương qua Recharts.
+### 1. Bảng Design Tokens & Biến CSS Toàn Cục ([src/index.css](src/index.css))
 
-### 2. Cổng Tự Phục Vụ — Employee Portal (`/employee/*`)
-Dành cho nhân viên thông thường, bảo vệ bởi `EmployeeGuard`:
-- **Dashboard Cá Nhân**: Xem nhanh ca làm hôm nay, trạng thái chấm công và giờ công tích lũy trong tháng.
-- **Lịch Sử Chấm Công**: Tra cứu toàn bộ các lần quẹt thẻ Check-in / Check-out và trạng thái công ngày.
-- **Lịch Ca Làm Việc**: Xem lịch phân ca của bản thân theo tuần và tháng.
-- **Dự Toán Lương**: Ước tính mức thu nhập thực tế trong tháng dựa trên tổng giờ làm và hệ số lương.
-- **Lịch Sử Phiếu Lương**: Tra cứu các phiếu lương đã được ban quản lý chốt sổ qua từng kỳ.
-- **Hồ Sơ Cá Nhân**: Xem thông tin tài khoản và cập nhật mật khẩu.
+| Biến CSS Token | Giá trị Light Mode | Giá trị Dark Mode (Mặc định) | Mục đích sử dụng |
+| :--- | :---: | :---: | :--- |
+| `--bg-page` | `#f4f6fc` | `#0b0d19` | Màu nền toàn bộ trang web |
+| `--bg-card` | `#ffffff` | `#13162b` | Nền thẻ Card / Bảng điều khiển (kèm độ mờ kính) |
+| `--border-card` | `#cbd5e1` | `#282e60` | Đường viền ngăn cách bán trong suốt |
+| `--text-main` | `#090d16` | `#ffffff` | Màu chữ tiêu đề chính & nội dung quan trọng |
+| `--text-muted` | `#334155` | `#cbd5e1` | Màu chữ phụ, mô tả ngắn |
+| `--accent-primary` | `#6d28d9` | `#8b5cf6` | Tông màu tím thương hiệu chủ đạo (Violet) |
+| `--accent-light` | `#ede9fe` | `rgba(139, 92, 246, 0.2)` | Màu nền highlight nút hoặc badge |
 
 ---
 
-## 📡 Tích Hợp Real-time & Truyền Phát Video
-
-### 1. Socket.IO Real-time Client
-Hệ thống kết nối tới hai namespaces chuyên biệt trên Backend:
-- **Namespace `/attendance`**: Lắng nghe sự kiện `checked-in` và `checked-out` tức thời để hiển thị thẻ thông báo trên `LiveEventFeed` và cập nhật biểu đồ thống kê mà không cần tải lại trang.
-- **Namespace `/devices`**: Lắng nghe sự kiện đổi chế độ thiết bị (`mode-changed`) và trạng thái nhịp tim (`status: ONLINE / OFFLINE`).
-
-### 2. WebRTC Live Camera Streaming
-Tích hợp trình phát video độ trễ thấp (*Ultra Low Latency*) qua chuẩn WebRTC kết nối với camera giám sát AIoT, cho phép người quản lý theo dõi trực tiếp khu vực cửa ra vào ngay trên màn hình Giám sát chấm công.
+### 2. Hệ Thống Typography Chuẩn UI/UX
+- **Phông chữ nội dung (Body Text)**: `Geist`, `Inter`, sans-serif (độ dày `font-weight: 500`).
+- **Phông chữ tiêu đề (Headings)**: `Space Grotesk`, sans-serif (độ dày `font-weight: 700`, `letter-spacing: -0.015em`).
+- **Phông chữ mã code & số liệu (Monospace)**: `JetBrains Mono`, monospace (dành cho mã NV `NV-001`, giờ công, địa chỉ IP).
 
 ---
 
-## 🔑 Biến Môi Trường (`.env`)
+### 3. Reusable UI Components ([src/components/common/](src/components/common/))
+- **`Table`**: Bảng dữ liệu hỗ trợ sắp xếp, phân trang, trạng thái đang tải Skeleton và hiển thị thông báo rỗng (*Empty State*).
+- **`Modal`**: Hộp thoại nổi với backdrop mờ nhòe kính, hiệu ứng transition mượt mà và hỗ trợ đóng bằng phím ESC.
+- **`SearchInput`**: Ô tìm kiếm thông minh tích hợp debounce tự động, nút xóa nhanh.
+- **`FilterBar` & `FilterSelect`**: Thanh công cụ lọc dữ liệu theo phòng ban, chức vụ, trạng thái, ngày tháng.
+- **`PageHeaderBanner`**: Khung tiêu đề trang kèm breadcrumbs, mô tả nghiệp vụ và các nút hành động chính (*Action Buttons*).
+- **`ErrorBoundary`**: Bắt lỗi vỡ giao diện runtime cục bộ và hiển thị màn hình phục hồi thân thiện với nút "Thử lại".
 
-Tạo file `.env` tại thư mục gốc `frontend/` để cấu hình kết nối tới Backend:
+---
 
+### 4. Shell Layout Giao Diện ([src/components/layout/](src/components/layout/))
+- **`AppLayout`**: Khung vỏ tổng thể gồm thanh bên `Sidebar`, thanh điều hướng trên cùng `Topbar` và vùng hiển thị nội dung `Outlet`.
+- **`Sidebar`**: Menu điều hướng thông minh tự động thay đổi danh mục liên kết theo vai trò đăng nhập (`ADMIN`, `MANAGER`, `EMPLOYEE`), hỗ trợ thu nhỏ (*collapse*).
+- **`Topbar`**: Hiển thị thông tin người dùng đang đăng nhập, nút chuyển nhanh Dark/Light theme, chuông thông báo và menu Đăng xuất.
+
+---
+
+## 🌐 Chuẩn Hóa Múi Giờ Việt Nam (+07:00) & Tiền Tệ
+
+Hệ thống loại bỏ hoàn toàn các lỗi lệch ngày do múi giờ UTC gây ra (đặc biệt trong khung giờ 00:00 - 06:59 sáng tại Việt Nam):
+- **Chuỗi ngày chuẩn**: Sử dụng hàm `getTodayVNString()` và `formatVNDateISO()` trong `src/utils/dateUtils.ts` dựa trên chuẩn `Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })` để luôn xuất ra định dạng `YYYY-MM-DD`.
+- **Định dạng tiền tệ**: Mọi số liệu lương, thưởng, phạt đều được format qua tiện ích `formatVNCurrency(number)` $\rightarrow$ hiển thị định dạng Việt Nam chuẩn: `150.000 ₫`.
+
+---
+
+## 🚀 Hướng Dẫn Cài Đặt & Khởi Chạy
+
+### 1. Cài Đặt Dependencies
+```bash
+cd frontend
+npm install
+```
+
+### 2. Cấu Hình Biến Môi Trường (`.env`)
+Tạo file `.env` từ file mẫu:
+```bash
+cp .env.example .env
+```
+Nội dung file `frontend/.env`:
 ```env
-# Địa chỉ gốc của REST API (để trống để sử dụng tính năng Proxy /api của Vite)
+# Để trống để sử dụng tính năng Proxy /api của Vite
 VITE_API_BASE=""
 
 # Địa chỉ máy chủ Socket.IO Backend
 VITE_SOCKET_URL="http://localhost:3000"
 ```
 
----
-
-## 🚀 Hướng Dẫn Cài Đặt & Khởi Chạy
-
-### 1. Yêu Cầu Tiên Quyết
-- **Node.js**: Phiên bản $\ge 20.0.0$
-- **NPM**: Đi kèm với Node.js
-
-### 2. Cài Đặt Thư Viện
-```bash
-cd frontend
-npm install
-```
-
-### 3. Cấu Hình Biến Môi Trường
-Sao chép file mẫu và cấu hình:
-```bash
-cp .env.example .env
-```
-
-### 4. Khởi Chạy Môi Trường Phát Triển
+### 3. Khởi Chạy Vite Dev Server
 ```bash
 npm run dev
-```
-Truy cập ứng dụng tại: `http://localhost:5173`
-
-### 5. Kiểm Tra Kiểu Dữ Liệu & Đóng Gói Production
-```bash
-# Kiểm tra lỗi kiểu tĩnh TypeScript
-npm run lint
-
-# Biên dịch và tối ưu hóa tài nguyên cho môi trường Production
-npm run build
-
-# Xem trước kết quả bản đóng gói Production
-npm run preview
+# Mở trình duyệt tại: http://localhost:5173
 ```
 
 ---
 
-## 📜 Danh Sách Lệnh NPM Scripts
+## 📜 Danh Sách NPM Scripts
 
 | Lệnh Script | Mô tả chức năng |
 | :--- | :--- |
-| `npm run dev` | Khởi chạy Vite Dev Server tại `http://localhost:5173` |
-| `npm run build` | Biên dịch TypeScript và đóng gói tài nguyên vào thư mục `dist/` |
-| `npm run preview` | Khởi chạy máy chủ cục bộ để xem trước bản build production |
-| `npm run lint` | Kiểm tra lỗi type checking toàn bộ dự án (`tsc --noEmit`) |
-| `npm run test` | Thực thi kiểm thử tự động với Vitest |
+| `npm run dev` | Khởi chạy Vite Dev Server tại địa chỉ `http://localhost:5173` |
+| `npm run build` | Biên dịch TypeScript và đóng gói tài nguyên tối ưu cho Production vào thư mục `dist/` |
+| `npm run preview` | Khởi chạy Server cục bộ để kiểm tra thử sản phẩm sau khi build |
+| `npm run lint` | Kiểm tra lỗi Type-checking nghiêm ngặt của TypeScript (`tsc --noEmit`) |
+| `npm run test` | Chạy bộ kiểm thử tự động với `vitest` và môi trường `jsdom` |

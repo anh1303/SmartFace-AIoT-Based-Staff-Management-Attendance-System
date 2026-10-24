@@ -2,21 +2,29 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, calculateNetSalary } from '../../common/utils.js'
-import { logAction } from '../audit-logs/index.js'
-import {
-  aggregateDailyAttendance,
-  getAttendanceSummariesByEmployeesAndDateRange,
-} from '../attendance/index.js'
+import { logAction } from '../audit-logs/audit.service.js'
+import { aggregateDailyAttendance } from '../attendance/attendance.service.js'
 import type { PayrollStatus } from '../../common/constants.js'
 import {
   isEmployeeManager,
   assertCannotModifySelfControlData,
   assertCannotModifyOtherManager,
-  findEmployeeByIdOrCode,
-  findActiveEmployees,
-  findEmployeeByUserId,
-} from '../employees/index.js'
+} from '../../common/permission.helper.js'
 
+
+function parseShiftHours(startTime?: string | Date | null, endTime?: string | Date | null): number {
+  if (!startTime || !endTime) return 8
+  if (startTime instanceof Date && endTime instanceof Date) {
+    const sMin = startTime.getUTCHours() * 60 + startTime.getUTCMinutes()
+    const eMin = endTime.getUTCHours() * 60 + endTime.getUTCMinutes()
+    return Math.max(0, (eMin - sMin) / 60)
+  }
+  const sStr = String(startTime)
+  const eStr = String(endTime)
+  const [sh = 8, sm = 0] = sStr.split(':').map(Number)
+  const [eh = 17, em = 30] = eStr.split(':').map(Number)
+  return Math.max(0, (eh * 60 + em - (sh * 60 + sm)) / 60)
+}
 
 export interface RawPayrollRecord {
   id: string | bigint
@@ -29,26 +37,16 @@ export interface RawPayrollRecord {
   allowance?: { toString(): string } | number | string | null
   net_salary?: { toString(): string } | number | string | null
   status?: string | null
-  reason?: string | null
-  overtime_rate?: number | null
-  late_early_penalty?: number | null
   employee?: { employee_code?: string; full_name?: string; department?: { name?: string } | null } | null
 }
 
 export function formatPayrollRecord(record: RawPayrollRecord) {
   const hourly_rate = Number(record.hourly_rate || 0)
-  const total_working_hours = Number(record.total_working_hours ?? 0)
+  const total_working_hours = Number(record.total_working_hours) > 0 ? Number(record.total_working_hours) : 176
   const total_overtime = Number(record.total_overtime || 0)
   const total_late_early = Number(record.total_late_early || 0)
   const allowance = Number(record.allowance || 0)
   const net_salary = Number(record.net_salary || 0)
-
-  let status: PayrollStatus = 'PENDING'
-  if (record.status === 'PAID') status = 'PAID'
-  else if (record.status === 'FINALIZED') status = 'FINALIZED'
-  else if (record.status === 'CONFIRMED') status = 'CONFIRMED'
-  else status = 'PENDING'
-
   return {
     id: record.id.toString(),
     payroll_id: `PR-${record.payroll_period.replace('-', '')}-${record.id.toString().padStart(3, '0')}`,
@@ -62,8 +60,7 @@ export function formatPayrollRecord(record: RawPayrollRecord) {
     total_late_early,
     allowance,
     net_salary,
-    status,
-    reason: record.reason || undefined,
+    status: (record.status === 'CONFIRMED' || record.status === 'FINALIZED' ? 'FINALIZED' : 'PENDING') as 'PENDING' | 'FINALIZED',
   }
 }
 
@@ -122,7 +119,7 @@ export async function updateBonusPenalty(data: {
       UPDATE payroll_records
       SET
         net_salary = GREATEST(0, ROUND(
-          hourly_rate * total_working_hours
+          hourly_rate * CASE WHEN total_working_hours > 0 THEN total_working_hours ELSE 176 END
           + CASE WHEN ${overtimeRate} <= 10 THEN total_overtime * hourly_rate * ${overtimeRate} ELSE total_overtime * ${overtimeRate} END
           - CASE WHEN ${latePenaltyRate} <= 10 THEN total_late_early * hourly_rate * ${latePenaltyRate} ELSE total_late_early * ${latePenaltyRate} END
           + allowance
@@ -168,7 +165,9 @@ export async function list(
   if (payroll_period) where.payroll_period = payroll_period
 
   if (requester?.role === 'EMPLOYEE' && requester.id) {
-    const emp = await findEmployeeByUserId(requester.id)
+    const emp = await prisma.employee.findFirst({
+      where: { user_id: requester.id },
+    })
     if (!emp) return []
     where.employeeId = emp.id
   } else if (employeeIdOrCode) {
@@ -177,7 +176,13 @@ export async function list(
 
   // Chốt chặn Requirement 1: Quản lý không xem được phiếu lương của Quản lý khác
   if (requester?.role === 'MANAGER' && employeeIdOrCode) {
-    const targetEmp = await findEmployeeByIdOrCode(employeeIdOrCode)
+    const targetEmp = await prisma.employee.findFirst({
+      where: buildIdOrCodeWhere(employeeIdOrCode),
+      include: {
+        department: true,
+        users: { include: { roles: true } },
+      },
+    })
     if (targetEmp && targetEmp.user_id !== requester.id && isEmployeeManager(targetEmp)) {
       throw AppError.forbidden('Quản lý không có quyền xem thông tin lương của Quản lý khác!')
     }
@@ -219,7 +224,6 @@ export async function updateItem(
     total_late_early?: number
     net_salary?: number
     status?: PayrollStatus
-    reason?: string
   },
   actorUser?: { id?: string; role?: string },
 ) {
@@ -256,9 +260,9 @@ export async function updateItem(
 
   if (!record) throw new AppError(404, 'Payroll record not found')
 
-  // Chốt chặn Requirement 5: Chặn sửa các phiếu có trạng thái khác PENDING. Backend là chốt bảo vệ cuối.
-  if (record.status !== 'PENDING') {
-    throw AppError.badRequest(`Không thể chỉnh sửa phiếu lương ở trạng thái ${record.status}. Chỉ cho phép chỉnh sửa phiếu lương khi ở trạng thái PENDING (Chờ duyệt)!`)
+  // Chốt chặn Requirement 5: Nếu kỳ lương đã Khóa (FINALIZED), chỉ Admin mới có quyền mở khóa/chỉnh sửa
+  if ((record.status === 'FINALIZED' || record.status === 'CONFIRMED') && actorUser?.role !== 'ADMIN') {
+    throw AppError.badRequest('Bảng lương kỳ này đã bị Khóa (Locked). Chỉ có Quản trị viên (Admin) mới có quyền mở khóa để chỉnh sửa!')
   }
 
   // Chốt chặn Requirement 1 & 2:
@@ -277,7 +281,7 @@ export async function updateItem(
     ? updates.total_working_hours
     : (updates.working_hours !== undefined
       ? updates.working_hours
-      : Number(record.total_working_hours ?? 0))
+      : (Number(record.total_working_hours) > 0 ? Number(record.total_working_hours) : 176))
 
   const bonusPenalty = await getBonusPenalty()
   const overtimeRate = bonusPenalty.overtime_rate
@@ -334,14 +338,10 @@ export async function updateItem(
       allowance: updated.allowance,
       net_salary: updated.net_salary,
       status: updated.status,
-      reason: updates.reason,
     },
   })
 
-  return {
-    ...formatPayrollRecord(updated),
-    reason: updates.reason,
-  }
+  return formatPayrollRecord(updated)
 }
 
 export async function finalizePeriod(period: string, actorUserId?: string) {
@@ -386,7 +386,10 @@ export async function generate(
 ) {
   // Chốt chặn: Manager không được tạo/tính lương cho Manager khác
   if (actorUser?.role === 'MANAGER' && employeeId) {
-    const targetEmp = await findEmployeeByIdOrCode(employeeId)
+    const targetEmp = await prisma.employee.findFirst({
+      where: buildIdOrCodeWhere(employeeId),
+      include: { department: true, users: { include: { roles: true } } },
+    });
     if (targetEmp && targetEmp.user_id !== actorUser.id && isEmployeeManager(targetEmp)) {
       throw AppError.forbidden('Quản lý không có quyền tạo hoặc tính lương cho Quản lý khác!');
     }
@@ -413,46 +416,28 @@ export async function generate(
 
   // 3. Đảm bảo tính Transaction và Idempotency cho toàn bộ chu kỳ tính lương
   return prisma.$transaction(async (tx) => {
-    let employees: Array<NonNullable<Awaited<ReturnType<typeof findEmployeeByIdOrCode>>>> = []
-    if (employeeId) {
-      const single = await findEmployeeByIdOrCode(employeeId, tx)
-      if (!single) {
-        throw new AppError(404, `Employee '${employeeId}' not found`)
-      }
-      employees = [single]
-    } else {
-      employees = await findActiveEmployees(tx)
-    }
-
-    const empIds = employees.map((e) => e.id)
-
-    // 1. Tối ưu Batch query: Lấy toàn bộ bản ghi lương hiện có trong kỳ 1 lần duy nhất
-    const existingRecords = await tx.payrollRecord.findMany({
-      where: {
-        employeeId: { in: empIds },
-        payroll_period,
-      },
-    })
-    const existingMap = new Map(existingRecords.map((r) => [r.employeeId, r]))
-
-    // 2. Tối ưu Batch query: Lấy toàn bộ daily_attendance_summary trong kỳ thông qua Attendance Module Service
-    const allAttendanceSummaries = await getAttendanceSummariesByEmployeesAndDateRange(
-      empIds,
-      periodStart,
-      periodEnd
-    )
-    const summaryMap = new Map<string, typeof allAttendanceSummaries>()
-    for (const s of allAttendanceSummaries) {
-      const list = summaryMap.get(s.employee_id) || []
-      list.push(s)
-      summaryMap.set(s.employee_id, list)
-    }
+    const employees = employeeId
+      ? [
+        await tx.employee.findFirstOrThrow({
+          where: buildIdOrCodeWhere(employeeId),
+        }),
+      ]
+      : await tx.employee.findMany({ where: { status: 'ACTIVE' } })
 
     const upsertPromises = employees.map(async (emp) => {
-      const existingRecord = existingMap.get(emp.id)
-      const attendanceSummaries = summaryMap.get(emp.id) || []
+      const existingRecord = await tx.payrollRecord.findUnique({
+        where: {
+          employeeId_payroll_period: { employeeId: emp.id, payroll_period },
+        },
+      })
 
       // 1 & 2. Lấy dữ liệu thực tế từ daily_attendance_summary và cộng dồn số giờ làm việc thực tế trong tháng
+      const attendanceSummaries = await tx.daily_attendance_summary.findMany({
+        where: {
+          employee_id: emp.id,
+          work_date: { gte: periodStart, lt: periodEnd },
+        },
+      })
       const actualMonthWorkingHours = attendanceSummaries.reduce(
         (sum, s) => sum + Number(s.total_working_hours || 0),
         0,
@@ -466,10 +451,10 @@ export async function generate(
         0,
       )
 
-      // Giờ công thực tế nếu có, mặc định là 0
+      // Ưu tiên giờ công thực tế, nếu chưa có log hàng ngày thì dùng chuẩn 176h
       const total_working_hours = actualMonthWorkingHours > 0
         ? Number(actualMonthWorkingHours.toFixed(2))
-        : (existingRecord ? Number(existingRecord.total_working_hours ?? 0) : 0)
+        : (existingRecord && Number(existingRecord.total_working_hours) > 0 ? Number(existingRecord.total_working_hours) : 176)
 
       const total_overtime = totalOvertimeHours > 0
         ? Number(totalOvertimeHours.toFixed(2))
@@ -542,8 +527,5 @@ export async function generate(
     })
 
     return results.map(formatPayrollRecord)
-  }, {
-    timeout: 30000,
-    maxWait: 10000,
   })
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Employee } from '../../types';
+import { useDepartmentPositions } from '../../hooks';
 import {
   getNextEmployeeId,
   EmployeeListHeader,
@@ -13,7 +14,6 @@ import {
   ConfirmDeleteEmployeeModal,
   ConfirmStatusEmployeeModal,
   DepartmentPositionDrawer,
-  useDepartmentPositions,
 } from '@/features/employees';
 
 export const ManagerEmployeeList: React.FC = () => {

@@ -3,9 +3,16 @@ import { logger } from '../utils/logger';
 
 const departmentLogger = logger.child('DepartmentApi');
 
-import { DepartmentItem } from '../types';
-
-export type { DepartmentItem };
+export interface DepartmentItem {
+  id: number;
+  department_code: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+  employee_count: number;
+  position_count?: number;
+  created_at?: string;
+}
 
 export async function fetchDepartmentsApi(): Promise<DepartmentItem[]> {
   try {

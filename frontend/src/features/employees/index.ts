@@ -8,6 +8,7 @@ export * from './components/EmployeeTable';
 export * from './components/AddEmployeeModal';
 export * from './components/EditEmployeeModal';
 export * from './components/EmployeeActionModals';
+export * from './components/PositionManagementModal';
 export * from './components/DepartmentPositionDrawer';
 export * from './components/DepartmentTabContent';
 export * from './components/PositionTabContent';
@@ -22,6 +23,6 @@ export * from './components/EmployeeAccountTab';
 export * from './components/EmployeePayslipModal';
 
 // Hooks
+export * from './hooks/useEmployeeDetailData';
 export * from './hooks/useDepartmentPositionManager';
-export * from './hooks/useDepartmentPositions';
 

@@ -28,7 +28,6 @@ export const updatePayrollSchema = z.object({
   working_hours: z.number().optional(),
   total_overtime: z.number().optional(),
   total_late_early: z.number().optional(),
-  reason: z.string().optional(),
   status: z
     .enum([
       PAYROLL_STATUS.PENDING,

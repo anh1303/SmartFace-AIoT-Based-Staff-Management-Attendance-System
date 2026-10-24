@@ -30,7 +30,7 @@ export async function generatePayrollApi(period: string): Promise<PayrollRecord[
 
 export async function updatePayrollItemApi(
   id: string,
-  updates: Partial<PayrollRecord> & { working_hours?: number; reason?: string }
+  updates: Partial<PayrollRecord> & { working_hours?: number }
 ): Promise<PayrollRecord> {
   const workingHours = updates.working_hours ?? updates.total_working_hours;
   const res = await apiFetch(`/api/payroll/${id}`, {
@@ -43,7 +43,6 @@ export async function updatePayrollItemApi(
       total_late_early: updates.total_late_early,
       allowance: updates.allowance,
       status: updates.status,
-      reason: updates.reason,
     }),
   });
   if (res.success && res.data) {

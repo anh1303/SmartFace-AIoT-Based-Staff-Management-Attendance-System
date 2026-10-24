@@ -15,11 +15,9 @@ export const employeeInclude = {
     select: {
       id: true,
       username: true,
-      role_id: true,
       is_active: true,
       roles: {
         select: {
-          id: true,
           role_name: true,
         },
       },

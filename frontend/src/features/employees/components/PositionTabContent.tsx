@@ -12,7 +12,8 @@ import {
   UserCheck,
   AlertTriangle,
 } from 'lucide-react';
-import { DepartmentItem, PositionItem } from '../../../types';
+import { DepartmentItem } from '../../../api/departmentApi';
+import { PositionItem } from '../../../api/positionApi';
 
 export interface PositionTabContentProps {
   loading: boolean;

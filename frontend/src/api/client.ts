@@ -1,7 +1,6 @@
-import { config } from '../config';
+import { API_BASE } from '../utils/apiConfig';
 import type { ApiResponse, ApiErrorResponse } from '../types/api.types';
 
-export const API_BASE = config.apiBaseUrl;
 export type { ApiResponse, ApiErrorResponse };
 
 /**
@@ -24,7 +23,7 @@ export class ApiError extends Error {
 /**
  * Resolves the final absolute/relative API URL without duplicate `/api` prefixes.
  */
-export function resolveApiUrl(endpoint: string, base: string = config.apiBaseUrl): string {
+export function resolveApiUrl(endpoint: string, base: string = API_BASE): string {
   if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
     return endpoint;
   }

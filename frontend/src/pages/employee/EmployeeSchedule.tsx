@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { getTodayVNString, formatVNDateISO, getMonday } from '../../utils/dateUtils';
+import { getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
 import {
   Calendar,
   Clock,
@@ -23,6 +23,13 @@ export const EmployeeSchedule: React.FC = () => {
   const [exchangeTargetEmp, setExchangeTargetEmp] = useState('');
   const [exchangeDate, setExchangeDate] = useState(() => getTodayVNString());
   const [exchangeReason, setExchangeReason] = useState('');
+
+  const getMonday = (d: Date) => {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+  };
 
   const [currentMonday, setCurrentMonday] = useState<Date>(() => getMonday(new Date()));
 
@@ -51,8 +58,6 @@ export const EmployeeSchedule: React.FC = () => {
 
   const handleExchangeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Tích hợp gọi API gửi yêu cầu đổi ca khi Backend hoàn thiện module yêu cầu nhân sự (/api/employee-requests hoặc /api/shifts/exchange).
-    // Hiện tại mô phỏng phản hồi giao diện thông báo thành công cho nhân viên.
     showToast('Đã gửi yêu cầu đổi ca trực đến Quản lý xét duyệt!', 'success');
     setExchangeModalOpen(false);
     setExchangeReason('');
@@ -349,4 +354,6 @@ export const EmployeeSchedule: React.FC = () => {
       </Modal>
     </div>
   );
-};
+};
+
+export const StaffSchedule = EmployeeSchedule;

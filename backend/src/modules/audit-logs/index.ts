@@ -1,5 +1,3 @@
-/**
- * Audit Logs Module Public API (Facade)
- */
-export * from './audit.service.js'
-export { auditRouter } from './audit.routes.js'
+export { auditRouter } from './audit.routes.js';
+export * from './audit.service.js';
+export * from './audit.repository.js';

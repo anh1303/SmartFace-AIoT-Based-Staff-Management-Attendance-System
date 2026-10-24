@@ -227,4 +227,6 @@ export const EmployeeProfile: React.FC = () => {
       </div>
     </div>
   );
-};
+};
+
+export const StaffProfile = EmployeeProfile;

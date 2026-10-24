@@ -5,7 +5,9 @@ import { useAuth } from '../../context/AuthContext';
 import { Users, ShieldAlert, Lock } from 'lucide-react';
 import { Employee, PayrollRecord } from '../../types';
 import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionUtils';
-import { getTodayVNString } from '@/utils/dateUtils';
+import {
+  getTodayVNString
+} from '../../utils/dateUtils';
 import {
   EmployeeDetailHeader,
   EmployeeOverviewTab,
@@ -15,9 +17,9 @@ import {
   EmployeeAccountTab,
   EmployeePayslipModal,
   EditEmployeeModal,
-  useDepartmentPositions,
+  useEmployeeDetailData,
 } from '@/features/employees';
-import { useEmployeeDetailData } from './hooks/useEmployeeDetailData';
+import { useDepartmentPositions } from '../../hooks';
 
 export const ManagerEmployeeDetail: React.FC = () => {
   const {
@@ -163,13 +165,20 @@ export const ManagerEmployeeDetail: React.FC = () => {
   const {
     employeeAttendanceLogs,
     attendanceStats,
+    employeePayrolls,
+    currentMonthPayroll,
     hourlyRate,
     standardHours,
     overtimeHours,
     lateEarlyHours,
+    allowance,
     currentNetSalary,
     pastPayrolls,
     employeeShifts,
+    currentPeriodKey,
+    baseSalary,
+    otAmount,
+    penaltyAmount,
     otRate,
     penaltyRate,
   } = useEmployeeDetailData({
@@ -292,6 +301,8 @@ export const ManagerEmployeeDetail: React.FC = () => {
           onNextEmployee={handleNextEmployee}
           onOpenEditModal={handleOpenEditModal}
           onPrint={handlePrint}
+          attendanceTotalLogs={0}
+          shiftsCount={0}
         />
         <div className="p-10 text-center bg-white dark:bg-[#13162b] border border-amber-300/70 dark:border-amber-900/40 rounded-2xl shadow-sm max-w-2xl mx-auto my-6">
           <div className="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto mb-4 border border-amber-200 dark:border-amber-800/60 shadow-xs">
@@ -347,6 +358,8 @@ export const ManagerEmployeeDetail: React.FC = () => {
         onNextEmployee={handleNextEmployee}
         onOpenEditModal={handleOpenEditModal}
         onPrint={handlePrint}
+        attendanceTotalLogs={attendanceStats.totalLogs}
+        shiftsCount={employeeShifts.length}
       />
 
       {/* 2. TAB 1: OVERVIEW & BIOMETRICS */}
@@ -386,7 +399,20 @@ export const ManagerEmployeeDetail: React.FC = () => {
       {/* 4. TAB 3: SALARY DETAILS & PAST MONTHS PAYROLLS */}
       {activeTab === 'payroll' && (
         <EmployeePayrollTab
+          currentPeriodKey={currentPeriodKey}
+          currentMonthPayroll={currentMonthPayroll}
           hourlyRate={hourlyRate}
+          currentNetSalary={currentNetSalary}
+          baseSalary={baseSalary}
+          standardHours={standardHours}
+          overtimeHours={overtimeHours}
+          otAmount={otAmount}
+          allowance={allowance}
+          lateEarlyHours={lateEarlyHours}
+          penaltyAmount={penaltyAmount}
+          workDays={attendanceStats.workDays}
+          otRate={otRate}
+          penaltyRate={penaltyRate}
           pastPayrolls={pastPayrolls}
           onSelectPayslip={setSelectedPayslipModal}
         />

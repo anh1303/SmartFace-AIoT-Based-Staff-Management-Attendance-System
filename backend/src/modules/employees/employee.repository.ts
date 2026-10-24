@@ -1,7 +1,25 @@
 import { prisma } from '../../config/database.js';
 import { Prisma } from '@prisma/client';
 
-export { employeeInclude, employeeModel } from './employee.model.js';
+export const employeeModel = prisma.employee;
+
+export const employeeInclude = {
+  department: true,
+  position: true,
+  users: {
+    select: {
+      id: true,
+      username: true,
+      role_id: true,
+      roles: {
+        select: {
+          id: true,
+          role_name: true,
+        },
+      },
+    },
+  },
+} as const;
 
 export class EmployeeRepository {
   async findMany(args?: Prisma.EmployeeFindManyArgs) {

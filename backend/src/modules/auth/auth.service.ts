@@ -1,4 +1,3 @@
-import type { Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { prisma } from '../../config/database.js'
@@ -7,7 +6,6 @@ import { AppError } from '../../common/AppError.js'
 import { USER_ROLES } from '../../common/constants.js'
 import { generateUniqueEmployeeCode } from '../../common/utils.js'
 import { logAction } from '../audit-logs/audit.service.js'
-import { createEmployee, findEmployeeByEmail } from '../employees/index.js'
 import type { z } from 'zod'
 import type { loginSchema, registerSchema } from './auth.dto.js'
 
@@ -127,7 +125,7 @@ export async function register(input: z.infer<typeof registerSchema>) {
   const existingUser = await prisma.user.findFirst({ where: { username: input.username } })
   if (existingUser) throw new AppError(409, 'Username already registered')
 
-  const existingEmployee = await findEmployeeByEmail(input.email)
+  const existingEmployee = await prisma.employee.findFirst({ where: { email: input.email } })
   if (existingEmployee) throw new AppError(409, 'Email already registered')
 
   // 1. Validate role with constants & database
@@ -167,17 +165,15 @@ export async function register(input: z.infer<typeof registerSchema>) {
   const finalCode = await generateUniqueEmployeeCode()
 
   return prisma.$transaction(async (tx) => {
-    // Gọi hàm Public createEmployee từ employees module thay vì tx.employee.create
-    const employee = await createEmployee(
-      {
+    const employee = await tx.employee.create({
+      data: {
         employee_code: finalCode,
         full_name: input.name,
         email: input.email,
         positionId: posId,
         departmentId: deptId,
       },
-      tx
-    )
+    })
 
     const user = await tx.user.create({
       data: {
@@ -215,83 +211,5 @@ export async function register(input: z.infer<typeof registerSchema>) {
 
     const safe = safeUser(user)
     return { user: safe, accessToken: tokenFor(safe) }
-  })
-}
-
-/**
- * Public Module API: Tìm User theo username (hỗ trợ transaction)
- */
-export async function findAuthUserByUsername(username: string, tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.user.findFirst({ where: { username } })
-}
-
-/**
- * Public Module API: Tìm User theo ID (hỗ trợ transaction)
- */
-export async function findAuthUserById(userId: string, tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.user.findUnique({ where: { id: userId } })
-}
-
-/**
- * Public Module API: Tạo User mới (dành cho module employees khi tạo nhân viên)
- */
-export async function createAuthUser(
-  data: {
-    username: string
-    passwordHash: string
-    role_id: number
-    is_active?: boolean
-  },
-  tx?: Prisma.TransactionClient
-) {
-  const client = tx ?? prisma
-  return client.user.create({ data })
-}
-
-/**
- * Public Module API: Cập nhật thông tin User (hỗ trợ transaction)
- */
-export async function updateAuthUser(
-  userId: string,
-  data: Prisma.UserUpdateInput,
-  tx?: Prisma.TransactionClient
-) {
-  const client = tx ?? prisma
-  return client.user.update({
-    where: { id: userId },
-    data,
-  })
-}
-
-/**
- * Public Module API: Tìm Role theo tên (hỗ trợ transaction)
- */
-export async function getRoleByName(roleName: string, tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.roles.findFirst({
-    where: { role_name: { equals: roleName, mode: 'insensitive' } },
-  })
-}
-
-/**
- * Public Module API: Lấy Role mặc định cho nhân viên mới (EMPLOYEE)
- */
-export async function getDefaultRole(tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  const empRole = await client.roles.findFirst({
-    where: { role_name: { equals: 'EMPLOYEE', mode: 'insensitive' } },
-  })
-  return empRole || client.roles.findFirst()
-}
-
-/**
- * Public Module API: Xóa tài khoản User (hỗ trợ transaction)
- */
-export async function deleteAuthUser(userId: string, tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.user.delete({
-    where: { id: userId },
   })
 }

@@ -40,3 +40,5 @@ export const employeeRoutes: RouteObject = {
   ],
 };
 
+// Alias export for backwards compatibility
+export const staffRoutes = employeeRoutes;

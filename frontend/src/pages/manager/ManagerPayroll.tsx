@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
-import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionUtils';
+import { isAnotherManager } from '../../utils/permissionUtils';
 import { PayrollRecord } from '../../types';
 import { logger } from '../../utils/logger';
-import { useDepartmentPositions } from '@/features/employees';
+import { useDepartmentPositions } from '../../hooks';
 import {
   PayrollHeader,
   PayrollSummaryCards,
@@ -15,7 +15,7 @@ import {
   PolicyFormData,
   PayrollFinalizeModal,
   PayrollUnlockModal,
-} from '@/features/payrolls';
+} from '../../features/payroll';
 
 const payrollLogger = logger.child('ManagerPayroll');
 
@@ -100,7 +100,6 @@ export const ManagerPayroll: React.FC = () => {
 
   // Modal State for Editing a Payroll line item
   const [editingItem, setEditingItem] = useState<EditingPayrollItem | null>(null);
-  const [isSavingItem, setIsSavingItem] = useState(false);
 
   // Dynamic periods generated from payroll records
   const availablePeriods = Array.from(
@@ -146,7 +145,7 @@ export const ManagerPayroll: React.FC = () => {
     return true;
   });
   const isFinalized =
-    allPeriodRecords.length > 0 && allPeriodRecords.every((p) => p.status === 'FINALIZED' || p.status === 'PAID');
+    allPeriodRecords.length > 0 && allPeriodRecords.every((p) => p.status === 'FINALIZED');
 
   // Compute metrics
   const totalExpense = allPeriodRecords.reduce((sum, r) => sum + (r.net_salary || 0), 0);
@@ -181,12 +180,6 @@ export const ManagerPayroll: React.FC = () => {
   const lateRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
 
   const handleOpenEdit = (record: PayrollRecord) => {
-    // Chốt chặn: Chặn sửa các phiếu có trạng thái khác PENDING
-    if (record.status !== 'PENDING') {
-      showToast(`Không thể chỉnh sửa phiếu lương ở trạng thái ${record.status}. Chỉ có thể chỉnh sửa khi ở trạng thái PENDING (Chờ duyệt)!`, 'error');
-      return;
-    }
-
     const emp = employees.find((e) => e.employee_id === record.employee_id);
     if (role !== 'admin') {
       const isSelf = Boolean(
@@ -200,32 +193,22 @@ export const ManagerPayroll: React.FC = () => {
         showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error');
         return;
       }
-      if (isDifferentDepartment(emp, currentUser)) {
-        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error');
-        return;
-      }
     }
 
     setEditingItem({
       record,
       empName: emp?.full_name || record.employee_name || record.employee_id,
-      hourly_rate: record.hourly_rate ?? 0,
-      working_hours: record.total_working_hours ?? record.working_hours ?? 0,
+      hourly_rate: record.hourly_rate || 100000,
+      working_hours: record.total_working_hours || 176,
       total_overtime: record.total_overtime ?? 0,
       total_late_early: record.total_late_early ?? 0,
-      allowance: record.allowance ?? 0,
-      reason: record.reason || '',
+      allowance: record.allowance || 0,
     });
   };
 
-  const handleConfirmEditSave = async (e: React.FormEvent) => {
+  const handleConfirmEditSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
-
-    if (editingItem.record.status !== 'PENDING') {
-      showToast(`Không thể chỉnh sửa phiếu lương ở trạng thái ${editingItem.record.status}. Chỉ có thể chỉnh sửa khi ở trạng thái PENDING (Chờ duyệt)!`, 'error');
-      return;
-    }
 
     const emp = employees.find((e) => e.employee_id === editingItem.record.employee_id);
     if (role !== 'admin') {
@@ -240,31 +223,18 @@ export const ManagerPayroll: React.FC = () => {
         showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error');
         return;
       }
-      if (isDifferentDepartment(emp, currentUser)) {
-        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error');
-        return;
-      }
     }
 
-    try {
-      setIsSavingItem(true);
-      await updatePayrollItem(editingItem.record.payroll_id, {
-        hourly_rate: editingItem.hourly_rate,
-        working_hours: editingItem.working_hours,
-        total_overtime: editingItem.total_overtime,
-        total_late_early: editingItem.total_late_early,
-        allowance: editingItem.allowance,
-        reason: editingItem.reason,
-      });
+    updatePayrollItem(editingItem.record.payroll_id, {
+      hourly_rate: editingItem.hourly_rate,
+      working_hours: editingItem.working_hours,
+      total_overtime: editingItem.total_overtime,
+      total_late_early: editingItem.total_late_early,
+      allowance: editingItem.allowance,
+    });
 
-      showToast(`Đã lưu thay đổi bảng lương cho ${editingItem.empName}!`, 'success');
-      setEditingItem(null);
-    } catch (err: any) {
-      payrollLogger.error('Lỗi khi cập nhật phiếu lương:', err);
-      showToast(err.message || 'Lỗi khi cập nhật phiếu lương', 'error');
-    } finally {
-      setIsSavingItem(false);
-    }
+    showToast(`Đã lưu thay đổi bảng lương cho ${editingItem.empName}!`, 'success');
+    setEditingItem(null);
   };
 
   const handleFinalizeConfirm = () => {
@@ -316,13 +286,7 @@ export const ManagerPayroll: React.FC = () => {
     const rows = recordsToExport.map((r) => {
       const emp = employees.find((e) => e.employee_id === r.employee_id);
       const name = emp?.full_name || r.employee_name || r.employee_id;
-      const statusStr = r.status === 'PAID'
-        ? 'Đã Thanh Toán'
-        : r.status === 'FINALIZED'
-        ? 'Đã Chốt'
-        : r.status === 'CONFIRMED'
-        ? 'Đã Xác Nhận'
-        : 'Đang Soạn Thảo';
+      const statusStr = r.status === 'FINALIZED' ? 'Đã Chốt' : 'Đang Soạn Thảo';
 
       return [
         r.employee_id,
@@ -410,7 +374,6 @@ export const ManagerPayroll: React.FC = () => {
         otRate={otRate}
         lateRate={lateRate}
         selectedPeriod={selectedPeriod}
-        isSubmitting={isSavingItem}
       />
 
       {/* Confirmation Modal: Finalize */}

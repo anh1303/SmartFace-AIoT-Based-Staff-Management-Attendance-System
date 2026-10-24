@@ -157,9 +157,7 @@ export const EmployeeAttendance: React.FC = () => {
                     {record.device_id}
                   </TableCell>
                   <TableCell className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                    {record.verification_score !== null && record.verification_score !== undefined
-                      ? `${(record.verification_score * 100).toFixed(1)}% Match`
-                      : '--'}
+                    {(record.verification_score * 100).toFixed(1)}% Match
                   </TableCell>
                   <TableCell isLast>
                     <span
@@ -191,3 +189,4 @@ export const EmployeeAttendance: React.FC = () => {
   );
 };
 
+export const StaffAttendance = EmployeeAttendance;

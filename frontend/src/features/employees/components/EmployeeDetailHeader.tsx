@@ -27,6 +27,8 @@ interface EmployeeDetailHeaderProps {
   onNextEmployee: () => void;
   onOpenEditModal: () => void;
   onPrint: () => void;
+  attendanceTotalLogs: number;
+  shiftsCount: number;
 }
 
 export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
@@ -39,6 +41,7 @@ export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
   onNextEmployee,
   onOpenEditModal,
   onPrint,
+  shiftsCount
 }) => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -241,31 +244,71 @@ export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
       </div>
 
       {/* Tab Navigation căn đều 5 button */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mt-5 pt-4 border-t border-purple-300 dark:border-white/20 w-full relative z-10">
-        {[
-          { id: 'overview' as const, label: 'Tổng quan & Sinh trắc', icon: User },
-          { id: 'attendance' as const, label: 'Nhật ký Chấm công', icon: Clock },
-          { id: 'schedule' as const, label: 'Lịch làm việc', icon: CalendarRange },
-          { id: 'payroll' as const, label: 'Lương & Phiếu lương', icon: DollarSign },
-          { id: 'account' as const, label: 'Tài khoản', icon: ShieldCheck },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${isActive
-                ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
-                : 'text-slate-700 hover:text-purple-700 hover:bg-white/60 dark:text-slate-300 dark:hover:text-white dark:hover:bg-white/10'
-                }`}
-            >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{tab.label}</span>
-            </button>
-          );
-        })}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mt-5 pt-4 border-t border-slate-100/10 dark:border-white/10 w-full relative z-10">
+        <button
+          type="button"
+          onClick={() => setActiveTab('overview')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === 'overview'
+              ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
+              : 'text-slate-300 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          <User className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">Tổng quan & Sinh trắc</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('attendance')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === 'attendance'
+              ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
+              : 'text-slate-300 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">Nhật ký Chấm công</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('schedule')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === 'schedule'
+              ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
+              : 'text-slate-300 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          <CalendarRange className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">Lịch làm việc</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('payroll')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === 'payroll'
+              ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
+              : 'text-slate-300 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          <DollarSign className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">Lương & Phiếu lương</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('account')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === 'account'
+              ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
+              : 'text-slate-300 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">Tài khoản</span>
+        </button>
       </div>
     </div>
   );

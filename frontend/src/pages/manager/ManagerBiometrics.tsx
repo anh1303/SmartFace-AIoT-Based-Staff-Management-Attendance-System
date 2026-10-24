@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
-import { useDepartmentPositions } from '@/features/employees';
+import { useDepartmentPositions } from '../../hooks';
 import { ScanFace, Fingerprint, AlertTriangle } from 'lucide-react';
 import {
   BiometricsHeader,
@@ -16,7 +16,7 @@ import {
   FingerprintConfirmModal,
   CameraEkycModal,
   useBiometricEnrollment,
-} from '@/features/biometrics';
+} from '../../features/biometrics';
 
 export const ManagerBiometrics: React.FC = () => {
   const { employees } = useApp();

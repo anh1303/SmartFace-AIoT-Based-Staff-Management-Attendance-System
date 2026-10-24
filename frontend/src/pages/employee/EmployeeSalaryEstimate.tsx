@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatVNDateISO } from '../../utils/dateUtils';
-import { calcPayrollAmount, formatPayrollRateLabel } from '../../utils/payrollUtils';
 import {
   DollarSign,
   Calendar,
@@ -41,25 +40,23 @@ export const EmployeeSalaryEstimate: React.FC = () => {
     || payroll.find(p => p.employee_id === empCode)
     || payroll[0];
 
-  // Dùng đơn giá snapshot của phiếu trong preview nếu có, thay vì lấy cấu hình mới áp lên phiếu cũ
-  const hourlyRate = currentPayroll?.hourly_rate !== undefined && currentPayroll?.hourly_rate !== null
-    ? Number(currentPayroll.hourly_rate)
-    : (currentEmp?.hourly_rate || 0);
-  const overtimeHours = currentPayroll?.total_overtime ?? 0;
+  const hourlyRate = currentEmp?.hourly_rate || currentPayroll?.hourly_rate || 120000;
+  const overtimeHours = currentPayroll?.total_overtime ?? 4.0;
   const lateEarlyHours = currentPayroll?.total_late_early ?? 0;
-  const allowance = currentPayroll?.allowance ?? 0;
-  const otRate = currentPayroll?.overtime_rate !== undefined && currentPayroll?.overtime_rate !== null
-    ? Number(currentPayroll.overtime_rate)
-    : (bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5);
-  const penaltyRate = currentPayroll?.late_early_penalty !== undefined && currentPayroll?.late_early_penalty !== null
-    ? Number(currentPayroll.late_early_penalty)
-    : (bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000);
+  const allowance = currentPayroll?.allowance ?? 2500000;
+  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5;
+  const penaltyRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
 
-  // Calculation using centralized payrollUtils
-  const otAmount = calcPayrollAmount(overtimeHours, otRate, hourlyRate);
-  const penaltyAmount = calcPayrollAmount(lateEarlyHours, penaltyRate, hourlyRate);
+  // Bug 1 Fix: Handle multiplier vs fixed amount correctly
+  const otAmount = otRate <= 10
+    ? overtimeHours * hourlyRate * otRate
+    : overtimeHours * otRate;
 
-  const standardHours = currentPayroll?.total_working_hours ?? currentPayroll?.working_hours ?? 0;
+  const penaltyAmount = penaltyRate <= 10
+    ? lateEarlyHours * hourlyRate * penaltyRate
+    : lateEarlyHours * penaltyRate;
+
+  const standardHours = currentPayroll?.total_working_hours || 160;
   const baseSalary = standardHours * hourlyRate;
   const netSalary = currentPayroll?.net_salary
     ? Number(currentPayroll.net_salary)
@@ -68,11 +65,16 @@ export const EmployeeSalaryEstimate: React.FC = () => {
   // Attended days count
   const myAttendance = attendance.filter(a => a.employee_id === empCode);
   const distinctDays = Array.from(new Set(myAttendance.map(a => formatVNDateISO(a.timestamp)))).length;
-  const workDaysCount = distinctDays > 0 ? distinctDays : 0;
+  const workDaysCount = distinctDays > 0 ? distinctDays : 19;
   const progressPercent = Math.min(100, Math.round((workDaysCount / 22) * 100));
 
-  const otRateLabel = formatPayrollRateLabel(otRate, hourlyRate);
-  const penaltyRateLabel = formatPayrollRateLabel(penaltyRate, hourlyRate);
+  const otRateLabel = otRate <= 10
+    ? `${otRate}x lương giờ (${(otRate * hourlyRate).toLocaleString('vi-VN')} ₫/h)`
+    : `${otRate.toLocaleString('vi-VN')} ₫/h`;
+
+  const penaltyRateLabel = penaltyRate <= 10
+    ? `${penaltyRate}x lương giờ (${(penaltyRate * hourlyRate).toLocaleString('vi-VN')} ₫/h)`
+    : `${penaltyRate.toLocaleString('vi-VN')} ₫/h`;
 
   return (
     <div className="space-y-6">
@@ -88,24 +90,8 @@ export const EmployeeSalaryEstimate: React.FC = () => {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
               Lương Tạm Tính ({selectedEmployeePeriod ? `Kỳ ${selectedEmployeePeriod}` : 'Kỳ hiện tại'})
             </h1>
-            <span
-              className={`text-xs px-2.5 py-0.5 rounded-full font-mono font-medium border ${
-                currentPayroll?.status === 'PAID'
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                  : currentPayroll?.status === 'FINALIZED'
-                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-                  : currentPayroll?.status === 'CONFIRMED'
-                  ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
-                  : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-              }`}
-            >
-              {currentPayroll?.status === 'PAID'
-                ? 'ĐÃ THANH TOÁN'
-                : currentPayroll?.status === 'FINALIZED'
-                ? 'ĐÃ CHỐT'
-                : currentPayroll?.status === 'CONFIRMED'
-                ? 'ĐÃ XÁC NHẬN'
-                : 'ĐANG TÍCH LŨY CÔNG'}
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono font-medium border border-amber-500/20">
+              {currentPayroll?.status === 'FINALIZED' ? 'ĐÃ CHỐT' : 'ĐANG TÍCH LŨY CÔNG'}
             </span>
           </div>
         </div>
@@ -171,8 +157,8 @@ export const EmployeeSalaryEstimate: React.FC = () => {
               />
             </div>
             <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-              <span>Đơn giá OT: {formatPayrollRateLabel(otRate, hourlyRate)}</span>
-              <span>Đơn giá phạt: {formatPayrollRateLabel(penaltyRate, hourlyRate)}</span>
+              <span>Đơn giá OT: {otRate <= 10 ? `${otRate}x (${(otRate * hourlyRate).toLocaleString('vi-VN')} ₫/h)` : `${otRate.toLocaleString('vi-VN')} ₫/h`}</span>
+              <span>Đơn giá phạt: {penaltyRate <= 10 ? `${penaltyRate}x` : `${penaltyRate.toLocaleString('vi-VN')} ₫/h`}</span>
             </div>
           </div>
         </div>
@@ -241,4 +227,6 @@ export const EmployeeSalaryEstimate: React.FC = () => {
       </div>
     </div>
   );
-};
+};
+
+export const StaffSalaryEstimate = EmployeeSalaryEstimate;

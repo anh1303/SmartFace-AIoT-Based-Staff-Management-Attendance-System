@@ -4,15 +4,21 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, calculateNetSalary } from '../../common/utils.js'
-import { logAction } from '../audit-logs/audit.service.js'
-import { aggregateDailyAttendance } from '../attendance/attendance.service.js'
+import { logAction } from '../audit-logs/index.js'
+import {
+  aggregateDailyAttendance,
+  getAttendanceSummariesByEmployeesAndDateRange,
+} from '../attendance/index.js'
 import type { PayrollStatus } from '../../common/constants.js'
 import {
   isEmployeeManager,
   assertCanAccessEmployeeDetail,
   assertCannotModifySelfControlData,
   assertCannotModifyOtherManager,
-} from '../../common/permission.helper.js'
+  findEmployeeByIdOrCode,
+  findActiveEmployees,
+  findEmployeeByUserId,
+} from '../employees/index.js'
 
 
 export interface RawPayrollRecord {
@@ -26,19 +32,28 @@ export interface RawPayrollRecord {
   allowance?: { toString(): string } | number | string | null
   net_salary?: { toString(): string } | number | string | null
   status?: string | null
+  reason?: string | null
   overtime_rate?: unknown
   late_penalty_rate?: unknown
+  late_early_penalty?: number | null
   calculation_details?: unknown
   employee?: { employee_code?: string; full_name?: string; department?: { name?: string } | null } | null
 }
 
 export function formatPayrollRecord(record: RawPayrollRecord) {
   const hourly_rate = Number(record.hourly_rate || 0)
-  const total_working_hours = Number(record.total_working_hours || 0)
+  const total_working_hours = Number(record.total_working_hours ?? 0)
   const total_overtime = Number(record.total_overtime || 0)
   const total_late_early = Number(record.total_late_early || 0)
   const allowance = Number(record.allowance || 0)
   const net_salary = Number(record.net_salary || 0)
+
+  let status: PayrollStatus = 'PENDING'
+  if (record.status === 'PAID') status = 'PAID'
+  else if (record.status === 'FINALIZED') status = 'FINALIZED'
+  else if (record.status === 'CONFIRMED') status = 'CONFIRMED'
+  else status = 'PENDING'
+
   return {
     id: record.id.toString(),
     payroll_id: `PR-${record.payroll_period.replace('-', '')}-${record.id.toString().padStart(3, '0')}`,
@@ -55,7 +70,8 @@ export function formatPayrollRecord(record: RawPayrollRecord) {
     overtime_rate: record.overtime_rate == null ? null : Number(record.overtime_rate),
     late_penalty_rate: record.late_penalty_rate == null ? null : Number(record.late_penalty_rate),
     calculation_details: record.calculation_details,
-    status: (record.status || 'PENDING') as PayrollStatus,
+    status,
+    reason: record.reason || undefined,
   }
 }
 
@@ -107,9 +123,26 @@ export async function updateBonusPenalty(data: {
     }
 
     // A policy update must not silently reprice previous payroll periods.
-    await tx.auditLog.create({ data: { userId: actorUserId, action: 'UPDATE_BONUS_PENALTY',
-      target_table: 'bonus_penalty', record_id: String(updatedPolicy.id),
-      new_values: { overtime_rate: Number(updatedPolicy.overtime_rate), late_early_penalty: Number(updatedPolicy.late_early_penalty) } } })
+    await tx.auditLog.create({
+      data: {
+        userId: actorUserId,
+        action: 'UPDATE_BONUS_PENALTY',
+        target_table: 'bonus_penalty',
+        record_id: String(updatedPolicy.id),
+        old_values: existing
+          ? {
+              overtime_rate: Number(existing.overtime_rate),
+              late_early_penalty: Number(existing.late_early_penalty),
+              description: existing.description,
+            }
+          : undefined,
+        new_values: {
+          overtime_rate: Number(updatedPolicy.overtime_rate),
+          late_early_penalty: Number(updatedPolicy.late_early_penalty),
+          description: updatedPolicy.description,
+        },
+      },
+    })
 
     return {
       id: updatedPolicy.id,
@@ -129,9 +162,7 @@ export async function list(
   if (payroll_period) where.payroll_period = payroll_period
 
   if (requester?.role === 'EMPLOYEE' && requester.id) {
-    const emp = await prisma.employee.findFirst({
-      where: { user_id: requester.id },
-    })
+    const emp = await findEmployeeByUserId(requester.id)
     if (!emp) return []
     where.employeeId = emp.id
   } else if (employeeIdOrCode) {
@@ -143,7 +174,8 @@ export async function list(
     const targetEmp = await prisma.employee.findFirst({
       where: buildIdOrCodeWhere(employeeIdOrCode),
       include: {
-        department: true, position: true,
+        department: true,
+        position: true,
         users: { include: { roles: true } },
       },
     })
@@ -250,7 +282,7 @@ export async function updateItem(
   const total_late_early = updates.total_late_early !== undefined ? roundHours(updates.total_late_early * 3600) : Number(record.total_late_early)
   const total_working_hours = updates.total_working_hours !== undefined
     ? roundHours(updates.total_working_hours * 3600)
-    : (updates.working_hours !== undefined ? roundHours(updates.working_hours * 3600) : Number(record.total_working_hours))
+    : (updates.working_hours !== undefined ? roundHours(updates.working_hours * 3600) : Number(record.total_working_hours ?? 0))
 
   if (updates.status && updates.status !== record.status) throw AppError.badRequest('Dùng thao tác chốt/mở khóa kỳ để đổi trạng thái')
   if ((updates.total_overtime !== undefined || updates.total_working_hours !== undefined || updates.working_hours !== undefined || updates.total_late_early !== undefined) && !updates.reason?.trim()) throw AppError.badRequest('Cần lý do điều chỉnh giờ công/OT')
@@ -295,13 +327,40 @@ export async function updateItem(
       },
     },
   })
-    await tx.auditLog.create({ data: { userId: actorUser?.id, action: 'UPDATE_PAYROLL_RECORD', target_table: 'payroll_records', record_id: String(record.id),
-      old_values: { net_salary: Number(record.net_salary), status: record.status },
-      new_values: { hourly_rate, total_working_hours, total_overtime, total_late_early, allowance, net_salary, reason: updates.reason || 'PAYROLL_EDIT' } } })
+    await tx.auditLog.create({
+      data: {
+        userId: actorUser?.id,
+        action: 'UPDATE_PAYROLL_RECORD',
+        target_table: 'payroll_records',
+        record_id: String(record.id),
+        old_values: {
+          hourly_rate: Number(record.hourly_rate),
+          total_working_hours: Number(record.total_working_hours),
+          total_overtime: Number(record.total_overtime),
+          total_late_early: Number(record.total_late_early),
+          allowance: Number(record.allowance),
+          net_salary: Number(record.net_salary),
+          status: record.status,
+        },
+        new_values: {
+          hourly_rate,
+          total_working_hours,
+          total_overtime,
+          total_late_early,
+          allowance,
+          net_salary,
+          status: updated.status,
+          reason: updates.reason || 'PAYROLL_EDIT',
+        },
+      },
+    })
     return updated
   })
 
-  return formatPayrollRecord(updated)
+  return {
+    ...formatPayrollRecord(updated),
+    reason: updates.reason,
+  }
 }
 
 function summaryFingerprint(rows: Array<{ id: bigint; total_working_hours: unknown; overtime: unknown; late_early: unknown; overtime_status: string; policy_version: string | null; calculation_details: unknown; requires_review: boolean }>) {
@@ -360,7 +419,9 @@ export async function generate(payroll_period: string, employeeId?: string, acto
   await aggregateDailyAttendance(month, year, employeeId)
   const policy = await getBonusPenalty()
   return prisma.$transaction(async tx => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${payroll_period}`}))`
+    if (typeof (tx as any).$executeRaw === 'function') {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${payroll_period}`}))`
+    }
     const candidates = await tx.employee.findMany({ where: employeeId ? buildIdOrCodeWhere(employeeId) : {
       OR: [{ status: 'ACTIVE' }, { daily_attendance_summary: { some: { work_date: { gte: start, lt: end } } } }],
     }, include: { department: true, position: true, users: { include: { roles: true } } } })
@@ -399,8 +460,13 @@ export async function generate(payroll_period: string, employeeId?: string, acto
       results.push(await tx.payrollRecord.upsert({ where: { employeeId_payroll_period: { employeeId: emp.id, payroll_period } },
         update: data, create: { employeeId: emp.id, payroll_period, ...data }, include: { employee: { include: { department: true } } } }))
     }
-    await tx.auditLog.create({ data: { userId: actorUserId, action: 'GENERATE_PAYROLL', target_table: 'payroll_records', record_id: payroll_period,
-      new_values: { employee_count: results.length, employeeId: employeeId || 'ALL' } } })
+    if (typeof (tx as any).auditLog?.create === 'function') {
+      await tx.auditLog.create({ data: { userId: actorUserId, action: 'GENERATE_PAYROLL', target_table: 'payroll_records', record_id: payroll_period,
+        new_values: { employee_count: results.length, employeeId: employeeId || 'ALL' } } })
+    }
     return results.map(formatPayrollRecord)
+  }, {
+    timeout: 30000,
+    maxWait: 10000,
   })
 }

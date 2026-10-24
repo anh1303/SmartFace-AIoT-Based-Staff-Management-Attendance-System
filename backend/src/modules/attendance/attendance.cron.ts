@@ -1,4 +1,4 @@
-import { emitAttendanceEvent } from '../../sockets/attendance.gateway.js'
+import { emitAttendanceEvent } from './attendance.gateway.js'
 import { aggregateDailyAttendance } from './attendance.service.js'
 import { getTodayVNString } from '../../common/utils.js'
 import { logger } from '../../common/logger.js'

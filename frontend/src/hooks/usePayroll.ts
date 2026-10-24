@@ -51,9 +51,9 @@ export function usePayroll() {
   });
 
   const updatePayrollItemMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<PayrollRecord> }) => updatePayrollItemApi(id, updates),
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<PayrollRecord> & { working_hours?: number; reason?: string } }) =>
+      updatePayrollItemApi(id, updates),
     onSuccess: () => {
-      showToast('Đã lưu thay đổi phiếu lương vào CSDL', 'success');
       queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
     },
     onError: (err: Error) => {
@@ -102,7 +102,8 @@ export function usePayroll() {
     setSelectedPeriod,
     isLoadingPayroll: payrollQuery.isLoading,
     generatePayroll: (period: string) => generatePayrollMutation.mutateAsync(period),
-    updatePayrollItem: (id: string, updates: Partial<PayrollRecord>) => updatePayrollItemMutation.mutateAsync({ id, updates }),
+    updatePayrollItem: (id: string, updates: Partial<PayrollRecord> & { working_hours?: number; reason?: string }) =>
+      updatePayrollItemMutation.mutateAsync({ id, updates }),
     finalizePayrollPeriod: (period: string) => finalizePayrollPeriodMutation.mutate(period),
     unlockPayrollPeriod: (period: string) => unlockPayrollPeriodMutation.mutate(period),
     updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => updateBonusPenaltyMutation.mutateAsync(data),

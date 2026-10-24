@@ -1,10 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchShiftsApi, assignShiftApi } from '../api/shiftApi';
-import { WorkShift } from '../types';
-import { useToast } from '../context/ToastContext';
+import { fetchShiftsApi, assignShiftApi } from '../../../api/shiftApi';
+import { WorkShift } from '../../../types';
+import { useToast } from '../../../context/ToastContext';
 
 export const SHIFTS_QUERY_KEY = ['shifts'];
 
+/**
+ * Feature Hook: Quản lý lịch ca làm việc và phân ca nhân sự.
+ */
 export function useShifts() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();

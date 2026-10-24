@@ -53,3 +53,29 @@ export const listLogs = (limit = 100) =>
     orderBy: { created_at: 'desc' },
     take: Math.min(limit, 100),
   })
+
+/**
+ * Public Module API: Tìm danh sách audit logs theo điều kiện (hỗ trợ transaction)
+ */
+export async function findAuditLogs(
+  query: Prisma.AuditLogWhereInput,
+  tx?: Prisma.TransactionClient
+) {
+  const client = tx ?? prisma
+  return client.auditLog.findMany({
+    where: query,
+  })
+}
+
+/**
+ * Public Module API: Tìm audit log đầu tiên theo điều kiện (hỗ trợ transaction)
+ */
+export async function findFirstAuditLog(
+  query: Prisma.AuditLogWhereInput,
+  tx?: Prisma.TransactionClient
+) {
+  const client = tx ?? prisma
+  return client.auditLog.findFirst({
+    where: query,
+  })
+}

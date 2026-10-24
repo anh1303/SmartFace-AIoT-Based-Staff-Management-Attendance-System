@@ -1,6 +1,6 @@
+/**
+ * Shared Hooks Layer.
+ * Only contains domain hooks consumed globally across both Employee and Manager spaces.
+ */
 export * from './useEmployees';
-export * from './useShifts';
-export * from './useAttendance';
 export * from './usePayroll';
-export * from './useDepartmentPositions';
-export * from './useAttendancePairs';

@@ -10,13 +10,15 @@ export function verifySocketToken(token: string): AuthUser {
 export function socketAuthMiddleware(socket: Socket, next: (err?: Error) => void) {
   let cookieToken: string | undefined
   try {
-    const cookie = socket.handshake.headers.cookie?.split(';').map(v => v.trim()).find(v => v.startsWith('token='))
+    const cookie = socket.handshake.headers?.cookie?.split(';').map(v => v.trim()).find(v => v.startsWith('token='))
     if (cookie) cookieToken = decodeURIComponent(cookie.slice(6))
   } catch { /* malformed cookies are not credentials */ }
+
   const token =
     socket.handshake.auth?.token ||
     socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '') ||
-    cookieToken
+    cookieToken ||
+    (typeof socket.handshake.query?.token === 'string' ? socket.handshake.query.token : undefined)
 
   if (!token) {
     return next(new Error('Authentication required: Token missing in handshake auth'))

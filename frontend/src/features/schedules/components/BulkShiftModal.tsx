@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sparkles, Lock } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
-import { WorkShift, Employee } from '../../../types';
+import { WorkShift, Employee, DepartmentItem } from '../../../types';
 
 interface BulkShiftModalProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface BulkShiftModalProps {
   startLabel: string;
   endLabel: string;
   employees: Employee[];
+  departments?: DepartmentItem[] | string[];
   bulkTarget: 'ALL' | 'DEPARTMENT' | string;
   setBulkTarget: (target: 'ALL' | 'DEPARTMENT' | string) => void;
   bulkDepartment: string;
@@ -34,6 +35,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
   startLabel,
   endLabel,
   employees,
+  departments = [],
   bulkTarget,
   setBulkTarget,
   bulkDepartment,
@@ -50,6 +52,16 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
   setBulkNote,
   onSubmit,
 }) => {
+  const departmentList = React.useMemo(() => {
+    if (departments && departments.length > 0) {
+      return departments.map(d => (typeof d === 'string' ? d : d.name));
+    }
+    const deptSet = new Set<string>();
+    employees.forEach(e => {
+      if (e.department) deptSet.add(e.department);
+    });
+    return Array.from(deptSet);
+  }, [departments, employees]);
   return (
     <Modal
       isOpen={isOpen}
@@ -76,13 +88,18 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setBulkTarget('DEPARTMENT')}
+              onClick={() => {
+                setBulkTarget('DEPARTMENT');
+                if (!bulkDepartment && departmentList.length > 0) {
+                  setBulkDepartment(departmentList[0]);
+                }
+              }}
               className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${bulkTarget === 'DEPARTMENT'
                 ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-600'
                 : 'bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-purple-300'
                 }`}
             >
-              Theo chức vụ
+              Theo phòng ban
             </button>
 
             <select
@@ -106,10 +123,15 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
                 onChange={e => setBulkDepartment(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
               >
-                <option value="Bảo vệ" className="bg-white dark:bg-[#13162b]">Bảo vệ</option>
-                <option value="Nhân viên" className="bg-white dark:bg-[#13162b]">Nhân viên</option>
-                <option value="Thu ngân" className="bg-white dark:bg-[#13162b]">Thu ngân</option>
-                <option value="Quản lý" className="bg-white dark:bg-[#13162b]">Quản lý</option>
+                {departmentList.length === 0 ? (
+                  <option value="" disabled className="bg-white dark:bg-[#13162b]">Chưa có phòng ban nào</option>
+                ) : (
+                  departmentList.map(deptName => (
+                    <option key={deptName} value={deptName} className="bg-white dark:bg-[#13162b]">
+                      {deptName}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
           )}

@@ -30,7 +30,7 @@ export async function generatePayrollApi(period: string): Promise<PayrollRecord[
 
 export async function updatePayrollItemApi(
   id: string,
-  updates: Partial<PayrollRecord> & { working_hours?: number }
+  updates: Partial<PayrollRecord> & { working_hours?: number; reason?: string }
 ): Promise<PayrollRecord> {
   const workingHours = updates.working_hours ?? updates.total_working_hours;
   const res = await apiFetch(`/api/payroll/${id}`, {

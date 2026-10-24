@@ -3,7 +3,7 @@ import { assertDeviceWebhook } from '../../common/device-auth.js';
 import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
 import * as service from './attendance.service.js';
-import { emitAttendanceEvent } from '../../sockets/attendance.gateway.js';
+import { emitAttendanceEvent } from './attendance.gateway.js';
 import {
   checkInSchema,
   adjustAttendanceSchema,
@@ -44,7 +44,7 @@ export const checkIn = async (req: Request, res: Response) => {
 
 export const checkOut = async (req: Request, res: Response) => {
   const body = checkOutSchema.parse(req.body);
-  const targetEmployeeId = body.employeeId;
+  const targetEmployeeId = body.employeeId || (body as any).employee_id;
   const result = await service.checkOut(targetEmployeeId, body.device_info, req.user, { eventId: body.event_id });
   if (!result.duplicate) emitAttendanceEvent('checked-out', result);
   successResponse(res, result, 'Check-out recorded', 201);

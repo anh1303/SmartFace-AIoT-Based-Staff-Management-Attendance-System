@@ -18,7 +18,7 @@ import {
 } from '../../../components/common';
 import { PayrollRecord, Employee } from '../../../types';
 import { useAuth } from '../../../context/AuthContext';
-import { isAnotherManager } from '../../../utils/permissionUtils';
+import { isAnotherManager, isDifferentDepartment } from '../../../utils/permissionUtils';
 
 interface PayrollTableProps {
   selectedPeriod: string;
@@ -88,7 +88,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
       </FilterBar>
 
       {/* Thanh 2: Bảng chi tiết lương chuẩn Bento */}
-      <TableContainer minWidth="1010px">
+      <TableContainer minWidth="1120px">
         <TableHead>
           <TableHeadRow>
             <TableHeadCell width="200px">Nhân viên</TableHeadCell>
@@ -98,28 +98,31 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
             <TableHeadCell width="130px">Số giờ đi trễ/về sớm</TableHeadCell>
             <TableHeadCell width="110px">Phụ cấp</TableHeadCell>
             <TableHeadCell width="130px">Thực lĩnh</TableHeadCell>
+            <TableHeadCell width="120px">Trạng thái</TableHeadCell>
             <TableHeadCell width="100px" isLast>Thao tác</TableHeadCell>
           </TableHeadRow>
         </TableHead>
         <TableBody>
           {currentRecords.length === 0 ? (
-            <TableEmpty colSpan={8} message="Không tìm thấy bảng lương nào phù hợp với bộ lọc." />
+            <TableEmpty colSpan={9} message="Không tìm thấy bảng lương nào phù hợp với bộ lọc." />
           ) : (
             currentRecords.map((record) => {
               const emp = employees.find((e) => e.employee_id === record.employee_id);
               const empName = emp?.full_name || record.employee_name || record.employee_id;
               const hourlyRate = record.hourly_rate || 0;
               const netSalary = record.net_salary || 0;
-              const totalWorkingHours = record.total_working_hours ?? 0;
+              const totalWorkingHours = record.total_working_hours ?? record.working_hours ?? 0;
               const totalOvertime = record.total_overtime ?? 0;
               const totalLateEarly = record.total_late_early ?? 0;
               const allowance = record.allowance || 0;
+              const isPending = record.status === 'PENDING';
 
               const isSelf = Boolean(
                 emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
               );
               const isOtherMgr = isAnotherManager(emp, currentUser);
-              const isBlockedFromEditing = record.status !== 'PENDING' || role !== 'admin' && (isSelf || isOtherMgr);
+              const isDiffDept = isDifferentDepartment(emp, currentUser);
+              const isBlockedFromEditing = record.status !== 'PENDING' || (role !== 'admin' && (isSelf || isOtherMgr || isDiffDept));
 
               return (
                 <TableRow key={record.payroll_id}>
@@ -187,7 +190,30 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                     {netSalary.toLocaleString('vi-VN')} ₫
                   </TableCell>
 
-                  {/* 8. Thao tác */}
+                  {/* 8. Trạng thái */}
+                  <TableCell align="center">
+                    <span
+                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-mono border ${
+                        record.status === 'PAID'
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                          : record.status === 'FINALIZED'
+                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                          : record.status === 'CONFIRMED'
+                          ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                      }`}
+                    >
+                      {record.status === 'PAID'
+                        ? 'ĐÃ THANH TOÁN'
+                        : record.status === 'FINALIZED'
+                        ? 'ĐÃ CHỐT'
+                        : record.status === 'CONFIRMED'
+                        ? 'ĐÃ XÁC NHẬN'
+                        : 'CHỜ DUYỆT'}
+                    </span>
+                  </TableCell>
+
+                  {/* 9. Thao tác */}
                   <TableCell isLast>
                     {isFinalized ? (
                       <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
@@ -199,6 +225,13 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                         label="Khóa"
                         icon={<Lock className="w-3.5 h-3.5 text-slate-400" />}
                         title={isSelf ? 'Chốt chặn an toàn: Không thể tự sửa phiếu lương của chính mình' : 'Chốt chặn an toàn: Không thể sửa phiếu lương của Quản lý khác'}
+                      />
+                    ) : !isPending ? (
+                      <ActionEditButton
+                        disabled
+                        label="Khóa"
+                        icon={<Lock className="w-3.5 h-3.5 text-slate-400" />}
+                        title={`Chỉ được phép sửa phiếu lương khi ở trạng thái PENDING (Phiếu hiện tại: ${record.status})`}
                       />
                     ) : (
                       <ActionEditButton

@@ -1,4 +1,3 @@
-import { useAttendanceSummaries } from '../../attendance/hooks/useAttendanceSummaries';
 import React, { useMemo } from 'react';
 import {
   Clock,
@@ -7,7 +6,7 @@ import {
 } from 'lucide-react';
 import { AttendanceRecord, Employee } from '../../../types';
 import { useApp } from '../../../context/AppContext';
-import { useAttendancePairs } from '../../../hooks/useAttendancePairs';
+import { useAttendancePairs, useAttendanceSummaries, AttendanceStats } from '@/features/attendances';
 import { getStatusBadge } from '../../../utils/timeUtils';
 import {
   TableContainer,
@@ -17,16 +16,6 @@ import {
   TableBody,
   TableEmpty
 } from '../../../components/common';
-
-interface AttendanceStats {
-  totalLogs: number;
-  checkIns: number;
-  checkOuts: number;
-  workDays: number;
-  lateCount: number;
-  earlyLeaveCount: number;
-  avgConfidence: number;
-}
 
 interface EmployeeAttendanceTabProps {
   currentEmp?: Employee;
@@ -68,7 +57,8 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
     return employees;
   }, [currentEmp, employees]);
 
-  const { summariesByKey } = useAttendanceSummaries(startDate, endDate);
+  const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap } = useAttendanceSummaries(startDate, endDate);
+
   const employeePairs = useAttendancePairs(
     targetEmployees,
     workShifts,
@@ -77,8 +67,12 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
     endDate,
     '',
     attendanceStatusFilter,
-    {},
-    {}, 'ALL', 'ALL', summariesByKey
+    customOvertimeMap,
+    customLateEarlyMap,
+    'ALL',
+    'ALL',
+    workingHoursMap,
+    summaryMap
   );
 
   // Chỉ hiển thị khi đã chấm công ít nhất 1 lần trong ca

@@ -22,7 +22,7 @@ export const generatePayrollSchema = z
   )
 
 export const updatePayrollSchema = z.object({
-  reason: z.string().trim().min(3).max(2000).optional(),
+  reason: z.string().trim().min(1).max(2000).optional(),
   hourly_rate: z.number().finite().min(0).max(1000000000).optional(),
   allowance: z.number().finite().min(0).max(1000000000000).optional(),
   total_working_hours: z.number().finite().min(0).max(744).optional(),

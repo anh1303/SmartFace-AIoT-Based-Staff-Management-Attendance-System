@@ -11,11 +11,9 @@ import {
   ShiftEditModal,
   EditingShiftTarget,
   BulkShiftModal,
-  getMonday,
-  formatDateToYYYYMMDD,
-  getISOWeekNumber
 } from '@/features/schedules';
-import { useDepartmentPositions } from '../../hooks';
+import { getMonday, formatDateToYYYYMMDD, getISOWeekNumber } from '@/utils/dateUtils';
+import { useDepartmentPositions } from '@/features/employees';
 
 export const ManagerSchedule: React.FC = () => {
   const { employees, workShifts, assignOrUpdateShift, showToast } = useApp();
@@ -39,7 +37,7 @@ export const ManagerSchedule: React.FC = () => {
     }
   }, [isManager, managerDept]);
 
-  const { departmentOptions, positionOptions } = useDepartmentPositions({
+  const { departmentOptions, positionOptions, dbDepartments } = useDepartmentPositions({
     employees,
     isManager,
     managerDept,
@@ -371,6 +369,7 @@ export const ManagerSchedule: React.FC = () => {
         startLabel={startLabel}
         endLabel={endLabel}
         employees={employees}
+        departments={dbDepartments}
         bulkTarget={bulkTarget}
         setBulkTarget={setBulkTarget}
         bulkDepartment={bulkDepartment}

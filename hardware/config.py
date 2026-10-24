@@ -475,6 +475,13 @@ TRACK_MAX_MISSING_FRAMES = _get_env_int("TRACK_MAX_MISSING_FRAMES", 10)
 
 MATCH_THRESHOLD = _get_env_float("MATCH_THRESHOLD", 0.35)
 
+# Enrollment Config
+RECOMMENDED_GALLERY_SIZE = _get_env_int("RECOMMENDED_GALLERY_SIZE", 3)
+
+# Attendance Tracking
+ATTENDANCE_MODE = (_get_env_str("ATTENDANCE_MODE", "checkin") or "checkin").lower()
+ATTENDANCE_GAP_MINUTES = _get_env_int("ATTENDANCE_GAP_MINUTES", 15)
+
 # Validation
 def validate_config():
     """Kiểm tra tính hợp lệ của các tham số cấu hình hệ thống."""

@@ -53,9 +53,11 @@ class RTSPStreamer:
         ]
         try:
             self.process = subprocess.Popen(
-                command, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL
+                command, stdin=subprocess.PIPE, stderr=subprocess.PIPE
             )
             os.set_blocking(self.process.stdin.fileno(), False)
+            if self.process.stderr:
+                os.set_blocking(self.process.stderr.fileno(), False)
             print(f"[STREAM] Đang đẩy luồng video RTSP tới MediaMTX: {self.rtsp_url}")
         except FileNotFoundError:
             print("[STREAM WARN] Không tìm thấy lệnh 'ffmpeg'! Live stream tạm tắt.")
@@ -107,6 +109,29 @@ class RTSPStreamer:
     def _close_process(self):
         process, self.process = self.process, None
         if process:
+            stderr_msg = ""
+            if getattr(process, 'stderr', None):
+                try:
+                    raw = process.stderr.read()
+                    if raw:
+                        lines = [l.strip() for l in raw.decode('utf-8', errors='ignore').splitlines() if l.strip()]
+                        ignored_prefixes = ("conversion failed", "video:", "frame=", "[libx264")
+                        error_lines = [
+                            l for l in lines
+                            if any(k in l.lower() for k in ("error", "failed", "refused", "timeout", "no route", "cannot", "denied", "unreachable"))
+                            and not l.lower().startswith(ignored_prefixes)
+                        ]
+                        if error_lines:
+                            stderr_msg = error_lines[-1]
+                        else:
+                            fallback = [l for l in lines if not l.lower().startswith(ignored_prefixes)]
+                            stderr_msg = fallback[-1] if fallback else (lines[-1] if lines else "")
+                except Exception:
+                    pass
+                try:
+                    process.stderr.close()
+                except Exception:
+                    pass
             try:
                 process.terminate()
                 process.wait(timeout=1)
@@ -114,7 +139,13 @@ class RTSPStreamer:
                 process.kill()
                 process.wait(timeout=1)
             finally:
-                if process.stdin: process.stdin.close()
+                if getattr(process, 'stdin', None):
+                    try:
+                        process.stdin.close()
+                    except Exception:
+                        pass
+            if stderr_msg:
+                print(f"[STREAM ERROR] Chi tiết FFmpeg: {stderr_msg}")
 
     def stop(self):
         self._stop.set()

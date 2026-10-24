@@ -174,8 +174,34 @@ def face_status_label(track):
     return f"REAL - {name}", (0, 255, 0)
 
 
-def main():
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser(description="SmartFace AIoT — Raspberry Pi 4 Edge Client")
+    parser.add_argument('--capture-dir', default=os.getenv("PAD_CAPTURE_DIR", None),
+                        help='Thư mục lưu crop PAD; nhấn C để chụp')
+    parser.add_argument('--subject', default=os.getenv("PAD_CAPTURE_SUBJECT", 'unspecified'),
+                        help='Mã người được chụp (không phải nhãn real/spoof)')
+    parser.add_argument('--condition', default=os.getenv("PAD_CAPTURE_CONDITION", 'unspecified'),
+                        help='Điều kiện ánh sáng / camera của phiên')
+    parser.add_argument('--label', choices=['real', 'fake'], default=os.getenv("PAD_CAPTURE_LABEL", None),
+                        help='Gán nhãn ground-truth tự động cho phiên chụp (real hoặc fake)')
+    return parser.parse_known_args()[0]
+
+
+def main(args=None):
     global current_mode
+    if args is None:
+        args = parse_args()
+
+    capture = None
+    if args.capture_dir:
+        try:
+            from pad_capture import PADCapture
+            capture = PADCapture(args.capture_dir, args.subject, args.condition, label=args.label)
+            label_info = f" [nhãn tự động: '{args.label}']" if args.label else " [chưa gán nhãn]"
+            print(f"[Capture] Đã bật chế độ chụp mẫu PAD: lưu vào {capture.directory}{label_info}")
+        except Exception as exc:
+            print(f"[Capture Warning] Không thể khởi tạo PADCapture: {exc}")
 
     print("\n=======================================================")
     print("      SMARTFACE AIoT — RASPBERRY PI 4 EDGE CLIENT     ")
@@ -183,6 +209,8 @@ def main():
     print(f"  Device ID        : {DEVICE_ID}")
     print(f"  Initial Mode     : {current_mode}")
     print(f"  TB Host          : {TB_HOST}:{TB_PORT}")
+    masked_token = f"{TB_TOKEN[:4]}...{TB_TOKEN[-4:]}" if TB_TOKEN and len(TB_TOKEN) >= 8 else (TB_TOKEN or "CHƯA ĐẶT")
+    print(f"  TB Token         : {masked_token}")
     print(f"  RTSP URL         : {RTSP_URL} (Stream Enabled: {STREAM_ENABLED})")
     print(f"  Detector Backend : {APP_DETECTOR.upper()}")
     print(f"  Detection Cadence: Mỗi {DETECTION_INTERVAL_SECONDS}s (Optical Flow ở giữa)")
@@ -612,6 +640,9 @@ def main():
                     track.attendance_sent = commit
                     track.last_scan_sent = now_wall
                     print(f"[Recognition] track={track.track_id} embedding={result.latency:.2f}s -> RPC {req_id}")
+                elif not tb_client.connected:
+                    status_banner = "TB MQTT DISCONNECTED"
+                    status_banner_time = now_wall
 
             live_keys = {(track.track_id, track.verification_generation, current_mode, mode_generation, presence_generation)
                          for _, track in tracked if track.missing_frames == 0 and track.is_real and not track.pad_invalid_reason}
@@ -695,6 +726,12 @@ def main():
                     cv2.LINE_AA
                 )
 
+            if capture is not None:
+                lbl_tag = f" [{capture.label}]" if capture.label else ""
+                capture_text = f"C: Save sample{lbl_tag} | Captured: {capture.saved_count}"
+                cv2.putText(frame, capture_text, (10, HEIGHT - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2, cv2.LINE_AA)
+
             # ── 8. Gửi Frame Vào Luồng RTSP Streamer ─────────────────────────
             streamer.write_frame(frame)
 
@@ -712,6 +749,15 @@ def main():
                     elif key == ord('m'):
                         tb_client.set_mode("CHECK_OUT" if current_mode == "CHECK_IN" else "CHECK_IN")
                         print(f"[KEYBOARD] Đã chuyển mode: {current_mode}")
+                    elif (key == ord('c') or key == ord('C')) and capture is not None:
+                        try:
+                            paths = capture.save(frame, tracked, fas_predictor)
+                            if paths:
+                                print(f"[Capture] +{len(paths)} mặt mới -> Tổng số ảnh đã chụp: {capture.saved_count} ({capture.directory})")
+                            else:
+                                print("[Capture] Không phát hiện khuôn mặt để chụp!")
+                        except Exception as exc:
+                            print(f"[Capture Error] {exc}")
                 except Exception:
                     pass
 

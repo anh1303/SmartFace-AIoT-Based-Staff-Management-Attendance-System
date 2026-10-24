@@ -589,7 +589,7 @@
             "type": "entity",
             "entityAliasId": "3e904359-de03-4499-89ef-7b3dbb0e1932"
           },
-          "targetDeviceId": "f9f424f0-c872-11f1-b81a-93872484301c",
+          "targetDeviceId": "efbab930-c7f6-11f1-b4f0-4bfc18af14d5",
           "datasources": [],
           "targetDeviceAliasIds": [
             "3e904359-de03-4499-89ef-7b3dbb0e1932"
@@ -706,7 +706,7 @@
           "type": "singleEntity",
           "singleEntity": {
             "entityType": "DEVICE",
-            "id": "f9f424f0-c872-11f1-b81a-93872484301c"
+            "id": "efbab930-c7f6-11f1-b4f0-4bfc18af14d5"
           },
           "resolveMultiple": false
         }
@@ -803,14 +803,14 @@
   "resources": null,
   "id": {
     "entityType": "DASHBOARD",
-    "id": "7c26ed80-c879-11f1-b81a-93872484301c"
+    "id": "16924ca0-c80e-11f1-8ff0-51a080711a36"
   },
-  "createdTime": 1792055952472,
+  "createdTime": 1792009825898,
   "tenantId": {
     "entityType": "TENANT",
-    "id": "c9ad22b0-c872-11f1-94cd-130a86da3c94"
+    "id": "74c05500-c7f6-11f1-9b9a-73474c36c48d"
   },
   "assignedCustomers": null,
-  "version": 1,
+  "version": 15,
   "externalId": null
 }

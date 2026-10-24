@@ -38,10 +38,14 @@ def save(name, data):
 
 
 def main():
+    global BASE
     env = {**dotenv_values(ROOT / "backend" / ".env"), **os.environ}
     secret = env.get('TB_WEBHOOK_SECRET', '')
     if len(secret) < 24:
         raise SystemExit('Cần TB_WEBHOOK_SECRET >=24 ký tự, giống backend; chưa thay đổi ThingsBoard.')
+    host = env.get('TB_HOST', '127.0.0.1')
+    port = env.get('TB_HTTP_PORT', '8081')
+    BASE = f"http://{host}:{port}"
     HEADERS["X-Authorization"] = "Bearer " + api("/api/auth/login", {
         "username": env["TB_USERNAME"], "password": env["TB_PASSWORD"],
     })["token"]

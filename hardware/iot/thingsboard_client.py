@@ -50,13 +50,16 @@ class ThingsBoardClient:
     def on_connect(self, client, userdata, flags, rc, properties=None):
         self.connected = rc == 0
         if not self.connected:
+            print(f"[MQTT ERROR] Không thể kết nối ThingsBoard tại {self.host}:{self.port} (rc={rc}). Kiểm tra broker hoặc token.")
             return
+        print(f"[MQTT] [OK] Đã kết nối thành công ThingsBoard broker tại {self.host}:{self.port}")
         for topic in ['attributes', 'attributes/response/+', 'rpc/request/+', 'rpc/response/+']:
             client.subscribe(f'v1/devices/me/{topic}', qos=1)
         client.publish('v1/devices/me/attributes/request/1', json.dumps({'sharedKeys': 'attendance_mode,mode_changed_at'}), qos=1)
 
     def on_disconnect(self, client, userdata, flags_or_rc, *args):
         self.connected = False
+        print(f"[MQTT] Mất kết nối tới ThingsBoard broker!")
 
     def set_mode(self, mode, version=None):
         if mode not in ('CHECK_IN', 'CHECK_OUT'):

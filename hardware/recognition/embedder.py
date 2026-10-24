@@ -49,3 +49,8 @@ class FaceEmbedder:
             return None
 
         return feat / norm
+
+    def embed_aligned(self, aligned_bgr: np.ndarray) -> np.ndarray:
+        """Alias tương thích với face_auth cho hàm extract()."""
+        return self.extract(aligned_bgr)
+

@@ -19,4 +19,4 @@ export DATABASE_URL="$TASK_DB_URL" DIRECT_URL="$TASK_DB_URL" RUN_POLICY_DB_TESTS
 cd "$TASK_ROOT/backend"
 npm run prisma:generate
 npm run prisma:migrate
-npm test -- validation/attendance.policy.test.ts validation/attendance.integration.test.ts validation/attendance.safety.integration.test.ts
+npm test -- --no-file-parallelism validation/attendance.policy.test.ts validation/attendance.integration.test.ts validation/attendance.safety.integration.test.ts

@@ -2,43 +2,43 @@
   "ruleChain": {
     "id": {
       "entityType": "RULE_CHAIN",
-      "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+      "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
     },
-    "createdTime": 1792053076294,
+    "createdTime": 1791999676369,
     "tenantId": {
       "entityType": "TENANT",
-      "id": "c9ad22b0-c872-11f1-94cd-130a86da3c94"
+      "id": "74c05500-c7f6-11f1-9b9a-73474c36c48d"
     },
     "name": "Root Rule Chain",
     "type": "CORE",
     "firstRuleNodeId": {
       "entityType": "RULE_NODE",
-      "id": "c9d5b952-c872-11f1-94cd-130a86da3c94"
+      "id": "75054d41-c7f6-11f1-9b9a-73474c36c48d"
     },
     "root": true,
     "debugMode": false,
     "externalId": null,
-    "version": 4,
+    "version": 7,
     "configuration": null,
     "additionalInfo": null
   },
   "metadata": {
     "ruleChainId": {
       "entityType": "RULE_CHAIN",
-      "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+      "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
     },
-    "version": 4,
+    "version": 7,
     "firstNodeIndex": 6,
     "nodes": [
       {
         "id": {
           "entityType": "RULE_NODE",
-          "id": "c9d56b30-c872-11f1-94cd-130a86da3c94"
+          "id": "750414c0-c7f6-11f1-9b9a-73474c36c48d"
         },
-        "createdTime": 1792053076322,
+        "createdTime": 1791999676427,
         "ruleChainId": {
           "entityType": "RULE_CHAIN",
-          "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
         },
         "type": "org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode",
         "name": "Save Timeseries",
@@ -55,19 +55,19 @@
         },
         "externalId": null,
         "additionalInfo": {
-          "layoutX": 824,
-          "layoutY": 156
+          "layoutX": 795,
+          "layoutY": 161
         }
       },
       {
         "id": {
           "entityType": "RULE_NODE",
-          "id": "c9d59240-c872-11f1-94cd-130a86da3c94"
+          "id": "750489f0-c7f6-11f1-9b9a-73474c36c48d"
         },
-        "createdTime": 1792053076324,
+        "createdTime": 1791999676430,
         "ruleChainId": {
           "entityType": "RULE_CHAIN",
-          "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
         },
         "type": "org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode",
         "name": "Save Client Attributes",
@@ -86,19 +86,19 @@
         },
         "externalId": null,
         "additionalInfo": {
-          "layoutX": 825,
-          "layoutY": 52
+          "layoutX": 796,
+          "layoutY": 57
         }
       },
       {
         "id": {
           "entityType": "RULE_NODE",
-          "id": "c9d59241-c872-11f1-94cd-130a86da3c94"
+          "id": "7504d810-c7f6-11f1-9b9a-73474c36c48d"
         },
-        "createdTime": 1792053076324,
+        "createdTime": 1791999676433,
         "ruleChainId": {
           "entityType": "RULE_CHAIN",
-          "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
         },
         "type": "org.thingsboard.rule.engine.filter.TbMsgTypeSwitchNode",
         "name": "Message Type Switch",
@@ -111,19 +111,19 @@
         },
         "externalId": null,
         "additionalInfo": {
-          "layoutX": 347,
-          "layoutY": 149
+          "layoutX": 318,
+          "layoutY": 154
         }
       },
       {
         "id": {
           "entityType": "RULE_NODE",
-          "id": "c9d59242-c872-11f1-94cd-130a86da3c94"
+          "id": "7504ff20-c7f6-11f1-9b9a-73474c36c48d"
         },
-        "createdTime": 1792053076324,
+        "createdTime": 1791999676434,
         "ruleChainId": {
           "entityType": "RULE_CHAIN",
-          "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
         },
         "type": "org.thingsboard.rule.engine.action.TbLogNode",
         "name": "Log RPC from Device",
@@ -138,19 +138,19 @@
         },
         "externalId": null,
         "additionalInfo": {
-          "layoutX": 825,
-          "layoutY": 266
+          "layoutX": 796,
+          "layoutY": 271
         }
       },
       {
         "id": {
           "entityType": "RULE_NODE",
-          "id": "c9d5b950-c872-11f1-94cd-130a86da3c94"
+          "id": "7504ff21-c7f6-11f1-9b9a-73474c36c48d"
         },
-        "createdTime": 1792053076325,
+        "createdTime": 1791999676434,
         "ruleChainId": {
           "entityType": "RULE_CHAIN",
-          "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
         },
         "type": "org.thingsboard.rule.engine.action.TbLogNode",
         "name": "Log Other",
@@ -165,19 +165,19 @@
         },
         "externalId": null,
         "additionalInfo": {
-          "layoutX": 825,
-          "layoutY": 379
+          "layoutX": 796,
+          "layoutY": 384
         }
       },
       {
         "id": {
           "entityType": "RULE_NODE",
-          "id": "c9d5b951-c872-11f1-94cd-130a86da3c94"
+          "id": "75054d40-c7f6-11f1-9b9a-73474c36c48d"
         },
-        "createdTime": 1792053076325,
+        "createdTime": 1791999676436,
         "ruleChainId": {
           "entityType": "RULE_CHAIN",
-          "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
         },
         "type": "org.thingsboard.rule.engine.rpc.TbSendRPCRequestNode",
         "name": "RPC Call Request",
@@ -190,19 +190,19 @@
         },
         "externalId": null,
         "additionalInfo": {
-          "layoutX": 825,
-          "layoutY": 468
+          "layoutX": 796,
+          "layoutY": 473
         }
       },
       {
         "id": {
           "entityType": "RULE_NODE",
-          "id": "c9d5b952-c872-11f1-94cd-130a86da3c94"
+          "id": "75054d41-c7f6-11f1-9b9a-73474c36c48d"
         },
-        "createdTime": 1792053076325,
+        "createdTime": 1791999676436,
         "ruleChainId": {
           "entityType": "RULE_CHAIN",
-          "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
         },
         "type": "org.thingsboard.rule.engine.profile.TbDeviceProfileNode",
         "name": "Device Profile Node",
@@ -217,67 +217,98 @@
         "externalId": null,
         "additionalInfo": {
           "description": "Process incoming messages from devices with the alarm rules defined in the device profile. Dispatch all incoming messages with \"Success\" relation type.",
-          "layoutX": 204,
-          "layoutY": 240
+          "layoutX": 175,
+          "layoutY": 245
         }
       },
       {
         "id": {
           "entityType": "RULE_NODE",
-          "id": "fa1abfc0-c872-11f1-b81a-93872484301c"
+          "id": "36a7f5f0-c7f8-11f1-b4f0-4bfc18af14d5"
         },
-        "createdTime": 1792053157308,
+        "createdTime": 1792000430799,
         "ruleChainId": {
           "entityType": "RULE_CHAIN",
-          "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
+        },
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Check Has Face Embedding",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return msg.embedding !== undefined && Array.isArray(msg.embedding) && msg.embedding.length === 512;",
+          "tbelScript": "return msg.embedding != null && (msg.embedding.size() == 512 || msg.embedding.length == 512);"
+        },
+        "externalId": null,
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 796,
+          "layoutY": 592
+        }
+      },
+      {
+        "id": {
+          "entityType": "RULE_NODE",
+          "id": "36a8b940-c7f8-11f1-b4f0-4bfc18af14d5"
+        },
+        "createdTime": 1792000430804,
+        "ruleChainId": {
+          "entityType": "RULE_CHAIN",
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
         },
         "type": "org.thingsboard.rule.engine.rest.TbRestApiCallNode",
-        "name": "SmartFace Backend Attendance Webhook",
+        "name": "Forward to SmartFace Backend",
         "debugSettings": null,
         "singletonMode": false,
         "queueName": null,
         "configurationVersion": 3,
         "configuration": {
-          "restEndpointUrlPattern": "http://backend:3000/api/attendance/tb-webhook",
+          "restEndpointUrlPattern": "http://host.docker.internal:3000/api/attendance/tb-webhook",
           "requestMethod": "POST",
-          "headers": {
-            "Content-Type": "application/json"
-          },
           "useSimpleClientHttpFactory": false,
-          "readTimeoutMs": 15000,
-          "maxParallelRequestsCount": 0,
           "parseToPlainText": false,
+          "ignoreRequestBody": false,
           "enableProxy": false,
           "useSystemProxyProperties": false,
+          "proxyScheme": null,
           "proxyHost": null,
           "proxyPort": 0,
           "proxyUser": null,
           "proxyPassword": null,
-          "proxyScheme": null,
+          "readTimeoutMs": 15000,
+          "maxParallelRequestsCount": 0,
+          "headers": {
+            "Content-Type": "application/json",
+            "X-TB-Webhook-Secret": "__CONFIGURE_TB_WEBHOOK_SECRET__",
+            "X-Device-Name": "${deviceName}"
+          },
           "credentials": {
             "type": "anonymous"
           },
-          "ignoreRequestBody": false,
           "maxInMemoryBufferSizeInKb": 256
         },
         "externalId": null,
         "additionalInfo": {
-          "layoutX": 1100,
-          "layoutY": 260
+          "description": "",
+          "layoutX": 1093,
+          "layoutY": 593
         }
       },
       {
         "id": {
           "entityType": "RULE_NODE",
-          "id": "fa1ae6d0-c872-11f1-b81a-93872484301c"
+          "id": "f9420c70-c845-11f1-8ff0-51a080711a36"
         },
-        "createdTime": 1792053157309,
+        "createdTime": 1792033828535,
         "ruleChainId": {
           "entityType": "RULE_CHAIN",
-          "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
         },
         "type": "org.thingsboard.rule.engine.rpc.TbSendRPCReplyNode",
-        "name": "SmartFace Attendance RPC Reply",
+        "name": "RPC Call Reply to Device",
         "debugSettings": null,
         "singletonMode": false,
         "queueName": null,
@@ -289,19 +320,94 @@
         },
         "externalId": null,
         "additionalInfo": {
-          "layoutX": 1420,
-          "layoutY": 260
+          "description": "Sends reply back to Pi 4 via MQTT v1/devices/me/rpc/response/{requestId}",
+          "layoutX": 1350,
+          "layoutY": 593
         }
       },
       {
         "id": {
           "entityType": "RULE_NODE",
-          "id": "7c1b2db0-c879-11f1-b81a-93872484301c"
+          "id": "09a3c1d0-cd0a-11f1-be48-07acd619545a"
         },
-        "createdTime": 1792055952395,
+        "createdTime": 1792557842029,
         "ruleChainId": {
           "entityType": "RULE_CHAIN",
-          "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
+        },
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "SmartFace Has Mode Revision",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return msg.current_mode != null && msg.mode_changed_at != null;",
+          "tbelScript": "return msg.current_mode != null && msg.mode_changed_at != null;"
+        },
+        "externalId": null,
+        "additionalInfo": {
+          "layoutX": 600,
+          "layoutY": 850
+        }
+      },
+      {
+        "id": {
+          "entityType": "RULE_NODE",
+          "id": "09a45e10-cd0a-11f1-be48-07acd619545a"
+        },
+        "createdTime": 1792557842033,
+        "ruleChainId": {
+          "entityType": "RULE_CHAIN",
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
+        },
+        "type": "org.thingsboard.rule.engine.rest.TbRestApiCallNode",
+        "name": "SmartFace Mode Relay",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 3,
+        "configuration": {
+          "restEndpointUrlPattern": "http://host.docker.internal:3000/api/devices/${deviceName}/mode-notify",
+          "requestMethod": "POST",
+          "useSimpleClientHttpFactory": false,
+          "parseToPlainText": false,
+          "ignoreRequestBody": false,
+          "enableProxy": false,
+          "useSystemProxyProperties": false,
+          "proxyScheme": null,
+          "proxyHost": null,
+          "proxyPort": 0,
+          "proxyUser": null,
+          "proxyPassword": null,
+          "readTimeoutMs": 15000,
+          "maxParallelRequestsCount": 0,
+          "headers": {
+            "Content-Type": "application/json",
+            "X-TB-Webhook-Secret": "__CONFIGURE_TB_WEBHOOK_SECRET__",
+            "X-Device-Name": "${deviceName}"
+          },
+          "credentials": {
+            "type": "anonymous"
+          },
+          "maxInMemoryBufferSizeInKb": 256
+        },
+        "externalId": null,
+        "additionalInfo": {
+          "layoutX": 930,
+          "layoutY": 850
+        }
+      },
+      {
+        "id": {
+          "entityType": "RULE_NODE",
+          "id": "09a4ac30-cd0a-11f1-be48-07acd619545a"
+        },
+        "createdTime": 1792557842035,
+        "ruleChainId": {
+          "entityType": "RULE_CHAIN",
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
         },
         "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
         "name": "SmartFace Has Liveness Score",
@@ -323,12 +429,12 @@
       {
         "id": {
           "entityType": "RULE_NODE",
-          "id": "7c1b54c0-c879-11f1-b81a-93872484301c"
+          "id": "09a54870-cd0a-11f1-be48-07acd619545a"
         },
-        "createdTime": 1792055952396,
+        "createdTime": 1792557842039,
         "ruleChainId": {
           "entityType": "RULE_CHAIN",
-          "id": "c9d0fe60-c872-11f1-94cd-130a86da3c94"
+          "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
         },
         "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
         "name": "SmartFace Score Only",
@@ -372,11 +478,21 @@
       {
         "fromIndex": 2,
         "toIndex": 7,
+        "type": "Post telemetry"
+      },
+      {
+        "fromIndex": 2,
+        "toIndex": 8,
         "type": "RPC Request from Device"
       },
       {
         "fromIndex": 2,
-        "toIndex": 9,
+        "toIndex": 10,
+        "type": "Post telemetry"
+      },
+      {
+        "fromIndex": 2,
+        "toIndex": 12,
         "type": "RPC Request from Device"
       },
       {
@@ -387,15 +503,25 @@
       {
         "fromIndex": 7,
         "toIndex": 8,
-        "type": "Success"
-      },
-      {
-        "fromIndex": 9,
-        "toIndex": 10,
         "type": "True"
       },
       {
+        "fromIndex": 8,
+        "toIndex": 9,
+        "type": "Success"
+      },
+      {
         "fromIndex": 10,
+        "toIndex": 11,
+        "type": "True"
+      },
+      {
+        "fromIndex": 12,
+        "toIndex": 13,
+        "type": "True"
+      },
+      {
+        "fromIndex": 13,
         "toIndex": 0,
         "type": "Success"
       }

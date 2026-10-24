@@ -83,6 +83,7 @@ class AntiSpoofPredictor:
             if model_path
             else DEFAULT_MODEL_PATH.resolve()
         )
+        self.model_name = self.model_path.name
         uses_default_runtime = self.model_path == DEFAULT_MODEL_PATH.resolve()
 
         if not self.model_path.exists():

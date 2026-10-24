@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
+import { getTodayVNString, formatVNDateISO, getMonday, getISOWeekNumber } from '@/utils/dateUtils';
 import {
   ReportsHeader,
   ReportsDateToolbar,
@@ -9,7 +9,7 @@ import {
   ExportReportsModal,
   ExportReportType,
   EmployeeAttendanceStat,
-} from '../../features/reports';
+} from '@/features/reports';
 
 export const ManagerReports: React.FC = () => {
   const { employees, attendance, payroll, selectedPeriod, showToast } = useApp();
@@ -97,28 +97,8 @@ export const ManagerReports: React.FC = () => {
   ];
 
   // Dynamic 4-Week Punctuality Trend
-  const getMonday = (d: Date) => {
-    const date = new Date(d);
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(date.setDate(diff));
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-  };
-
-  const getISOWeekNumber = (d: Date) => {
-    const target = new Date(d.valueOf());
-    const dayNr = (d.getDay() + 6) % 7;
-    target.setDate(target.getDate() - dayNr + 3);
-    const firstThursday = target.valueOf();
-    target.setMonth(0, 1);
-    if (target.getDay() !== 4) {
-      target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
-    }
-    return 1 + Math.round((firstThursday - target.valueOf()) / 604800000);
-  };
-
   const currentMonday = getMonday(new Date());
+  currentMonday.setHours(0, 0, 0, 0);
 
   const punctualityData = [3, 2, 1, 0].map((weeksAgo) => {
     const weekStart = new Date(currentMonday);
@@ -233,7 +213,13 @@ export const ManagerReports: React.FC = () => {
       rows = activeRecords.map((r) => {
         const emp = employees.find((e) => e.employee_id === r.employee_id);
         const name = emp?.full_name || r.employee_name || r.employee_id;
-        const statusStr = r.status === 'FINALIZED' ? 'Đã Chốt' : 'Đang Soạn Thảo';
+        const statusStr = r.status === 'PAID'
+          ? 'Đã Thanh Toán'
+          : r.status === 'FINALIZED'
+          ? 'Đã Chốt'
+          : r.status === 'CONFIRMED'
+          ? 'Đã Xác Nhận'
+          : 'Đang Soạn Thảo';
         return [
           r.employee_id,
           `"${name}"`,

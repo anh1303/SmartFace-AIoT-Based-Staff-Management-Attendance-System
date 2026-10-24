@@ -74,6 +74,7 @@ model Employee {
   avatar_url               String?                    @db.Text
   hourly_rate              Decimal?                   @default(0) @db.Decimal(15, 2)
   status                   String                     @default("ACTIVE") @db.VarChar(20)
+  fingerprint_enrolled     Boolean                    @default(false)
   createdAt                DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   attendance_logs          attendance_logs[]
@@ -143,6 +144,7 @@ model attendance_logs {
   employees          Employee @relation(fields: [employee_id], references: [id], onUpdate: NoAction)
 
   @@index([employee_id, event_time(sort: Desc)], map: "idx_attendance_emp_time")
+  @@index([type], map: "idx_attendance_type")
 }
 
 /// Bảng tổng hợp dữ liệu chấm công hàng ngày của từng nhân viên.
@@ -159,12 +161,15 @@ model daily_attendance_summary {
   late_early          Decimal      @default(0) @db.Decimal(5, 2)
   overtime            Decimal      @default(0) @db.Decimal(5, 2)
   attendance_status   String       @default("PRESENT") @db.VarChar(30)
+  manual_adjustment   Boolean?     @default(false)
+  policy_version      String?      @db.VarChar(40)
   updated_at          DateTime     @default(now()) @db.Timestamptz(6)
   employees           Employee     @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   work_shifts         work_shifts? @relation(fields: [shift_id], references: [id], onUpdate: NoAction)
 
   @@unique([employee_id, work_date], map: "uq_emp_work_date")
   @@index([work_date], map: "idx_daily_summary_date")
+  @@index([attendance_status], map: "idx_daily_summary_status")
 }
 
 model employee_shifts {
@@ -183,6 +188,7 @@ model employee_shifts {
 
   @@unique([employee_id, work_date], map: "uq_emp_shift_date")
   @@index([employee_id, work_date], map: "idx_emp_shifts_lookup")
+  @@index([shift_type], map: "idx_emp_shifts_type")
 }
 
 model face_embeddings {

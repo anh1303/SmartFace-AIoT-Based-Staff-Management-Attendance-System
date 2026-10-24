@@ -1,5 +1,6 @@
 import { Device } from '@prisma/client'
 import { prisma } from '../../config/database.js'
+import { env } from '../../config/env.js'
 import { AppError } from '../../common/AppError.js'
 import { logAction } from '../audit-logs/audit.service.js'
 
@@ -130,6 +131,9 @@ export async function updateStatus(id: string, status: string) {
 let cachedTbJwt: { token: string; exp: number } | null = null
 
 async function getThingsBoardToken(tbHost: string, tbPort: string): Promise<string | null> {
+  if (!tbHost || !env.TB_USERNAME || !env.TB_PASSWORD) {
+    return null
+  }
   if (cachedTbJwt && Date.now() < cachedTbJwt.exp - 60000) {
     return cachedTbJwt.token
   }
@@ -138,62 +142,141 @@ async function getThingsBoardToken(tbHost: string, tbPort: string): Promise<stri
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        username: process.env.TB_USERNAME || 'tenant@thingsboard.org',
-        password: process.env.TB_PASSWORD || 'tenant',
+        username: env.TB_USERNAME,
+        password: env.TB_PASSWORD,
       }),
+      signal: AbortSignal.timeout(600),
     })
     if (!res.ok) return null
     const data = (await res.json()) as any
     cachedTbJwt = { token: data.token, exp: Date.now() + 2 * 3600 * 1000 }
     return data.token
-  } catch (err) {
-    console.warn('[ThingsBoard] Could not login to ThingsBoard API:', err)
+  } catch {
     return null
   }
 }
 
-export async function setDeviceAttendanceMode(deviceId: string, mode: 'CHECK_IN' | 'CHECK_OUT') {
-  const tbHost = process.env.TB_HOST || '10.74.201.36'
-  const tbPort = process.env.TB_HTTP_PORT || '8080'
-  const tbToken = process.env.TB_DEVICE_TOKEN || 'ivu62ZoR6gkXyqqoDobJ'
-  const tbDeviceId = process.env.TB_DEVICE_UUID || 'efbab930-c7f6-11f1-b4f0-4bfc18af14d5'
+export interface DeviceModeState {
+  deviceId: string
+  mode: 'CHECK_IN' | 'CHECK_OUT' | null
+  confirmed: boolean
+  lastUpdated?: string
+}
 
-  try {
-    // 1. Gửi Telemetry thô qua Device token
-    await fetch(`http://${tbHost}:${tbPort}/api/v1/${tbToken}/telemetry`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ current_mode: mode, mode }),
-    }).catch(() => {})
+// Lưu trữ trạng thái chế độ thực tế của thiết bị đã được ACK từ Raspberry Pi
+const deviceModeStore = new Map<string, DeviceModeState>()
 
-    // 2. Gửi Shared Attribute & Timeseries với quyền Tenant qua ThingsBoard REST API
-    const jwt = await getThingsBoardToken(tbHost, tbPort)
-    if (jwt) {
-      await Promise.all([
-        // Cập nhật SHARED_SCOPE -> ThingsBoard tự động đẩy MQTT xuống Pi 4
-        fetch(`http://${tbHost}:${tbPort}/api/plugins/telemetry/DEVICE/${tbDeviceId}/SHARED_SCOPE`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Authorization': `Bearer ${jwt}`,
-          },
-          body: JSON.stringify({ attendance_mode: mode }),
-        }),
-        // Cập nhật Timeseries -> Dashboard Widgets đổi trạng thái thời gian thực
-        fetch(`http://${tbHost}:${tbPort}/api/plugins/telemetry/DEVICE/${tbDeviceId}/timeseries/ANY`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Authorization': `Bearer ${jwt}`,
-          },
-          body: JSON.stringify({ current_mode: mode, mode }),
-        }),
-      ])
-      console.log(`[ThingsBoard] Đã đồng bộ mode '${mode}' lên Shared Attribute và Telemetry`)
-    }
-  } catch (err) {
-    console.warn('[ThingsBoard] Could not sync mode to ThingsBoard:', err)
+// Bộ điều phối chờ ACK từ Pi khi Web App gửi lệnh PATCH đổi chế độ
+const pendingModeAcks = new Map<string, { mode: 'CHECK_IN' | 'CHECK_OUT'; resolve: (confirmed: boolean) => void }>()
+
+export function recordDeviceModeNotify(deviceId: string, mode: 'CHECK_IN' | 'CHECK_OUT'): DeviceModeState {
+  const state: DeviceModeState = {
+    deviceId,
+    mode,
+    confirmed: true,
+    lastUpdated: new Date().toISOString(),
+  }
+  deviceModeStore.set(deviceId, state)
+
+  // Nếu có request PATCH /mode đang chờ ACK từ Pi, hoàn thành ngay lập tức
+  const pending = pendingModeAcks.get(deviceId)
+  if (pending && pending.mode === mode) {
+    pending.resolve(true)
+    pendingModeAcks.delete(deviceId)
   }
 
-  return { deviceId, mode }
+  return state
+}
+
+export async function getDeviceMode(deviceId: string): Promise<DeviceModeState> {
+  const cached = deviceModeStore.get(deviceId)
+  if (cached) {
+    return cached
+  }
+  // Mặc định lần đầu khi chưa nhận được xác nhận từ Pi -> confirmed = false, mode = null
+  return {
+    deviceId,
+    mode: null,
+    confirmed: false,
+  }
+}
+
+export async function setDeviceAttendanceMode(
+  deviceId: string,
+  mode: 'CHECK_IN' | 'CHECK_OUT'
+): Promise<{ deviceId: string; mode: string; confirmed: boolean }> {
+  const tbHost = env.TB_HOST
+  const tbPort = env.TB_HTTP_PORT
+  const tbToken = env.TB_DEVICE_TOKEN
+  const tbDeviceId = env.TB_DEVICE_UUID
+
+  // Thiết lập Promise chờ ACK từ Pi qua /api/devices/:id/mode-notify trong tối đa 1500ms
+  let ackTimeout: NodeJS.Timeout
+  const ackPromise = new Promise<boolean>((resolve) => {
+    pendingModeAcks.set(deviceId, {
+      mode,
+      resolve: (val) => {
+        clearTimeout(ackTimeout)
+        resolve(val)
+      },
+    })
+    ackTimeout = setTimeout(() => {
+      pendingModeAcks.delete(deviceId)
+      // Nếu không có ACK từ Pi trong thời gian chờ -> confirmed = false
+      resolve(false)
+    }, 1500)
+  })
+
+  // Đồng bộ ThingsBoard đồng thời (non-blocking với timeout an toàn)
+  const syncToThingsBoard = async () => {
+    if (!tbHost || !tbToken) return
+    try {
+      await fetch(`http://${tbHost}:${tbPort}/api/v1/${tbToken}/telemetry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_mode: mode, mode }),
+        signal: AbortSignal.timeout(600),
+      }).catch(() => {})
+
+      const jwt = await getThingsBoardToken(tbHost, tbPort)
+      if (jwt) {
+        await Promise.all([
+          fetch(`http://${tbHost}:${tbPort}/api/plugins/telemetry/DEVICE/${tbDeviceId}/SHARED_SCOPE`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Authorization': `Bearer ${jwt}`,
+            },
+            body: JSON.stringify({ attendance_mode: mode }),
+            signal: AbortSignal.timeout(600),
+          }),
+          fetch(`http://${tbHost}:${tbPort}/api/plugins/telemetry/DEVICE/${tbDeviceId}/timeseries/ANY`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Authorization': `Bearer ${jwt}`,
+            },
+            body: JSON.stringify({ current_mode: mode, mode }),
+            signal: AbortSignal.timeout(600),
+          }),
+        ]).catch(() => {})
+      }
+    } catch {
+      // Bỏ qua lỗi kết nối tới ThingsBoard khi chạy offline / dev
+    }
+  }
+
+  syncToThingsBoard().catch(() => {})
+
+  const confirmed = await ackPromise
+  if (confirmed) {
+    deviceModeStore.set(deviceId, {
+      deviceId,
+      mode,
+      confirmed: true,
+      lastUpdated: new Date().toISOString(),
+    })
+  }
+
+  return { deviceId, mode, confirmed }
 }

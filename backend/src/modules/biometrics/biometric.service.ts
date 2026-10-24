@@ -1,17 +1,13 @@
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { logAction } from '../audit-logs/audit.service.js'
+import { logAction } from '../audit-logs/index.js'
 import { env } from '../../config/env.js'
-import { buildIdOrCodeWhere } from '../../common/utils.js'
-import { isEmployeeManager } from '../../common/permission.helper.js'
+import { findEmployeeByIdOrCode, isEmployeeManager } from '../employees/index.js'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 async function resolveEmployeeId(idOrCode: string) {
-  const isUuid = UUID_REGEX.test(idOrCode)
-  const emp = await prisma.employee.findFirst({
-    where: isUuid ? { OR: [{ id: idOrCode }, { employee_code: idOrCode }] } : { employee_code: idOrCode },
-  })
+  const emp = await findEmployeeByIdOrCode(idOrCode)
   if (!emp) throw new AppError(404, 'Employee not found')
   return emp.id
 }
@@ -72,12 +68,9 @@ export async function removeAll(idOrCode: string, actorUserId?: string) {
 }
 
 export async function enrollImages(idOrCode: string, imagesBase64: string[], actorUserId?: string) {
-  const employeeId = await resolveEmployeeId(idOrCode)
-  const emp = await prisma.employee.findUnique({
-    where: { id: employeeId },
-    select: { employee_code: true },
-  })
+  const emp = await findEmployeeByIdOrCode(idOrCode)
   if (!emp) throw new AppError(404, 'Employee not found')
+  const employeeId = emp.id
 
   const timeoutMs = env.FACE_AUTH_TIMEOUT_MS || 30000
   let resp: globalThis.Response
@@ -157,14 +150,8 @@ export async function enrollImagesWithPermissionCheck(
   imagesBase64: string[],
   actorUser?: { id?: string; role?: string }
 ) {
-  const targetEmp = await prisma.employee.findFirst({
-    where: buildIdOrCodeWhere(employeeId),
-    include: {
-      department: true,
-      users: { select: { id: true, roles: { select: { role_name: true } } } },
-    },
-  });
-  if (!targetEmp) throw AppError.notFound('Không tìm thấy nhân viên');
+  const targetEmp = await findEmployeeByIdOrCode(employeeId)
+  if (!targetEmp) throw AppError.notFound('Không tìm thấy nhân viên')
 
   if (actorUser?.role !== 'ADMIN') {
     if (targetEmp.user_id === actorUser?.id) {
@@ -184,14 +171,8 @@ export async function removeAllWithPermissionCheck(
   employeeId: string,
   actorUser?: { id?: string; role?: string }
 ) {
-  const targetEmp = await prisma.employee.findFirst({
-    where: buildIdOrCodeWhere(employeeId),
-    include: {
-      department: true,
-      users: { select: { id: true, roles: { select: { role_name: true } } } },
-    },
-  });
-  if (!targetEmp) throw AppError.notFound('Không tìm thấy nhân viên');
+  const targetEmp = await findEmployeeByIdOrCode(employeeId)
+  if (!targetEmp) throw AppError.notFound('Không tìm thấy nhân viên')
 
   if (actorUser?.role !== 'ADMIN') {
     if (targetEmp.user_id === actorUser?.id) {

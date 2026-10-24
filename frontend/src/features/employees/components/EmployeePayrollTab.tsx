@@ -13,20 +13,7 @@ import {
 } from '../../../components/common';
 
 interface EmployeePayrollTabProps {
-  currentPeriodKey?: string;
-  currentMonthPayroll?: PayrollRecord | null;
   hourlyRate?: number;
-  currentNetSalary?: number;
-  baseSalary?: number;
-  standardHours?: number;
-  overtimeHours?: number;
-  otAmount?: number;
-  allowance?: number;
-  lateEarlyHours?: number;
-  penaltyAmount?: number;
-  workDays?: number;
-  otRate?: number;
-  penaltyRate?: number;
   pastPayrolls: PayrollRecord[];
   onSelectPayslip: (p: PayrollRecord) => void;
 }
@@ -69,8 +56,8 @@ export const EmployeePayrollTab: React.FC<EmployeePayrollTabProps> = ({
               <TableEmpty colSpan={7} message="Chưa có lịch sử bảng lương cho nhân viên này." />
             ) : (
               pastPayrolls.map((p, idx) => {
-                const hourly = Number(p.hourly_rate || hourlyRate);
-                const working = Number(p.total_working_hours ?? p.working_hours ?? 160);
+                const hourly = Number(p.hourly_rate ?? hourlyRate ?? 0);
+                const working = Number(p.total_working_hours ?? p.working_hours ?? 0);
                 const ot = Number(p.total_overtime ?? 0);
                 const lateEarly = Number(p.total_late_early ?? 0);
                 const allw = Number(p.allowance ?? 0);

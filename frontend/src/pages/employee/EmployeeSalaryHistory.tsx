@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { calcPayrollAmount } from '../../utils/payrollUtils';
 import {
   FileText,
   Download,
@@ -41,12 +42,15 @@ export const EmployeeSalaryHistory: React.FC = () => {
   const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5;
   const penaltyRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
 
-  const getOTAmount = (otHours: number, hourly: number) => {
-    return otRate <= 10 ? otHours * hourly * otRate : otHours * otRate;
+  // Dùng đơn giá snapshot của phiếu trong preview nếu có, thay vì lấy cấu hình mới áp lên phiếu cũ
+  const getOTAmount = (otHours: number, hourly: number, slipOtRate?: number) => {
+    const rate = slipOtRate !== undefined && slipOtRate !== null ? Number(slipOtRate) : otRate;
+    return calcPayrollAmount(otHours, rate, hourly);
   };
 
-  const getLateAmount = (lateHours: number, hourly: number) => {
-    return penaltyRate <= 10 ? lateHours * hourly * penaltyRate : lateHours * penaltyRate;
+  const getLateAmount = (lateHours: number, hourly: number, slipPenaltyRate?: number) => {
+    const rate = slipPenaltyRate !== undefined && slipPenaltyRate !== null ? Number(slipPenaltyRate) : penaltyRate;
+    return calcPayrollAmount(lateHours, rate, hourly);
   };
 
   return (
@@ -85,13 +89,13 @@ export const EmployeeSalaryHistory: React.FC = () => {
             <TableEmpty colSpan={8} message="Không có dữ liệu phiếu lương nào." />
           ) : (
             myPayrolls.map((p, idx) => {
-              const hourly = Number(p.hourly_rate || 120000);
+              const hourly = Number(p.hourly_rate ?? 0);
               const ot = Number(p.total_overtime ?? 0);
               const late = Number(p.total_late_early ?? 0);
               const allw = Number(p.allowance ?? 0);
               const net = Number(p.net_salary ?? 0);
-              const otAmount = getOTAmount(ot, hourly);
-              const lateAmount = getLateAmount(late, hourly);
+              const otAmount = getOTAmount(ot, hourly, p.overtime_rate);
+              const lateAmount = getLateAmount(late, hourly, p.late_early_penalty);
               const periodStr = p.period || p.payroll_period;
 
               return (
@@ -116,12 +120,23 @@ export const EmployeeSalaryHistory: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <span
-                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-mono ${p.status === 'FINALIZED'
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                        }`}
+                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-mono border ${
+                        p.status === 'PAID'
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                          : p.status === 'FINALIZED'
+                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                          : p.status === 'CONFIRMED'
+                          ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                      }`}
                     >
-                      {p.status === 'FINALIZED' ? 'ĐÃ CHỐT' : 'CHỜ DUYỆT'}
+                      {p.status === 'PAID'
+                        ? 'ĐÃ THANH TOÁN'
+                        : p.status === 'FINALIZED'
+                        ? 'ĐÃ CHỐT'
+                        : p.status === 'CONFIRMED'
+                        ? 'ĐÃ XÁC NHẬN'
+                        : 'CHỜ DUYỆT'}
                     </span>
                   </TableCell>
                   <TableCell isLast align="right">
@@ -149,11 +164,11 @@ export const EmployeeSalaryHistory: React.FC = () => {
         maxWidth="lg"
       >
         {selectedSlip && (() => {
-          const slipHourly = Number(selectedSlip.hourly_rate || 120000);
+          const slipHourly = Number(selectedSlip.hourly_rate ?? 0);
           const slipOT = Number(selectedSlip.total_overtime ?? 0);
           const slipLate = Number(selectedSlip.total_late_early ?? 0);
-          const slipOTAmount = getOTAmount(slipOT, slipHourly);
-          const slipLateAmount = getLateAmount(slipLate, slipHourly);
+          const slipOTAmount = getOTAmount(slipOT, slipHourly, selectedSlip.overtime_rate);
+          const slipLateAmount = getLateAmount(slipLate, slipHourly, selectedSlip.late_early_penalty);
 
           return (
             <div className="space-y-4">
@@ -167,8 +182,24 @@ export const EmployeeSalaryHistory: React.FC = () => {
                     {currentUser?.department} • {currentUser?.position}
                   </p>
                 </div>
-                <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20 font-medium">
-                  {selectedSlip.status === 'FINALIZED' ? 'ĐÃ THANH TOÁN' : 'TẠM TÍNH'}
+                <span
+                  className={`text-xs font-mono px-3 py-1 rounded-lg border font-medium ${
+                    selectedSlip.status === 'PAID'
+                      ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/50'
+                      : selectedSlip.status === 'FINALIZED'
+                      ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50'
+                      : selectedSlip.status === 'CONFIRMED'
+                      ? 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800/50'
+                      : 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/50'
+                  }`}
+                >
+                  {selectedSlip.status === 'PAID'
+                    ? 'ĐÃ THANH TOÁN'
+                    : selectedSlip.status === 'FINALIZED'
+                    ? 'ĐÃ CHỐT'
+                    : selectedSlip.status === 'CONFIRMED'
+                    ? 'ĐÃ XÁC NHẬN'
+                    : 'TẠM TÍNH'}
                 </span>
               </div>
 
@@ -226,6 +257,4 @@ export const EmployeeSalaryHistory: React.FC = () => {
       </Modal>
     </div>
   );
-};
-
-export const StaffSalaryHistory = EmployeeSalaryHistory;
+};

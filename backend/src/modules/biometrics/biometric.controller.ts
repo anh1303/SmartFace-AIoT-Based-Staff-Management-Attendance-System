@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
-import { assertCanAccessEmployeeDetail } from '../../common/permission.helper.js';
+import { assertCanAccessEmployeeDetail } from '../employees/index.js';
 import * as service from './biometric.service.js';
 import { enrollImagesSchema } from './biometric.dto.js';
 

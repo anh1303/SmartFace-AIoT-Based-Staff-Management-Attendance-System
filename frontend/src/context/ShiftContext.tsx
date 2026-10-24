@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { useShifts } from '../hooks/useShifts';
+import { useShifts } from '@/features/schedules';
 import { WorkShift } from '../types';
 
 export interface ShiftContextType {

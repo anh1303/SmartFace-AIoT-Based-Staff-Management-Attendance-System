@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { PositionItem, fetchPositionsApi } from '../api/positionApi';
-import { DepartmentItem, fetchDepartmentsApi } from '../api/departmentApi';
-import { Employee } from '../types';
-import { FilterSelectOption } from '../components/common';
+import { PositionItem, fetchPositionsApi } from '../../../api/positionApi';
+import { DepartmentItem, fetchDepartmentsApi } from '../../../api/departmentApi';
+import { Employee } from '../../../types';
+import { FilterSelectOption } from '../../../components/common';
 
 export interface UseDepartmentPositionsOptions {
   employees?: Employee[];
@@ -11,19 +11,10 @@ export interface UseDepartmentPositionsOptions {
   departmentFilter?: string;
 }
 
-const FALLBACK_POSITIONS_MAP: Record<string, string[]> = {
-  'Nhân sự': ['Trưởng phòng Nhân sự', 'Chuyên viên Tuyển dụng', 'Chuyên viên C&B', 'Nhân viên'],
-  'Kế toán': ['Kế toán trưởng', 'Kế toán tổng hợp', 'Kế toán tiền lương', 'Nhân viên'],
-  'Kinh doanh': ['Trưởng phòng Kinh doanh', 'Chuyên viên Quản lý khách hàng', 'Đại diện Kinh doanh', 'Nhân viên bán hàng'],
-  'Marketing': ['Trưởng phòng Marketing', 'Chuyên viên Nội dung', 'Chuyên viên Digital Marketing'],
-  'IT': ['Trưởng phòng CNTT', 'Kỹ sư Phần mềm', 'Kỹ sư Hệ thống & AIoT'],
-  'CSKH': ['Trưởng phòng CSKH', 'Chuyên viên Hỗ trợ khách hàng', 'Chuyên viên Trực tổng đài'],
-};
-
 const DEFAULT_DEPARTMENTS = ['Nhân sự', 'Kế toán', 'Kinh doanh', 'Marketing', 'IT', 'CSKH'];
 
 /**
- * Custom hook quản lý danh mục phòng ban và chức vụ, hỗ trợ tự động đồng bộ từ Database
+ * Feature Hook: Quản lý danh mục phòng ban và chức vụ nhân sự, hỗ trợ tự động đồng bộ từ Database
  * và phân quyền bộ lọc/chọn lựa cho Quản lý (Manager).
  */
 export function useDepartmentPositions(options: UseDepartmentPositionsOptions = {}) {
@@ -120,7 +111,10 @@ export function useDepartmentPositions(options: UseDepartmentPositionsOptions = 
 
       if (matching.length > 0) return matching;
 
-      return FALLBACK_POSITIONS_MAP[deptName] || ['Nhân viên'];
+      if (import.meta.env.DEV) {
+        console.warn(`[useDepartmentPositions:DEV_ONLY] Chưa có chức vụ nào được cấu hình cho phòng ban '${deptName}' trong CSDL`);
+      }
+      return ['Nhân viên'];
     },
     [dbPositions, employees]
   );
@@ -156,7 +150,7 @@ export function useDepartmentPositions(options: UseDepartmentPositionsOptions = 
       if (effectiveDept !== 'ALL') {
         return getPositionsByDepartment(effectiveDept);
       }
-      return ['Bảo vệ', 'Nhân viên', 'Thu ngân', 'Quản lý'];
+      return ['Nhân viên'];
     }
     return list;
   }, [dbPositions, employees, departmentFilter, isManager, managerDept, getPositionsByDepartment]);

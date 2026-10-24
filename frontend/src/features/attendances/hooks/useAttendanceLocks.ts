@@ -22,10 +22,10 @@ export function useAttendanceLocks() {
         if (res.success && Array.isArray(res.data)) {
           return res.data;
         }
-      } catch {
-        // Return default locked dates if backend endpoint fails
+      } catch (err) {
+        console.warn('[useAttendanceLocks] Không thể lấy danh sách khoá công từ máy chủ:', err);
       }
-      return [{ date: '2026-09-10', is_locked: true }];
+      return [];
     },
     staleTime: 1000 * 60, // 1 phút
     refetchInterval: 1000 * 60, // Tự động refetch mỗi phút để cập nhật khi qua 0h00

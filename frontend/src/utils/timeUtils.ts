@@ -19,10 +19,27 @@ export const formatSecondsToHHMMSS = (totalSec: number): string => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
+/**
+ * Quy tắc làm tròn thời gian (áp dụng cho Tăng ca và Đi trễ / Về sớm):
+ * - Từ 0 đến 29 phút: quy về phần giờ + 0 giờ (0 phút)
+ * - Từ 30 đến 59 phút: quy về phần giờ + 0.5 giờ (30 phút = 1800s)
+ */
+export const roundToHalfHour = (totalSec: number): number => {
+  if (totalSec <= 0) return 0;
+  const totalMinutes = Math.floor(totalSec / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours + (minutes >= 30 ? 0.5 : 0);
+};
+
 export const roundTo30Minutes = (totalSec: number): number => {
   if (totalSec <= 0) return 0;
-  return Math.round(totalSec / 1800) * 1800;
+  const totalMinutes = Math.floor(totalSec / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours * 3600 + (minutes >= 30 ? 1800 : 0);
 };
+
 
 export const calculateRawLateEarlySec = (
   shift: { start_time: string; end_time: string },
@@ -66,6 +83,21 @@ export const calculateRawInitialOTSec = (
   const expectedWorkSec = endSec - startSec;
   const rawOT = actualWorkSec - expectedWorkSec;
   return rawOT > 0 ? rawOT : 0;
+};
+
+/**
+ * Tính số giờ làm việc chuẩn trong ngày = thời gian kết thúc ca - thời gian bắt đầu ca
+ * (Ví dụ ca hành chính: 17:30 - 08:30 = 9.0 giờ)
+ */
+export const calculateShiftWorkingHours = (
+  shift: { start_time?: string; end_time?: string }
+): number => {
+  const startSec = parseTimeToSeconds(shift.start_time || '08:30');
+  const endSec = parseTimeToSeconds(shift.end_time || '17:30');
+  if (startSec === null || endSec === null) return 9;
+  let diffSec = endSec - startSec;
+  if (diffSec < 0) diffSec += 24 * 3600;
+  return Math.round((diffSec / 3600) * 100) / 100;
 };
 
 export const getStatusBadge = (status: string) => {

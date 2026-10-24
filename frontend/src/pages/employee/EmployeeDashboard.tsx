@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatVNTime, getTodayVNString, formatVNDateISO } from '../../utils/dateUtils';
+import { formatVNTime, getTodayVNString, formatVNDateISO, getMonday } from '../../utils/dateUtils';
 import {
   Clock,
   CheckCircle2,
@@ -51,15 +51,9 @@ export const EmployeeDashboard: React.FC = () => {
     : null;
   const netSalaryFormatted = currentPayroll
     ? Number(currentPayroll.net_salary || 0).toLocaleString('vi-VN') + '₫'
-    : ((currentEmp?.hourly_rate || 120000) * 160).toLocaleString('vi-VN') + '₫';
+    : '0 ₫';
 
   // Dynamic 7-day week rhythm
-  const getMonday = (d: Date) => {
-    const date = new Date(d);
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(date.setDate(diff));
-  };
   const monday = getMonday(new Date());
   const dayNames = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
 
@@ -99,6 +93,8 @@ export const EmployeeDashboard: React.FC = () => {
 
   const handleExplainSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // TODO: Tích hợp gọi API gửi giải trình khi Backend hoàn thiện module yêu cầu nhân viên (/api/employee-requests hoặc /api/attendance/explanation).
+    // Hiện tại thông báo phản hồi giả lập giao diện cho nhân sự.
     showToast('Đã gửi đơn giải trình chấm công đến quản lý!', 'success');
     setExplainModalOpen(false);
     setExplainReason('');
@@ -143,7 +139,7 @@ export const EmployeeDashboard: React.FC = () => {
               </span>
             </p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-              Xác thực: {latestPunch ? `${(latestPunch.verification_score * 100).toFixed(1)}% Match • ${latestPunch.device_id}` : 'AI Face Recognition Node 01'}
+              Xác thực: {latestPunch ? `${latestPunch.verification_score !== null && latestPunch.verification_score !== undefined ? `${(latestPunch.verification_score * 100).toFixed(1)}% Match` : 'Đã xác thực'} • ${latestPunch.device_id || 'AI Node'}` : 'AI Face Recognition Node 01'}
             </p>
           </div>
         </div>
@@ -457,6 +453,4 @@ export const EmployeeDashboard: React.FC = () => {
       </Modal>
     </div>
   );
-};
-
-export const StaffDashboard = EmployeeDashboard;
+};

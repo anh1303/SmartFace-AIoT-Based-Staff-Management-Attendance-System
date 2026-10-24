@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { useApp } from '../../../context/AppContext';
-import { Employee, PayrollRecord, AttendanceRecord, WorkShift } from '../../../types';
+import { Employee } from '../../../types';
 import { formatVNDateISO } from '../../../utils/dateUtils';
 
-export interface UseEmployeeDetailDataOptions {
+export interface UseEmployeeAttendanceDetailOptions {
   currentEmp: Employee | null;
   startDate?: string;
   endDate?: string;
@@ -21,9 +21,12 @@ export interface AttendanceStats {
   avgConfidence: number;
 }
 
-export function useEmployeeDetailData(options: UseEmployeeDetailDataOptions) {
+/**
+ * Feature Hook: Quản lý chi tiết lịch sử chấm công và tính toán thống kê chấm công của từng nhân viên.
+ */
+export function useEmployeeAttendanceDetail(options: UseEmployeeAttendanceDetailOptions) {
   const { currentEmp, startDate = '', endDate = '', attendanceTypeFilter = 'ALL', attendanceStatusFilter = 'ALL' } = options;
-  const { attendance, payroll, bonusPenalty, workShifts } = useApp();
+  const { attendance } = useApp();
 
   // 1. Filtered Attendance Logs
   const employeeAttendanceLogs = useMemo(() => {
@@ -79,77 +82,8 @@ export function useEmployeeDetailData(options: UseEmployeeDetailDataOptions) {
     };
   }, [attendance, currentEmp, startDate, endDate]);
 
-  // 3. Employee Payroll Records
-  const employeePayrolls = useMemo(() => {
-    if (!currentEmp) return [];
-    return payroll
-      .filter((p) => p.employee_id === currentEmp.employee_id || p.employee_id === currentEmp.id)
-      .sort((a, b) => {
-        const periodA = a.period || a.payroll_period || '';
-        const periodB = b.period || b.payroll_period || '';
-        return periodB.localeCompare(periodA);
-      });
-  }, [payroll, currentEmp]);
-
-  // 4. Current Month Payroll Estimation
-  const currentYear = new Date().getFullYear();
-  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-  const currentPeriodKey = `${currentYear}-${currentMonth}`;
-
-  const currentMonthPayroll = useMemo(() => {
-    return employeePayrolls.find((p) => (p.period || p.payroll_period) === currentPeriodKey) || employeePayrolls[0] || null;
-  }, [employeePayrolls, currentPeriodKey]);
-
-  const hourlyRate = currentEmp?.hourly_rate || currentMonthPayroll?.hourly_rate || 100000;
-  const standardHours = currentMonthPayroll?.total_working_hours ?? currentMonthPayroll?.working_hours ?? (attendanceStats.workDays * 8 || 160);
-  const overtimeHours = currentMonthPayroll?.total_overtime ?? 4.0;
-  const lateEarlyHours = currentMonthPayroll?.total_late_early ?? (attendanceStats.lateCount * 0.5);
-  const allowance = currentMonthPayroll?.allowance ?? 2000000;
-
-  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5;
-  const penaltyRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
-
-  const otAmount = otRate <= 10
-    ? overtimeHours * hourlyRate * otRate
-    : overtimeHours * otRate;
-
-  const penaltyAmount = penaltyRate <= 10
-    ? lateEarlyHours * hourlyRate * penaltyRate
-    : lateEarlyHours * penaltyRate;
-
-  const baseSalary = standardHours * hourlyRate;
-  const currentNetSalary = currentMonthPayroll?.net_salary
-    ? Number(currentMonthPayroll.net_salary)
-    : Math.max(0, Math.round(baseSalary + otAmount - penaltyAmount + allowance));
-
-  const pastPayrolls = employeePayrolls;
-
-  // 5. Employee Work Shifts
-  const employeeShifts = useMemo(() => {
-    if (!currentEmp) return [];
-    return workShifts
-      .filter((s) => s.employee_id === currentEmp.employee_id || s.employee_id === currentEmp.id)
-      .sort((a, b) => b.date.localeCompare(a.date));
-  }, [workShifts, currentEmp]);
-
   return {
     employeeAttendanceLogs,
     attendanceStats,
-    employeePayrolls,
-    currentMonthPayroll,
-    hourlyRate,
-    standardHours,
-    overtimeHours,
-    lateEarlyHours,
-    allowance,
-    currentNetSalary,
-    pastPayrolls,
-    employeeShifts,
-    currentPeriodKey,
-    baseSalary,
-    otAmount,
-    penaltyAmount,
-    otRate,
-    penaltyRate,
   };
 }

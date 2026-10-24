@@ -6,3 +6,4 @@ export * from './shiftApi';
 export * from './payrollApi';
 export * from './biometricApi';
 export * from './positionApi';
+export * from './departmentApi';

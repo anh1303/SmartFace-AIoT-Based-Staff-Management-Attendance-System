@@ -12,7 +12,7 @@ export interface EditingPayrollItem {
   total_overtime: number;
   total_late_early: number;
   allowance: number;
-  reason?: string;
+  reason: string;
 }
 
 interface PayrollItemEditModalProps {
@@ -37,6 +37,8 @@ export const PayrollItemEditModal: React.FC<PayrollItemEditModalProps> = ({
   isSubmitting = false,
 }) => {
   if (!editingItem) return null;
+  otRate = editingItem.record.overtime_rate ?? otRate;
+  lateRate = editingItem.record.late_penalty_rate ?? lateRate;
 
   // Dùng đơn giá snapshot của phiếu trong preview nếu có, thay vì lấy cấu hình mới áp lên phiếu cũ
   const effectiveOtRate = editingItem.record.overtime_rate !== undefined && editingItem.record.overtime_rate !== null
@@ -158,10 +160,13 @@ export const PayrollItemEditModal: React.FC<PayrollItemEditModalProps> = ({
 
         <div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-            Lý do điều chỉnh (giờ làm / OT / phụ cấp):
+            Lý do điều chỉnh (bắt buộc khi sửa giờ công/OT):
           </label>
           <textarea
             rows={2}
+            required
+            minLength={3}
+            maxLength={2000}
             placeholder="Nhập lý do điều chỉnh giờ công, OT hoặc phụ cấp để lưu vết kiểm toán..."
             value={editingItem.reason || ''}
             onChange={(e) =>

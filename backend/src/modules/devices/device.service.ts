@@ -1,6 +1,7 @@
 import { Device } from '@prisma/client'
 import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
+import { isValidUuid } from '../../common/utils.js'
 import { AppError } from '../../common/AppError.js'
 import { logAction } from '../audit-logs/audit.service.js'
 
@@ -10,7 +11,7 @@ export function formatDevice(d: Device) {
     name: d.name,
     location: d.location,
     ip: d.ip || null,
-    status: d.status as 'ONLINE' | 'OFFLINE' | 'MAINTENANCE',
+    status: (d.status === 'MAINTENANCE' ? 'MAINTENANCE' : d.last_seen && Date.now() - +d.last_seen < 60000 ? d.status : 'OFFLINE') as 'ONLINE' | 'OFFLINE' | 'MAINTENANCE',
     lastSeen: d.last_seen ? d.last_seen.toISOString() : null,
     createdAt: d.createdAt ? d.createdAt.toISOString() : new Date().toISOString(),
   }
@@ -20,7 +21,19 @@ export async function list() {
   const devices = await prisma.device.findMany({
     orderBy: { createdAt: 'desc' },
   })
-  return devices.map(formatDevice)
+  const result = devices.map(formatDevice)
+  try {
+    const target = await resolveTbDevice(process.env.TB_DEVICE_NAME || 'PI4_FRONT_GATE')
+    const attributes = await tbRequest(`/api/plugins/telemetry/DEVICE/${target.id.id}/values/attributes/SERVER_SCOPE?keys=lastActivityTime,active`) as Array<{ key: string; value: unknown }>
+    const last = Number(attributes.find(a => a.key === 'lastActivityTime')?.value || 0)
+    const active = attributes.find(a => a.key === 'active')?.value === true
+    const status = active && Date.now() - last < 60000 ? 'ONLINE' as const : 'OFFLINE' as const
+    const item = result.find(d => d.name === target.name)
+    if (item) { item.status = status; item.lastSeen = last ? new Date(last).toISOString() : null }
+    else result.push({ id: target.id.id, name: target.name, location: 'Pi Edge', ip: null, status,
+      lastSeen: last ? new Date(last).toISOString() : null, createdAt: new Date(target.createdTime).toISOString() })
+  } catch { /* existing devices stay offline unless their last_seen is recent */ }
+  return result
 }
 
 export async function get(id: string) {
@@ -130,30 +143,58 @@ export async function updateStatus(id: string, status: string) {
 
 let cachedTbJwt: { token: string; exp: number } | null = null
 
-async function getThingsBoardToken(tbHost: string, tbPort: string): Promise<string | null> {
-  if (!tbHost || !env.TB_USERNAME || !env.TB_PASSWORD) {
-    return null
-  }
-  if (cachedTbJwt && Date.now() < cachedTbJwt.exp - 60000) {
-    return cachedTbJwt.token
-  }
+function tbBase() {
+  const host = process.env.TB_HOST, port = process.env.TB_HTTP_PORT || '8081'
+  if (!host) throw new AppError(503, 'Chưa cấu hình TB_HOST')
+  return `http://${host}:${port}`
+}
+
+async function getThingsBoardToken(): Promise<string> {
+  if (cachedTbJwt && cachedTbJwt.exp > Date.now() + 30000) return cachedTbJwt.token
+  const response = await fetch(`${tbBase()}/api/auth/login`, {
+    method: 'POST',
+    signal: AbortSignal.timeout(5000),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: process.env.TB_USERNAME, password: process.env.TB_PASSWORD }),
+  })
+  if (!response.ok) throw new AppError(502, `ThingsBoard login failed (${response.status})`)
+  const body = (await response.json()) as { token: string }
+  if (!body.token) throw new AppError(502, 'ThingsBoard không trả token')
+  let exp = Date.now() + 60000
   try {
-    const res = await fetch(`http://${tbHost}:${tbPort}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: env.TB_USERNAME,
-        password: env.TB_PASSWORD,
-      }),
-      signal: AbortSignal.timeout(600),
-    })
-    if (!res.ok) return null
-    const data = (await res.json()) as any
-    cachedTbJwt = { token: data.token, exp: Date.now() + 2 * 3600 * 1000 }
-    return data.token
+    exp = JSON.parse(Buffer.from(body.token.split('.')[1], 'base64url').toString()).exp * 1000
   } catch {
-    return null
+    /* short cache */
   }
+  cachedTbJwt = { token: body.token, exp }
+  return body.token
+}
+
+async function tbRequest(path: string, data?: unknown, retry = true): Promise<any> {
+  const token = await getThingsBoardToken()
+  const response = await fetch(tbBase() + path, {
+    method: data === undefined ? 'GET' : 'POST',
+    signal: AbortSignal.timeout(12000),
+    headers: { 'Content-Type': 'application/json', 'X-Authorization': `Bearer ${token}` },
+    body: data === undefined ? undefined : JSON.stringify(data),
+  })
+  if (response.status === 401 && retry) {
+    cachedTbJwt = null
+    return tbRequest(path, data, false)
+  }
+  if (!response.ok) throw new AppError(502, `ThingsBoard ${response.status}: không thể xác nhận trạng thái thiết bị`)
+  const text = await response.text()
+  return text ? JSON.parse(text) : null
+}
+
+async function resolveTbDevice(deviceId: string): Promise<{ id: { id: string }; name: string; createdTime: number }> {
+  let name = deviceId
+  if (isValidUuid(deviceId)) {
+    const stored = await prisma.device.findUnique({ where: { id: deviceId } })
+    if (stored) name = stored.name
+    else return tbRequest(`/api/device/${deviceId}`)
+  }
+  return tbRequest('/api/tenant/devices?deviceName=' + encodeURIComponent(name))
 }
 
 export interface DeviceModeState {
@@ -165,9 +206,7 @@ export interface DeviceModeState {
 
 // Lưu trữ trạng thái chế độ thực tế của thiết bị đã được ACK từ Raspberry Pi
 const deviceModeStore = new Map<string, DeviceModeState>()
-
-// Bộ điều phối chờ ACK từ Pi khi Web App gửi lệnh PATCH đổi chế độ
-const pendingModeAcks = new Map<string, { mode: 'CHECK_IN' | 'CHECK_OUT'; resolve: (confirmed: boolean) => void }>()
+const pendingModeAcks = new Map<string, { mode: string; resolve: (val: boolean) => void }>()
 
 export function recordDeviceModeNotify(deviceId: string, mode: 'CHECK_IN' | 'CHECK_OUT'): DeviceModeState {
   const state: DeviceModeState = {
@@ -178,7 +217,6 @@ export function recordDeviceModeNotify(deviceId: string, mode: 'CHECK_IN' | 'CHE
   }
   deviceModeStore.set(deviceId, state)
 
-  // Nếu có request PATCH /mode đang chờ ACK từ Pi, hoàn thành ngay lập tức
   const pending = pendingModeAcks.get(deviceId)
   if (pending && pending.mode === mode) {
     pending.resolve(true)
@@ -190,10 +228,7 @@ export function recordDeviceModeNotify(deviceId: string, mode: 'CHECK_IN' | 'CHE
 
 export async function getDeviceMode(deviceId: string): Promise<DeviceModeState> {
   const cached = deviceModeStore.get(deviceId)
-  if (cached) {
-    return cached
-  }
-  // Mặc định lần đầu khi chưa nhận được xác nhận từ Pi -> confirmed = false, mode = null
+  if (cached) return cached
   return {
     deviceId,
     mode: null,
@@ -201,16 +236,25 @@ export async function getDeviceMode(deviceId: string): Promise<DeviceModeState> 
   }
 }
 
-export async function setDeviceAttendanceMode(
-  deviceId: string,
-  mode: 'CHECK_IN' | 'CHECK_OUT'
-): Promise<{ deviceId: string; mode: string; confirmed: boolean }> {
-  const tbHost = env.TB_HOST
-  const tbPort = env.TB_HTTP_PORT
-  const tbToken = env.TB_DEVICE_TOKEN
-  const tbDeviceId = env.TB_DEVICE_UUID
+export async function getDeviceAttendanceMode(deviceId: string) {
+  if (process.env.TB_HOST) {
+    try {
+      const target = await resolveTbDevice(deviceId)
+      const value = await tbRequest(`/api/rpc/twoway/${target.id.id}`, { method: 'getValue', params: {}, timeout: 5000 })
+      if (typeof value === 'boolean') {
+        const mode = value ? ('CHECK_IN' as const) : ('CHECK_OUT' as const)
+        recordDeviceModeNotify(deviceId, mode)
+        return { deviceId, mode, confirmed: true }
+      }
+    } catch {
+      // Fallback to local cached mode
+    }
+  }
+  const cached = await getDeviceMode(deviceId)
+  return { deviceId, mode: cached.mode || 'CHECK_IN', confirmed: cached.confirmed }
+}
 
-  // Thiết lập Promise chờ ACK từ Pi qua /api/devices/:id/mode-notify trong tối đa 1500ms
+export async function setDeviceAttendanceMode(deviceId: string, mode: 'CHECK_IN' | 'CHECK_OUT') {
   let ackTimeout: NodeJS.Timeout
   const ackPromise = new Promise<boolean>((resolve) => {
     pendingModeAcks.set(deviceId, {
@@ -222,61 +266,38 @@ export async function setDeviceAttendanceMode(
     })
     ackTimeout = setTimeout(() => {
       pendingModeAcks.delete(deviceId)
-      // Nếu không có ACK từ Pi trong thời gian chờ -> confirmed = false
       resolve(false)
     }, 1500)
   })
 
-  // Đồng bộ ThingsBoard đồng thời (non-blocking với timeout an toàn)
-  const syncToThingsBoard = async () => {
-    if (!tbHost || !tbToken) return
+  if (process.env.TB_HOST && process.env.NODE_ENV !== 'test') {
     try {
-      await fetch(`http://${tbHost}:${tbPort}/api/v1/${tbToken}/telemetry`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ current_mode: mode, mode }),
-        signal: AbortSignal.timeout(600),
-      }).catch(() => {})
-
-      const jwt = await getThingsBoardToken(tbHost, tbPort)
-      if (jwt) {
-        await Promise.all([
-          fetch(`http://${tbHost}:${tbPort}/api/plugins/telemetry/DEVICE/${tbDeviceId}/SHARED_SCOPE`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Authorization': `Bearer ${jwt}`,
-            },
-            body: JSON.stringify({ attendance_mode: mode }),
-            signal: AbortSignal.timeout(600),
-          }),
-          fetch(`http://${tbHost}:${tbPort}/api/plugins/telemetry/DEVICE/${tbDeviceId}/timeseries/ANY`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Authorization': `Bearer ${jwt}`,
-            },
-            body: JSON.stringify({ current_mode: mode, mode }),
-            signal: AbortSignal.timeout(600),
-          }),
-        ]).catch(() => {})
+      const target = await resolveTbDevice(deviceId)
+      const value = await tbRequest(`/api/rpc/twoway/${target.id.id}`, { method: 'setValue', params: mode === 'CHECK_IN', timeout: 5000 })
+      if (value === (mode === 'CHECK_IN')) {
+        await tbRequest(`/api/plugins/telemetry/DEVICE/${target.id.id}/SHARED_SCOPE`, { attendance_mode: mode, mode_changed_at: Date.now() })
+        recordDeviceModeNotify(deviceId, mode)
+        return { deviceId, mode, confirmed: true }
       }
-    } catch {
-      // Bỏ qua lỗi kết nối tới ThingsBoard khi chạy offline / dev
+    } catch (tbErr) {
+      console.warn(`[Device Service] TB RPC error:`, tbErr)
     }
   }
 
-  syncToThingsBoard().catch(() => {})
-
   const confirmed = await ackPromise
   if (confirmed) {
-    deviceModeStore.set(deviceId, {
-      deviceId,
-      mode,
-      confirmed: true,
-      lastUpdated: new Date().toISOString(),
-    })
+    recordDeviceModeNotify(deviceId, mode)
   }
-
   return { deviceId, mode, confirmed }
+}
+
+export async function persistConfirmedAttendanceMode(deviceId: string, mode: 'CHECK_IN' | 'CHECK_OUT') {
+  if (!process.env.TB_HOST) return
+  try {
+    const target = await resolveTbDevice(deviceId)
+    await tbRequest(`/api/plugins/telemetry/DEVICE/${target.id.id}/SHARED_SCOPE`, { attendance_mode: mode, mode_changed_at: Date.now() })
+    recordDeviceModeNotify(deviceId, mode)
+  } catch {
+    // Non-fatal if ThingsBoard is unreachable
+  }
 }

@@ -63,6 +63,9 @@ export interface AttendancePairItem {
   reviewReason: string | null;
   policyVersion: string | null;
   isLegacyNoPolicy: boolean;
+  overtimeStatus: string;
+  candidateHours: number;
+  pairIntervals: string[];
 }
 
 export function useAttendancePairs(
@@ -77,10 +80,22 @@ export function useAttendancePairs(
   customLateEarlyMap: Record<string, number>,
   departmentFilter: string = 'ALL',
   positionFilter: string = 'ALL',
-  workingHoursMap?: Record<string, number>,
-  summaryMap?: Record<string, BackendAttendanceSummaryItem>
+  workingHoursMapOrSummaries?: Record<string, number> | Record<string, any>,
+  maybeSummaryMap?: Record<string, BackendAttendanceSummaryItem>
 ): AttendancePairItem[] {
   return useMemo(() => {
+    const isFirstParamSummary = Boolean(
+      workingHoursMapOrSummaries &&
+      Object.values(workingHoursMapOrSummaries).some(v => v !== null && typeof v === 'object')
+    );
+
+    const summaryMap: Record<string, any> = isFirstParamSummary
+      ? (workingHoursMapOrSummaries as Record<string, any>)
+      : (maybeSummaryMap || {});
+
+    const workingHoursMap: Record<string, number> = isFirstParamSummary
+      ? {}
+      : ((workingHoursMapOrSummaries as Record<string, number>) || {});
     // 1. Lọc danh sách ca làm việc trong khoảng ngày [startDate, endDate]
     // QUAN TRỌNG: KHÔNG loại bỏ ca 'OFF' để Manager có thể theo dõi và duyệt OT ngày nghỉ
     const targetShifts = workShifts.filter(shift => {
@@ -162,7 +177,7 @@ export function useAttendancePairs(
       const isUnassigned = empShift.shift_type === 'UNASSIGNED';
 
       const shiftName = isOffDay
-        ? 'Nghỉ (OFF)'
+        ? 'Ngày OFF'
         : isUnassigned
           ? 'Chưa phân ca'
           : empShift.shift_type === 'MORNING'
@@ -182,8 +197,12 @@ export function useAttendancePairs(
       // 3. Số giờ làm việc lấy trực tiếp từ summary backend (không tự tạo công 9h khi có sự kiện lẻ)
       const regularHours = isOffDay
         ? 0
-        : (summary?.regular_hours ?? (summary?.total_working_hours ?? (workingHoursMap?.[summaryKey] ?? (fallbackKey ? workingHoursMap?.[fallbackKey] ?? 0 : 0))));
-      const workingHours = regularHours;
+        : (summary?.total_working_hours !== undefined
+            ? Number(summary.total_working_hours)
+            : (summary?.regular_hours !== undefined
+                ? Number(summary.regular_hours)
+                : (workingHoursMap?.[summaryKey] ?? (fallbackKey ? workingHoursMap?.[fallbackKey] ?? 0 : 0))));
+      const workingHours = isOffDay ? 0 : Number(summary?.total_working_hours ?? regularHours);
 
       // Giây làm việc gốc (raw_work_seconds)
       const rawWorkSeconds = summary?.raw_work_seconds ?? 0;
@@ -263,7 +282,7 @@ export function useAttendancePairs(
       // 5. Bóc tách từng khoảng IN -> OUT hợp lệ
       const validIntervals: AttendanceIntervalItem[] = [];
       if (summary?.pairs && summary.pairs.length > 0) {
-        summary.pairs.forEach(p => {
+        summary.pairs.forEach((p: any) => {
           validIntervals.push({
             inTime: p.in_time,
             outTime: p.out_time,
@@ -417,6 +436,11 @@ export function useAttendancePairs(
         reviewReason,
         policyVersion,
         isLegacyNoPolicy,
+        overtimeStatus: (summary as any)?.overtime_status || 'NONE',
+        candidateHours: Number((summary as any)?.overtime_candidate_hours || 0),
+        pairIntervals: Array.isArray((summary as any)?.calculation_details?.pairs)
+          ? (summary as any).calculation_details.pairs.map((p: any) => `${formatVNTime(p.start)} → ${formatVNTime(p.end)}`)
+          : [],
       };
     });
 
@@ -440,7 +464,7 @@ export function useAttendancePairs(
     customLateEarlyMap,
     departmentFilter,
     positionFilter,
-    workingHoursMap,
-    summaryMap,
+    workingHoursMapOrSummaries,
+    maybeSummaryMap,
   ]);
 }

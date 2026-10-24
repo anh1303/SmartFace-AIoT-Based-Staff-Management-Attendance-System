@@ -117,10 +117,36 @@ Tích hợp trình phát video độ trễ thấp (*Ultra Low Latency*) qua chu�
 
 ---
 
+### 3. Reusable UI Components ([src/components/common/](src/components/common))
+- **`Table`**: Bảng dữ liệu hỗ trợ sắp xếp, phân trang, trạng thái đang tải Skeleton và hiển thị thông báo rỗng (*Empty State*).
+- **`Modal`**: Hộp thoại nổi với backdrop mờ nhòe kính, hiệu ứng transition mượt mà và hỗ trợ đóng bằng phím ESC.
+- **`SearchInput`**: Ô tìm kiếm thông minh tích hợp debounce tự động, nút xóa nhanh.
+- **`FilterBar` & `FilterSelect`**: Thanh công cụ lọc dữ liệu theo phòng ban, chức vụ, trạng thái, ngày tháng.
+- **`PageHeaderBanner`**: Khung tiêu đề trang kèm breadcrumbs, mô tả nghiệp vụ và các nút hành động chính (*Action Buttons*).
+- **`ErrorBoundary`**: Bắt lỗi vỡ giao diện runtime cục bộ và hiển thị màn hình phục hồi thân thiện với nút "Thử lại".
+
+### 4. Shell Layout Giao Diện ([src/components/layout/](src/components/layout))
+- **`AppLayout`**: Khung vỏ tổng thể gồm thanh bên `Sidebar`, thanh điều hướng trên cùng `Topbar` và vùng hiển thị nội dung `Outlet`.
+- **`Sidebar`**: Menu điều hướng thông minh tự động thay đổi danh mục liên kết theo vai trò đăng nhập (`ADMIN`, `MANAGER`, `EMPLOYEE`), hỗ trợ thu nhỏ (*collapse*).
+- **`Topbar`**: Hiển thị thông tin người dùng đang đăng nhập, nút chuyển nhanh Dark/Light theme, chuông thông báo và menu Đăng xuất.
+
+---
+
+## 🌐 Chuẩn Hóa Múi Giờ Việt Nam (+07:00) & Tiền Tệ
+
+Hệ thống loại bỏ hoàn toàn các lỗi lệch ngày do múi giờ UTC gây ra (đặc biệt trong khung giờ 00:00 - 06:59 sáng tại Việt Nam):
+- **Chuỗi ngày chuẩn**: Sử dụng hàm `getTodayVNString()` và `formatVNDateISO()` trong `src/utils/dateUtils.ts` dựa trên chuẩn `Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })` để luôn xuất ra định dạng `YYYY-MM-DD`.
+- **Định dạng tiền tệ**: Mọi số liệu lương, thưởng, phạt đều được format qua tiện ích `formatVNCurrency(number)` $\rightarrow$ hiển thị định dạng Việt Nam chuẩn: `150.000 ₫`.
+
+---
+
 ## 🔑 Biến Môi Trường (`.env`)
 
 Tạo file `.env` tại thư mục gốc `frontend/` để cấu hình kết nối tới Backend:
-
+```bash
+cp .env.example .env
+```
+Nội dung file `frontend/.env`:
 ```env
 # Địa chỉ gốc của REST API (để trống để sử dụng tính năng Proxy /api của Vite)
 VITE_API_BASE=""

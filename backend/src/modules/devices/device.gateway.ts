@@ -1,11 +1,13 @@
 import type { Server } from 'socket.io'
 import { eventBus } from '../../common/event-bus.js'
+import { socketAuthMiddleware } from '../../sockets/socket.auth.js'
 
 let io: Server | undefined
 
 export const initializeDeviceGateway = (server: Server) => {
   io = server
   const nsp = server.of('/devices')
+  nsp.use(socketAuthMiddleware)
   nsp.on('connection', (socket) => {
     const user = socket.data.user
     if (user?.role) {
@@ -32,7 +34,6 @@ export const emitDeviceEvent = (event: string, payload: unknown, room?: string) 
     nsp.to(room).emit(event, payload)
   } else {
     nsp.to('ADMIN').to('MANAGER').emit(event, payload)
-    nsp.emit(event, payload)
   }
 }
 

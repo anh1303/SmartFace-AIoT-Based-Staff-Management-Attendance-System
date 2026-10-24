@@ -11,7 +11,7 @@ from pathlib import Path
 class FaceEmbedder:
     """ArcFace MobileFaceNet Feature Embedder (512D) sử dụng ONNX Runtime."""
 
-    def __init__(self, model_path: str = None):
+    def __init__(self, model_path: str = None, intra_op_threads=1):
         import onnxruntime as ort
 
         if model_path is None:
@@ -21,7 +21,10 @@ class FaceEmbedder:
             raise FileNotFoundError(f"Không tìm thấy model ArcFace tại: {model_path}")
 
         opts = ort.SessionOptions()
-        opts.intra_op_num_threads = 2
+        opts.intra_op_num_threads = max(1, int(intra_op_threads))
+        opts.inter_op_num_threads = 1
+        opts.add_session_config_entry("session.intra_op.allow_spinning", "0")
+        opts.add_session_config_entry("session.inter_op.allow_spinning", "0")
         opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         self.session = ort.InferenceSession(model_path, sess_options=opts, providers=["CPUExecutionProvider"])
         self.input_name = self.session.get_inputs()[0].name

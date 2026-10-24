@@ -24,6 +24,7 @@ export interface PayrollRecord {
   net_salary: number;
   status: PayrollStatus;
   reason?: string;
-  overtime_rate?: number;
-  late_early_penalty?: number;
+  overtime_rate?: number | null;
+  late_penalty_rate?: number | null;
+  late_early_penalty?: number | null;
 }

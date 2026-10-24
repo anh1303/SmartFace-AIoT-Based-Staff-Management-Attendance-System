@@ -35,7 +35,7 @@ export const PayrollFinalizeModal: React.FC<PayrollFinalizeModalProps> = ({
           <div>
             <p className="font-bold">Lưu ý bảo mật:</p>
             <p className="mt-1 text-slate-600 dark:text-slate-300">
-              Sau khi chốt sổ, toàn bộ dữ liệu lương sẽ được khóa (read-only), nhân viên có thể xem
+              Sau khi chốt sổ, các phiếu thuộc quyền được chốt sẽ được khóa (read-only), nhân viên có thể xem
               phiếu lương chi tiết và kế toán sẽ tiến hành giải ngân qua ngân hàng.
             </p>
           </div>

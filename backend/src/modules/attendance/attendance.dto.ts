@@ -1,9 +1,11 @@
+import { workDateSchema } from '../../common/date.schema.js'
 import { z } from 'zod'
 import { ATTENDANCE_METHOD } from '../../common/constants.js'
 
 export const checkInSchema = z.object({
   employeeId: z.string().min(1),
   device_info: z.string().optional(),
+  event_id: z.string().uuid().optional(),
   method: z.enum([
     ATTENDANCE_METHOD.FACE,
     ATTENDANCE_METHOD.FINGERPRINT,
@@ -15,15 +17,16 @@ export const checkInSchema = z.object({
 
 export const adjustAttendanceSchema = z.object({
   employeeId: z.string().min(1),
-  date: z.string().min(1),
-  late_early: z.number().min(0).default(0),
-  overtime: z.number().min(0).default(0),
-  reason: z.string().min(1, 'Lý do điều chỉnh là bắt buộc'),
+  date: workDateSchema,
+  reason: z.string().trim().min(1, 'Lý do điều chỉnh là bắt buộc').max(2000),
+  late_early: z.number().finite().min(0).max(744).default(0),
+  overtime: z.number().finite().min(0).max(744).default(0),
 })
 
 export const checkOutSchema = z.object({
   employeeId: z.string().min(1),
   device_info: z.string().optional(),
+  event_id: z.string().uuid().optional(),
   method: z.enum([
     ATTENDANCE_METHOD.FACE,
     ATTENDANCE_METHOD.FINGERPRINT,

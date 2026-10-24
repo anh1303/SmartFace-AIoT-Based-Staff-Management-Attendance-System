@@ -19,6 +19,7 @@ const httpServer = createServer(app)
 const io = new Server(httpServer, {
   cors: {
     origin: env.CORS_ORIGIN.split(',').map((x) => x.trim()),
+    credentials: true,
   },
 })
 
@@ -101,4 +102,3 @@ async function gracefulShutdown(signal: string) {
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => gracefulShutdown(signal))
 }
-

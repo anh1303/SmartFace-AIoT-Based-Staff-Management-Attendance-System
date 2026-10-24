@@ -80,7 +80,6 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       // Khi vừa kết nối hoặc reconnect: đọc lại mode thực tế từ Pi
       fetchDeviceRealMode();
     });
-
     socket.on('device-mode-changed', (data: any) => {
       if (data && (data.deviceId === deviceId || data.deviceId === 'PI4_FRONT_GATE')) {
         if (data.confirmed === true && (data.mode === 'CHECK_IN' || data.mode === 'CHECK_OUT')) {
@@ -118,10 +117,8 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
     if (sessionUrlRef.current) {
       const urlToDelete = sessionUrlRef.current;
       sessionUrlRef.current = null;
-      fetch(urlToDelete, { method: 'DELETE' }).catch(() => {});
+      fetch(urlToDelete, { method: 'DELETE', keepalive: true }).catch(() => {});
     }
-
-    // 4. Đóng PeerConnection và dừng video track
     if (pcRef.current) {
       pcRef.current.close();
       pcRef.current = null;
@@ -233,6 +230,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       });
     } catch (err: any) {
       if (err.name === 'AbortError') return;
+      stopConnection();
       setErrorMsg(err.message || 'Không thể kết nối luồng WebRTC');
       setIsConnecting(false);
       setIceState('failed');
@@ -264,8 +262,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
         method: 'PATCH',
         body: JSON.stringify({ mode }),
       });
-
-      if (res.success && res.data?.confirmed === true && res.data?.mode === mode) {
+      if (res.success && res.data?.confirmed && res.data?.mode === mode) {
         setActiveMode(mode);
         onModeChange?.(mode);
         showToast?.(`Đã đổi chế độ sang ${mode === 'CHECK_IN' ? 'Check-in (Vào ca)' : 'Check-out (Tan ca)'}`, 'success');

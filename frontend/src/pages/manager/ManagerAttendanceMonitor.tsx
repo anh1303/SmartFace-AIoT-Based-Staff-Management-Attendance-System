@@ -56,7 +56,6 @@ export const ManagerAttendanceMonitor: React.FC = () => {
 
   const { devices, isError: isDevicesError } = useDevices();
   const { isDateLocked, toggleLock } = useAttendanceLocks();
-
   // useAttendanceSummaries lấy đúng khoảng ngày đang xem [startDate, endDate]
   const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap, adjustAttendance } = useAttendanceSummaries(startDate, endDate);
 
@@ -103,7 +102,6 @@ export const ManagerAttendanceMonitor: React.FC = () => {
       showToast('Không có dữ liệu ca hoặc chấm công để điều chỉnh', 'warning');
       return;
     }
-
     setEditingItem({
       employee: item.employee,
       shiftName: item.shift.name,

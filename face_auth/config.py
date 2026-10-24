@@ -48,9 +48,18 @@ def _get_env_bool(key: str, default: bool) -> bool:
     return val.lower() in ("true", "1", "yes", "y", "on")
 
 
+# Explicit experiment switch: the selected adaptive profile overrides env tuning.
+PAD_ADAPTIVE_ENABLED = _get_env_bool("PAD_ADAPTIVE_ENABLED", False)
+PAD_ADAPTIVE_CONFIG_PATH = _get_env_str("PAD_ADAPTIVE_CONFIG_PATH", 'antispoof/models/R7_SC_FULL_local80_candidate_runtime.json')
+
+
 def _load_pad_runtime_config():
     raw_path = _get_env_str("PAD_RUNTIME_CONFIG_PATH", None)
+    if PAD_ADAPTIVE_ENABLED:
+        raw_path = PAD_ADAPTIVE_CONFIG_PATH
     if raw_path is None or raw_path.lower() in ("none", "null"):
+        if PAD_ADAPTIVE_ENABLED:
+            raise ValueError("PAD_ADAPTIVE_CONFIG_PATH không được để None khi bật adaptive")
         return None, {}, None
 
     path = Path(raw_path).expanduser()
@@ -63,6 +72,8 @@ def _load_pad_runtime_config():
         raise ValueError(f"Không thể đọc PAD runtime config '{path}': {exc}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"PAD runtime config phải là JSON object: '{path}'")
+    if PAD_ADAPTIVE_ENABLED and not isinstance(data.get("adaptive_threshold"), dict):
+        raise ValueError("PAD_ADAPTIVE_ENABLED=true yêu cầu profile có adaptive_threshold")
     return str(path), data, path.parent
 
 
@@ -136,6 +147,8 @@ def _get_env_float_vector(key: str, default):
 
 
 PAD_RUNTIME_CONFIG_PATH, _PAD_RUNTIME_CONFIG, _PAD_RUNTIME_CONFIG_DIR = _load_pad_runtime_config()
+PAD_LIGHTING_PROFILE = _PAD_RUNTIME_CONFIG.get("lighting")
+PAD_ADAPTIVE_THRESHOLD_PROFILE = _PAD_RUNTIME_CONFIG.get("adaptive_threshold")
 
 
 def _pad_contract_value(runtime_key, env_key, runtime_reader, env_reader, default):
@@ -225,7 +238,7 @@ PAD_ENABLED = _get_env_bool("PAD_ENABLED", True)
 PAD_MIN_DETECTOR_CONFIDENCE = _get_env_float("PAD_MIN_DETECTOR_CONFIDENCE", 0.6)
 
 # PAD_RUNTIME_CONFIG_PATH (optional) loads the model's runtime contract JSON.
-# A loaded field takes precedence; PAD_* is used only for fields absent from JSON.
+# Model/preprocessing fields prefer JSON; explicit threshold overrides prefer .env.
 PAD_MODEL_FILENAME = _pad_contract_value(
     "model_file", "PAD_MODEL_FILENAME", _runtime_str, _get_env_str,
     "mnv3s_e1_preliminary_v5_3_edge_best.onnx",
@@ -261,32 +274,51 @@ _runtime_pad_threshold_logit = _runtime_float(
     "calibrated_logit_threshold",
     math.log(_runtime_pad_threshold / (1.0 - _runtime_pad_threshold)),
 )
-_pad_threshold_env = _get_env_str("PAD_THRESHOLD", None)
-_pad_threshold_logit_env = _get_env_str("PAD_THRESHOLD_LOGIT", None)
-if _has_runtime_probability or _has_runtime_logit:
-    PAD_THRESHOLD = _runtime_pad_threshold
-    PAD_THRESHOLD_LOGIT = _runtime_pad_threshold_logit
-elif _pad_threshold_env is not None and _pad_threshold_logit_env is None:
-    PAD_THRESHOLD = _get_env_float("PAD_THRESHOLD", _runtime_pad_threshold)
+_pad_threshold_env = None if PAD_ADAPTIVE_ENABLED else _get_env_str("PAD_THRESHOLD", None)
+_pad_threshold_logit_env = None if PAD_ADAPTIVE_ENABLED else _get_env_str("PAD_THRESHOLD_LOGIT", None)
+
+
+def _threshold_override(name, raw):
+    try:
+        value = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} phải là một số hữu hạn") from exc
+    if not math.isfinite(value):
+        raise ValueError(f"{name} phải là một số hữu hạn")
+    return value
+
+
+# Explicit, nonblank environment thresholds override the JSON decision boundary.
+# Other JSON fields (model/hash/preprocessing) remain authoritative.
+if _pad_threshold_env is not None and _pad_threshold_logit_env is None:
+    PAD_THRESHOLD = _threshold_override("PAD_THRESHOLD", _pad_threshold_env)
     PAD_THRESHOLD_LOGIT = (
         math.log(PAD_THRESHOLD / (1.0 - PAD_THRESHOLD))
         if 0.0 < PAD_THRESHOLD < 1.0
         else 0.0
     )
+    PAD_THRESHOLD_SOURCE = "env:PAD_THRESHOLD"
 elif _pad_threshold_logit_env is not None and _pad_threshold_env is None:
-    PAD_THRESHOLD_LOGIT = _get_env_float(
-        "PAD_THRESHOLD_LOGIT", _runtime_pad_threshold_logit
-    )
+    PAD_THRESHOLD_LOGIT = _threshold_override("PAD_THRESHOLD_LOGIT", _pad_threshold_logit_env)
     if PAD_THRESHOLD_LOGIT >= 0.0:
         PAD_THRESHOLD = 1.0 / (1.0 + math.exp(-PAD_THRESHOLD_LOGIT))
     else:
         exp_logit = math.exp(PAD_THRESHOLD_LOGIT)
         PAD_THRESHOLD = exp_logit / (1.0 + exp_logit)
+    PAD_THRESHOLD_SOURCE = "env:PAD_THRESHOLD_LOGIT"
+elif _pad_threshold_env is not None and _pad_threshold_logit_env is not None:
+    PAD_THRESHOLD = _threshold_override("PAD_THRESHOLD", _pad_threshold_env)
+    PAD_THRESHOLD_LOGIT = _threshold_override("PAD_THRESHOLD_LOGIT", _pad_threshold_logit_env)
+    PAD_THRESHOLD_SOURCE = "env:PAD_THRESHOLD+PAD_THRESHOLD_LOGIT"
 else:
-    PAD_THRESHOLD = _get_env_float("PAD_THRESHOLD", _runtime_pad_threshold)
-    PAD_THRESHOLD_LOGIT = _get_env_float(
-        "PAD_THRESHOLD_LOGIT", _runtime_pad_threshold_logit
-    )
+    PAD_THRESHOLD = _runtime_pad_threshold
+    PAD_THRESHOLD_LOGIT = _runtime_pad_threshold_logit
+    PAD_THRESHOLD_SOURCE = "runtime_json" if (_has_runtime_probability or _has_runtime_logit) else "default"
+    if PAD_ADAPTIVE_ENABLED:
+        PAD_THRESHOLD_SOURCE = "adaptive_profile"
+
+if not math.isfinite(PAD_THRESHOLD_LOGIT):
+    raise ValueError("PAD_THRESHOLD_LOGIT phải là một số hữu hạn")
 
 if not (0.0 < PAD_THRESHOLD < 1.0):
     raise ValueError(
@@ -324,7 +356,7 @@ PAD_GAMMA_ENABLED = _pad_contract_value(
     "apply_gamma", "PAD_GAMMA_ENABLED", _runtime_bool, _get_env_bool, False,
 )
 # Explicit experiment override: bypasses a runtime JSON apply_gamma=false value.
-FORCE_GAMMA = _get_env_bool("FORCE_GAMMA", False)
+FORCE_GAMMA = False if PAD_ADAPTIVE_ENABLED else _get_env_bool("FORCE_GAMMA", False)
 if FORCE_GAMMA:
     PAD_GAMMA_ENABLED = True
 
@@ -333,10 +365,18 @@ if FORCE_GAMMA:
 PAD_GAMMA_TARGET  = _get_env_float("PAD_GAMMA_TARGET", 110.0)
 
 # Hệ số mở rộng bbox khi crop khuôn mặt đưa vào PAD.
-PAD_BBOX_EXPANSION_FACTOR = _pad_contract_value(
-    "bbox_expansion_factor", "PAD_BBOX_EXPANSION_FACTOR",
-    _runtime_float, _get_env_float, 1.55,
-)
+_pad_crop_factor_env = None if PAD_ADAPTIVE_ENABLED else _clean_env_val(os.getenv("PAD_BBOX_EXPANSION_FACTOR"))
+if _pad_crop_factor_env is None or _pad_crop_factor_env.lower() in ("", "none"):
+    PAD_BBOX_EXPANSION_FACTOR = _runtime_float(
+        _PAD_RUNTIME_CONFIG, "bbox_expansion_factor", 1.55,
+    )
+else:
+    try:
+        PAD_BBOX_EXPANSION_FACTOR = float(_pad_crop_factor_env)
+    except ValueError as exc:
+        raise ValueError("PAD_BBOX_EXPANSION_FACTOR phải là số dương, để trống hoặc None") from exc
+if not math.isfinite(PAD_BBOX_EXPANSION_FACTOR) or PAD_BBOX_EXPANSION_FACTOR <= 0:
+    raise ValueError("PAD_BBOX_EXPANSION_FACTOR phải là số dương hữu hạn")
 PAD_CROP_MODE = _pad_contract_value(
     "crop_mode", "PAD_CROP_MODE", _runtime_str, _get_env_str,
     "square_reflect_v1",
@@ -392,7 +432,7 @@ FPS_AVG_WINDOW = _get_env_int("FPS_AVG_WINDOW", 30)
 # Tracking Config
 # Khuôn mặt được track bằng IOU giữa các frame; danh tính chỉ được re-verify
 # (chạy lại align+embed+DB search) sau mỗi RECOGNIZE_INTERVAL_SECONDS giây
-# thay vì đếm số frame. Đặt theo thời gian (0.5s) giúp hệ thống hoạt động
+# thay vì đếm số frame. Chu kỳ mặc định 1.0s giúp hệ thống hoạt động
 # hoàn toàn nhất quán bất kể chạy trên thiết bị có FPS cao (Mac 30-60 FPS)
 # hay thiết bị Edge có FPS thấp (Raspberry Pi 5-15 FPS).
 RECOGNIZE_INTERVAL_SECONDS = _get_env_float("RECOGNIZE_INTERVAL_SECONDS", 1.0)
@@ -419,7 +459,7 @@ RECOGNITION_LABEL_HOLD_SECONDS = max(0.0, _get_env_float("RECOGNITION_LABEL_HOLD
 PAD_SMOOTH_WINDOW = _get_env_int("PAD_SMOOTH_WINDOW", 5)
 
 # PAD_MIN_VOTES: số phiếu tối thiểu cần tích lũy trước khi track thoát khỏi trạng thái PAD_PENDING
-PAD_MIN_VOTES = _get_env_int("PAD_MIN_VOTES", PAD_SMOOTH_WINDOW)
+PAD_MIN_VOTES = _get_env_int("PAD_MIN_VOTES", 3)
 
 # PAD_SPOOF_MIN_RATIO: tỉ lệ tối thiểu phiếu SPOOF trong window để bị kết luận SPOOF.
 #   0.6 = cần ≥ 60% phiếu SPOOF → mới hiện đỏ. Mặt thật di chuyển thường chỉ
@@ -433,30 +473,19 @@ PAD_SPOOF_MIN_RATIO = _get_env_float("PAD_SPOOF_MIN_RATIO", 0.6)
 # khi người dùng rời khỏi frame rồi quay lại (gương/ảnh mới).
 PAD_STALE_TIMEOUT_SECONDS = _get_env_float("PAD_STALE_TIMEOUT_SECONDS", 3.0)
 PAD_DIAGNOSTIC_LOG = _get_env_bool("PAD_DIAGNOSTIC_LOG", False)
+
 # Experiment: stabilize small PAD crop jitter without altering tracking/cadence.
 PAD_CROP_SMOOTHING = _pad_contract_value(
     "crop_smoothing", "PAD_CROP_SMOOTHING", _runtime_bool, _get_env_bool,
     False,
 )
 
-# PAD_INTERVAL_SECONDS: khoảng cách giữa 2 lần chạy PAD inference cho cùng 1 track.
-#
-# KHÔNG ĐẶT THỦ CÔNG — được tự động tính từ:
-#   PAD_INTERVAL = RECOGNIZE_INTERVAL / PAD_SMOOTH_WINDOW
-#
-# Ý nghĩa: PAD chạy đúng PAD_SMOOTH_WINDOW lần trong mỗi 1 chu kỳ recognition.
-# → Khi recognition fire (mỗi 0.5s), rolling window đã đủ SMOOTH_WINDOW phiếu → verdict ổn định.
-# → PAD và Recognition luôn đồng bộ, không cần chỉnh thêm.
-PAD_INTERVAL_SECONDS = _get_env_float(
-    "PAD_INTERVAL_SECONDS",
-    round(RECOGNIZE_INTERVAL_SECONDS / max(PAD_SMOOTH_WINDOW, 1), 4),
-)
+# PAD and detection cadence are configured independently of recognition/vote count.
+# Defaults: recognition 1.0s, PAD 0.2s, detection 0.2s.
+PAD_INTERVAL_SECONDS = _get_env_float("PAD_INTERVAL_SECONDS", 0.2)
 
-# Face detector cadence. 0 means detect every frame (debug/rollback mode).
-# Mặc định đồng bộ với PAD cadence để không chạy detector dày hơn cần thiết.
-DETECTION_INTERVAL_SECONDS = _get_env_float(
-    "DETECTION_INTERVAL_SECONDS", PAD_INTERVAL_SECONDS
-)
+# 0 means detect every frame (debug/rollback mode).
+DETECTION_INTERVAL_SECONDS = _get_env_float("DETECTION_INTERVAL_SECONDS", 0.2)
 
 # Ngưỡng IOU để coi 2 bbox ở 2 frame liên tiếp là cùng một track.
 TRACK_IOU_THRESHOLD = _get_env_float("TRACK_IOU_THRESHOLD", 0.3)
@@ -479,7 +508,7 @@ MATCH_THRESHOLD = _get_env_float("MATCH_THRESHOLD", 0.35)
 # Attendance Tracking
 ATTENDANCE_MODE = (_get_env_str("ATTENDANCE_MODE", "checkin") or "checkin").lower()
 ATTENDANCE_GAP_MINUTES = _get_env_int("ATTENDANCE_GAP_MINUTES", 15)
-ATTENDANCE_STABLE_COUNT = _get_env_int("ATTENDANCE_STABLE_COUNT", 3)
+ATTENDANCE_STABLE_COUNT = max(1, _get_env_int("ATTENDANCE_STABLE_COUNT", 3))
 
 
 # Validation
@@ -538,3 +567,8 @@ def validate_config():
 
 
 validate_config()
+
+# Maximum selected faces passed to tracking, PAD and recognition.
+MAX_FACES_PER_FRAME = _get_env_int("MAX_FACES_PER_FRAME", 3)
+if MAX_FACES_PER_FRAME < 1:
+    raise ValueError("MAX_FACES_PER_FRAME phải >= 1")

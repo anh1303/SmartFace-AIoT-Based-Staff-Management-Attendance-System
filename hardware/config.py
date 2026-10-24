@@ -1,0 +1,540 @@
+import json
+import math
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
+load_dotenv()
+
+
+def _clean_env_val(val: str | None) -> str | None:
+    if val is None:
+        return None
+    # python-dotenv đã xử lý comment và quoted value khi load_dotenv().
+    # ở đây chỉ cần strip khoảng trắng thừa ở đầu/cuối.
+    return val.strip()
+
+
+def _get_env_str(key: str, default: str | None = None) -> str | None:
+    val = _clean_env_val(os.getenv(key))
+    return val if val is not None and val != "" else default
+
+
+def _get_env_int(key: str, default: int) -> int:
+    val = _clean_env_val(os.getenv(key))
+    if val is None or val == "":
+        return default
+    try:
+        return int(val)
+    except ValueError:
+        return default
+
+
+def _get_env_float(key: str, default: float) -> float:
+    val = _clean_env_val(os.getenv(key))
+    if val is None or val == "":
+        return default
+    try:
+        return float(val)
+    except ValueError:
+        return default
+
+
+def _get_env_bool(key: str, default: bool) -> bool:
+    val = _clean_env_val(os.getenv(key))
+    if val is None or val == "":
+        return default
+    return val.lower() in ("true", "1", "yes", "y", "on")
+
+
+# Explicit experiment switch: the selected adaptive profile overrides env tuning.
+PAD_ADAPTIVE_ENABLED = _get_env_bool("PAD_ADAPTIVE_ENABLED", False)
+PAD_ADAPTIVE_CONFIG_PATH = _get_env_str("PAD_ADAPTIVE_CONFIG_PATH", 'models/R7_SC_FULL_local80_candidate_runtime.json')
+
+
+def _load_pad_runtime_config():
+    raw_path = _get_env_str("PAD_RUNTIME_CONFIG_PATH", "models/R7_SC_FULL_crop15_runtime_config_casia.json")
+    if PAD_ADAPTIVE_ENABLED:
+        raw_path = PAD_ADAPTIVE_CONFIG_PATH
+    if raw_path is None or raw_path.lower() in ("none", "null"):
+        if PAD_ADAPTIVE_ENABLED:
+            raise ValueError("PAD_ADAPTIVE_CONFIG_PATH không được để None khi bật adaptive")
+        return None, {}, None
+
+    path = Path(raw_path).expanduser()
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parent / path
+    path = path.resolve()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Không thể đọc PAD runtime config '{path}': {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"PAD runtime config phải là JSON object: '{path}'")
+    if PAD_ADAPTIVE_ENABLED and not isinstance(data.get("adaptive_threshold"), dict):
+        raise ValueError("PAD_ADAPTIVE_ENABLED=true yêu cầu profile có adaptive_threshold")
+    return str(path), data, path.parent
+
+
+def _runtime_float(data: dict, key: str, default: float) -> float:
+    if key not in data:
+        return default
+    try:
+        return float(data[key])
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"PAD runtime config field '{key}' phải là số") from exc
+
+
+def _runtime_str(data: dict, key: str, default: str) -> str:
+    if key not in data:
+        return default
+    value = data[key]
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"PAD runtime config field '{key}' phải là chuỗi không rỗng")
+    return value.strip()
+
+
+def _runtime_int(data: dict, key: str, default: int) -> int:
+    if key not in data:
+        return default
+    value = data[key]
+    if isinstance(value, bool):
+        raise ValueError(f"PAD runtime config field '{key}' phải là số nguyên")
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"PAD runtime config field '{key}' phải là số nguyên") from exc
+    if parsed != value:
+        raise ValueError(f"PAD runtime config field '{key}' phải là số nguyên")
+    return parsed
+
+
+def _runtime_bool(data: dict, key: str, default: bool) -> bool:
+    if key not in data:
+        return default
+    value = data[key]
+    if not isinstance(value, bool):
+        raise ValueError(f"PAD runtime config field '{key}' phải là true/false")
+    return value
+
+
+def _runtime_vector(data: dict, key: str):
+    if key not in data:
+        return None
+    value = data[key]
+    if value is None:
+        return None
+    if not isinstance(value, list) or len(value) != 3:
+        raise ValueError(f"PAD runtime config field '{key}' phải có đúng 3 giá trị")
+    try:
+        return [float(item) for item in value]
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"PAD runtime config field '{key}' phải chứa số") from exc
+
+
+def _get_env_float_vector(key: str, default):
+    raw = _get_env_str(key, None)
+    if raw is None:
+        return default
+    try:
+        values = [float(value.strip()) for value in raw.split(",")]
+    except ValueError as exc:
+        raise ValueError(f"Cấu hình {key} phải là 3 số phân cách bằng dấu phẩy") from exc
+    if len(values) != 3:
+        raise ValueError(f"Cấu hình {key} phải có đúng 3 giá trị")
+    return values
+
+
+PAD_RUNTIME_CONFIG_PATH, _PAD_RUNTIME_CONFIG, _PAD_RUNTIME_CONFIG_DIR = _load_pad_runtime_config()
+PAD_LIGHTING_PROFILE = _PAD_RUNTIME_CONFIG.get("lighting")
+PAD_ADAPTIVE_THRESHOLD_PROFILE = _PAD_RUNTIME_CONFIG.get("adaptive_threshold")
+
+
+def _pad_contract_value(runtime_key, env_key, runtime_reader, env_reader, default):
+    """Use a runtime contract field before its PAD_* environment fallback."""
+    if runtime_key in _PAD_RUNTIME_CONFIG:
+        return runtime_reader(_PAD_RUNTIME_CONFIG, runtime_key, default)
+    return env_reader(env_key, default)
+
+
+# Model Config — Recognition (ArcFace)
+# ArcFace lấy từ insightface model pack buffalo_s.
+MODEL_PACK_NAME = _get_env_str("MODEL_PACK_NAME", "buffalo_s")
+EMBEDDING_MODEL_VERSION = _get_env_str("EMBEDDING_MODEL_VERSION", MODEL_PACK_NAME)
+
+# ctx_id: -1 = CPU, >=0 = GPU device index (chỉ có ý nghĩa khi dùng CUDAExecutionProvider)
+MODEL_CTX_ID = _get_env_int("MODEL_CTX_ID", -1)
+
+# Detector Config — YunNet / SCRFD
+# DETECTOR_MODEL_PATH: None = dùng đường dẫn mặc định trong detection/models/
+DETECTOR_MODEL_PATH = _get_env_str("DETECTOR_MODEL_PATH", None)
+DETECTOR_CONF_THRESH = _get_env_float("DETECTOR_CONF_THRESH", 0.5)
+DETECTOR_NMS_THRESH = _get_env_float("DETECTOR_NMS_THRESH", 0.3) # trùng lặp 30% thì bỏ trùng lặp, gửi lại bbox có acc lớn nhất
+DETECTOR_TOP_K = _get_env_int("DETECTOR_TOP_K", 5000)
+
+# Kích thước khuôn mặt tối thiểu (pixel chiều rộng & chiều cao), áp dụng cho
+# cả YunNet và SCRFD trước khi tạo detection/track.
+# - Tăng giá trị (ví dụ: 60 - 100) để tập trung nhận diện người đứng gần camera/kiosk,
+#   tự động bỏ qua người đi lại ở hậu cảnh xa.
+# - Giảm giá trị (ví dụ: 20 - 30) nếu muốn nhận diện người từ khoảng cách xa.
+DETECTOR_MIN_FACE_SIZE = _get_env_int("DETECTOR_MIN_FACE_SIZE", 60)
+
+# Khoảng cách tối thiểu (pixel) từ khuôn mặt tới 4 mép viền ảnh.
+# Bỏ qua các khuôn mặt quá sát mép (< margin) để tránh cắt lẹm mặt gây sai lệch nhận diện & anti-spoofing.
+DETECTOR_MARGIN = _get_env_int("DETECTOR_MARGIN", 5)
+
+# Kích thước khung hình khởi tạo cho detector
+DETECTOR_INPUT_WIDTH  = _get_env_int("DETECTOR_INPUT_WIDTH", 320)
+DETECTOR_INPUT_HEIGHT = _get_env_int("DETECTOR_INPUT_HEIGHT", 320)
+DETECTOR_INPUT_SIZE   = (DETECTOR_INPUT_WIDTH, DETECTOR_INPUT_HEIGHT)
+
+# Alias tương thích ngược (từ bản SCRFD cũ, giữ để không vỡ script cũ)
+DETECTOR_DET_SIZE = (640, 640)
+
+# Camera Config (dùng cho app.py và các script demo webcam real-time)
+CAMERA_INDEX  = _get_env_int("CAMERA_INDEX", 0)
+CAMERA_WIDTH  = _get_env_int("CAMERA_WIDTH", 640)
+CAMERA_HEIGHT = _get_env_int("CAMERA_HEIGHT", 480)
+# False preserves the camera backend's default resolution; True restores width/height requests.
+CAMERA_FORCE_RESOLUTION = _get_env_bool("CAMERA_FORCE_RESOLUTION", True)
+CAMERA_FPS    = _get_env_int("CAMERA_FPS", 30)
+# Giảm số frame cũ nằm trong hàng đợi backend camera. Một số backend có thể bỏ qua.
+CAMERA_BUFFER_SIZE = _get_env_int("CAMERA_BUFFER_SIZE", 1)
+
+# Detector cho app.py (real-time inference).
+# - "yunnet": cv2.FaceDetectorYN, ~122 KB, nhanh trên edge, nhưng cần resize frame nhỏ trước khi detect.
+#             CAMERA_FORCE_RESOLUTION=true giới hạn frame size theo CAMERA_WIDTH × CAMERA_HEIGHT.
+# - "scrfd" : InsightFace SCRFD (buffalo_s), resize nội bộ qua det_size nhưng vẫn nhận
+#             frame camera theo kích thước cấu hình; app in kích thước thực tế vì backend
+#             Windows/Linux/macOS có thể không hỗ trợ mọi lệnh cap.set().
+APP_DETECTOR = (_get_env_str("APP_DETECTOR", "scrfd") or "scrfd").lower()
+
+# Anti-Spoofing / PAD (Presentation Attack Detection) Config
+# PAD_ENABLED: bật/tắt module kiểm tra liveness. Cũng có thể bật/tắt qua CLI --pad / --no-pad.
+# Set "true"/"1" để bật mặc định, "false"/"0" để tắt mặc định.
+PAD_ENABLED = _get_env_bool("PAD_ENABLED", True)
+# Detector score tối thiểu riêng cho PAD. DETECTOR_CONF_THRESH vẫn quyết định
+# detector có trả detection hay không; PAD áp thêm ngưỡng score riêng.
+PAD_MIN_DETECTOR_CONFIDENCE = _get_env_float("PAD_MIN_DETECTOR_CONFIDENCE", 0.6)
+
+# PAD_RUNTIME_CONFIG_PATH (optional) loads the model's runtime contract JSON.
+# Model/preprocessing fields prefer JSON; explicit threshold overrides prefer .env.
+PAD_MODEL_FILENAME = _pad_contract_value(
+    "model_file", "PAD_MODEL_FILENAME", _runtime_str, _get_env_str,
+    "mnv3s_e1_preliminary_v5_3_edge_best.onnx",
+)
+PAD_MODEL_IMG_SIZE = _pad_contract_value(
+    "model_img_size", "PAD_MODEL_IMG_SIZE", _runtime_int, _get_env_int, 128,
+)
+if PAD_MODEL_IMG_SIZE <= 0:
+    raise ValueError("PAD_MODEL_IMG_SIZE phải lớn hơn 0")
+
+# PAD_THRESHOLD luôn là xác suất P(REAL), không phải logit difference.
+_has_runtime_probability = "predictor_threshold_probability" in _PAD_RUNTIME_CONFIG
+_has_runtime_logit = "calibrated_logit_threshold" in _PAD_RUNTIME_CONFIG
+_runtime_pad_threshold = _runtime_float(
+    _PAD_RUNTIME_CONFIG, "predictor_threshold_probability", 0.38579509526467753
+)
+if _has_runtime_logit and not _has_runtime_probability:
+    _runtime_logit_only = _runtime_float(
+        _PAD_RUNTIME_CONFIG, "calibrated_logit_threshold", 0.0
+    )
+    if _runtime_logit_only >= 0.0:
+        _runtime_pad_threshold = 1.0 / (1.0 + math.exp(-_runtime_logit_only))
+    else:
+        _exp_logit = math.exp(_runtime_logit_only)
+        _runtime_pad_threshold = _exp_logit / (1.0 + _exp_logit)
+if not 0.0 < _runtime_pad_threshold < 1.0:
+    raise ValueError(
+        "PAD runtime config field 'predictor_threshold_probability' "
+        "phải nằm trong khoảng (0, 1)"
+    )
+_runtime_pad_threshold_logit = _runtime_float(
+    _PAD_RUNTIME_CONFIG,
+    "calibrated_logit_threshold",
+    math.log(_runtime_pad_threshold / (1.0 - _runtime_pad_threshold)),
+)
+_pad_threshold_env = None if PAD_ADAPTIVE_ENABLED else _get_env_str("PAD_THRESHOLD", None)
+_pad_threshold_logit_env = None if PAD_ADAPTIVE_ENABLED else _get_env_str("PAD_THRESHOLD_LOGIT", None)
+
+
+def _threshold_override(name, raw):
+    try:
+        value = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} phải là một số hữu hạn") from exc
+    if not math.isfinite(value):
+        raise ValueError(f"{name} phải là một số hữu hạn")
+    return value
+
+
+# Explicit, nonblank environment thresholds override the JSON decision boundary.
+# Other JSON fields (model/hash/preprocessing) remain authoritative.
+if _pad_threshold_env is not None and _pad_threshold_logit_env is None:
+    PAD_THRESHOLD = _threshold_override("PAD_THRESHOLD", _pad_threshold_env)
+    PAD_THRESHOLD_LOGIT = (
+        math.log(PAD_THRESHOLD / (1.0 - PAD_THRESHOLD))
+        if 0.0 < PAD_THRESHOLD < 1.0
+        else 0.0
+    )
+    PAD_THRESHOLD_SOURCE = "env:PAD_THRESHOLD"
+elif _pad_threshold_logit_env is not None and _pad_threshold_env is None:
+    PAD_THRESHOLD_LOGIT = _threshold_override("PAD_THRESHOLD_LOGIT", _pad_threshold_logit_env)
+    if PAD_THRESHOLD_LOGIT >= 0.0:
+        PAD_THRESHOLD = 1.0 / (1.0 + math.exp(-PAD_THRESHOLD_LOGIT))
+    else:
+        exp_logit = math.exp(PAD_THRESHOLD_LOGIT)
+        PAD_THRESHOLD = exp_logit / (1.0 + exp_logit)
+    PAD_THRESHOLD_SOURCE = "env:PAD_THRESHOLD_LOGIT"
+elif _pad_threshold_env is not None and _pad_threshold_logit_env is not None:
+    PAD_THRESHOLD = _threshold_override("PAD_THRESHOLD", _pad_threshold_env)
+    PAD_THRESHOLD_LOGIT = _threshold_override("PAD_THRESHOLD_LOGIT", _pad_threshold_logit_env)
+    PAD_THRESHOLD_SOURCE = "env:PAD_THRESHOLD+PAD_THRESHOLD_LOGIT"
+else:
+    PAD_THRESHOLD = _runtime_pad_threshold
+    PAD_THRESHOLD_LOGIT = _runtime_pad_threshold_logit
+    PAD_THRESHOLD_SOURCE = "runtime_json" if (_has_runtime_probability or _has_runtime_logit) else "default"
+    if PAD_ADAPTIVE_ENABLED:
+        PAD_THRESHOLD_SOURCE = "adaptive_profile"
+
+if not math.isfinite(PAD_THRESHOLD_LOGIT):
+    raise ValueError("PAD_THRESHOLD_LOGIT phải là một số hữu hạn")
+
+if not (0.0 < PAD_THRESHOLD < 1.0):
+    raise ValueError(
+        f"Cấu hình PAD_THRESHOLD={PAD_THRESHOLD} không hợp lệ. Yêu cầu 0 < threshold < 1."
+    )
+_expected_pad_threshold_logit = math.log(PAD_THRESHOLD / (1.0 - PAD_THRESHOLD))
+if abs(PAD_THRESHOLD_LOGIT - _expected_pad_threshold_logit) > 1e-6:
+    raise ValueError(
+        "PAD_THRESHOLD và PAD_THRESHOLD_LOGIT không nhất quán: "
+        f"expected {_expected_pad_threshold_logit:.12f}, "
+        f"received {PAD_THRESHOLD_LOGIT:.12f}."
+    )
+
+_runtime_color_order = _PAD_RUNTIME_CONFIG.get("color_order")
+if _runtime_color_order is not None and not isinstance(_runtime_color_order, str):
+    raise ValueError("PAD runtime config field 'color_order' phải là chuỗi")
+_raw_color_order = _pad_contract_value(
+    "color_order", "PAD_COLOR_ORDER", _runtime_str, _get_env_str, None
+)
+if _raw_color_order is not None and _raw_color_order != "":
+    PAD_COLOR_ORDER = _raw_color_order.strip().upper()
+    if PAD_COLOR_ORDER not in ("RGB", "BGR"):
+        raise ValueError(
+            f"Cấu hình PAD_COLOR_ORDER không hợp lệ: '{_raw_color_order}'. "
+            f"Chỉ chấp nhận 'RGB', 'BGR' hoặc để trống (auto-detect)."
+        )
+else:
+    PAD_COLOR_ORDER = None
+
+# Adaptive Gamma Correction cho face crop của PAD.
+# Bật để robust hơn với điều kiện ánh sáng khác nhau (tối / sáng quá).
+# Gamma được tính động theo perceived luma (kênh V của HSV), target về ~110/255.
+# Set "true"/"1" để bật, "false"/"0" để tắt.
+PAD_GAMMA_ENABLED = _pad_contract_value(
+    "apply_gamma", "PAD_GAMMA_ENABLED", _runtime_bool, _get_env_bool, False,
+)
+# Explicit experiment override: bypasses a runtime JSON apply_gamma=false value.
+FORCE_GAMMA = False if PAD_ADAPTIVE_ENABLED else _get_env_bool("FORCE_GAMMA", False)
+if FORCE_GAMMA:
+    PAD_GAMMA_ENABLED = True
+
+# Target luma (kênh V, [0-255]) mà adaptive gamma hướng đến.
+# 110 ≈ 43% — đủ sáng để model học texture, không bị over-expose.
+PAD_GAMMA_TARGET  = _get_env_float("PAD_GAMMA_TARGET", 110.0)
+
+# Hệ số mở rộng bbox khi crop khuôn mặt đưa vào PAD.
+_pad_crop_factor_env = None if PAD_ADAPTIVE_ENABLED else _clean_env_val(os.getenv("PAD_BBOX_EXPANSION_FACTOR"))
+if _pad_crop_factor_env is None or _pad_crop_factor_env.lower() in ("", "none"):
+    PAD_BBOX_EXPANSION_FACTOR = _runtime_float(
+        _PAD_RUNTIME_CONFIG, "bbox_expansion_factor", 1.55,
+    )
+else:
+    try:
+        PAD_BBOX_EXPANSION_FACTOR = float(_pad_crop_factor_env)
+    except ValueError as exc:
+        raise ValueError("PAD_BBOX_EXPANSION_FACTOR phải là số dương, để trống hoặc None") from exc
+if not math.isfinite(PAD_BBOX_EXPANSION_FACTOR) or PAD_BBOX_EXPANSION_FACTOR <= 0:
+    raise ValueError("PAD_BBOX_EXPANSION_FACTOR phải là số dương hữu hạn")
+PAD_CROP_MODE = _pad_contract_value(
+    "crop_mode", "PAD_CROP_MODE", _runtime_str, _get_env_str,
+    "square_reflect_v1",
+).strip().lower()
+if PAD_CROP_MODE not in ("square_reflect_v1", "minifasnet_train_v1"):
+    raise ValueError(
+        "PAD_CROP_MODE phải là 'square_reflect_v1' hoặc 'minifasnet_train_v1'"
+    )
+if _PAD_RUNTIME_CONFIG.get("crop_mode") == "minifasnet_train_v1":
+    # Older MiniFASNet sidecars omitted these keys; their [0,1] input is unnormalized.
+    PAD_MEAN = _runtime_vector(_PAD_RUNTIME_CONFIG, "mean")
+    PAD_STD = _runtime_vector(_PAD_RUNTIME_CONFIG, "std")
+else:
+    PAD_MEAN = _pad_contract_value(
+        "mean", "PAD_MEAN", lambda data, key, default: _runtime_vector(data, key),
+        _get_env_float_vector, None,
+    )
+    PAD_STD = _pad_contract_value(
+        "std", "PAD_STD", lambda data, key, default: _runtime_vector(data, key),
+        _get_env_float_vector, None,
+    )
+if (PAD_MEAN is None) != (PAD_STD is None):
+    raise ValueError("PAD_MEAN và PAD_STD phải được cấu hình cùng nhau")
+
+# Đường dẫn thư mục chứa tất cả model anti-spoofing
+_ANTISPOOF_MODELS_DIR = Path(__file__).resolve().parent / "models"
+if "model_file" in _PAD_RUNTIME_CONFIG and _PAD_RUNTIME_CONFIG_DIR is not None:
+    _PAD_MODEL_BASE_DIR = _PAD_RUNTIME_CONFIG_DIR
+else:
+    _PAD_MODEL_BASE_DIR = _ANTISPOOF_MODELS_DIR
+_pad_model_path = Path(PAD_MODEL_FILENAME).expanduser()
+if not _pad_model_path.is_absolute():
+    _pad_model_path = _PAD_MODEL_BASE_DIR / _pad_model_path
+PAD_MODEL_PATH = str(_pad_model_path.resolve())
+PAD_RUNTIME_MODEL_SHA256 = (
+    _runtime_str(_PAD_RUNTIME_CONFIG, "model_sha256", "")
+    if "model_sha256" in _PAD_RUNTIME_CONFIG
+    else None
+)
+PAD_OUTPUT_CLASSES = _runtime_int(_PAD_RUNTIME_CONFIG, "output_classes", None)
+if PAD_OUTPUT_CLASSES not in (None, 2, 3):
+    raise ValueError("PAD runtime output_classes phải là 2 hoặc 3")
+
+# Alias tương thích ngược (từ biến LIVENESS_* cũ)
+LIVENESS_MODEL_PATH = PAD_MODEL_PATH
+LIVENESS_THRESHOLD  = PAD_THRESHOLD
+
+# FPS log ở terminal mỗi 10 giây; không vẽ số FPS lên video/TFT.
+SHOW_FPS = _get_env_bool("SHOW_FPS", True)
+# Số frame dùng để tính FPS trung bình (rolling window)
+FPS_AVG_WINDOW = _get_env_int("FPS_AVG_WINDOW", 30)
+
+# Tracking Config
+# Khuôn mặt được track bằng IOU giữa các frame; danh tính chỉ được re-verify
+# (chạy lại align+embed+DB search) sau mỗi RECOGNIZE_INTERVAL_SECONDS giây
+# thay vì đếm số frame. Chu kỳ mặc định 1.0s giúp hệ thống hoạt động
+# hoàn toàn nhất quán bất kể chạy trên thiết bị có FPS cao (Mac 30-60 FPS)
+# hay thiết bị Edge có FPS thấp (Raspberry Pi 5-15 FPS).
+RECOGNIZE_INTERVAL_SECONDS = _get_env_float("RECOGNIZE_INTERVAL_SECONDS", 1.0)
+RECOGNIZE_INTERVAL = RECOGNIZE_INTERVAL_SECONDS  # Alias tương thích ngược
+
+# Realtime recognition worker: one consumer; bounded queue for Pi 4.
+RECOGNITION_QUEUE_SIZE = max(1, _get_env_int("RECOGNITION_QUEUE_SIZE", 2))
+RECOGNITION_INTRA_OP_THREADS = max(1, _get_env_int("RECOGNITION_INTRA_OP_THREADS", 1))
+RECOGNITION_CACHE_TTL_SECONDS = max(0.0, _get_env_float("RECOGNITION_CACHE_TTL_SECONDS", 30.0))
+RECOGNITION_CACHE_THRESHOLD = _get_env_float("RECOGNITION_CACHE_THRESHOLD", 0.65)
+if not math.isfinite(RECOGNITION_CACHE_THRESHOLD) or not 0 <= RECOGNITION_CACHE_THRESHOLD <= 1:
+    raise ValueError("RECOGNITION_CACHE_THRESHOLD must be between 0 and 1")
+RECOGNITION_LABEL_CONFIRMATIONS = max(1, _get_env_int("RECOGNITION_LABEL_CONFIRMATIONS", 2))
+RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS = max(1, _get_env_int("RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS", 3))
+RECOGNITION_LABEL_HOLD_SECONDS = max(0.0, _get_env_float("RECOGNITION_LABEL_HOLD_SECONDS", 1.5))
+
+# PAD Temporal Smoothing — chống nhấp nháy SPOOF/REAL khi mặt di chuyển.
+#
+# PAD_SMOOTH_WINDOW: số lần inference PAD dùng để biểu quyết REAL/SPOOF (rolling window).
+#   Mỗi lần inference = 1 "phiếu" bầu. Window tích lũy PAD_SMOOTH_WINDOW phiếu gần nhất.
+#   Tăng → ổn định hơn, chậm phản ứng hơn.  Giảm → nhanh hơn nhưng dễ nhấp nháy.
+PAD_SMOOTH_WINDOW = _get_env_int("PAD_SMOOTH_WINDOW", 5)
+
+# PAD_MIN_VOTES: số phiếu tối thiểu cần tích lũy trước khi track thoát khỏi trạng thái PAD_PENDING
+PAD_MIN_VOTES = _get_env_int("PAD_MIN_VOTES", 3)
+
+# PAD_SPOOF_MIN_RATIO: tỉ lệ tối thiểu phiếu SPOOF trong window để bị kết luận SPOOF.
+#   0.6 = cần ≥ 60% phiếu SPOOF → mới hiện đỏ. Mặt thật di chuyển thường chỉ
+#   bị nhiễu ~30-40% phiếu → không đủ ngưỡng → giữ xanh.
+PAD_SPOOF_MIN_RATIO = _get_env_float("PAD_SPOOF_MIN_RATIO", 0.6)
+
+# PAD_STALE_TIMEOUT_SECONDS: nếu track không nhận PAD inference nào trong khoảng thời gian này,
+# rolling window sẽ bị coi là cũ và bị reset khi inference tiếp theo được gọi.
+# Kết quả: track quay về trạng thái PAD_PENDING (không thể điểm danh) cho đến khi đủ vote mới.
+# Mặc định 3.0s — đủ dài để che hết khoảng cách giữa các lần detect, đủ ngắn để phát hiện
+# khi người dùng rời khỏi frame rồi quay lại (gương/ảnh mới).
+PAD_STALE_TIMEOUT_SECONDS = _get_env_float("PAD_STALE_TIMEOUT_SECONDS", 3.0)
+PAD_DIAGNOSTIC_LOG = _get_env_bool("PAD_DIAGNOSTIC_LOG", False)
+
+# Experiment: stabilize small PAD crop jitter without altering tracking/cadence.
+PAD_CROP_SMOOTHING = _pad_contract_value(
+    "crop_smoothing", "PAD_CROP_SMOOTHING", _runtime_bool, _get_env_bool,
+    False,
+)
+
+# PAD and detection cadence are configured independently of recognition/vote count.
+# Defaults: recognition 1.0s, PAD 0.2s, detection 0.2s.
+PAD_INTERVAL_SECONDS = _get_env_float("PAD_INTERVAL_SECONDS", 0.2)
+
+# 0 means detect every frame (debug/rollback mode).
+DETECTION_INTERVAL_SECONDS = _get_env_float("DETECTION_INTERVAL_SECONDS", 0.2)
+
+# Ngưỡng IOU để coi 2 bbox ở 2 frame liên tiếp là cùng một track.
+TRACK_IOU_THRESHOLD = _get_env_float("TRACK_IOU_THRESHOLD", 0.3)
+
+# Số frame liên tiếp không match được detection nào trước khi xóa track
+# (coi như khuôn mặt đã rời khỏi khung hình).
+TRACK_MAX_MISSING_FRAMES = _get_env_int("TRACK_MAX_MISSING_FRAMES", 10)
+
+MATCH_THRESHOLD = _get_env_float("MATCH_THRESHOLD", 0.35)
+
+# Validation
+def validate_config():
+    """Kiểm tra tính hợp lệ của các tham số cấu hình hệ thống."""
+    if not (0.0 <= PAD_MIN_DETECTOR_CONFIDENCE <= 1.0):
+        raise ValueError(
+            "Cấu hình PAD_MIN_DETECTOR_CONFIDENCE="
+            f"{PAD_MIN_DETECTOR_CONFIDENCE} không hợp lệ. Yêu cầu 0.0 <= value <= 1.0."
+        )
+    if PAD_BBOX_EXPANSION_FACTOR <= 0:
+        raise ValueError(
+            f"Cấu hình PAD_BBOX_EXPANSION_FACTOR={PAD_BBOX_EXPANSION_FACTOR} không hợp lệ. "
+            "Yêu cầu > 0."
+        )
+    if DETECTOR_MIN_FACE_SIZE < 0:
+        raise ValueError(
+            f"Cấu hình DETECTOR_MIN_FACE_SIZE={DETECTOR_MIN_FACE_SIZE} không hợp lệ. "
+            "Yêu cầu >= 0."
+        )
+    if PAD_SMOOTH_WINDOW < 1:
+        raise ValueError(f"Cấu hình PAD_SMOOTH_WINDOW={PAD_SMOOTH_WINDOW} không hợp lệ. Yêu cầu >= 1.")
+    if not (1 <= PAD_MIN_VOTES <= PAD_SMOOTH_WINDOW):
+        raise ValueError(
+            f"Cấu hình PAD_MIN_VOTES={PAD_MIN_VOTES} không hợp lệ. "
+            f"Yêu cầu 1 <= PAD_MIN_VOTES <= PAD_SMOOTH_WINDOW ({PAD_SMOOTH_WINDOW})."
+        )
+    if not (0.0 <= PAD_SPOOF_MIN_RATIO <= 1.0):
+        raise ValueError(
+            f"Cấu hình PAD_SPOOF_MIN_RATIO={PAD_SPOOF_MIN_RATIO} không hợp lệ. "
+            f"Yêu cầu 0.0 <= PAD_SPOOF_MIN_RATIO <= 1.0."
+        )
+    if PAD_INTERVAL_SECONDS <= 0:
+        raise ValueError(f"Cấu hình PAD_INTERVAL_SECONDS={PAD_INTERVAL_SECONDS} không hợp lệ. Yêu cầu > 0.")
+    if PAD_STALE_TIMEOUT_SECONDS <= 0:
+        raise ValueError(
+            f"Cấu hình PAD_STALE_TIMEOUT_SECONDS={PAD_STALE_TIMEOUT_SECONDS} không hợp lệ. Yêu cầu > 0."
+        )
+    if DETECTION_INTERVAL_SECONDS < 0:
+        raise ValueError(
+            f"Cấu hình DETECTION_INTERVAL_SECONDS={DETECTION_INTERVAL_SECONDS} không hợp lệ. "
+            "Yêu cầu >= 0 (0 = detect mỗi frame)."
+        )
+    if CAMERA_WIDTH <= 0 or CAMERA_HEIGHT <= 0:
+        raise ValueError(
+            f"Cấu hình camera {CAMERA_WIDTH}x{CAMERA_HEIGHT} không hợp lệ. "
+            "Yêu cầu width/height > 0."
+        )
+    if CAMERA_FPS <= 0:
+        raise ValueError(f"Cấu hình CAMERA_FPS={CAMERA_FPS} không hợp lệ. Yêu cầu > 0.")
+    if CAMERA_BUFFER_SIZE < 0:
+        raise ValueError(
+            f"Cấu hình CAMERA_BUFFER_SIZE={CAMERA_BUFFER_SIZE} không hợp lệ. "
+            "Yêu cầu >= 0 (0 = để backend tự chọn)."
+        )
+
+
+validate_config()
+
+ATTENDANCE_STABLE_COUNT = max(1, _get_env_int("ATTENDANCE_STABLE_COUNT", 3))
+
+# Maximum selected faces passed to tracking, PAD and recognition.
+MAX_FACES_PER_FRAME = _get_env_int("MAX_FACES_PER_FRAME", 3)
+if MAX_FACES_PER_FRAME < 1:
+    raise ValueError("MAX_FACES_PER_FRAME phải >= 1")

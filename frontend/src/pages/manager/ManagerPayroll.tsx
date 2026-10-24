@@ -145,8 +145,9 @@ export const ManagerPayroll: React.FC = () => {
     }
     return true;
   });
+  const controlledPeriodRecords = allPeriodRecords.filter(p => role === 'admin' || p.employee_id !== currentUser?.employee_id);
   const isFinalized =
-    allPeriodRecords.length > 0 && allPeriodRecords.every((p) => p.status === 'FINALIZED' || p.status === 'PAID');
+    controlledPeriodRecords.length > 0 && controlledPeriodRecords.every((p) => p.status !== 'PENDING');
 
   // Compute metrics
   const totalExpense = allPeriodRecords.reduce((sum, r) => sum + (r.net_salary || 0), 0);
@@ -177,16 +178,14 @@ export const ManagerPayroll: React.FC = () => {
     return true;
   });
 
-  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5;
+  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000;
   const lateRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
 
   const handleOpenEdit = (record: PayrollRecord) => {
-    // Chốt chặn: Chặn sửa các phiếu có trạng thái khác PENDING
     if (record.status !== 'PENDING') {
-      showToast(`Không thể chỉnh sửa phiếu lương ở trạng thái ${record.status}. Chỉ có thể chỉnh sửa khi ở trạng thái PENDING (Chờ duyệt)!`, 'error');
+      showToast('Bảng lương kỳ này đã bị Khóa. Cần mở khóa kỳ trước khi sửa phiếu lương!', 'warning');
       return;
     }
-
     const emp = employees.find((e) => e.employee_id === record.employee_id);
     if (role !== 'admin') {
       const isSelf = Boolean(

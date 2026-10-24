@@ -1,3 +1,4 @@
+import { AppError } from './AppError.js';
 import { prisma } from '../config/database.js';
 
 const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
@@ -142,6 +143,7 @@ export interface SalaryCalculationInput {
  * Pure Function để tính lương thực lĩnh (net_salary) dùng chung thống nhất toàn hệ thống.
  */
 export function calculateNetSalary(params: SalaryCalculationInput): number {
+  if (!Object.values(params).every(v => Number.isFinite(v) && v >= 0)) throw AppError.badRequest('Dữ liệu tính lương phải hữu hạn và không âm');
   const {
     hourly_rate,
     total_working_hours,
@@ -162,7 +164,9 @@ export function calculateNetSalary(params: SalaryCalculationInput): number {
 
   const baseSalaryTotal = hourly_rate * total_working_hours;
 
-  return Math.max(0, Math.round(baseSalaryTotal + overtimePay - latePenaltyDeduction + allowance));
+  const net = Math.max(0, Math.round(baseSalaryTotal + overtimePay - latePenaltyDeduction + allowance));
+  if (!Number.isFinite(net) || net >= 1e13) throw AppError.badRequest('Số tiền vượt giới hạn lưu trữ phiếu lương');
+  return net;
 }
 
 /**

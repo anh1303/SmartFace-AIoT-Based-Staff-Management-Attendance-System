@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { PAYROLL_STATUS } from '../../common/constants.js'
 
 export const updateBonusPenaltySchema = z.object({
-  overtime_rate: z.number().optional(),
-  late_early_penalty: z.number().optional(),
+  overtime_rate: z.number().finite().min(0).max(99999999.99).optional(),
+  late_early_penalty: z.number().finite().min(0).max(1000000000).optional(),
   description: z.string().optional(),
 })
 
@@ -16,19 +16,19 @@ export const generatePayrollSchema = z
   .refine(
     (data) => {
       const p = data.payroll_period || data.period
-      return Boolean(p && /^\d{4}-\d{2}$/.test(p))
+      return Boolean(p && /^\d{4}-(0[1-9]|1[0-2])$/.test(p))
     },
     { message: 'Format payroll_period/period phải là YYYY-MM' },
   )
 
 export const updatePayrollSchema = z.object({
-  hourly_rate: z.number().optional(),
-  allowance: z.number().optional(),
-  total_working_hours: z.number().optional(),
-  working_hours: z.number().optional(),
-  total_overtime: z.number().optional(),
-  total_late_early: z.number().optional(),
-  reason: z.string().optional(),
+  reason: z.string().trim().min(1).max(2000).optional(),
+  hourly_rate: z.number().finite().min(0).max(1000000000).optional(),
+  allowance: z.number().finite().min(0).max(1000000000000).optional(),
+  total_working_hours: z.number().finite().min(0).max(744).optional(),
+  working_hours: z.number().finite().min(0).max(744).optional(),
+  total_overtime: z.number().finite().min(0).max(744).optional(),
+  total_late_early: z.number().finite().min(0).max(744).optional(),
   status: z
     .enum([
       PAYROLL_STATUS.PENDING,

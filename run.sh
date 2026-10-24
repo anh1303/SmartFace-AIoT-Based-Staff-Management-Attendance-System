@@ -44,8 +44,22 @@ open_terminal() {
   local cmd="$2"
 
   if [[ "$OSTYPE" == "darwin"* ]] && command -v osascript >/dev/null 2>&1; then
-    # Tren macOS: Mo cua so Terminal.app moi va thuc thi lenh
-    osascript -e "tell application \"Terminal\" to do script \"echo -n -e '\\033]0;$title\\007'; cd '$DIR' && $cmd\"" >/dev/null
+    # Truyen lenh qua argv, khong chen shell escapes vao source AppleScript.
+    local quoted_title quoted_dir terminal_command
+    printf -v quoted_title '%q' "$title"
+    printf -v quoted_dir '%q' "$DIR"
+    terminal_command="printf '\\033]0;%s\\007' $quoted_title; cd $quoted_dir && $cmd"
+    if ! osascript - "$terminal_command" <<'APPLESCRIPT' >/dev/null
+on run argv
+  tell application "Terminal"
+    do script (item 1 of argv)
+  end tell
+end run
+APPLESCRIPT
+    then
+      echo "[LOI] Khong mo duoc Terminal cho $title. Kiem tra loi osascript phia tren." >&2
+      return 1
+    fi
   else
     # Fallback cho Linux hoac moi truong khong co AppleScript: Chay background
     echo "[INFO] Dang chay trong background: $title"
@@ -79,10 +93,13 @@ menu() {
         check_env
         echo ""
         echo "Dang khoi chay Face Auth API, Backend va Frontend (Cloud DB) trong cua so Terminal moi..."
-        open_terminal "SmartFace Backend" "cd '$DIR/backend' && npm run dev"
-        open_terminal "SmartFace Frontend" "cd '$DIR/frontend' && npm run dev"
-        open_terminal "SmartFace Face Auth API" "cd '$DIR/face_auth' && '$FACE_AUTH_PYTHON' -m uvicorn api_service:app --host 0.0.0.0 --port 5000"
-        echo "Da mo terminal Face Auth API, Backend va Frontend. Kiem tra /health de xac nhan ready."
+        if open_terminal "SmartFace Backend" "cd '$DIR/backend' && npm run dev" &&
+           open_terminal "SmartFace Frontend" "cd '$DIR/frontend' && npm run dev" &&
+           open_terminal "SmartFace Face Auth API" "cd '$DIR/face_auth' && '$FACE_AUTH_PYTHON' -m uvicorn api_service:app --host 0.0.0.0 --port 5000"; then
+          echo "Da mo terminal Face Auth API, Backend va Frontend. Kiem tra /health de xac nhan ready."
+        else
+          echo "[LOI] Chua mo duoc day du cac terminal. Xem loi phia tren."
+        fi
         pause
         ;;
       2)
@@ -96,10 +113,13 @@ menu() {
         fi
         echo ""
         echo "Dang khoi chay Face Auth API, Backend va Frontend trong cua so Terminal moi..."
-        open_terminal "SmartFace Backend" "cd '$DIR/backend' && npm run dev"
-        open_terminal "SmartFace Frontend" "cd '$DIR/frontend' && npm run dev"
-        open_terminal "SmartFace Face Auth API" "cd '$DIR/face_auth' && '$FACE_AUTH_PYTHON' -m uvicorn api_service:app --host 0.0.0.0 --port 5000"
-        echo "Da mo cac terminal. Kiem tra log va /health de xac nhan ready."
+        if open_terminal "SmartFace Backend" "cd '$DIR/backend' && npm run dev" &&
+           open_terminal "SmartFace Frontend" "cd '$DIR/frontend' && npm run dev" &&
+           open_terminal "SmartFace Face Auth API" "cd '$DIR/face_auth' && '$FACE_AUTH_PYTHON' -m uvicorn api_service:app --host 0.0.0.0 --port 5000"; then
+          echo "Da mo cac terminal. Kiem tra log va /health de xac nhan ready."
+        else
+          echo "[LOI] Chua mo duoc day du cac terminal. Xem loi phia tren."
+        fi
         pause
         ;;
       3)

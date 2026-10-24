@@ -1,11 +1,13 @@
 import type { Server } from 'socket.io'
 import { eventBus } from '../../common/event-bus.js'
+import { socketAuthMiddleware } from '../../sockets/socket.auth.js'
 
 let io: Server | undefined
 
 export const initializeAttendanceGateway = (server: Server) => {
   io = server
   const nsp = server.of('/attendance')
+  nsp.use(socketAuthMiddleware)
   nsp.on('connection', (socket) => {
     const user = socket.data.user
     if (user?.role) {

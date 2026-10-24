@@ -78,3 +78,17 @@ output/
 /output/
 
 md/future/
+
+# Track canonical documentation despite the parent repository's md/ ignore.
+!/md/
+/md/*
+!/md/README.md
+!/md/source_of_truth/
+!/md/source_of_truth/**
+!/md/plan/
+!/md/plan/**/
+!/md/plan/**/*.md
+!/md/plan/**/*.json
+
+# Local MAST-PAD manuscript and all generated LaTeX artifacts.
+/paper/

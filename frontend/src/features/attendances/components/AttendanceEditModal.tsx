@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { AttendancePairItem } from '../hooks/useAttendancePairs';
-import { formatSecondsToHHMMSS, roundToHalfHour } from '../../../utils/timeUtils';
+import { formatSecondsToHHMMSS, roundPayableHours, roundToHalfHour } from '../../../utils/timeUtils';
 
 export interface EditingItemState {
   employee: AttendancePairItem['employee'];
@@ -86,9 +86,8 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
   ) => {
     const totalLE = (leH || 0) * 3600 + (leM || 0) * 60 + (leS || 0);
 
-    // Không cho phép số âm
-    if (leH < 0 || leM < 0 || leS < 0 || _otH < 0 || _otM < 0 || _otS < 0) {
-      setModalError('Thời gian không được là số âm');
+    if (![leH, leM, leS, _otH, _otM, _otS].every(Number.isFinite) || totalLE < 0 || leH < 0 || _otH < 0 || leM < 0 || leM > 59 || _otM < 0 || _otM > 59 || leS < 0 || leS > 59 || _otS < 0 || _otS > 59) {
+      setModalError('Nhập thời gian hợp lệ, không âm; phút/giây từ 0–59.');
       return false;
     }
 
@@ -99,8 +98,8 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
 
     // BỎ GIỚI HẠN: OT không bị chặn bởi initialOTSec để quản lý tự do điều chỉnh/duyệt OT kể cả ngày OFF
 
-    if (!currentReason.trim()) {
-      setModalError('Lý do điều chỉnh chấm công là bắt buộc. Vui lòng nhập lý do giải trình.');
+    if (!currentReason.trim() || currentReason.trim().length < 3) {
+      setModalError('Cần ghi lý do duyệt/điều chỉnh (ít nhất 3 ký tự).');
       return false;
     }
 
@@ -128,8 +127,8 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
       return;
     }
 
-    const roundedLEHours = roundToHalfHour(totalInputLESec);
-    const roundedOTHours = roundToHalfHour(totalInputOTSec);
+    const roundedLEHours = roundPayableHours(totalInputLESec);
+    const roundedOTHours = roundPayableHours(totalInputOTSec);
 
     setIsSubmitting(true);
     setModalError(null);
@@ -273,7 +272,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                 <input
                   type="number"
                   min={0}
-                  max={23}
+                  max={744}
                   value={inputOTHours}
                   disabled={isSubmitting}
                   onChange={(e) => handleOTChange(parseInt(e.target.value, 10) || 0, inputOTMinutes, inputOTSeconds)}

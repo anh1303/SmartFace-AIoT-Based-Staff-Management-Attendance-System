@@ -43,12 +43,12 @@ export const EmployeeSalaryHistory: React.FC = () => {
   const penaltyRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
 
   // Dùng đơn giá snapshot của phiếu trong preview nếu có, thay vì lấy cấu hình mới áp lên phiếu cũ
-  const getOTAmount = (otHours: number, hourly: number, slipOtRate?: number) => {
+  const getOTAmount = (otHours: number, hourly: number, slipOtRate?: number | null) => {
     const rate = slipOtRate !== undefined && slipOtRate !== null ? Number(slipOtRate) : otRate;
     return calcPayrollAmount(otHours, rate, hourly);
   };
 
-  const getLateAmount = (lateHours: number, hourly: number, slipPenaltyRate?: number) => {
+  const getLateAmount = (lateHours: number, hourly: number, slipPenaltyRate?: number | null) => {
     const rate = slipPenaltyRate !== undefined && slipPenaltyRate !== null ? Number(slipPenaltyRate) : penaltyRate;
     return calcPayrollAmount(lateHours, rate, hourly);
   };

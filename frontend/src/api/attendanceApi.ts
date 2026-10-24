@@ -104,6 +104,7 @@ export async function addAttendanceApi(record: Omit<AttendanceRecord, 'attendanc
     method: 'POST',
     body: JSON.stringify({
       employeeId: record.employee_id,
+      event_id: crypto.randomUUID(),
       device_info: record.device_id,
       method: record.method,
     }),

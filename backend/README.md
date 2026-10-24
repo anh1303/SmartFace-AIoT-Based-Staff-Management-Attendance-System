@@ -102,9 +102,34 @@ backend/
 
 ---
 
+## 📡 Real-time Gateways & Kết Nối Ngoại Vi
+
+### 1. Socket.IO Gateway
+Máy chủ hỗ trợ 2 namespaces chuyên trách với cơ chế xác thực JWT bắt buộc trong quá trình bắt tay kết nối (*Handshake*):
+
+#### Namespace `/attendance`:
+- **Sự kiện `checked-in`**: Broadcast ngay khi nhân viên quẹt thẻ vào ca (gương mặt/vân tay) kèm theo thông tin nhân viên, thời gian, độ tin cậy và trạng thái trễ/đúng giờ.
+- **Sự kiện `checked-out`**: Broadcast ngay khi nhân viên chấm công ra ca kèm tổng giờ làm tích lũy.
+
+#### Namespace `/devices`:
+- **Sự kiện `status`**: Cập nhật trạng thái kết nối nhịp tim heartbeat của các thiết bị AIoT (`ONLINE` / `OFFLINE` / `MAINTENANCE`).
+- **Sự kiện `created` / `updated`**: Thông báo tức thời khi có thiết bị mới hoặc có thay đổi cấu hình.
+
+---
+
+### 2. MQTT Client Gateway ([src/config/mqtt.ts](src/config/mqtt.ts))
+Lắng nghe các topic telemetry từ phần cứng Edge Camera và Máy vân tay:
+
+| MQTT Topic Pattern | Hướng truyền | Mục đích xử lý |
+| :--- | :---: | :--- |
+| `attendance/devices/+/check-in` | Device ➔ BE | Tiếp nhận sự kiện nhận diện thành công từ Edge AI Camera |
+| `attendance/devices/+/status` | Device ➔ BE | Tiếp nhận bản tin nhịp tim (heartbeat) định kỳ của thiết bị |
+
+---
+
 ## 🔌 Danh Sách REST API Endpoints
 
-### 1. Xác Thực & Tài Khoản (`/api/auth`)
+### 1. Xác Thực & Người Dùng (`/api/auth`)
 | Method | Endpoint | Quyền hạn | Mô tả chức năng |
 | :--- | :--- | :---: | :--- |
 | `POST` | `/api/auth/login` | Public | Đăng nhập tài khoản, thiết lập Cookie `HttpOnly` chứa JWT |

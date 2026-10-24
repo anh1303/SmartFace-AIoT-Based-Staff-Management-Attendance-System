@@ -8,10 +8,11 @@ export const attendanceInclude = {
   employees: {
     select: {
       id: true,
+      user_id: true,
+      avatar_url: true,
       full_name: true,
       employee_code: true,
       email: true,
-      avatar_url: true,
       position: true,
       department: true,
     },

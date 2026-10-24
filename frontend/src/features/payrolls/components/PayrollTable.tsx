@@ -122,7 +122,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
               );
               const isOtherMgr = isAnotherManager(emp, currentUser);
               const isDiffDept = isDifferentDepartment(emp, currentUser);
-              const isBlockedFromEditing = role !== 'admin' && (isSelf || isOtherMgr || isDiffDept);
+              const isBlockedFromEditing = record.status !== 'PENDING' || (role !== 'admin' && (isSelf || isOtherMgr || isDiffDept));
 
               return (
                 <TableRow key={record.payroll_id}>

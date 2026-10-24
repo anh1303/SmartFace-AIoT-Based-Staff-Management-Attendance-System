@@ -1,3 +1,4 @@
+import { workDateSchema } from '../../common/date.schema.js'
 import { z } from 'zod'
 
 export const VALID_SHIFT_TYPES = ['OFFICE_HOURS', 'MORNING', 'AFTERNOON', 'OFF'] as const
@@ -6,8 +7,8 @@ export const assignShiftSchema = z
   .object({
     employee_id: z.string().optional(),
     employeeId: z.string().optional(),
-    date: z.string().optional(),
-    work_date: z.string().optional(),
+    date: workDateSchema.optional(),
+    work_date: workDateSchema.optional(),
     work_day: z.string().optional(),
     shift_type: z.enum([
       'OFFICE_HOURS',

@@ -68,7 +68,7 @@ export async function assertCanAccessEmployeeDetail(
     const target = await prisma.employee.findFirst({
       where: buildIdOrCodeWhere(targetIdOrCode),
       include: {
-        department: true,
+        department: true, position: true,
         users: {
           select: {
             id: true,
@@ -134,7 +134,7 @@ export function assertCannotModifyOtherManager(
   actor: { id?: string; role?: string } | undefined,
   target: {
     user_id?: string | null;
-    position?: string | null;
+    position?: { name?: string | null; level?: string | null } | string | null;
     department?: { name?: string | null } | null;
     users?: { roles?: { role_name?: string | null } | null } | null;
   } | null | undefined,

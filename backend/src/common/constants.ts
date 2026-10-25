@@ -42,6 +42,7 @@ export const ATTENDANCE_PUNCTUALITY = {
   ON_TIME: 'ON_TIME',
   LATE: 'LATE',
   EARLY_LEAVE: 'EARLY_LEAVE',
+  UNRECORDED: 'UNRECORDED',
 } as const
 
 export type AttendancePunctuality = (typeof ATTENDANCE_PUNCTUALITY)[keyof typeof ATTENDANCE_PUNCTUALITY]

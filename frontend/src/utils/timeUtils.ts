@@ -121,6 +121,8 @@ export const getStatusBadge = (status: string) => {
     case 'INCOMPLETE': return { label: 'Chưa đủ điều kiện ca', color: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20' };
     case 'NO_SHIFT':
       return { label: 'Không có ca', color: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' };
+    case 'UNRECORDED':
+      return { label: 'UNRECORDED', color: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-[#171b30] dark:text-slate-400 dark:border-slate-700/60' };
     default:
       return { label: status, color: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' };
   }

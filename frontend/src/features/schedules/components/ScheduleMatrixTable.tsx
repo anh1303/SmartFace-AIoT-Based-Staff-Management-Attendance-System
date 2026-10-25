@@ -125,9 +125,9 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
                         </div>
                         <p
                           className="text-[10px] font-mono text-purple-600 dark:text-purple-400 truncate"
-                          title={`${emp.employee_id} - ${emp.department}`}
+                          title={emp.employee_id}
                         >
-                          {emp.employee_id} - {emp.department}
+                          {emp.employee_id}
                         </p>
                       </div>
                     </div>

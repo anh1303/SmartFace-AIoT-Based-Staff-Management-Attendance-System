@@ -1,7 +1,7 @@
 export type AttendanceType = 'CHECK_IN' | 'CHECK_OUT' | 'TAN_CA';
 export type AttendanceMethod = 'FACE' | 'FINGERPRINT' | 'MANUAL' | 'CARD' | 'RFID';
 export type AttendanceStatus = 'VALID' | 'INVALID' | 'FLAGGED';
-export type AttendancePunctuality = 'ON_TIME' | 'LATE' | 'EARLY_LEAVE';
+export type AttendancePunctuality = 'ON_TIME' | 'LATE' | 'EARLY_LEAVE' | 'UNRECORDED';
 
 export interface AttendanceRecord {
   id?: string;

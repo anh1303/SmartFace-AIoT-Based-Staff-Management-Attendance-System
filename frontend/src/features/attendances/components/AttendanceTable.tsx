@@ -37,8 +37,16 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
    * Nếu chưa có lượt quẹt thì hiển thị "--"
    */
   const renderEventStatusBadge = (ev: AttendanceEventItem) => {
-    if (!ev.time || ev.time === '--:--:--' || ev.status === 'UNRECORDED') {
+    if (!ev.time || ev.time === '--:--:--') {
       return <span className="text-slate-500 font-mono text-xs">--</span>;
+    }
+
+    if (ev.status === 'UNRECORDED' || ev.statusText === 'UNRECORDED') {
+      return (
+        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#171b30] text-slate-400 border border-slate-700/60 whitespace-nowrap">
+          UNRECORDED
+        </span>
+      );
     }
 
     if (ev.status === 'LATE' || ev.statusText === 'Đi muộn' || ev.statusText === 'Đi trễ') {
@@ -57,7 +65,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
       );
     }
 
-    // Mặc định chuẩn giờ khi đã quẹt
+    // Mặc định chuẩn giờ khi đã quẹt trong ca
     return (
       <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#0c2a20] text-emerald-400 border border-emerald-800/80 whitespace-nowrap">
         Đúng giờ

@@ -248,6 +248,8 @@ export function useAttendancePairs(
         })
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
+      const isNoShift = isOffDay || isUnassigned;
+
       // Danh sách tất cả raw events (bao gồm cả sự kiện lẻ)
       const rawEvents: AttendanceEventItem[] = empLogs.map((log, idx) => {
         const isFace = log.method === 'FACE';
@@ -261,6 +263,8 @@ export function useAttendancePairs(
                 ? 'Thủ công'
                 : (log.method || 'UNRECORDED');
 
+        const isEventUnrecorded = isNoShift || log.punctuality === 'UNRECORDED';
+
         return {
           id: `${emp.employee_id}-${shiftDate}-raw-${idx}-${log.attendance_id || idx}`,
           type: log.type === 'CHECK_OUT' || log.type === 'TAN_CA' ? 'CHECK_OUT' : 'CHECK_IN',
@@ -270,16 +274,20 @@ export function useAttendancePairs(
           methodLabel,
           device_id: log.device_id || '--',
           score: log.verification_score !== undefined && log.verification_score !== null ? log.verification_score : null,
-          status: log.punctuality === 'LATE'
-            ? 'LATE'
-            : log.punctuality === 'EARLY_LEAVE'
-              ? 'EARLY_LEAVE'
-              : 'ON_TIME',
-          statusText: log.punctuality === 'LATE'
-            ? 'Đi muộn'
-            : log.punctuality === 'EARLY_LEAVE'
-              ? 'Về sớm'
-              : 'Đúng giờ',
+          status: isEventUnrecorded
+            ? 'UNRECORDED'
+            : log.punctuality === 'LATE'
+              ? 'LATE'
+              : log.punctuality === 'EARLY_LEAVE'
+                ? 'EARLY_LEAVE'
+                : 'ON_TIME',
+          statusText: isEventUnrecorded
+            ? 'UNRECORDED'
+            : log.punctuality === 'LATE'
+              ? 'Đi muộn'
+              : log.punctuality === 'EARLY_LEAVE'
+                ? 'Về sớm'
+                : 'Đúng giờ',
         };
       });
 
@@ -372,12 +380,24 @@ export function useAttendancePairs(
         methodLabel: checkInLog ? (isCheckInFace ? 'Face-id' : 'Vân tay') : 'UNRECORDED',
         device_id: checkInLog?.device_id || '--',
         score: checkInLog?.verification_score ?? null,
-        status: checkInLog
-          ? (checkInLog.punctuality === 'LATE' ? 'LATE' : 'ON_TIME')
-          : 'UNRECORDED',
-        statusText: checkInLog
-          ? (checkInLog.punctuality === 'LATE' ? 'Đi muộn' : 'Đúng giờ')
-          : '--',
+        status: isNoShift
+          ? 'UNRECORDED'
+          : checkInLog
+            ? (checkInLog.punctuality === 'LATE'
+                ? 'LATE'
+                : checkInLog.punctuality === 'UNRECORDED'
+                  ? 'UNRECORDED'
+                  : 'ON_TIME')
+            : 'UNRECORDED',
+        statusText: isNoShift
+          ? (checkInLog ? 'UNRECORDED' : '--')
+          : checkInLog
+            ? (checkInLog.punctuality === 'LATE'
+                ? 'Đi muộn'
+                : checkInLog.punctuality === 'UNRECORDED'
+                  ? 'UNRECORDED'
+                  : 'Đúng giờ')
+            : '--',
       };
 
       const outPunc = checkOutLog
@@ -393,12 +413,24 @@ export function useAttendancePairs(
         methodLabel: checkOutLog ? (isCheckOutFace ? 'Face-id' : 'Vân tay') : 'UNRECORDED',
         device_id: checkOutLog?.device_id || '--',
         score: checkOutLog?.verification_score ?? null,
-        status: checkOutLog
-          ? (outPunc === 'EARLY_LEAVE' ? 'EARLY_LEAVE' : 'ON_TIME')
-          : 'UNRECORDED',
-        statusText: checkOutLog
-          ? (outPunc === 'EARLY_LEAVE' ? 'Về sớm' : 'Đúng giờ')
-          : '--',
+        status: isNoShift
+          ? 'UNRECORDED'
+          : checkOutLog
+            ? (outPunc === 'EARLY_LEAVE'
+                ? 'EARLY_LEAVE'
+                : outPunc === 'UNRECORDED'
+                  ? 'UNRECORDED'
+                  : 'ON_TIME')
+            : 'UNRECORDED',
+        statusText: isNoShift
+          ? (checkOutLog ? 'UNRECORDED' : '--')
+          : checkOutLog
+            ? (outPunc === 'EARLY_LEAVE'
+                ? 'Về sớm'
+                : outPunc === 'UNRECORDED'
+                  ? 'UNRECORDED'
+                  : 'Đúng giờ')
+            : '--',
       };
 
       return {

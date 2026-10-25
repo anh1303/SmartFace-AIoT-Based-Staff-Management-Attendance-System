@@ -142,7 +142,8 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
 
     // Timeout thiết lập kết nối WebRTC (12 giây)
     connectionTimeoutRef.current = setTimeout(() => {
-      if (!isLive) {
+      const state = pcRef.current?.iceConnectionState;
+      if (state !== 'connected' && state !== 'completed') {
         setErrorMsg('Quá thời gian kết nối tới luồng WebRTC (Connection Timeout).');
         stopConnection();
       }
@@ -160,6 +161,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       pc.ontrack = (event) => {
         if (videoRef.current && event.streams[0]) {
           videoRef.current.srcObject = event.streams[0];
+          videoRef.current.play().catch(() => {});
           setIsConnecting(false);
         }
       };
@@ -235,7 +237,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       setIsConnecting(false);
       setIceState('failed');
     }
-  }, [streamUrl, isLive, stopConnection]);
+  }, [streamUrl, stopConnection]);
 
   useEffect(() => {
     startConnection();

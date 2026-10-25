@@ -100,13 +100,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('userSession');
       }
 
-      const roleLabel =
-        targetRole === 'admin'
-          ? 'Quản trị viên (Admin)'
-          : targetRole === 'manager'
-          ? 'Quản lý (Manager)'
-          : 'Nhân viên (Employee)';
-      showToast(`Đăng nhập thành công! Vai trò: ${roleLabel}`, 'success');
       return { success: true, role: targetRole };
     } catch (error: unknown) {
       authLogger.error('Login error:', error);

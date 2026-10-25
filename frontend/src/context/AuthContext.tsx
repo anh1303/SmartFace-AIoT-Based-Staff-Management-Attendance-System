@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { UserSession, Role, Employee } from '../types';
 import { loginApi, logoutApi, meApi, DEFAULT_USERS } from '../api/authApi';
 import { useToast } from './ToastContext';
+import { useOptionalNotifications } from '../features/notifications';
 import { logger } from '../utils/logger';
 
 const authLogger = logger.child('AuthContext');
@@ -23,6 +24,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const notifications = useOptionalNotifications();
+
 
   const [currentUser, setCurrentUser] = useState<UserSession | null>(() => {
     try {
@@ -83,8 +86,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      // Clear any prior user's cached queries before setting up new session
+      // Clear any prior user's cached queries and notifications before setting up new session
       queryClient.clear();
+      notifications?.clearAll();
 
       const { session, targetRole } = await loginApi(identifier, password, rememberMe);
       setCurrentUser(session);
@@ -113,11 +117,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       showToast(errMsg, 'error');
       return { success: false, message: errMsg };
     }
-  }, [queryClient, showToast]);
+  }, [queryClient, showToast, notifications]);
 
   const logout = useCallback(async () => {
     // 1. Mandatory: Wipe React Query cache to prevent data leaks between sessions
     queryClient.clear();
+
+    // 2. Wipe all notifications completely (no old notifications retained on logout)
+    notifications?.clearAll();
+    try {
+      sessionStorage.removeItem('smartface_notifications_cache');
+      localStorage.removeItem('smartface_notifications_cache');
+    } catch {
+      // Ignore
+    }
 
     try {
       await logoutApi();
@@ -130,7 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('userSession');
     localStorage.removeItem('token');
     showToast('Đã đăng xuất khỏi hệ thống', 'info');
-  }, [queryClient, showToast]);
+  }, [queryClient, showToast, notifications]);
 
   const switchRole = useCallback((newRole: Role, employeesFallback: Employee[] = []) => {
     // 2. Lock switchRole in production builds using import.meta.env.DEV
@@ -139,12 +152,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    // Reset notifications when switching roles in DEV
+    notifications?.clearAll();
+
     if (newRole === 'admin') {
       setCurrentUser(DEFAULT_USERS.admin);
       sessionStorage.setItem('userSession', JSON.stringify(DEFAULT_USERS.admin));
       showToast('[DEV ONLY] Đã chuyển đổi sang vai trò: Quản trị viên (Admin)', 'info');
       return;
     }
+
 
     const matched = employeesFallback.find(e =>
       newRole === 'manager'

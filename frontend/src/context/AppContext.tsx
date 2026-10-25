@@ -15,6 +15,8 @@ import { EmployeeProvider, useEmployeeContext } from './EmployeeContext';
 import { ShiftProvider, useShiftContext } from './ShiftContext';
 import { AttendanceProvider, useAttendanceContext } from './AttendanceContext';
 import { PayrollProvider, usePayrollContext } from './PayrollContext';
+import { NotificationProvider, useNotifications } from '../features/notifications';
+
 
 export interface AppContextType {
   currentUser: UserSession | null;
@@ -151,19 +153,21 @@ const AppConsumerBridge: React.FC<{ children: React.ReactNode }> = ({ children }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <EmployeeProvider>
-          <ShiftProvider>
-            <AttendanceProvider>
-              <PayrollProvider>
-                <AppConsumerBridge>{children}</AppConsumerBridge>
-              </PayrollProvider>
-            </AttendanceProvider>
-          </ShiftProvider>
-        </EmployeeProvider>
-      </AuthProvider>
-    </ToastProvider>
+    <NotificationProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <EmployeeProvider>
+            <ShiftProvider>
+              <AttendanceProvider>
+                <PayrollProvider>
+                  <AppConsumerBridge>{children}</AppConsumerBridge>
+                </PayrollProvider>
+              </AttendanceProvider>
+            </ShiftProvider>
+          </EmployeeProvider>
+        </AuthProvider>
+      </ToastProvider>
+    </NotificationProvider>
   );
 };
 
@@ -182,3 +186,4 @@ export { useAttendanceContext, AttendanceProvider } from './AttendanceContext';
 export { usePayrollContext, PayrollProvider } from './PayrollContext';
 export { useAuth, AuthProvider } from './AuthContext';
 export { useToast, ToastProvider } from './ToastContext';
+export { useNotifications, NotificationProvider } from '../features/notifications';

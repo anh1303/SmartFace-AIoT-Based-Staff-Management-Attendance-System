@@ -57,7 +57,11 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
     return employees;
   }, [currentEmp, employees]);
 
-  const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap } = useAttendanceSummaries(startDate, endDate);
+  const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap } = useAttendanceSummaries(
+    startDate,
+    endDate,
+    currentEmp?.employee_id
+  );
 
   const employeePairs = useAttendancePairs(
     targetEmployees,

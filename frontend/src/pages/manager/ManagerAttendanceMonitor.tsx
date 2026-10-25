@@ -20,7 +20,7 @@ import {
 } from '@/features/attendances';
 import { fetchAttendancePaginatedApi } from '../../api/attendanceApi';
 import { AttendanceRecord } from '../../types';
-import { Database, ChevronLeft, ChevronRight, RefreshCw, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, FileText } from 'lucide-react';
 
 export const ManagerAttendanceMonitor: React.FC = () => {
   const { attendance, employees, workShifts, showToast, role, currentUser } = useApp();
@@ -231,30 +231,12 @@ export const ManagerAttendanceMonitor: React.FC = () => {
       />
 
       {/* Bảng công tổng hợp chính */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono">
-              Bảng Tổng Hợp Chấm Công ({employeePairs.length} lượt theo dõi ca)
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowRawLogs(prev => !prev)}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/40 border border-purple-200 dark:border-purple-800 transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>{showRawLogs ? 'Đóng lịch sử raw logs' : 'Xem lịch sử raw logs (Phân trang)'}</span>
-          </button>
-        </div>
-
-        <AttendanceTable
-          employeePairs={employeePairs}
-          startDate={startDate}
-          endDate={endDate}
-          onOpenEditModal={handleOpenEditModal}
-        />
-      </div>
+      <AttendanceTable
+        employeePairs={employeePairs}
+        startDate={startDate}
+        endDate={endDate}
+        onOpenEditModal={handleOpenEditModal}
+      />
 
       {/* Mục phân trang lịch sử Raw Logs (Khắc phục việc dừng âm thầm ở 5.000 bản ghi) */}
       {showRawLogs && (

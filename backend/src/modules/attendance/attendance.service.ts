@@ -83,7 +83,7 @@ export function calcShiftWorkingHours(startTimeVal?: string | Date | null, endTi
 export function determinePunctuality(
   type: string,
   eventTime: Date | string,
-  employeeShifts?: Array<{ work_date: Date | string; start_time?: string | Date | null; end_time?: string | Date | null }> | null
+  employeeShifts?: Array<{ work_date: Date | string; start_time?: string | Date | null; end_time?: string | Date | null; shift_type?: string | null }> | null
 ): AttendancePunctuality {
   const eventDate = new Date(eventTime)
   const vnDateStr = eventDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
@@ -94,8 +94,13 @@ export function determinePunctuality(
     return shiftDateStr === vnDateStr
   })
 
-  const shiftStartStr = extractTimeString(shift?.start_time, '08:00')
-  const shiftEndStr = extractTimeString(shift?.end_time, '17:30')
+  // Không có ca, hoặc ca nghỉ OFF, hoặc chưa có giờ bắt đầu/kết thúc ca -> UNRECORDED
+  if (!shift || shift.shift_type === 'OFF' || !shift.start_time || !shift.end_time) {
+    return ATTENDANCE_PUNCTUALITY.UNRECORDED
+  }
+
+  const shiftStartStr = extractTimeString(shift.start_time, '08:00')
+  const shiftEndStr = extractTimeString(shift.end_time, '17:30')
 
   const [sH, sM] = shiftStartStr.split(':').map(n => parseInt(n, 10) || 0)
   const [eH, eM] = shiftEndStr.split(':').map(n => parseInt(n, 10) || 0)

@@ -1,9 +1,9 @@
-/** Draft input rounding. Backend remains authoritative for paid time. */
+/** Half-hour floor rule: 0-29m -> 0h; 30-59m -> 0.5h. Backend remains authoritative for paid time. */
 export const roundPayableHours = (seconds: number): number => {
   const duration = Math.max(0, seconds);
   const whole = Math.floor(duration / 3600);
   const remainder = duration - whole * 3600;
-  return whole + (remainder >= 2700 ? 1 : remainder >= 1800 ? 0.5 : 0);
+  return whole + (remainder >= 1800 ? 0.5 : 0);
 };
 
 export const formatSecondsToHHMMSS = (totalSec: number): string => {
@@ -118,10 +118,11 @@ export const getStatusBadge = (status: string) => {
     case 'ABSENT':
       return { label: 'Vắng mặt', color: 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' };
     case 'OFF': return { label: 'Ngày OFF', color: 'text-slate-500' };
-    case 'SCHEDULED': return { label: 'Chưa đến ca', color: 'text-slate-500' };
-    case 'INCOMPLETE': return { label: 'Thiếu cặp IN/OUT', color: 'text-amber-600' };
+    case 'INCOMPLETE': return { label: 'Chưa đủ điều kiện ca', color: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20' };
     case 'NO_SHIFT':
       return { label: 'Không có ca', color: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' };
+    case 'UNRECORDED':
+      return { label: 'UNRECORDED', color: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-[#171b30] dark:text-slate-400 dark:border-slate-700/60' };
     default:
       return { label: status, color: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' };
   }

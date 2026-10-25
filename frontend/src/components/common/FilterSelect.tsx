@@ -48,7 +48,7 @@ export const FilterSelect: React.FC<FilterSelectProps> = ({
 
   const allItems: FilterSelectOption[] = [
     ...(allLabel ? [{ value: allValue, label: allLabel }] : []),
-    ...normalizedOptions,
+    ...normalizedOptions.filter((o) => !allLabel || o.value !== allValue),
   ];
 
   const currentOption = allItems.find((o) => o.value === value);

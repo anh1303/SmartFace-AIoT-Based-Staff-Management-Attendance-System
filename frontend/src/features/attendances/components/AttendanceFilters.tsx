@@ -141,7 +141,6 @@ export const AttendanceFilters: React.FC<AttendanceFiltersProps> = ({
             onChange={setStatusFilter}
             allLabel="Tất cả trạng thái"
             options={[
-              { value: 'ALL', label: 'Tất cả trạng thái' },
               { value: 'ON_TIME', label: 'Đúng giờ' },
               { value: 'LATE', label: 'Đi muộn' },
               { value: 'EARLY_LEAVE', label: 'Về sớm' },

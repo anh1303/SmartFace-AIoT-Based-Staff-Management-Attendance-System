@@ -1,15 +1,15 @@
 import { createHash } from 'node:crypto'
 /** Company policy v2026-10-19. Pure calculations; no database, network or rounding per pair. */
-export const ATTENDANCE_POLICY_VERSION = '2026-10-19-v2'
+export const ATTENDANCE_POLICY_VERSION = '2026-10-25-v4'
 export const MAX_PAIR_MS = 24 * 60 * 60 * 1000
 export const OT_THRESHOLD_SECONDS = 30 * 60
 export const OT_REVIEW_SECONDS = 4 * 60 * 60
-/** Fractional hour bands: <0.5 -> 0; [0.5,0.75) -> 0.5; >=0.75 -> 1. */
+/** Half-hour floor rule: 0-29m -> 0h; 30-59m -> 0.5h. */
 export function roundHours(seconds: number): number {
   const duration = Math.max(0, seconds)
   const whole = Math.floor(duration / 3600)
   const remainder = duration - whole * 3600
-  return whole + (remainder >= 2700 ? 1 : remainder >= 1800 ? 0.5 : 0)
+  return whole + (remainder >= 1800 ? 0.5 : 0)
 }
 export const vnDay = (value: Date | string): string => new Date(value).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
 
@@ -76,38 +76,80 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
   const start = new Date(`${workDate}T${clock(shift?.start_time, '08:00')}+07:00`)
   const end = new Date(`${workDate}T${clock(shift?.end_time, '17:30')}+07:00`)
   if (!off && end <= start) end.setUTCDate(end.getUTCDate() + 1)
-  let regularSeconds = 0, overtimeSeconds = 0
-  if (shift && !off) for (const p of pairs) {
-    regularSeconds += Math.max(0, (Math.min(+p.end, +end) - Math.max(+p.start, +start)) / 1000)
-    overtimeSeconds += Math.max(0, (+p.end - Math.max(+p.start, +end)) / 1000)
+
+  const scheduledShiftSeconds = shift && !off ? Math.max(0, (+end - +start) / 1000) : 0
+  let actualWorkedSecondsInShift = 0
+  let rawOvertimeSeconds = 0
+  if (shift && !off) {
+    for (const p of pairs) {
+      actualWorkedSecondsInShift += Math.max(0, (Math.min(+p.end, +end) - Math.max(+p.start, +start)) / 1000)
+      rawOvertimeSeconds += Math.max(0, (+p.end - Math.max(+p.start, +end)) / 1000)
+    }
   }
+
   const first = pairs[0]?.start ?? (open ? new Date(result.pending!.event_time) : null)
   const last = pairs.at(-1)?.end ?? null
-  const lateSeconds = shift && !off && pairs.length && first ? Math.min((+end - +start) / 1000, Math.max(0, (+first - +start) / 1000)) : 0
-  const earlySeconds = shift && !off && last ? Math.min((+end - +start) / 1000, Math.max(0, (+end - +last) / 1000)) : 0
+  const meetsHalfShift = Boolean(shift && !off && scheduledShiftSeconds > 0 && actualWorkedSecondsInShift >= scheduledShiftSeconds / 2)
+  const underHalfShift = Boolean(shift && !off && pairs.length > 0 && !meetsHalfShift)
+
+  let regularSeconds = 0
+  let overtimeSeconds = 0
+  let lateSeconds = 0
+  let earlySeconds = 0
+
+  if (meetsHalfShift) {
+    // Lựa chọn B: Tổng giờ làm việc trong ngày = Giờ kết thúc ca - Giờ bắt đầu ca
+    regularSeconds = scheduledShiftSeconds
+    overtimeSeconds = rawOvertimeSeconds
+    lateSeconds = first ? Math.min(scheduledShiftSeconds, Math.max(0, (+first - +start) / 1000)) : 0
+    earlySeconds = last ? Math.min(scheduledShiftSeconds, Math.max(0, (+end - +last) / 1000)) : 0
+  }
+  // Nếu !meetsHalfShift (chưa được 1 nửa thời gian ca hoặc không đi làm):
+  // regularSeconds = 0 -> workingHours = 0
+  // overtimeSeconds = 0 -> overtimeCandidateHours = 0
+  // lateSeconds = 0, earlySeconds = 0 -> lateEarlyHours = 0
+
+  const lateEarlySeconds = lateSeconds + earlySeconds
   const invalid = ignored.some(l => l.reason === 'INVALID_PAIR' || l.reason === 'INTERRUPTED_PAIR')
   const flagged = logs.some(l => l.status === 'FLAGGED' && vnDay(l.event_time) === workDate)
   const orphanOut = !pairs.length && ignored.some(l => l.reason === 'UNPAIRED_CHECK_OUT')
-  const review = Boolean(open || invalid || flagged || orphanOut || (!shift && (pairs.length || ignored.length)) || overtimeSeconds > OT_REVIEW_SECONDS)
+  const review = Boolean(open || invalid || flagged || orphanOut || underHalfShift || (!shift && (pairs.length || ignored.length)) || overtimeSeconds > OT_REVIEW_SECONDS)
   let status = off ? 'OFF' : !shift ? 'NO_SHIFT' : +start > +now ? 'SCHEDULED' : !first && !last ? 'ABSENT' : 'PRESENT'
-  if (!off && shift && (open || invalid)) status = 'INCOMPLETE'
-  else if (!off && shift && first) {
+  if (!off && shift && (open || invalid || underHalfShift)) status = 'INCOMPLETE'
+  else if (!off && shift && first && meetsHalfShift) {
     if (lateSeconds > 900 && earlySeconds > 0) status = 'LATE_AND_EARLY'
     else if (lateSeconds > 900) status = 'LATE'
     else if (earlySeconds > 0) status = 'EARLY_LEAVE'
   }
   const candidate = overtimeSeconds > OT_THRESHOLD_SECONDS ? roundHours(overtimeSeconds) : 0
   return {
-    first, last, regularSeconds, overtimeSeconds, lateEarlySeconds: lateSeconds + earlySeconds,
-    workingHours: roundHours(regularSeconds), lateEarlyHours: roundHours(lateSeconds + earlySeconds),
+    first, last, regularSeconds, overtimeSeconds, lateEarlySeconds,
+    workingHours: roundHours(regularSeconds), lateEarlyHours: roundHours(lateEarlySeconds),
     overtimeCandidateHours: candidate, status, requiresReview: review,
-    reviewReason: [open ? 'MISSING_CHECK_OUT' : '', invalid ? 'INVALID_PAIR' : '', flagged ? 'FLAGGED_EVENT' : '', orphanOut ? 'UNPAIRED_CHECK_OUT' : '',
-      !shift && (pairs.length || ignored.length) ? 'NO_SHIFT' : '', overtimeSeconds > OT_REVIEW_SECONDS ? 'OT_OVER_4H' : ''].filter(Boolean).join(',') || null,
-    details: { events: sourceEvents,
+    reviewReason: [
+      open ? 'MISSING_CHECK_OUT' : '',
+      invalid ? 'INVALID_PAIR' : '',
+      flagged ? 'FLAGGED_EVENT' : '',
+      orphanOut ? 'UNPAIRED_CHECK_OUT' : '',
+      underHalfShift ? 'UNDER_HALF_SHIFT' : '',
+      !shift && (pairs.length || ignored.length) ? 'NO_SHIFT' : '',
+      overtimeSeconds > OT_REVIEW_SECONDS ? 'OT_OVER_4H' : '',
+    ].filter(Boolean).join(',') || null,
+    details: {
+      events: sourceEvents,
       fingerprint: createHash('sha256').update(JSON.stringify({
         logs: source.map(l => [String(l.id), l.type, new Date(l.event_time).toISOString(), l.status]),
         start: start.toISOString(), end: end.toISOString(), off: Boolean(off), assigned: Boolean(shift),
-      })).digest('hex'), policy: ATTENDANCE_POLICY_VERSION, pairs: pairs.map(p => ({ ...p, start: p.start.toISOString(), end: p.end.toISOString() })), ignored,
-      off: Boolean(off), scheduledStart: start.toISOString(), scheduledEnd: end.toISOString() },
+      })).digest('hex'),
+      policy: ATTENDANCE_POLICY_VERSION,
+      pairs: pairs.map(p => ({ ...p, start: p.start.toISOString(), end: p.end.toISOString() })),
+      ignored,
+      off: Boolean(off),
+      scheduledStart: start.toISOString(),
+      scheduledEnd: end.toISOString(),
+      actualWorkedSecondsInShift,
+      scheduledShiftSeconds,
+      meetsHalfShift,
+    },
   }
 }

@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { ToastContainer } from '../common/Toast';
+import { FloatingNotificationBubble } from '../../features/notifications';
 
 /**
  * AppLayout is a pure presentation component responsible ONLY for layout composition.
@@ -34,6 +35,7 @@ export const AppLayout: React.FC = () => {
 
       {/* Reusable Global Overlays */}
       <ToastContainer />
+      <FloatingNotificationBubble />
     </div>
   );
 };

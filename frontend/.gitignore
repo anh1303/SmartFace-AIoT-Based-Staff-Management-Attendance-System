@@ -45,3 +45,8 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Keep business-policy regression tests with this module.
+!validation/
+!validation/*.test.ts
+!validation/*.test.tsx

@@ -42,7 +42,7 @@ export const updateItem = async (req: Request, res: Response) => {
 
 export const finalizePeriod = async (req: Request, res: Response) => {
   const period = req.params.period as string;
-  successResponse(res, await service.finalizePeriod(period, req.user?.id), 'Payroll period finalized');
+  successResponse(res, await service.finalizePeriod(period, req.user?.id, req.user?.role), 'Payroll period finalized');
 };
 
 export const unlockPeriod = async (req: Request, res: Response) => {

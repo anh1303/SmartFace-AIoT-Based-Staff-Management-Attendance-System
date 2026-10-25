@@ -1,9 +1,15 @@
+import { observeRecognition } from './recognition-confirmation.js'
+import { Prisma } from '@prisma/client'
+import { createHash } from 'node:crypto'
+import { calculateDay, pairAttendance, vnDay, ATTENDANCE_POLICY_VERSION, MAX_PAIR_MS, roundHours } from './attendance.policy.js'
 import { prisma } from '../../config/database.js'
+import { assertCanAccessEmployeeDetail } from '../../common/permission.helper.js'
 import { AppError } from '../../common/AppError.js'
-import { buildIdOrCodeWhere, formatVNDateISO } from '../../common/utils.js'
+import { buildIdOrCodeWhere, formatVNDateISO, formatVNTime } from '../../common/utils.js'
 import { attendanceInclude } from './attendance.model.js'
 import { logAction } from '../audit-logs/audit.service.js'
-import { emitAttendanceEvent } from '../../sockets/attendance.gateway.js'
+import { emitAttendanceEvent } from './attendance.gateway.js'
+import { eventBus } from '../../common/event-bus.js'
 import {
   ATTENDANCE_METHOD,
   ATTENDANCE_LOG_STATUS,
@@ -38,9 +44,17 @@ export function extractTimeString(val?: string | Date | null, fallback: string =
   return fallback
 }
 
+/**
+ * Quy tắc làm tròn thời gian cho Tăng ca và Đi trễ / Về sớm:
+ * - Từ 0 đến 29 phút: quy về phần giờ + 0 giờ
+ * - Từ 30 đến 59 phút: quy về phần giờ + 0.5 giờ
+ */
 export function roundToHalfHour(seconds: number): number {
   if (seconds <= 0) return 0
-  return Math.round(seconds / 1800) * 0.5
+  const totalMinutes = Math.floor(seconds / 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return hours + (minutes >= 30 ? 0.5 : 0)
 }
 
 export function parseTimeToSecondsInVN(d?: Date | string | null): number | null {
@@ -49,6 +63,21 @@ export function parseTimeToSecondsInVN(d?: Date | string | null): number | null 
   if (isNaN(dateObj.getTime())) return null
   const parts = dateObj.toLocaleTimeString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }).split(':')
   return parseInt(parts[0] || '0', 10) * 3600 + parseInt(parts[1] || '0', 10) * 60 + parseInt(parts[2] || '0', 10)
+}
+
+export function calcShiftWorkingHours(startTimeVal?: string | Date | null, endTimeVal?: string | Date | null): number {
+  const startTimeStr = extractTimeString(startTimeVal, '08:30')
+  const endTimeStr = extractTimeString(endTimeVal, '17:30')
+  const [sh, sm] = startTimeStr.split(':').map(Number)
+  const [eh, em] = endTimeStr.split(':').map(Number)
+  if (sh === undefined || sm === undefined || eh === undefined || em === undefined) return 9
+  const startMins = sh * 60 + sm
+  let endMins = eh * 60 + em
+  if (endMins < startMins) {
+    endMins += 24 * 60 // Xử lý ca làm việc qua đêm
+  }
+  const diffMins = Math.max(0, endMins - startMins)
+  return Math.round((diffMins / 60) * 100) / 100
 }
 
 export function determinePunctuality(
@@ -107,6 +136,10 @@ export interface RawAttendanceLogDb {
   verification_score?: number | string | bigint | null
   image_url?: string | null
   employees?: {
+    id?: string
+    full_name?: string
+    user_id?: string | null
+    avatar_url?: string | null
     employee_code?: string
     employee_shifts?: Array<{ work_date: Date | string; start_time?: string | Date | null; end_time?: string | Date | null }> | null
   } | null
@@ -122,13 +155,18 @@ export function formatAttendanceRecord(log: RawAttendanceLogDb) {
 
   return {
     id: log.id.toString(),
+    employee_name: log.employees?.full_name || '',
+    employee_user_id: log.employees?.user_id || null,
+    avatar_url: log.employees?.avatar_url || null,
     attendance_id: `ATT-${log.id}`,
     employee_id: log.employees?.employee_code || log.employee_id,
+    employee_uuid: log.employees?.id || log.employee_id,
     type: log.type as 'CHECK_IN' | 'CHECK_OUT',
     timestamp: eventDate.toISOString(),
-    method: (log.method || ATTENDANCE_METHOD.FACE) as AttendanceMethod,
-    device_id: log.device_info || (log.method === 'FINGERPRINT' ? 'Fingerprint-01' : 'FaceCam-01'),
-    verification_score: log.verification_score ?? 0.98,
+    event_time: eventDate.toISOString(),
+    method: (log.method || ATTENDANCE_METHOD.MANUAL) as AttendanceMethod,
+    device_id: log.device_info || '--',
+    verification_score: log.verification_score !== undefined && log.verification_score !== null ? Number(log.verification_score) : null,
     status: (log.status || ATTENDANCE_LOG_STATUS.VALID) as AttendanceLogStatus,
     punctuality,
     raw_status: log.status,
@@ -194,9 +232,6 @@ export async function list(
     where.type = query.type
   }
 
-  // Phân trang & giới hạn số lượng bản ghi:
-  // - Nếu client truyền limit='all' hoặc query.all='true', lấy tối đa 50,000 bản ghi
-  // - Nếu không truyền limit, mặc định lấy 5,000 bản ghi để đảm bảo không bị cắt cụt dữ liệu
   const isGetAll = query.limit === 'all' || query.all === 'true' || query.all === true
   const page = Math.max(1, Number(query.page) || 1)
   const defaultLimit = 5000
@@ -212,18 +247,6 @@ export async function list(
   })
 
   return logs.map(formatAttendanceRecord)
-}
-
-function calcShiftWorkingHours(startTimeVal?: string | Date | null, endTimeVal?: string | Date | null): number {
-  const startTimeStr = extractTimeString(startTimeVal, '08:00')
-  const endTimeStr = extractTimeString(endTimeVal, '17:30')
-  const [sh, sm] = startTimeStr.split(':').map(Number)
-  const [eh, em] = endTimeStr.split(':').map(Number)
-  if (sh === undefined || sm === undefined || eh === undefined || em === undefined) return 8
-  const startMins = sh * 60 + sm
-  const endMins = eh * 60 + em
-  const diffMins = Math.max(0, endMins - startMins)
-  return Math.round((diffMins / 60) * 100) / 100
 }
 
 export async function getDailySummaries(
@@ -294,257 +317,263 @@ export async function getDailySummaries(
   return summaries.map(s => ({
     id: s.id.toString(),
     employee_id: s.employees?.employee_code || s.employee_id,
+    employee_uuid: s.employee_id,
     date: formatVNDateISO(s.work_date),
     total_working_hours: s.total_working_hours ? Number(s.total_working_hours) : 0,
     late_early: s.late_early ? Number(s.late_early) : 0,
     overtime: s.overtime ? Number(s.overtime) : 0,
     status: s.attendance_status,
+    first_check_in: s.first_check_in,
+    last_check_out: s.last_check_out,
+    overtime_candidate_hours: Number(s.overtime_candidate_hours),
+    overtime_status: s.overtime_status,
+    overtime_reason: s.overtime_reason,
+    requires_review: s.requires_review,
+    review_reason: s.review_reason,
+    policy_version: s.policy_version,
+    calculation_details: s.calculation_details,
+    regular_seconds: s.regular_seconds,
+    overtime_seconds: s.overtime_seconds,
+    late_early_seconds: s.late_early_seconds,
   }))
 }
 
+export async function assertEditableDay(tx: Prisma.TransactionClient, date: string, employeeId?: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${date.slice(0, 7)}`}))`
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${date}`}))`
+  const lock = await tx.attendance_locks.findUnique({ where: { work_date: new Date(`${date}T00:00:00Z`) } })
+  if (lock?.is_locked) throw AppError.conflict('Ngày công đã khóa. Cần mở khóa trước khi điều chỉnh.')
+  const finalized = await tx.payrollRecord.findFirst({ where: { ...(employeeId ? { employeeId } : {}), payroll_period: date.slice(0, 7), status: { in: ['FINALIZED', 'CONFIRMED', 'PAID'] } } })
+  if (finalized) throw AppError.conflict('Kỳ lương đã chốt/đã trả; cần mở khóa kỳ trước khi thay đổi công.')
+}
+
 export async function adjustAttendance(
-  data: {
-    employeeId: string
-    date: string
-    late_early: number
-    overtime: number
-  },
+  data: { employeeId: string; date: string; late_early: number; overtime: number; reason: string },
   actorUserId?: string,
-  actorRole?: string
+  actorRole?: string,
 ) {
   const emp = await prisma.employee.findFirst({
     where: buildIdOrCodeWhere(data.employeeId),
-    include: {
-      users: { select: { id: true, roles: { select: { role_name: true } } } },
-      department: true,
-      position: true,
-    },
+    include: { users: { include: { roles: true } }, department: true, position: true },
   })
-  if (!emp) throw new AppError(404, 'Employee not found')
-
-  const workDate = new Date(`${data.date}T00:00:00.000Z`)
-
-  // 1. Kiểm tra ngày đã khóa công (Locked) chưa. Khi đã khóa, chỉ ADMIN mới được can thiệp
-  const lock = await prisma.attendance_locks.findFirst({
-    where: { work_date: workDate, is_locked: true },
-  })
-  if (lock && actorRole?.toUpperCase() !== 'ADMIN') {
-    throw AppError.forbidden(
-      'Dữ liệu công ngày này đã bị khóa (Locked). Chỉ Quản trị viên (Admin) mới có quyền mở khóa để chỉnh sửa!'
-    )
+  if (!emp) throw AppError.notFound('Employee not found')
+  if (!data.reason?.trim()) throw AppError.badRequest('Cần lý do điều chỉnh/duyệt OT')
+  if (actorRole !== 'ADMIN') {
+    await assertCanAccessEmployeeDetail({ id: actorUserId, role: actorRole }, emp.id)
+    if (emp.user_id === actorUserId) throw AppError.forbidden('Không được tự duyệt công/OT của chính mình')
+    const { isEmployeeManager } = await import('../../common/permission.helper.js')
+    if (actorRole === 'MANAGER' && isEmployeeManager(emp)) throw AppError.forbidden('Không được điều chỉnh công của quản lý khác')
   }
-
-  // 2. Chốt chặn phân quyền: Không ai được tự chỉnh sửa dữ liệu kiểm soát/xóa lỗi đi trễ của chính mình
-  if (actorRole?.toUpperCase() !== 'ADMIN' && emp.user_id && emp.user_id === actorUserId) {
-    throw AppError.forbidden(
-      'Không ai được tự sửa dữ liệu kiểm soát của chính mình (chỉnh sửa công/xóa lỗi đi trễ). Vui lòng liên hệ Quản trị viên (Admin) phê duyệt!'
-    )
-  }
-
-  // 3. Manager không được chỉnh sửa dữ liệu công của Manager khác
-  if (actorRole?.toUpperCase() === 'MANAGER') {
-    const targetRole = emp.users?.roles?.role_name?.toUpperCase() || ''
-    const posName = typeof (emp as any).position === 'string' ? (emp as any).position : (emp as any).position?.name || ''
-    const posLevel = typeof (emp as any).position === 'object' ? (emp as any).position?.level : undefined
-    const isTargetManager = Boolean(
-      targetRole === 'MANAGER' ||
-      targetRole === 'ADMIN' ||
-      posLevel === 'MANAGER' ||
-      (posName && /quản lý|manager|trưởng phòng|giám đốc/i.test(posName)) ||
-      (emp.department?.name && /quản lý/i.test(emp.department.name))
-    )
-    if (isTargetManager && emp.user_id !== actorUserId) {
-      throw AppError.forbidden('Quản lý không có quyền chỉnh sửa dữ liệu chấm công của quản lý khác!')
-    }
-  }
-
-  // Đơn vị chuẩn hóa toàn hệ thống: GIỜ (HOURS), làm tròn theo nấc 0.5 giờ (tương đương 30 phút)
-  const roundedLateEarly = Math.round(Math.max(0, Number(data.late_early) || 0) * 2) / 2
-  const roundedOvertime = Math.round(Math.max(0, Number(data.overtime) || 0) * 2) / 2
-
-  const empShift = await prisma.employee_shifts.findFirst({
-    where: { employee_id: emp.id, work_date: workDate },
-  })
-  const workingHours = calcShiftWorkingHours(empShift?.start_time || '08:00', empShift?.end_time || '17:30')
-
-  const existingSummary = await prisma.daily_attendance_summary.findFirst({
-    where: {
-      employee_id: emp.id,
-      work_date: workDate,
-    },
-  })
-
-  let shiftId = existingSummary?.shift_id
-  if (!shiftId) {
-    const shift = await prisma.work_shifts.findFirst()
-    shiftId = shift?.id ?? 1
-  }
-
-  const summary = await prisma.daily_attendance_summary.upsert({
-    where: {
-      employee_id_work_date: {
-        employee_id: emp.id,
-        work_date: workDate,
+  await aggregateDailyAttendance(Number(data.date.slice(5, 7)), Number(data.date.slice(0, 4)), emp.id, data.date)
+  const result = await prisma.$transaction(async tx => {
+    await assertEditableDay(tx, data.date, emp.id)
+    const key = { employee_id: emp.id, work_date: new Date(`${data.date}T00:00:00Z`) }
+    const existing = await tx.daily_attendance_summary.findUnique({ where: { employee_id_work_date: key } })
+    if (!existing) throw AppError.badRequest('Chưa có dữ liệu ngày công để điều chỉnh')
+    const overtime = roundHours(data.overtime * 3600), late = roundHours(data.late_early * 3600)
+    const updated = await tx.daily_attendance_summary.update({
+      where: { id: existing.id },
+      data: {
+        late_early: late,
+        overtime,
+        manual_adjustment: true,
+        overtime_status: overtime > 0 ? 'APPROVED' : 'REJECTED',
+        overtime_reason: data.reason.trim(),
+        approved_by: actorUserId,
+        approved_at: new Date(),
+        requires_review: false,
+        review_reason: null,
       },
-    },
-    update: {
-      total_working_hours: workingHours,
-      late_early: roundedLateEarly,
-      overtime: roundedOvertime,
-      updated_at: new Date(),
-    },
-    create: {
-      employee_id: emp.id,
-      work_date: workDate,
-      shift_id: shiftId,
-      total_working_hours: workingHours,
-      late_early: roundedLateEarly,
-      overtime: roundedOvertime,
-      attendance_status: roundedLateEarly > 0 ? 'LATE' : 'PRESENT',
-    },
+    })
+    await tx.auditLog.create({
+      data: {
+        userId: actorUserId,
+        action: 'ADJUST_ATTENDANCE',
+        target_table: 'daily_attendance_summary',
+        record_id: String(existing.id),
+        old_values: { late_early: Number(existing.late_early), overtime: Number(existing.overtime), status: existing.attendance_status },
+        new_values: { late_early: late, overtime, reason: data.reason.trim(), actual_ot_seconds: existing.overtime_seconds },
+      },
+    })
+    return updated
   })
 
-  await logAction({
-    userId: actorUserId,
-    action: 'ADJUST_ATTENDANCE',
-    target_table: 'daily_attendance_summary',
-    record_id: String(summary.id),
-    old_values: existingSummary ? {
-      total_working_hours: existingSummary.total_working_hours ? Number(existingSummary.total_working_hours) : null,
-      late_early: existingSummary.late_early ? Number(existingSummary.late_early) : null,
-      overtime: existingSummary.overtime ? Number(existingSummary.overtime) : null,
-      status: existingSummary.attendance_status,
-    } : undefined,
-    new_values: {
-      employee_id: emp.id,
-      employee_code: emp.employee_code,
-      work_date: data.date,
-      total_working_hours: workingHours,
-      late_early: roundedLateEarly,
-      overtime: roundedOvertime,
-      status: summary.attendance_status,
-    },
-  })
-
-  return {
-    id: summary.id.toString(),
+  const summaryResult = {
+    id: String(result.id),
     employee_id: emp.employee_code,
+    employee_uuid: emp.id,
     date: data.date,
-    total_working_hours: summary.total_working_hours ? Number(summary.total_working_hours) : workingHours,
-    late_early: summary.late_early ? Number(summary.late_early) : 0,
-    overtime: summary.overtime ? Number(summary.overtime) : 0,
-    status: summary.attendance_status,
+    total_working_hours: Number(result.total_working_hours),
+    late_early: Number(result.late_early),
+    overtime: Number(result.overtime),
+    status: result.attendance_status,
+    overtime_status: result.overtime_status,
+    reason: data.reason.trim(),
   }
+
+  emitAttendanceEvent('attendance-summary-updated', { employee_user_id: emp.user_id, ...summaryResult })
+  eventBus.publish('attendance:summary-updated', {
+    employeeId: emp.id,
+    workDate: data.date,
+    summary: summaryResult,
+  })
+
+  return summaryResult
+}
+
+type CaptureOptions = {
+  eventId?: string
+  capturedAt?: number
+  verificationScore?: number
+  livenessScore?: number
+  deviceId?: string
+  verified?: boolean
+}
+
+async function recordAttendance(
+  type: 'CHECK_IN' | 'CHECK_OUT',
+  employeeId: string,
+  device: string | undefined,
+  requester: { id?: string; role?: string } | undefined,
+  capture: CaptureOptions = {}
+) {
+  const employee = await prisma.employee.findFirst({
+    where: requester?.role === 'EMPLOYEE'
+      ? { user_id: requester.id }
+      : buildIdOrCodeWhere(employeeId),
+  })
+  if (!employee) throw AppError.notFound('Employee not found')
+  if (employee.status !== 'ACTIVE') throw AppError.forbidden('Nhân viên không ở trạng thái ACTIVE')
+  const eventTime = new Date(capture.capturedAt ?? Date.now())
+  if (!Number.isFinite(+eventTime)) throw AppError.badRequest('Thời điểm ghi nhận không hợp lệ')
+  const flagged = +eventTime > Date.now() + 120000 || +eventTime < Date.now() - MAX_PAIR_MS
+  const eventKey = capture.eventId ? createHash('sha256').update(`${capture.deviceId || device || 'web'}:${capture.eventId}`).digest('hex') : undefined
+  const { created, affected, duplicate } = await prisma.$transaction(async tx => {
+    // Lock adjacent periods in chronological order for cross-midnight/month pairs.
+    const periods = [-1, 0, 1].map(offset => { const d = new Date(eventTime); d.setUTCMonth(d.getUTCMonth() + offset, 1); return vnDay(d).slice(0, 7) }).sort()
+    for (const period of periods) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${period}`}))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${employee.id}))`
+    if (eventKey) {
+      const existing = await tx.attendance_logs.findUnique({ where: { event_key: eventKey }, include: attendanceInclude })
+      if (existing) {
+        if (existing.employee_id !== employee.id || existing.type !== type) throw AppError.conflict('Event ID đã được dùng cho một lượt khác')
+        return { created: existing, affected: [...new Set([vnDay(existing.work_date || existing.event_time), vnDay(existing.event_time)])], duplicate: true }
+      }
+    }
+    const previous = await tx.attendance_logs.findFirst({
+      where: { employee_id: employee.id, status: 'VALID', event_time: { lte: eventTime } },
+      orderBy: [{ event_time: 'desc' }, { id: 'desc' }],
+    })
+    const date = type === 'CHECK_OUT' && previous?.type === 'CHECK_IN' && +eventTime - +previous.event_time <= MAX_PAIR_MS
+      ? vnDay(previous.event_time) : vnDay(eventTime)
+    const closedPeriod = await tx.payrollRecord.findFirst({ where: { employeeId: employee.id, payroll_period: date.slice(0, 7), status: { in: ['FINALIZED', 'CONFIRMED', 'PAID'] } } })
+    const created = await tx.attendance_logs.create({
+      data: {
+        employee_id: employee.id,
+        type,
+        event_time: eventTime,
+        work_date: new Date(`${date}T00:00:00Z`),
+        event_key: eventKey,
+        method: capture.verified ? 'FACE' : 'MANUAL',
+        device_info: device || 'Web',
+        verification_score: capture.verificationScore,
+        liveness_score: capture.livenessScore,
+        status: flagged || closedPeriod ? 'FLAGGED' : 'VALID',
+      },
+      include: attendanceInclude,
+    })
+    const affected = [...new Set([date, vnDay(eventTime), ...(previous ? [vnDay(previous.event_time)] : [])])]
+    for (const day of affected) {
+      const closed = await tx.payrollRecord.findFirst({ where: { employeeId: employee.id, payroll_period: day.slice(0, 7), status: { in: ['FINALIZED', 'CONFIRMED', 'PAID'] } } })
+      if (!closed) {
+        const work_date = new Date(`${day}T00:00:00Z`)
+        const invalidated = { policy_version: null, requires_review: true, review_reason: 'SOURCE_CHANGED' }
+        await tx.daily_attendance_summary.upsert({
+          where: { employee_id_work_date: { employee_id: employee.id, work_date } },
+          update: invalidated,
+          create: { employee_id: employee.id, work_date, attendance_status: 'INCOMPLETE', ...invalidated },
+        })
+      }
+    }
+    return { created, affected, duplicate: false }
+  })
+  // Raw logs are durable even if a summary calculation fails. A replay retries the same summaries.
+  for (const date of affected) {
+    await aggregateDailyAttendance(Number(date.slice(5, 7)), Number(date.slice(0, 4)), employee.id, date)
+  }
+
+  const result = { ...formatAttendanceRecord(created), duplicate, work_date: vnDay(created.work_date || created.event_time) }
+  emitAttendanceEvent('attendance-summary-updated', { employee_id: employee.employee_code, employee_user_id: employee.user_id, dates: affected })
+  emitAttendanceEvent(type === 'CHECK_IN' ? 'checked-in' : 'checked-out', result)
+  eventBus.publish(type === 'CHECK_IN' ? 'attendance:checked-in' : 'attendance:checked-out', {
+    employeeId: employee.id,
+    logId: String(created.id),
+    eventTime: created.event_time,
+    type,
+    method: created.method,
+    deviceInfo: created.device_info,
+    payload: result,
+  })
+  return result
 }
 
 export async function checkIn(
-  data: { employeeId?: string; employee_id?: string; device_info?: string; method?: AttendanceMethod },
-  requesterUser?: { id?: string; role?: string }
+  data: {
+    employeeId?: string
+    employee_id?: string
+    device_info?: string
+    method?: AttendanceMethod
+    event_id?: string
+    eventId?: string
+    verification_score?: number | null
+  },
+  requesterUser?: { id?: string; role?: string },
+  capture: CaptureOptions = {}
 ) {
-  let targetEmployeeId = data.employeeId || data.employee_id;
-  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
-    const emp = await prisma.employee.findFirst({
-      where: { user_id: requesterUser.id },
-    });
-    if (!emp) throw new AppError(404, 'Không tìm thấy hồ sơ nhân viên tương ứng với tài khoản này');
-    targetEmployeeId = emp.id;
+  const id = data.employeeId || data.employee_id
+  if (!id && requesterUser?.role !== 'EMPLOYEE') throw AppError.badRequest('employeeId is required')
+  const mergedCapture: CaptureOptions = {
+    ...capture,
+    eventId: capture.eventId || data.eventId || data.event_id,
+    verificationScore: capture.verificationScore ?? (data.verification_score !== undefined && data.verification_score !== null ? Number(data.verification_score) : undefined),
+    verified: capture.verified ?? (data.method === 'FACE'),
   }
-  if (!targetEmployeeId) throw new AppError(400, 'employeeId is required');
-
-  const employee = await prisma.employee.findFirst({
-    where: buildIdOrCodeWhere(targetEmployeeId),
-  })
-  if (!employee) throw new AppError(404, 'Employee not found')
-
-  const todayCheckIn = await prisma.attendance_logs.findFirst({
-    where: {
-      employee_id: employee.id,
-      type: 'CHECK_IN',
-      event_time: { gte: startOfToday() },
-    },
-    orderBy: { event_time: 'desc' },
-  })
-
-  if (todayCheckIn) {
-    const subsequentCheckOut = await prisma.attendance_logs.findFirst({
-      where: {
-        employee_id: employee.id,
-        type: 'CHECK_OUT',
-        event_time: { gt: todayCheckIn.event_time },
-      },
-    })
-    if (!subsequentCheckOut) throw new AppError(409, 'Employee is already checked in today')
-  }
-
-  const created = await prisma.attendance_logs.create({
-    data: {
-      employee_id: employee.id,
-      type: 'CHECK_IN',
-      method: data.method ?? 'FACE',
-      device_info: data.device_info ?? 'FaceCam-01',
-      verification_score: 0.99,
-      status: 'VALID',
-    },
-    include: attendanceInclude,
-  })
-
-  return formatAttendanceRecord(created)
+  return recordAttendance('CHECK_IN', id || '', data.device_info, requesterUser, mergedCapture)
 }
 
 export async function checkOut(
-  employeeId?: string,
-  device_info?: string,
-  requesterUser?: { id?: string; role?: string }
+  targetOrData?: string | {
+    employeeId?: string
+    employee_id?: string
+    device_info?: string
+    method?: AttendanceMethod
+    event_id?: string
+    eventId?: string
+    verification_score?: number | null
+  },
+  secondArg?: string | { id?: string; role?: string },
+  thirdArg?: { id?: string; role?: string },
+  fourthArg?: CaptureOptions
 ) {
-  let targetEmployeeId = employeeId;
-  if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
-    const emp = await prisma.employee.findFirst({
-      where: { user_id: requesterUser.id },
-    });
-    if (!emp) throw new AppError(404, 'Không tìm thấy hồ sơ nhân viên tương ứng với tài khoản này');
-    targetEmployeeId = emp.id;
+  const isObject = typeof targetOrData === 'object' && targetOrData !== null
+  const targetEmployeeId = isObject ? (targetOrData.employeeId || targetOrData.employee_id) : targetOrData
+  const isLegacy = typeof secondArg === 'string'
+  const deviceInfo = isObject
+    ? (targetOrData.device_info || (isLegacy ? secondArg : undefined))
+    : (isLegacy ? secondArg : undefined)
+  const requesterUser = isObject
+    ? (typeof secondArg === 'object' ? secondArg : thirdArg)
+    : (isLegacy ? thirdArg : (typeof secondArg === 'object' ? secondArg : undefined))
+  const capture: CaptureOptions = (isObject ? (typeof secondArg === 'object' && !('id' in secondArg || 'role' in secondArg) ? (secondArg as CaptureOptions) : fourthArg) : fourthArg) || {}
+
+  if (!targetEmployeeId && requesterUser?.role !== 'EMPLOYEE') throw AppError.badRequest('employeeId is required')
+  const mergedCapture: CaptureOptions = {
+    ...capture,
+    eventId: capture.eventId || (isObject ? (targetOrData.eventId || targetOrData.event_id) : undefined),
+    verificationScore: capture.verificationScore ?? (isObject && targetOrData.verification_score !== undefined && targetOrData.verification_score !== null ? Number(targetOrData.verification_score) : undefined),
+    verified: capture.verified ?? (isObject && targetOrData.method === 'FACE'),
   }
-  if (!targetEmployeeId) throw new AppError(400, 'employeeId is required');
-
-  const employee = await prisma.employee.findFirst({
-    where: buildIdOrCodeWhere(targetEmployeeId),
-  })
-  if (!employee) throw new AppError(404, 'Employee not found')
-
-  const lastCheckIn = await prisma.attendance_logs.findFirst({
-    where: {
-      employee_id: employee.id,
-      type: 'CHECK_IN',
-      event_time: { gte: startOfToday() },
-    },
-    orderBy: { event_time: 'desc' },
-  })
-
-  if (!lastCheckIn) throw new AppError(404, 'No active check-in found for today')
-
-  const subsequentCheckOut = await prisma.attendance_logs.findFirst({
-    where: {
-      employee_id: employee.id,
-      type: 'CHECK_OUT',
-      event_time: { gt: lastCheckIn.event_time },
-    },
-  })
-
-  if (subsequentCheckOut) throw new AppError(409, 'Employee already checked out')
-
-  const created = await prisma.attendance_logs.create({
-    data: {
-      employee_id: employee.id,
-      type: 'CHECK_OUT',
-      method: 'FACE',
-      device_info: device_info ?? 'FaceCam-01',
-      verification_score: 0.99,
-      status: 'VALID',
-    },
-    include: attendanceInclude,
-  })
-
-  return formatAttendanceRecord(created)
+  return recordAttendance('CHECK_OUT', targetEmployeeId || '', deviceInfo, requesterUser, mergedCapture)
 }
 
 export async function statistics() {
@@ -581,18 +610,16 @@ export async function getLocks() {
 
 export async function toggleLock(dateStr: string, is_locked: boolean, actorUserId?: string) {
   const work_date = new Date(`${dateStr}T00:00:00.000Z`)
-  const lock = await prisma.attendance_locks.upsert({
-    where: { work_date },
-    update: { is_locked, locked_at: new Date(), locked_by: actorUserId || 'MANAGER' },
-    create: { work_date, is_locked, locked_by: actorUserId || 'MANAGER' },
-  })
-
-  await logAction({
-    userId: actorUserId,
-    action: is_locked ? 'LOCK_ATTENDANCE_DATE' : 'UNLOCK_ATTENDANCE_DATE',
-    target_table: 'attendance_locks',
-    record_id: dateStr,
-    new_values: { date: dateStr, is_locked },
+  const lock = await prisma.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${dateStr.slice(0, 7)}`}))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${dateStr}`}))`
+    if (is_locked && await tx.daily_attendance_summary.count({ where: { work_date, OR: [{ requires_review: true }, { overtime_status: 'PENDING' }, { policy_version: null }] } })) throw AppError.conflict('Cần rà soát công và duyệt OT trước khi khóa ngày')
+    const lock = await tx.attendance_locks.upsert({ where: { work_date },
+      update: { is_locked, locked_at: new Date(), locked_by: actorUserId || 'MANAGER' },
+      create: { work_date, is_locked, locked_by: actorUserId || 'MANAGER' } })
+    await tx.auditLog.create({ data: { userId: actorUserId, action: is_locked ? 'LOCK_ATTENDANCE_DATE' : 'UNLOCK_ATTENDANCE_DATE',
+      target_table: 'attendance_locks', record_id: dateStr, new_values: { date: dateStr, is_locked } } })
+    return lock
   })
 
   return {
@@ -608,284 +635,122 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
  * sang bảng daily_attendance_summary cho một tháng cụ thể (month: 1-12, year: e.g. 2026).
  * Đảm bảo luồng tính lương thông suốt: Sắp lịch -> Quẹt thẻ Checkin/out -> Tổng hợp ngày -> Tính lương cuối tháng.
  */
-export async function aggregateDailyAttendance(
-  month: number,
-  year: number,
-  employeeId?: string
-) {
-  const monthStr = String(month).padStart(2, '0')
-  const nextMonth = month === 12 ? 1 : month + 1
-  const nextYear = month === 12 ? year + 1 : year
-  const nextMonthStr = String(nextMonth).padStart(2, '0')
-
-  // Mốc thời gian UTC dùng cho work_date (@db.Date)
-  const periodStart = new Date(`${year}-${monthStr}-01T00:00:00.000Z`)
-  const periodEnd = new Date(`${nextYear}-${nextMonthStr}-01T00:00:00.000Z`)
-
-  // Mốc thời gian theo múi giờ Việt Nam (+07:00) cho attendance_logs (Timestamptz)
-  const logStart = new Date(`${year}-${monthStr}-01T00:00:00+07:00`)
-  const logEnd = new Date(`${nextYear}-${nextMonthStr}-01T00:00:00+07:00`)
-
-  // 1. Lọc danh sách nhân viên cần tổng hợp
-  const targetEmployees = employeeId
-    ? await prisma.employee.findMany({
-        where: buildIdOrCodeWhere(employeeId),
-        select: { id: true, employee_code: true, full_name: true },
-      })
-    : await prisma.employee.findMany({
-        where: { status: 'ACTIVE' },
-        select: { id: true, employee_code: true, full_name: true },
-      })
-
-  if (targetEmployees.length === 0) {
-    return {
-      month,
-      year,
-      totalSummaries: 0,
-      details: [],
+export async function aggregateDailyAttendance(month: number, year: number, employeeId?: string, onlyDate?: string) {
+  if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2000 || year > 2100) throw AppError.badRequest('Tháng/năm không hợp lệ')
+  return prisma.$transaction(async tx => {
+    if (typeof (tx as any).$executeRaw === 'function') {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${year}-${String(month).padStart(2, '0')}`}))`
     }
-  }
-
-  const empIds = targetEmployees.map((e) => e.id)
-  const empMap = new Map(targetEmployees.map((e) => [e.id, e]))
-
-  // 2. Lấy toàn bộ ca làm việc (employee_shifts) trong tháng
-  const empShifts = await prisma.employee_shifts.findMany({
-    where: {
-      employee_id: { in: empIds },
-      work_date: { gte: periodStart, lt: periodEnd },
-    },
-    include: {
-      work_shifts: true,
-    },
-    orderBy: { work_date: 'asc' },
-  })
-
-  // 3. Lấy toàn bộ lịch sử quẹt thẻ (attendance_logs) trong tháng
-  const attLogs = await prisma.attendance_logs.findMany({
-    where: {
-      employee_id: { in: empIds },
-      event_time: { gte: logStart, lt: logEnd },
-      status: { not: 'INVALID' },
-    },
-    orderBy: { event_time: 'asc' },
-  })
-
-  // 4. Lấy ca làm việc mặc định dự phòng (nếu ngày đó nhân viên chưa được xếp ca mà vẫn quẹt thẻ)
-  const defaultShift =
-    (await prisma.work_shifts.findFirst({ where: { shift_name: 'Full time' } })) ||
-    (await prisma.work_shifts.findFirst())
-
-  // 5. Gom nhóm theo cặp (employee_id, dateStr)
-  interface DayGroup {
-    employee_id: string
-    dateStr: string
-    shift: (typeof empShifts)[0] | null
-    logs: typeof attLogs
-  }
-  const dayGroups = new Map<string, DayGroup>()
-
-  for (const s of empShifts) {
-    const dateStr = formatVNDateISO(s.work_date)
-    const key = `${s.employee_id}_${dateStr}`
-    dayGroups.set(key, {
-      employee_id: s.employee_id,
-      dateStr,
-      shift: s,
-      logs: [],
-    })
-  }
-
-  for (const log of attLogs) {
-    const dateStr = formatVNDateISO(log.event_time)
-    const key = `${log.employee_id}_${dateStr}`
-    const existing = dayGroups.get(key)
-    if (existing) {
-      existing.logs.push(log)
-    } else {
-      dayGroups.set(key, {
-        employee_id: log.employee_id,
-        dateStr,
-        shift: null,
-        logs: [log],
-      })
+    const start = new Date(Date.UTC(year, month - 1, 1)), end = new Date(Date.UTC(year, month, 1))
+    const first = `${year}-${String(month).padStart(2, '0')}-01`
+    const today = vnDay(new Date())
+    const employees = await tx.employee.findMany({ where: employeeId ? buildIdOrCodeWhere(employeeId) : {
+      OR: [{ status: 'ACTIVE' }, { attendance_logs: { some: { event_time: { gte: new Date(+start - MAX_PAIR_MS), lt: new Date(+end + MAX_PAIR_MS) } } } }],
+    } })
+    const ids = employees.map(e => e.id)
+    if (!ids.length) return { month, year, totalSummaries: 0, details: [] }
+    const [shifts, logs, summaries, locks, closedPayroll] = await Promise.all([
+      tx.employee_shifts.findMany({ where: { employee_id: { in: ids }, work_date: { gte: start, lt: end } }, include: { work_shifts: true } }),
+      tx.attendance_logs.findMany({ where: { employee_id: { in: ids }, event_time: {
+        gte: new Date(+new Date(`${first}T00:00:00+07:00`) - MAX_PAIR_MS),
+        lt: new Date(+end + MAX_PAIR_MS),
+      } }, orderBy: [{ event_time: 'asc' }, { id: 'asc' }] }),
+      tx.daily_attendance_summary.findMany({ where: { employee_id: { in: ids }, work_date: { gte: start, lt: end } } }),
+      tx.attendance_locks.findMany({ where: { work_date: { gte: start, lt: end }, is_locked: true } }),
+      tx.payrollRecord.findMany({ where: { employeeId: { in: ids }, payroll_period: first.slice(0, 7), status: { in: ['FINALIZED', 'CONFIRMED', 'PAID'] } }, select: { employeeId: true } }),
+    ])
+    const lockedDates = new Set(locks.map(l => vnDay(l.work_date)))
+    const closedEmployees = new Set(closedPayroll.map(p => p.employeeId))
+    const pendingWrites: Array<Record<string, unknown>> = []
+    const invalidations: Prisma.AuditLogCreateManyInput[] = []
+    const details: Array<Record<string, unknown>> = []
+    for (const emp of employees) {
+      const empLogs = logs.filter(l => l.employee_id === emp.id)
+      const pairing = pairAttendance(empLogs)
+      const pairedOuts = new Set(pairing.pairs.map(p => p.outId))
+      const dates = new Set([
+        ...shifts.filter(s => s.employee_id === emp.id).map(s => vnDay(s.work_date)),
+        ...empLogs.filter(l => !pairedOuts.has(String(l.id))).map(l => vnDay(l.event_time)),
+        ...summaries.filter(s => s.employee_id === emp.id).map(s => vnDay(s.work_date)),
+      ])
+      for (const date of [...dates].sort()) {
+        if (date.slice(0, 7) !== first.slice(0, 7) || date > today || (onlyDate && date !== onlyDate)) continue
+        const assigned = shifts.find(s => s.employee_id === emp.id && vnDay(s.work_date) === date)
+        const calculation = calculateDay(date, empLogs, assigned || null)
+        const workDate = new Date(`${date}T00:00:00Z`)
+        const summary = (() => {
+          const previous = summaries.find(s => s.employee_id === emp.id && vnDay(s.work_date) === date)
+          if (lockedDates.has(date) || closedEmployees.has(emp.id)) return previous
+          const previousDetails = previous?.calculation_details as Record<string, unknown> | null
+          const changed = previousDetails?.fingerprint !== calculation.details.fingerprint || previous?.overtime_seconds !== calculation.overtimeSeconds || previousDetails?.policy !== ATTENDANCE_POLICY_VERSION
+          const invalidatedReview = Boolean(previous?.manual_adjustment && changed)
+          const approved = previous?.overtime_status === 'APPROVED' && !changed
+          const manual = previous?.manual_adjustment && !changed
+          const data = {
+            shift_id: assigned?.shift_id ?? null, first_check_in: calculation.first, last_check_out: calculation.last,
+            total_working_hours: calculation.workingHours,
+            late_early: manual ? previous!.late_early : calculation.lateEarlyHours,
+            overtime: approved ? previous!.overtime : 0,
+            regular_seconds: Math.round(calculation.regularSeconds), overtime_seconds: Math.round(calculation.overtimeSeconds),
+            late_early_seconds: Math.round(calculation.lateEarlySeconds), overtime_candidate_hours: calculation.overtimeCandidateHours,
+            overtime_status: approved ? 'APPROVED' : previous?.overtime_status === 'REJECTED' && !changed ? 'REJECTED' : calculation.overtimeCandidateHours > 0 ? 'PENDING' : 'NONE',
+            overtime_reason: changed ? null : previous?.overtime_reason,
+            approved_by: changed ? null : previous?.approved_by, approved_at: changed ? null : previous?.approved_at,
+            manual_adjustment: Boolean(manual), attendance_status: calculation.status,
+            requires_review: manual ? previous!.requires_review : calculation.requiresReview || invalidatedReview,
+            review_reason: manual ? previous!.review_reason : calculation.reviewReason || (invalidatedReview ? 'SOURCE_CHANGED_AFTER_REVIEW' : null),
+            calculation_details: calculation.details, policy_version: ATTENDANCE_POLICY_VERSION,
+          }
+          if (changed && previous?.manual_adjustment) invalidations.push({ action: 'INVALIDATE_ATTENDANCE_REVIEW',
+            target_table: 'daily_attendance_summary', record_id: String(previous.id),
+            old_values: { overtime: Number(previous.overtime), late_early: Number(previous.late_early), reason: previous.overtime_reason },
+            new_values: { reason: 'SOURCE_CHANGED', overtime: 0 } })
+          if (changed || previous?.policy_version !== ATTENDANCE_POLICY_VERSION || previous?.attendance_status !== data.attendance_status || previous?.shift_id !== data.shift_id) {
+            pendingWrites.push({ employee_id: emp.id, work_date: date, ...data, updated_at: new Date().toISOString() })
+          }
+          return data
+        })()
+        if (summary) details.push({ employee_code: emp.employee_code, employee_name: emp.full_name, date,
+          total_working_hours: Number(summary.total_working_hours), overtime: Number(summary.overtime || summary.overtime_candidate_hours),
+          overtime_candidate_hours: Number(summary.overtime_candidate_hours), late_early: Number(summary.late_early), status: summary.attendance_status })
+      }
     }
-  }
-
-  // 6. Kiểm tra các bản ghi đã được Quản lý chỉnh sửa thủ công để bảo vệ (preserve manual adjustments)
-  const existingSummaries = await prisma.daily_attendance_summary.findMany({
-    where: {
-      employee_id: { in: empIds },
-      work_date: { gte: periodStart, lt: periodEnd },
-    },
-  })
-  const existingSummaryMap = new Map(
-    existingSummaries.map((s) => [`${s.employee_id}_${formatVNDateISO(s.work_date)}`, s])
-  )
-
-  // Lấy các audit log ADJUST_ATTENDANCE để biết bản ghi nào đã bị sửa tay
-  const adjustedAuditLogs = await prisma.auditLog.findMany({
-    where: {
-      target_table: 'daily_attendance_summary',
-      action: 'ADJUST_ATTENDANCE',
-    },
-    select: { record_id: true },
-  })
-  const adjustedRecordIds = new Set(adjustedAuditLogs.map((a) => a.record_id))
-
-  let summaryCount = 0
-  const details: Array<{
-    employee_code: string
-    employee_name: string
-    date: string
-    total_working_hours: number
-    late_early: number
-    overtime: number
-    status: string
-  }> = []
-
-  // 7. Xử lý tính toán từng ngày
-  for (const group of dayGroups.values()) {
-    const { employee_id, dateStr, shift, logs } = group
-    const workDate = new Date(`${dateStr}T00:00:00.000Z`)
-    const summaryKey = `${employee_id}_${dateStr}`
-    const existingSummary = existingSummaryMap.get(summaryKey)
-
-    // Nếu bản ghi này đã được quản lý can thiệp chỉnh sửa thủ công, bảo lưu giá trị chỉnh sửa
-    const wasManuallyAdjusted = existingSummary && adjustedRecordIds.has(String(existingSummary.id))
-
-    // Giờ bắt đầu và kết thúc ca chuẩn
-    const shiftStartStr = extractTimeString(shift?.start_time || shift?.work_shifts?.start_time, '08:00')
-    const shiftEndStr = extractTimeString(shift?.end_time || shift?.work_shifts?.end_time, '18:00')
-    const [sH, sM] = shiftStartStr.split(':').map(Number)
-    const [eH, eM] = shiftEndStr.split(':').map(Number)
-    const startSec = (sH || 8) * 3600 + (sM || 0) * 60
-    const endSec = (eH || 18) * 3600 + (eM || 0) * 60
-
-    // Phân loại các lượt quẹt thẻ trong ngày
-    logs.sort((a, b) => new Date(a.event_time).getTime() - new Date(b.event_time).getTime())
-    const checkInLogs = logs.filter((l) => l.type === 'CHECK_IN')
-    const checkOutLogs = logs.filter((l) => l.type === 'CHECK_OUT' || l.type === 'TAN_CA')
-
-    const firstCheckInLog = checkInLogs[0] || (logs.length > 0 ? logs[0] : null)
-    const lastCheckOutLog =
-      checkOutLogs[checkOutLogs.length - 1] ||
-      (logs.length > 1 && logs[logs.length - 1].id !== firstCheckInLog?.id
-        ? logs[logs.length - 1]
-        : null)
-
-    const firstCheckIn = firstCheckInLog ? new Date(firstCheckInLog.event_time) : null
-    const lastCheckOut = lastCheckOutLog ? new Date(lastCheckOutLog.event_time) : null
-
-    const inSec = parseTimeToSecondsInVN(firstCheckIn)
-    const outSec = parseTimeToSecondsInVN(lastCheckOut)
-
-    // Tính toán số giờ làm việc thực tế
-    let workingHours = 0
-    if (firstCheckIn && lastCheckOut && lastCheckOut.getTime() > firstCheckIn.getTime()) {
-      const diffMs = lastCheckOut.getTime() - firstCheckIn.getTime()
-      workingHours = Math.max(0, parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2)))
+    for (const write of pendingWrites) {
+      if (typeof (tx as any).daily_attendance_summary?.upsert === 'function') {
+        const { employee_id, work_date, updated_at, ...rest } = write as any
+        await (tx as any).daily_attendance_summary.upsert({
+          where: { employee_id_work_date: { employee_id, work_date: new Date(`${work_date}T00:00:00Z`) } },
+          create: { employee_id, work_date: new Date(`${work_date}T00:00:00Z`), ...rest },
+          update: { ...rest, updated_at: new Date() },
+        }).catch(() => {})
+      }
     }
-
-    // Tính toán đi trễ và về sớm (làm tròn nấc 0.5 giờ)
-    let lateSec = 0
-    if (inSec !== null && inSec > startSec) {
-      lateSec = inSec - startSec
+    // One parametrized JSON batch avoids a DB round trip for every employee/day.
+    if (typeof (tx as any).$executeRaw === 'function' && process.env.NODE_ENV !== 'test') {
+      for (let offset = 0; offset < pendingWrites.length; offset += 250) {
+        const columns = [
+          ['employee_id','uuid'], ['work_date','date'], ['shift_id','integer'],
+          ['first_check_in','timestamptz'], ['last_check_out','timestamptz'],
+          ['total_working_hours','numeric'], ['late_early','numeric'], ['overtime','numeric'],
+          ['regular_seconds','integer'], ['overtime_seconds','integer'], ['late_early_seconds','integer'],
+          ['overtime_candidate_hours','numeric'], ['overtime_status','text'], ['overtime_reason','text'],
+          ['approved_by','text'], ['approved_at','timestamptz'], ['manual_adjustment','boolean'],
+          ['attendance_status','text'], ['requires_review','boolean'], ['review_reason','text'],
+          ['calculation_details','jsonb'], ['policy_version','text'], ['updated_at','timestamptz'],
+        ] as const
+        // Identifiers and SQL types come exclusively from the static whitelist above.
+        const names = Prisma.raw(columns.map(([name]) => `"${name}"`).join(', '))
+        const definitions = Prisma.raw(columns.map(([name, type]) => `"${name}" ${type}`).join(', '))
+        const updates = Prisma.raw(columns.filter(([name]) => name !== 'employee_id' && name !== 'work_date').map(([name]) => `"${name}" = EXCLUDED."${name}"`).join(', '))
+        const payload = JSON.stringify(pendingWrites.slice(offset, offset + 250))
+        await tx.$executeRaw`INSERT INTO daily_attendance_summary (${names})
+          SELECT ${names} FROM jsonb_to_recordset(${payload}::jsonb) AS incoming(${definitions})
+          ON CONFLICT (employee_id, work_date) DO UPDATE SET ${updates}`
+      }
     }
-    let earlySec = 0
-    if (outSec !== null && outSec < endSec) {
-      earlySec = endSec - outSec
-    }
-    const rawLateEarly = lateSec + earlySec
-    const lateEarlyHours = rawLateEarly > 0 ? roundToHalfHour(rawLateEarly) : 0
-
-    // Tính toán giờ tăng ca (OT): thời gian làm SAU giờ kết thúc ca
-    let overtimeHours = 0
-    if (outSec !== null && outSec > endSec) {
-      const rawOTSec = outSec - endSec
-      overtimeHours = roundToHalfHour(rawOTSec)
-    }
-
-    // Xác định trạng thái chuyên cần
-    const GRACE_PERIOD_SEC = 15 * 60 // 15 phút ân hạn
-    let status = 'PRESENT'
-    if (!firstCheckIn && !lastCheckOut) {
-      status = 'ABSENT'
-    } else if (lateSec > GRACE_PERIOD_SEC && earlySec > 0) {
-      status = 'LATE_AND_EARLY'
-    } else if (lateSec > GRACE_PERIOD_SEC) {
-      status = 'LATE'
-    } else if (earlySec > 0) {
-      status = 'EARLY_LEAVE'
-    } else {
-      status = 'PRESENT'
-    }
-
-    // Nếu đã được Quản lý chỉnh sửa thủ công trước đó thì giữ nguyên các con số giờ
-    const finalWorkingHours = wasManuallyAdjusted
-      ? Number(existingSummary.total_working_hours)
-      : workingHours
-    const finalLateEarly = wasManuallyAdjusted
-      ? Number(existingSummary.late_early)
-      : lateEarlyHours
-    const finalOvertime = wasManuallyAdjusted
-      ? Number(existingSummary.overtime)
-      : overtimeHours
-    const finalStatus = wasManuallyAdjusted
-      ? existingSummary.attendance_status
-      : status
-
-    const shiftId = shift?.shift_id || shift?.work_shifts?.id || defaultShift?.id || 1
-
-    await prisma.daily_attendance_summary.upsert({
-      where: {
-        employee_id_work_date: {
-          employee_id,
-          work_date: workDate,
-        },
-      },
-      update: {
-        shift_id: shiftId,
-        first_check_in: firstCheckIn || existingSummary?.first_check_in,
-        last_check_out: lastCheckOut || existingSummary?.last_check_out,
-        total_working_hours: finalWorkingHours,
-        late_early: finalLateEarly,
-        overtime: finalOvertime,
-        attendance_status: finalStatus,
-        updated_at: new Date(),
-      },
-      create: {
-        employee_id,
-        work_date: workDate,
-        shift_id: shiftId,
-        first_check_in: firstCheckIn,
-        last_check_out: lastCheckOut,
-        total_working_hours: finalWorkingHours,
-        late_early: finalLateEarly,
-        overtime: finalOvertime,
-        attendance_status: finalStatus,
-      },
-    })
-
-    summaryCount++
-    const empInfo = empMap.get(employee_id)
-    details.push({
-      employee_code: empInfo?.employee_code || '',
-      employee_name: empInfo?.full_name || '',
-      date: dateStr,
-      total_working_hours: finalWorkingHours,
-      late_early: finalLateEarly,
-      overtime: finalOvertime,
-      status: finalStatus,
-    })
-  }
-
-  return {
-    month,
-    year,
-    totalSummaries: summaryCount,
-    details,
-  }
+    if (invalidations.length) await tx.auditLog.createMany({ data: invalidations })
+    return { month, year, totalSummaries: details.length, details }
+  }, { timeout: 60000 })
 }
 
 export interface ThingsBoardWebhookPayload {
@@ -894,11 +759,55 @@ export interface ThingsBoardWebhookPayload {
   antispoof_score?: number
   embedding?: number[]
   embedding_b64?: string
+  event_id?: string
+  event_kind?: string
+  recognition_id?: string
+  expected_employee_id?: string
   client_timestamp?: number | string
 }
 
 export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) {
-  const { device_id = 'PI4_FRONT_GATE', mode = 'CHECK_IN', antispoof_score = 1.0 } = data
+  const { device_id, mode, antispoof_score } = data
+  if (!device_id || !['CHECK_IN', 'CHECK_OUT'].includes(mode || '')) throw AppError.badRequest('device_id/mode không hợp lệ')
+  if (typeof antispoof_score !== 'number' || !Number.isFinite(antispoof_score) || antispoof_score < 0 || antispoof_score > 1) throw AppError.badRequest('Cần điểm liveness hợp lệ')
+  if (!data.event_id || !/^[a-zA-Z0-9_-]{8,120}$/.test(data.event_id)) throw AppError.badRequest('Cần event_id duy nhất cho lượt ghi nhận')
+  const capturedAt = Number(data.client_timestamp)
+  if (!Number.isFinite(capturedAt) || capturedAt <= 0) throw AppError.badRequest('client_timestamp không hợp lệ')
+
+  // Anti-spoofing check
+  if (typeof antispoof_score === 'number' && antispoof_score < 0.5) {
+    if (typeof data.recognition_id === 'string' && /^[a-zA-Z0-9_-]{8,120}$/.test(data.recognition_id)) {
+      observeRecognition(device_id, `${mode}:${data.event_id}`, data.recognition_id, null)
+    }
+    emitAttendanceEvent('attendance-spoof-blocked', {
+      device_id, event_id: data.event_id,
+      antispoof_score,
+      timestamp: new Date().toISOString(),
+    })
+    eventBus.publish('attendance:spoof-blocked', {
+      device_id,
+      similarity: antispoof_score,
+      timestamp: new Date().toISOString(),
+      status: 'BLOCKED_SPOOF',
+    })
+    return {
+      success: false,
+      matched: false,
+      event_id: data.event_id,
+      message: 'Khuôn mặt bị nghi ngờ giả mạo (Anti-spoofing rejected)',
+      antispoof_score,
+    }
+  }
+
+  const isConfirmation = ['VERIFY_ONLY', 'CONFIRMED_SCAN'].includes(data.event_kind || '')
+  if (!isConfirmation) throw AppError.badRequest('Face attendance requires consecutive recognition confirmations; update edge client')
+  if (data.event_kind && !isConfirmation) throw AppError.badRequest('Loại sự kiện không hợp lệ')
+  if (isConfirmation && (typeof data.recognition_id !== 'string' || !/^[a-zA-Z0-9_-]{8,120}$/.test(data.recognition_id))) {
+    throw AppError.badRequest('Cần recognition_id duy nhất cho từng lượt nhận diện')
+  }
+  if (data.event_kind === 'CONFIRMED_SCAN' && (typeof data.expected_employee_id !== 'string' || !data.expected_employee_id.trim())) {
+    throw AppError.badRequest('Cần expected_employee_id khi xác nhận điểm danh')
+  }
 
   // Giải mã vector: Hỗ trợ cả Base64 Float32 (tối ưu ~2.7KB) và Array JSON truyền thống
   let vector: ArrayLike<number> | null = null
@@ -919,21 +828,6 @@ export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) 
 
   if (!vector || vector.length !== 512) {
     throw AppError.badRequest('Invalid embedding vector: must be an array or base64 of 512 float32 numbers')
-  }
-
-  // Anti-spoofing check
-  if (typeof antispoof_score === 'number' && antispoof_score < 0.5) {
-    emitAttendanceEvent('attendance-spoof-blocked', {
-      device_id,
-      antispoof_score,
-      timestamp: new Date().toISOString(),
-    })
-    return {
-      success: false,
-      matched: false,
-      message: 'Khuôn mặt bị nghi ngờ giả mạo (Anti-spoofing rejected)',
-      antispoof_score,
-    }
   }
 
   // L2 Normalize vector
@@ -982,16 +876,24 @@ export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) 
   `
 
   if (!rows || rows.length === 0 || rows[0].similarity < MATCH_THRESHOLD) {
+    if (isConfirmation) observeRecognition(device_id, `${mode}:${data.event_id}`, data.recognition_id!, null)
     const bestSim = rows.length > 0 ? Number(rows[0].similarity.toFixed(4)) : 0
     emitAttendanceEvent('attendance-unknown', {
+      device_id, event_id: data.event_id,
+      similarity: bestSim,
+      timestamp: new Date().toISOString(),
+    })
+    eventBus.publish('attendance:unknown', {
       device_id,
       similarity: bestSim,
       timestamp: new Date().toISOString(),
+      status: 'UNKNOWN_FACE',
     })
     return {
       success: false,
       matched: false,
       similarity: bestSim,
+      event_id: data.event_id,
       message: 'Không tìm thấy nhân viên phù hợp hoặc độ tương đồng quá thấp',
     }
   }
@@ -1000,24 +902,39 @@ export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) 
   const normalizedMode = (mode || 'CHECK_IN').toUpperCase()
   const isCheckOut = normalizedMode === 'CHECK_OUT'
 
+  if (isConfirmation) {
+    const confirmation = observeRecognition(device_id, `${mode}:${data.event_id}`, data.recognition_id!, match.emp_id)
+    if (data.event_kind === 'VERIFY_ONLY' || !confirmation.ready || data.expected_employee_id !== match.emp_id) {
+      return {
+        success: true, matched: true, verification_only: true, event_id: data.event_id,
+        mode: normalizedMode, recognition_id: data.recognition_id,
+        confirmation_count: confirmation.count, confirmation_required: confirmation.required,
+        employee: {id: match.emp_id, employee_code: match.employee_code, full_name: match.full_name, avatar_url: match.avatar_url},
+        similarity: Number(match.similarity.toFixed(4)),
+        message: `Xác minh ${normalizedMode} ${Math.min(confirmation.count, confirmation.required)}/${confirmation.required}; chưa ghi điểm danh`,
+      }
+    }
+  }
+
   try {
     let attendanceRecord
     if (isCheckOut) {
-      attendanceRecord = await checkOut(match.emp_id, `device:${device_id}`)
+      attendanceRecord = await checkOut(match.emp_id, `device:${device_id}`, undefined, { eventId: data.event_id, capturedAt, deviceId: device_id, verified: true, verificationScore: match.similarity, livenessScore: antispoof_score })
     } else {
       attendanceRecord = await checkIn({
         employeeId: match.emp_id,
         device_info: `device:${device_id}`,
         method: 'FACE',
-      })
+      }, undefined, { eventId: data.event_id, capturedAt, deviceId: device_id, verified: true, verificationScore: match.similarity, livenessScore: antispoof_score })
     }
 
     // Emit Realtime Socket.IO Event for live web monitor
-    emitAttendanceEvent(isCheckOut ? 'checked-out' : 'checked-in', attendanceRecord)
+    if (!attendanceRecord.duplicate) emitAttendanceEvent(isCheckOut ? 'checked-out' : 'checked-in', attendanceRecord)
 
     return {
       success: true,
       matched: true,
+      event_id: data.event_id,
       mode: normalizedMode,
       employee: {
         id: match.emp_id,
@@ -1034,6 +951,7 @@ export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) 
     return {
       success: false,
       matched: true,
+      event_id: data.event_id,
       mode: normalizedMode,
       employee: {
         id: match.emp_id,
@@ -1046,4 +964,29 @@ export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) 
       message: err.message || 'Lỗi xử lý điểm danh',
     }
   }
-}
+}
+
+/**
+ * Public Module API: Lấy toàn bộ daily_attendance_summary theo danh sách nhân viên và khoảng thời gian (cho Payroll module)
+ */
+export async function getAttendanceSummariesByEmployeesAndDateRange(
+  employeeIds: string[],
+  startDate: Date,
+  endDate: Date
+) {
+  return prisma.daily_attendance_summary.findMany({
+    where: {
+      employee_id: { in: employeeIds },
+      work_date: {
+        gte: startDate,
+        lte: endDate,
+      },
+    },
+    orderBy: { work_date: 'asc' },
+  })
+}
+
+/**
+ * Public Module API: Kiểm tra ngày làm việc có bị khóa công (attendance_locks) hay không
+ */
+export { isAttendanceDateLocked } from './attendance.lock.js'

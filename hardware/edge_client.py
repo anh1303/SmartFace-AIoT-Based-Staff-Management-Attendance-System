@@ -11,6 +11,8 @@ Orchestrator kết nối toàn diện các module:
 - streaming   : RTSPStreamer (FFmpeg pipe -> MediaMTX WebRTC/HLS/RTSP)
 """
 
+import queue
+import uuid
 import os
 import sys
 import time
@@ -29,6 +31,7 @@ except ImportError:
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 load_dotenv()
+import config as vision
 
 
 # Helper đọc biến môi trường
@@ -77,19 +80,21 @@ RTSP_URL = get_env_str("RTSP_URL", "rtsp://127.0.0.1:8554/pi4_cam")
 CAM_INDEX = get_env_int("CAMERA_INDEX", 0)
 WIDTH = get_env_int("CAMERA_WIDTH", 640)
 HEIGHT = get_env_int("CAMERA_HEIGHT", 480)
-FPS = get_env_int("CAMERA_FPS", 15)
+FPS = vision.CAMERA_FPS
 
 # Cấu hình AI & Tracking
-APP_DETECTOR = get_env_str("APP_DETECTOR", "scrfd").lower()
-FAS_LOGIT_THRESHOLD = get_env_float("FAS_LOGIT_THRESHOLD", -4.2998)
-REQUIRED_CONSECUTIVE = get_env_int("CONSECUTIVE_REAL_FRAMES", 3)
+APP_DETECTOR = vision.APP_DETECTOR
+FAS_LOGIT_THRESHOLD = vision.PAD_THRESHOLD_LOGIT
+REQUIRED_CONSECUTIVE = vision.PAD_MIN_VOTES
 COOLDOWN_SEC = get_env_float("SCAN_COOLDOWN_SECONDS", 5.0)
 
 # Detection Cadence: chạy detector mỗi N giây; các frame ở giữa dùng optical flow tiết kiệm CPU Pi
-DETECTION_INTERVAL_SECONDS = get_env_float("DETECTION_INTERVAL_SECONDS", 0.2)
-TRACK_IOU_THRESHOLD = get_env_float("TRACK_IOU_THRESHOLD", 0.3)
-TRACK_MAX_MISSING_FRAMES = get_env_int("TRACK_MAX_MISSING_FRAMES", 10)
-MAX_FACES_PER_FRAME = get_env_int("MAX_FACES_PER_FRAME", 1)
+DETECTION_INTERVAL_SECONDS = vision.DETECTION_INTERVAL_SECONDS
+RECOGNIZE_INTERVAL_SECONDS = vision.RECOGNIZE_INTERVAL_SECONDS
+PAD_INTERVAL_SECONDS = vision.PAD_INTERVAL_SECONDS
+TRACK_IOU_THRESHOLD = vision.TRACK_IOU_THRESHOLD
+TRACK_MAX_MISSING_FRAMES = vision.TRACK_MAX_MISSING_FRAMES
+MAX_FACES_PER_FRAME = vision.MAX_FACES_PER_FRAME
 
 SHOW_GUI = get_env_bool("SHOW_GUI", False)
 
@@ -103,7 +108,7 @@ TFT_DC_PIN = get_env_int("TFT_DC_PIN", 25)
 TFT_RESET_PIN = get_env_int("TFT_RESET_PIN", 24)
 TFT_BGR = get_env_bool("TFT_BGR", False)
 TFT_INVERT = get_env_bool("TFT_INVERT", False)
-TFT_DISPLAY_FPS = get_env_float("TFT_DISPLAY_FPS", 15.0)
+TFT_DISPLAY_FPS = get_env_float("TFT_DISPLAY_FPS", 10.0)
 
 # Cấu hình Cảm biến siêu âm Wake-on-Presence (Tiết kiệm CPU & Chống Spam)
 ULTRASONIC_ENABLED = get_env_bool("ULTRASONIC_ENABLED", True)
@@ -128,6 +133,9 @@ from tracking import FaceTracker
 from antispoof import AntiSpoofPredictor
 from alignment import align_face
 from recognition import FaceEmbedder
+from recognition.worker import RecognitionWorker, IdentityCache
+from vision_pipeline import update_track_pad, limit_faces
+from alignment.aligner import get_input_face
 from iot import ThingsBoardClient
 from streaming import RTSPStreamer
 from display import TFTDisplay
@@ -135,16 +143,65 @@ from peripherals import UltrasonicSensor
 
 # Trạng thái toàn cục
 current_mode = INITIAL_MODE
+mode_generation = 0
 
 
 def on_mode_change(new_mode: str):
-    global current_mode
+    global current_mode, mode_generation
+    if new_mode != current_mode:
+        mode_generation += 1
     current_mode = new_mode
     print(f"\n[MODE SWITCH] Nhận lệnh từ ThingsBoard: Đổi sang {current_mode}!\n")
 
 
-def main():
+def liveness_score(logit, threshold=None):
+    """Map raw PAD margin to backend's existing [0,1] transport contract."""
+    delta = float(logit) - (vision.PAD_THRESHOLD_LOGIT if threshold is None else float(threshold))
+    return float(1 / (1 + np.exp(-max(-60.0, min(60.0, delta)))))
+
+
+def face_status_label(track):
+    """Display only; never use a held identity to override the PAD verdict."""
+    if track.pad_invalid_reason:
+        return "INVALID", (0, 165, 255)
+    if track.missing_frames or not track.pad_ready:
+        return "CHECKING", (0, 255, 255)
+    if track.is_spoof:
+        return "SPOOF", (0, 0, 255)
+    if not track.is_real:
+        return "CHECKING", (0, 255, 255)
+    name, _, _ = track.display_result(vision.RECOGNITION_LABEL_HOLD_SECONDS)
+    return f"REAL - {name}", (0, 255, 0)
+
+
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser(description="SmartFace AIoT — Raspberry Pi 4 Edge Client")
+    parser.add_argument('--capture-dir', default=os.getenv("PAD_CAPTURE_DIR", None),
+                        help='Thư mục lưu crop PAD; nhấn C để chụp')
+    parser.add_argument('--subject', default=os.getenv("PAD_CAPTURE_SUBJECT", 'unspecified'),
+                        help='Mã người được chụp (không phải nhãn real/spoof)')
+    parser.add_argument('--condition', default=os.getenv("PAD_CAPTURE_CONDITION", 'unspecified'),
+                        help='Điều kiện ánh sáng / camera của phiên')
+    parser.add_argument('--label', choices=['real', 'fake'], default=os.getenv("PAD_CAPTURE_LABEL", None),
+                        help='Gán nhãn ground-truth tự động cho phiên chụp (real hoặc fake)')
+    return parser.parse_known_args()[0]
+
+
+def main(args=None):
     global current_mode
+    if args is None:
+        args = parse_args()
+
+    capture = None
+    if args.capture_dir:
+        try:
+            from pad_capture import PADCapture
+            capture = PADCapture(args.capture_dir, args.subject, args.condition, label=args.label)
+            label_info = f" [nhãn tự động: '{args.label}']" if args.label else " [chưa gán nhãn]"
+            print(f"[Capture] Đã bật chế độ chụp mẫu PAD: lưu vào {capture.directory}{label_info}")
+        except Exception as exc:
+            print(f"[Capture Warning] Không thể khởi tạo PADCapture: {exc}")
 
     print("\n=======================================================")
     print("      SMARTFACE AIoT — RASPBERRY PI 4 EDGE CLIENT     ")
@@ -152,16 +209,21 @@ def main():
     print(f"  Device ID        : {DEVICE_ID}")
     print(f"  Initial Mode     : {current_mode}")
     print(f"  TB Host          : {TB_HOST}:{TB_PORT}")
+    masked_token = f"{TB_TOKEN[:4]}...{TB_TOKEN[-4:]}" if TB_TOKEN and len(TB_TOKEN) >= 8 else (TB_TOKEN or "CHƯA ĐẶT")
+    print(f"  TB Token         : {masked_token}")
     print(f"  RTSP URL         : {RTSP_URL} (Stream Enabled: {STREAM_ENABLED})")
     print(f"  Detector Backend : {APP_DETECTOR.upper()}")
     print(f"  Detection Cadence: Mỗi {DETECTION_INTERVAL_SECONDS}s (Optical Flow ở giữa)")
+    print(f"  Recognition Every: {RECOGNIZE_INTERVAL_SECONDS}s | PAD Every: {PAD_INTERVAL_SECONDS}s")
     print(f"  Tracking Config  : IOU={TRACK_IOU_THRESHOLD}, MaxMissing={TRACK_MAX_MISSING_FRAMES}")
-    print(f"  Anti-Spoofing    : Ngưỡng logit={FAS_LOGIT_THRESHOLD}, Cần {REQUIRED_CONSECUTIVE} votes Real")
+    print(f"  Anti-Spoofing    : Ngưỡng logit={FAS_LOGIT_THRESHOLD}, tối thiểu {REQUIRED_CONSECUTIVE}/{vision.PAD_SMOOTH_WINDOW} phiếu")
     print(f"  Max Faces/Frame  : {MAX_FACES_PER_FRAME if MAX_FACES_PER_FRAME > 0 else 'KHÔNG GIỚI HẠN (All faces)'}")
     print(f"  Cooldown         : {COOLDOWN_SEC}s mỗi Track")
     print(f"  TFT ST7789V SPI  : {'BẬT (320x240)' if TFT_ENABLED else 'TẮT'}")
     print(f"  Ultrasonic Sensor: {'BẬT (TRIG=' + str(ULTRASONIC_TRIG_PIN) + ', ECHO=' + str(ULTRASONIC_ECHO_PIN) + ', Ngưỡng=' + str(ULTRASONIC_TRIGGER_DISTANCE) + 'cm)' if ULTRASONIC_ENABLED else 'TẮT'}")
     print("=======================================================\n")
+
+    result_queue = queue.SimpleQueue()
 
     # Callback khi nhận kết quả đối soát điểm danh Two-way RPC từ Backend
     def on_attendance_result(res: dict):
@@ -177,7 +239,8 @@ def main():
         if is_matched and is_success:
             emp = res.get("employee", {})
             emp_name = emp.get("full_name") or emp.get("employee_code") or "Nhân viên"
-            status_banner = f"{emp_name} - {mode} THÀNH CÔNG ({sim:.2f})"
+            review = res.get("attendance", {}).get("status") == "FLAGGED"
+            status_banner = f"{emp_name} - {mode}: {'ĐÃ LƯU, CẦN KIỂM TRA' if review else 'THÀNH CÔNG'} ({sim:.2f})"
             status_banner_time = time.time()
             print(f"[EDGE] 🎉 ĐIỂM DANH THÀNH CÔNG: {emp_name} ({mode}) - Similarity: {sim:.2f}")
         elif is_matched and not is_success:
@@ -200,9 +263,8 @@ def main():
         device_id=DEVICE_ID,
         initial_mode=current_mode,
         on_mode_change=on_mode_change,
-        on_attendance_result=on_attendance_result,
+        on_attendance_result=None,
     )
-    tb_client.start()
 
     # 2. Khởi tạo Pipeline AI: Detector + Tracker + AntiSpoof + Embedder
     print("[AI] Đang nạp các mô hình ONNX...")
@@ -210,21 +272,23 @@ def main():
     print(f"  [OK] Face Detector : {APP_DETECTOR.upper()}")
 
     tracker = FaceTracker(
-        recognize_interval_seconds=1.0,
+        recognize_interval_seconds=RECOGNIZE_INTERVAL_SECONDS,
         iou_threshold=TRACK_IOU_THRESHOLD,
         max_missing_frames=TRACK_MAX_MISSING_FRAMES,
-        pad_smooth_window=5,
-        pad_spoof_min_ratio=0.6,
-        pad_interval_seconds=0.2,
+        pad_smooth_window=vision.PAD_SMOOTH_WINDOW,
+        pad_spoof_min_ratio=vision.PAD_SPOOF_MIN_RATIO,
+        pad_interval_seconds=PAD_INTERVAL_SECONDS,
         pad_min_votes=REQUIRED_CONSECUTIVE,
-        pad_stale_timeout=3.0,
+        pad_stale_timeout=vision.PAD_STALE_TIMEOUT_SECONDS,
     )
     print("  [OK] Face Tracker  : IOU Matching + LK Optical Flow Cadence")
 
-    fas_predictor = AntiSpoofPredictor(threshold_logit=FAS_LOGIT_THRESHOLD)
+    if not vision.PAD_ENABLED:
+        raise ValueError("Hardware điểm danh yêu cầu PAD_ENABLED=true")
+    fas_predictor = AntiSpoofPredictor()
     print("  [OK] Anti-Spoofing : MiniFASNet R7 (~1.7 MB)")
 
-    embedder = FaceEmbedder()
+    embedder = FaceEmbedder(intra_op_threads=vision.RECOGNITION_INTRA_OP_THREADS)
     print("  [OK] Face Embedder : ArcFace MobileFaceNet (~13 MB)")
 
     # 3. Mở Camera
@@ -234,8 +298,11 @@ def main():
         tb_client.stop()
         sys.exit(1)
 
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
+    if vision.CAMERA_BUFFER_SIZE > 0:
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, vision.CAMERA_BUFFER_SIZE)
+    if vision.CAMERA_FORCE_RESOLUTION:
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
     cap.set(cv2.CAP_PROP_FPS, FPS)
 
     # 4. Khởi tạo Live Streamer (RTSP -> MediaMTX)
@@ -277,28 +344,64 @@ def main():
     is_awake = not ULTRASONIC_ENABLED
     last_present_time = time.time() if not ULTRASONIC_ENABLED else 0.0
     attendance_latch = False
+    last_mode_generation = mode_generation
+    presence_generation = 0
+    last_submission = None
+    camera_failures = 0
     last_face_seen_time = 0.0
     last_active_track_id = None
     last_telemetry_time = 0.0
+    frame_id = 0
+    last_submission_embedding = None
+    previous_recognition_tracks = {}
 
-    print("\n[RUNNING] Hệ thống đang chạy. Nhấn Ctrl+C để dừng.\n")
-
+    recognition_worker = RecognitionWorker(embedder, queue_size=vision.RECOGNITION_QUEUE_SIZE)
+    identity_cache = IdentityCache(vision.RECOGNITION_CACHE_TTL_SECONDS,
+                                   max(vision.MATCH_THRESHOLD, vision.RECOGNITION_CACHE_THRESHOLD))
     try:
+        tb_client.start()
+        print("\n[RUNNING] Hệ thống đang chạy. Nhấn Ctrl+C để dừng.\n")
         while True:
+            if mode_generation != last_mode_generation:
+                attendance_latch = False
+                last_submission = None
+                last_mode_generation = mode_generation
             ret, frame = cap.read()
             if not ret:
+                camera_failures += 1
+                for track in previous_recognition_tracks.values():
+                    if getattr(track, 'recognition_eligible', False):
+                        track.verification_generation += 1
+                        track.invalidate_recognition()
+                        track.recognition_eligible = False
+                previous_recognition_tracks = {}
+                attendance_latch = False
+                last_submission = None
+                recognition_worker.retain(set())
+                recognition_worker.poll()
+                if camera_failures == 1:
+                    print('[CAMERA] Không đọc được hình; tạm dừng nhận diện.')
+                    tb_client.send_telemetry({'ai_state': 'CAMERA_ERROR', 'status': 'DEGRADED'})
+                if camera_failures >= 100:
+                    raise RuntimeError('Camera không trả hình sau 100 lần đọc; cần kiểm tra camera hoặc khởi động lại service.')
                 time.sleep(0.05)
                 continue
+            camera_failures = 0
 
+            frame_id += 1
             fps_counter += 1
             now_wall = time.time()
             now_mono = time.monotonic()
+            tft_due = tft_display.wants_frame()
+            render_output = SHOW_GUI or STREAM_ENABLED or tft_due
 
             # Heartbeat định kỳ 10 giây một lần gửi lên ThingsBoard
             if now_wall - last_hb_time >= 10.0:
                 current_fps = fps_counter / (now_wall - last_hb_time)
                 fps_counter = 0
                 last_hb_time = now_wall
+                if vision.SHOW_FPS:
+                    print(f"[FPS] {current_fps:.1f} (average over 10s)")
 
             # ── 4.1. Đánh giá Trạng thái Siêu âm (Wake-on-Presence) ───────────
             dist = ultrasonic.get_distance() if ULTRASONIC_ENABLED else None
@@ -315,12 +418,16 @@ def main():
                         print(f"[EDGE] 💤 Không có người trong {ULTRASONIC_SLEEP_DELAY}s (Khoảng cách: {dist}cm) -> AI CHUYỂN SANG NGỦ!")
                         is_awake = False
                         attendance_latch = False
+                        last_submission = None
+                        presence_generation += 1
                         last_active_track_id = None
 
             # Cơ chế Hybrid Reset: Khi đang thức và đã khóa chốt, nếu mất mặt cũ trong FACE_LOST_RESET_SECONDS
             if is_awake and attendance_latch:
                 if (now_wall - last_face_seen_time) >= FACE_LOST_RESET_SECONDS:
                     attendance_latch = False
+                    last_submission = None
+                    presence_generation += 1
                     last_active_track_id = None
                     print(f"[EDGE] 🔄 Reset chốt điểm danh (Không thấy mặt cũ trong {FACE_LOST_RESET_SECONDS}s) -> Sẵn sàng đón người tiếp theo!")
 
@@ -341,21 +448,26 @@ def main():
 
             # ── 5. Detection Cadence + Tracking Stage (Chỉ chạy khi THỨC) ─────
             tracked = []
+            recognition_eligible = {}
             if not is_awake:
+                for track in previous_recognition_tracks.values():
+                    if getattr(track, 'recognition_eligible', False):
+                        track.verification_generation += 1
+                        track.invalidate_recognition()
+                        track.recognition_eligible = False
+                previous_recognition_tracks = {}
                 # Trạng thái AI NGỦ: Không tốn CPU cho ONNX, chỉ hiển thị thông báo chờ
-                sleep_text = f"AI: SLEEP (CHO NGUOI <= {int(ULTRASONIC_TRIGGER_DISTANCE)}cm)"
-                if dist is not None:
-                    sleep_text += f" | d: {dist:.0f}cm"
-                cv2.putText(
-                    frame,
-                    sleep_text,
-                    (20, HEIGHT // 2),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (0, 255, 255),
-                    2,
-                    cv2.LINE_AA,
-                )
+                if render_output:
+                    cv2.putText(
+                        frame,
+                        "SLEEP",
+                        (20, HEIGHT // 2),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.65,
+                        (0, 255, 255),
+                        2,
+                        cv2.LINE_AA,
+                    )
             else:
                 # Trạng thái AI THỨC: Chạy SCRFD theo chu kỳ và optical flow ở giữa
                 detector_due = (
@@ -369,14 +481,7 @@ def main():
                     tracked = tracker.update([], frame=frame, detector_called=False)
                 else:
                     try:
-                        detections = detector.detect(frame)
-                        # Ưu tiên các khuôn mặt có diện tích lớn nhất (gần camera nhất)
-                        if MAX_FACES_PER_FRAME > 0 and len(detections) > MAX_FACES_PER_FRAME:
-                            detections.sort(
-                                key=lambda d: (d["bbox"][2] - d["bbox"][0]) * (d["bbox"][3] - d["bbox"][1]),
-                                reverse=True,
-                            )
-                            detections = detections[:MAX_FACES_PER_FRAME]
+                        detections = limit_faces(detector.detect(frame))
                     except Exception as e:
                         print(f"[Detector Error] {e}")
                         detections = []
@@ -384,12 +489,8 @@ def main():
                     tracked = tracker.update(detections, frame=frame, detector_called=True)
 
                 # Giới hạn số lượng track được xử lý
-                if MAX_FACES_PER_FRAME > 0 and len(tracked) > MAX_FACES_PER_FRAME:
-                    tracked.sort(
-                        key=lambda item: (item[1].bbox[2] - item[1].bbox[0]) * (item[1].bbox[3] - item[1].bbox[1]),
-                        reverse=True,
-                    )
-                    tracked = tracked[:MAX_FACES_PER_FRAME]
+                selected_ids = {id(d) for d in limit_faces([d for d, _ in tracked])}
+                tracked = [(d, t) for d, t in tracked if id(d) in selected_ids]
 
                 # Cập nhật thời điểm nhìn thấy mặt và kiểm tra đổi người (Track ID mới)
                 if len(tracked) > 0:
@@ -397,8 +498,40 @@ def main():
                     current_track_id = tracked[0][1].track_id
                     if attendance_latch and last_active_track_id is not None and current_track_id != last_active_track_id:
                         attendance_latch = False
+                        last_submission = None
+                        presence_generation += 1
                         print(f"[EDGE] 🔄 Phát hiện khuôn mặt mới (Track #{current_track_id} thay cho #{last_active_track_id}) -> Mở chốt điểm danh!")
                     last_active_track_id = current_track_id
+
+                update_track_pad(tracked, frame, fas_predictor, PAD_INTERVAL_SECONDS,
+                                 frame_id, detector_due, vision.PAD_DIAGNOSTIC_LOG,
+                                 crop_smoothing=vision.PAD_CROP_SMOOTHING)
+                # Match face_auth: loss of PAD/track eligibility invalidates the
+                # recognition session, without erasing the SPOOF vote window.
+                visible_tracks = {track.track_id: track for _, track in tracked}
+                all_tracks = {**previous_recognition_tracks, **visible_tracks}
+                for track_id, track in all_tracks.items():
+                    eligible = (track_id in visible_tracks and track.missing_frames == 0 and track.pad_ready and track.is_real
+                                and not track.is_spoof and not track.pad_invalid_reason)
+                    if eligible:
+                        track.recognition_eligible = True
+                    elif getattr(track, 'recognition_eligible', False):
+                        track.verification_generation += 1
+                        track.invalidate_recognition()
+                        track.stable_recognitions = 0
+                        track.recognition_eligible = False
+                previous_recognition_tracks = visible_tracks
+                inference_frame = frame
+                if render_output:
+                    frame = frame.copy()  # Never draw on model input.
+                if last_submission is not None and attendance_latch:
+                    same_session = any(track.track_id == last_submission[0]
+                                       and track.verification_generation == last_submission[5]
+                                       for _, track in tracked)
+                    if not same_session:
+                        attendance_latch = False
+                        last_submission = None
+                frame_mode = (current_mode, mode_generation, presence_generation)
 
                 # ── 6. Xử lý từng Track (Anti-Spoofing & Biometric Extraction) ───
                 for detection, track in tracked:
@@ -406,98 +539,181 @@ def main():
                     landmarks = track.landmarks
                     x1, y1, x2, y2 = [int(v) for v in bbox]
 
-                    # (A) Cập nhật Anti-Spoofing theo chu kỳ của track
-                    if track.needs_pad(interval_seconds=0.2):
-                        try:
-                            is_real, real_prob, _ = fas_predictor.predict(frame, bbox)
-                            track.update_pad(is_real, real_prob)
-                        except Exception as e:
-                            pass
-
                     # (B) Đánh giá trạng thái PAD đa frame
-                    if not track.pad_ready:
-                        color = (0, 255, 255)  # Vàng: Đang tích lũy votes
-                        status_label = f"#{track.track_id} CHECKING ({len(track._pad_window)}/{track.pad_min_votes})"
-                    elif track.is_spoof:
-                        color = (0, 0, 255)    # Đỏ: Giả mạo (ảnh/video)
-                        status_label = f"#{track.track_id} SPOOF ({track.last_pad_score or 0.0:.2f})"
-                    else:
+                    if track.pad_ready and track.is_spoof:
+                        if not getattr(track, 'spoof_reported', False):
+                            track.spoof_reported = tb_client.send_spoof_event(liveness_score(track.last_pad_score, track.last_pad_threshold), current_mode)
+                    elif track.pad_ready:
                         # Người thật (REAL)
-                        color = (0, 255, 0)    # Xanh lá: Hợp lệ
-                        status_label = f"#{track.track_id} REAL ({track.last_pad_score or 1.0:.2f})"
 
-                        # (C) Kiểm tra điều kiện gửi điểm danh (Chống Spam qua Latch Flag & Cooldown)
-                        last_sent = getattr(track, "last_scan_sent", 0.0)
-                        already_sent = getattr(track, "attendance_sent", False)
-
-                        # Chỉ gửi nếu chốt chưa khóa (attendance_latch == False)
-                        if not attendance_latch:
-                            if not already_sent or (now_wall - last_sent >= COOLDOWN_SEC):
+                        # (C) Camera owns tracks; ArcFace runs only on the worker.
+                        scope = (track.verification_generation, *frame_mode)
+                        if getattr(track, 'scan_scope', None) != scope:
+                            track.scan_scope = scope
+                            track.last_scan_sent = 0.0
+                            track.scan_event_id = uuid.uuid4().hex
+                            track.scan_captured_at = None
+                            track.last_recognition_time = None
+                            track.stable_recognitions = 0
+                            track.employee_id = None
+                        key = (track.track_id, *scope)
+                        if (track.track_id == last_active_track_id and not attendance_latch
+                                and track.missing_frames == 0 and track.last_pad_score is not None
+                                and not track.pad_invalid_reason):
+                            recognition_eligible[key] = track
+                            if (key not in recognition_worker.pending
+                                  and now_wall - track.last_scan_sent >= COOLDOWN_SEC
+                                  and track.needs_recognition(RECOGNIZE_INTERVAL_SECONDS, pad_enabled=True)):
+                                track.last_recognition_time = now_mono
                                 if landmarks is None or len(landmarks) != 5:
                                     last_detection_time = None
                                 else:
-                                    aligned_face = align_face(frame, landmarks)
-                                    if aligned_face is not None:
-                                        embedding = embedder.extract(aligned_face)
-                                        if embedding is not None:
-                                            req_id = tb_client.send_scan_rpc(
-                                                embedding,
-                                                float(track.last_pad_score or 1.0),
-                                                current_mode
-                                            )
-                                            if req_id > 0:
-                                                attendance_latch = True
-                                                track.attendance_sent = True
-                                                track.last_scan_sent = now_wall
-                                                status_banner = f"TRACK #{track.track_id}: ĐANG ĐỐI SOÁT RPC..."
-                                                status_banner_time = now_wall
-                                                print(f"[EDGE] Track #{track.track_id} -> Đã gửi Two-way RPC (Khóa chốt chống spam thành công)!")
-
-                        # Hiển thị trạng thái chốt trên nhãn bounding box
-                        if attendance_latch:
-                            status_label += " [DA GUI - CHO NGUOI MOI]"
-                        else:
-                            status_label += " [READY]"
+                                    try:
+                                        aligned_face = get_input_face(inference_frame, bbox, landmarks, embedder.input_size)
+                                        if aligned_face is None:
+                                            raise ValueError("Alignment failed")
+                                        captured_at = track.scan_captured_at or int(now_wall * 1000)
+                                        context = (track.scan_event_id, captured_at, liveness_score(track.last_pad_score, track.last_pad_threshold))
+                                        recognition_worker.submit(key, aligned_face, context)
+                                    except Exception:
+                                        track.stable_recognitions = 0
+                                        track.scan_event_id = uuid.uuid4().hex
+                                        track.scan_captured_at = None
 
                     # Vẽ Bounding Box & Nhãn Track lên khung hình
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                    cv2.putText(
-                        frame,
-                        status_label,
-                        (x1, max(18, y1 - 8)),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.52,
-                        color,
-                        2,
-                        cv2.LINE_AA
-                    )
+                    if render_output:
+                        status_label, color = face_status_label(track)
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                        cv2.putText(
+                            frame,
+                            status_label,
+                            (x1, max(18, y1 - 8)),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.52,
+                            color,
+                            2,
+                            cv2.LINE_AA
+                        )
+
+            # Discard jobs as soon as PAD/track/presence continuity is lost.
+            # Cancelled jobs still count towards queue capacity until consumed.
+            recognition_worker.retain(set(recognition_eligible))
+            for result in recognition_worker.poll():
+                track = recognition_eligible.get(result.key)
+                if (track is None or result.key[2:] != (current_mode, mode_generation, presence_generation)
+                        or attendance_latch or not is_awake):
+                    continue
+                if result.error:
+                    track.last_recognition_time = time.monotonic()
+                    track.recognition_error = True
+                    track.stable_recognitions = 0
+                    track.scan_event_id = uuid.uuid4().hex
+                    track.scan_captured_at = None
+                    track.recognition_status = f"ERROR {result.error}"
+                    status_banner = f"RECOGNITION ERROR: {result.error}"
+                    status_banner_time = now_wall
+                    print(f"[Recognition] track={track.track_id} ERROR {result.error}")
+                    continue
+                cached = identity_cache.lookup(result.key, result.embedding)
+                if cached is not None:
+                    track.update_display_identity(cached, vision.RECOGNITION_LABEL_CONFIRMATIONS,
+                                                  vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
+                    track.recognition_status = "CACHE (DISPLAY ONLY)"
+                event_id, captured_at, pad_score = result.context
+                expected_employee = getattr(track, 'employee_id', None)
+                commit = (getattr(track, 'stable_recognitions', 0) >= vision.ATTENDANCE_STABLE_COUNT - 1
+                          and bool(expected_employee))
+                event_kind = 'CONFIRMED_SCAN' if commit else 'VERIFY_ONLY'
+                submission = (track.track_id, result.key[2], event_id, result.key[3], result.key[4], result.key[1], event_kind)
+                track.scan_captured_at = captured_at
+                req_id = tb_client.send_scan_rpc(
+                    result.embedding, pad_score, result.key[2],
+                    on_result=lambda response, token=submission: result_queue.put((token, response)),
+                    event_id=event_id, captured_at=captured_at,
+                    event_kind=event_kind, recognition_id=uuid.uuid4().hex,
+                    expected_employee_id=expected_employee if commit else None,
+                )
+                if req_id > 0:
+                    last_submission = submission
+                    last_submission_embedding = result.embedding.copy()
+                    attendance_latch = True
+                    track.attendance_sent = commit
+                    track.last_scan_sent = now_wall
+                    print(f"[Recognition] track={track.track_id} embedding={result.latency:.2f}s -> RPC {req_id}")
+                elif not tb_client.connected:
+                    status_banner = "TB MQTT DISCONNECTED"
+                    status_banner_time = now_wall
+
+            live_keys = {(track.track_id, track.verification_generation, current_mode, mode_generation, presence_generation)
+                         for _, track in tracked if track.missing_frames == 0 and track.is_real and not track.pad_invalid_reason}
+            identity_cache.retain(live_keys)
+            while not result_queue.empty():
+                submission, response = result_queue.get()
+                if submission != last_submission or submission[1] != current_mode or submission[0] != last_active_track_id or submission[3] != mode_generation or submission[4] != presence_generation or not is_awake or now_wall - last_face_seen_time > FACE_LOST_RESET_SECONDS:
+                    continue
+                response_track = next((track for _, track in tracked
+                                       if track.track_id == submission[0]
+                                       and track.verification_generation == submission[5]
+                                       and track.missing_frames == 0 and track.is_real
+                                       and not track.pad_invalid_reason), None)
+                if response_track is None:
+                    continue
+                if response.get('matched') and last_submission_embedding is not None:
+                    employee = response.get('employee') or {}
+                    identity = (employee.get('id') or employee.get('employee_code'),
+                                employee.get('full_name') or employee.get('employee_code') or 'Nhân viên',
+                                float(response.get('similarity', 0)))
+                    key = (submission[0], submission[5], submission[1], submission[3], submission[4])
+                    identity_cache.confirm(key, last_submission_embedding, identity)
+                    response_track.update_result(*identity)
+                    response_track.update_display_identity(identity, vision.RECOGNITION_LABEL_CONFIRMATIONS,
+                                                           vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
+                    response_track.recognition_status = 'CLOUD'
+                elif not response.get('matched'):
+                    key = (submission[0], submission[5], submission[1], submission[3], submission[4])
+                    identity_cache.entries.pop(key, None)
+                    response_track.update_result(None, "UNKNOWN", float(response.get("similarity", 0)))
+                    response_track.update_display_identity((None, 'UNKNOWN', 0.0),
+                                                           vision.RECOGNITION_LABEL_CONFIRMATIONS,
+                                                           vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
+                if response.get('verification_only') and response.get('matched') and response.get('success'):
+                    count = max(0, int(response.get('confirmation_count', 0)))
+                    response_track.stable_recognitions = count
+                    attendance_latch = False
+                    last_submission = None
+                    response_track.last_scan_sent = 0.0
+                    continue
+                on_attendance_result(response)
+                if not (response.get('success') and response.get('matched')):
+                    attendance_latch = False
+                    if not response.get('uncertain'):
+                        last_submission = None
 
             # ── 7. Vẽ Thanh Thông Tin & Banners Lên Video ────────────────────
-            # Top Banner: Trạng thái thiết bị, Chế độ Check In/Out, FPS, Trạng thái AI/Siêu âm
+            # Compact status; telemetry still carries FPS/distance for diagnostics.
             if not is_awake:
                 banner_bg = (50, 50, 50)  # Xám sẫm khi AI đang ngủ
-                dist_str = f"{dist:.0f}cm" if dist is not None else ">100cm"
-                banner_text = f"DEVICE: {DEVICE_ID} | AI: SLEEP (d: {dist_str}) | FPS: {current_fps:.1f}"
+                banner_text = f"{current_mode} | SLEEP"
             else:
                 banner_bg = (180, 100, 0) if current_mode == "CHECK_IN" else (0, 100, 200)
-                dist_str = f"{dist:.0f}cm" if dist is not None else "?cm"
-                latch_str = "LATCH: LOCKED" if attendance_latch else "LATCH: READY"
-                banner_text = f"DEVICE: {DEVICE_ID} | {current_mode} | FPS: {current_fps:.1f} | d: {dist_str} | {latch_str}"
+                latch_str = "WAIT NEXT PERSON" if attendance_latch else "READY"
+                banner_text = f"{current_mode} | {latch_str}"
 
-            cv2.rectangle(frame, (0, 0), (WIDTH, 36), banner_bg, -1)
-            cv2.putText(
-                frame,
-                banner_text,
-                (10, 24),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.55,
-                (255, 255, 255),
-                2,
-                cv2.LINE_AA
-            )
+            if render_output:
+                cv2.rectangle(frame, (0, 0), (WIDTH, 36), banner_bg, -1)
+                cv2.putText(
+                    frame,
+                    banner_text,
+                    (10, 24),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55,
+                    (255, 255, 255),
+                    2,
+                    cv2.LINE_AA
+                )
 
             # Bottom Banner: Thông báo điểm danh vừa gửi thành công
-            if status_banner and (now_wall - status_banner_time < 3.0):
+            if render_output and status_banner and (now_wall - status_banner_time < 3.0):
                 cv2.rectangle(frame, (0, HEIGHT - 32), (WIDTH, HEIGHT), (0, 180, 0), -1)
                 cv2.putText(
                     frame,
@@ -510,11 +726,17 @@ def main():
                     cv2.LINE_AA
                 )
 
+            if capture is not None:
+                lbl_tag = f" [{capture.label}]" if capture.label else ""
+                capture_text = f"C: Save sample{lbl_tag} | Captured: {capture.saved_count}"
+                cv2.putText(frame, capture_text, (10, HEIGHT - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2, cv2.LINE_AA)
+
             # ── 8. Gửi Frame Vào Luồng RTSP Streamer ─────────────────────────
             streamer.write_frame(frame)
 
             # ── 9. Hiển thị lên Màn hình phần cứng TFT ST7789V ──────────────
-            if tft_display.is_active():
+            if tft_due:
                 tft_display.show_frame(frame)
 
             # ── 10. Hiển thị GUI nếu được bật ───────────────────────────────
@@ -525,14 +747,25 @@ def main():
                     if key == ord('q'):
                         break
                     elif key == ord('m'):
-                        current_mode = "CHECK_OUT" if current_mode == "CHECK_IN" else "CHECK_IN"
+                        tb_client.set_mode("CHECK_OUT" if current_mode == "CHECK_IN" else "CHECK_IN")
                         print(f"[KEYBOARD] Đã chuyển mode: {current_mode}")
+                    elif (key == ord('c') or key == ord('C')) and capture is not None:
+                        try:
+                            paths = capture.save(frame, tracked, fas_predictor)
+                            if paths:
+                                print(f"[Capture] +{len(paths)} mặt mới -> Tổng số ảnh đã chụp: {capture.saved_count} ({capture.directory})")
+                            else:
+                                print("[Capture] Không phát hiện khuôn mặt để chụp!")
+                        except Exception as exc:
+                            print(f"[Capture Error] {exc}")
                 except Exception:
                     pass
 
     except KeyboardInterrupt:
         print("\n[STOP] Đang dừng Pi Edge Client...")
     finally:
+        stopped = recognition_worker.close()
+        print(f"[Recognition worker] stopped={stopped}")
         cap.release()
         if SHOW_GUI:
             try:
@@ -540,7 +773,8 @@ def main():
             except Exception:
                 pass
         ultrasonic.stop()
-        tft_display.cleanup()
+        if tft_display.cleanup() is False:
+            print("[TFT] Worker còn chờ SPI; sẽ tự đóng tài nguyên khi driver trả về.")
         streamer.stop()
         tb_client.stop()
         print("[EXIT] Pi Edge Client đã tắt an toàn.")

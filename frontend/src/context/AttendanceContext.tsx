@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { useAttendance } from '../hooks/useAttendance';
+import { useAttendance } from '@/features/attendances';
 import { AttendanceRecord } from '../types';
 
 export interface AttendanceContextType {

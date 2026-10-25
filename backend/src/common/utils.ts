@@ -1,3 +1,4 @@
+import { AppError } from './AppError.js';
 import { prisma } from '../config/database.js';
 
 const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
@@ -12,6 +13,14 @@ const vnDateISOFormatter = new Intl.DateTimeFormat('en-CA', {
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
+});
+
+const vnTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: VN_TIMEZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
 });
 
 /**
@@ -29,6 +38,20 @@ export function formatVNDateISO(dateInput?: Date | string | number | null): stri
     return vnDateISOFormatter.format(d);
   } catch {
     return vnDateISOFormatter.format(new Date());
+  }
+}
+
+/**
+ * Returns time formatted as HH:mm:ss in Vietnam local timezone (+07:00).
+ */
+export function formatVNTime(dateInput?: Date | string | number | null): string {
+  if (!dateInput) return '--:--:--';
+  try {
+    const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
+    if (isNaN(d.getTime())) return '--:--:--';
+    return vnTimeFormatter.format(d);
+  } catch {
+    return '--:--:--';
   }
 }
 
@@ -120,6 +143,7 @@ export interface SalaryCalculationInput {
  * Pure Function để tính lương thực lĩnh (net_salary) dùng chung thống nhất toàn hệ thống.
  */
 export function calculateNetSalary(params: SalaryCalculationInput): number {
+  if (!Object.values(params).every(v => Number.isFinite(v) && v >= 0)) throw AppError.badRequest('Dữ liệu tính lương phải hữu hạn và không âm');
   const {
     hourly_rate,
     total_working_hours,
@@ -140,7 +164,9 @@ export function calculateNetSalary(params: SalaryCalculationInput): number {
 
   const baseSalaryTotal = hourly_rate * total_working_hours;
 
-  return Math.max(0, Math.round(baseSalaryTotal + overtimePay - latePenaltyDeduction + allowance));
+  const net = Math.max(0, Math.round(baseSalaryTotal + overtimePay - latePenaltyDeduction + allowance));
+  if (!Number.isFinite(net) || net >= 1e13) throw AppError.badRequest('Số tiền vượt giới hạn lưu trữ phiếu lương');
+  return net;
 }
 
 /**

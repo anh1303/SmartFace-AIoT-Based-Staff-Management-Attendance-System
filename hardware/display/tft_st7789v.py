@@ -4,6 +4,8 @@ Sử dụng driver SPI phần cứng và nén RGB565 trực tiếp để tối �
 """
 
 from time import monotonic
+import math
+import threading
 import cv2
 import numpy as np
 from PIL import Image
@@ -56,6 +58,8 @@ def frame_to_tft_image(frame: np.ndarray, size: tuple) -> Image.Image:
         raise RuntimeError(f"Định dạng frame không hợp lệ: {resized.shape}")
 
     img = Image.fromarray(rgb)
+    if img.size == size:
+        return img
     canvas = Image.new("RGB", size, "black")
     canvas.paste(img, ((width - new_w) // 2, (height - new_h) // 2))
     return canvas
@@ -75,7 +79,7 @@ class TFTDisplay:
         reset_pin: int = 24,
         bgr: bool = False,
         invert: bool = False,
-        max_fps: float = 15.0,
+        max_fps: float = 10.0,
     ):
         self.enabled = enabled
         self.width = width
@@ -86,12 +90,21 @@ class TFTDisplay:
         self.reset_pin = reset_pin
         self.bgr = bgr
         self.invert = invert
-        self.max_fps = max(float(max_fps), 1.0)
+        if not math.isfinite(float(max_fps)):
+            raise ValueError("TFT max_fps phải là số hữu hạn")
+        self.max_fps = min(max(float(max_fps), 1.0), 10.0)
         self.min_interval = 1.0 / self.max_fps
 
         self.screen = None
         self.serial = None
         self.last_display_time = 0.0
+        self._last_submit_time = -float("inf")
+        self._condition = threading.Condition()
+        self._stop = threading.Event()
+        self._pending_frame = None
+        self._worker = None
+        self._cleanup_lock = threading.Lock()
+        self._cleaned = False
 
         if not self.enabled:
             return
@@ -128,6 +141,7 @@ class TFTDisplay:
                 rotate=self.rotate,
                 backlight=lambda enabled: None,
             )
+            self._start_worker()
             print(f"[TFT] [OK] Đã kết nối màn hình TFT ST7789V ({self.screen.size}, SPI={self.spi_mhz} MHz)")
         except ImportError as e:
             print(f"[TFT] [INFO] Không tìm thấy thư viện SPI/Luma ({e}). Tự động tắt màn hình TFT.")
@@ -138,30 +152,82 @@ class TFTDisplay:
 
     def is_active(self) -> bool:
         """Kiểm tra màn hình TFT có đang sẵn sàng hoạt động hay không."""
-        return self.enabled and self.screen is not None
+        return self.enabled and self.screen is not None and not self._stop.is_set()
+
+    def _start_worker(self):
+        worker = threading.Thread(target=self._run, name="SmartFace-TFT", daemon=True)
+        worker.start()
+        self._worker = worker
+
+    def wants_frame(self):
+        """Let the camera skip TFT-only overlays on frames we would discard."""
+        return self.is_active() and monotonic() - self._last_submit_time >= self.min_interval
 
     def show_frame(self, frame: np.ndarray):
-        """Gửi frame ảnh (OpenCV BGR) đã vẽ bounding box/nhãn lên màn hình TFT."""
+        """Offer a private snapshot at most max_fps times/s; never wait for SPI."""
         if not self.is_active():
-            return
+            return False
         now = monotonic()
-        if now - self.last_display_time >= self.min_interval:
-            try:
-                tft_img = frame_to_tft_image(frame, self.screen.size)
-                self.screen.display(tft_img)
-                self.last_display_time = now
-            except Exception:
-                pass
+        with self._condition:
+            if self._stop.is_set() or now - self._last_submit_time < self.min_interval:
+                return False
+            # Replace, never append: one in-flight frame and at most one pending.
+            self._pending_frame = frame.copy()
+            self._last_submit_time = now
+            self._condition.notify()
+        return True
 
-    def cleanup(self):
-        """Dọn dẹp tài nguyên và tắt SPI khi kết thúc."""
-        if self.screen is not None:
+    def _run(self):
+        try:
+            while not self._stop.is_set():
+                with self._condition:
+                    while not self._stop.is_set():
+                        if self._pending_frame is None:
+                            self._condition.wait()
+                            continue
+                        delay = self.last_display_time + self.min_interval - monotonic()
+                        if delay > 0:
+                            self._condition.wait(timeout=delay)
+                            continue
+                        frame = self._pending_frame
+                        self._pending_frame = None
+                        self.last_display_time = monotonic()
+                        break
+                    if self._stop.is_set():
+                        break
+                # Resize, color conversion and SPI belong exclusively to this worker.
+                image = frame_to_tft_image(frame, self.screen.size)
+                if not self._stop.is_set():
+                    self.screen.display(image)
+        except Exception as exc:
+            self.enabled = False
+            self._stop.set()
+            print(f"[TFT] Tắt hiển thị sau lỗi: {exc}")
+        finally:
+            with self._condition:
+                self._pending_frame = None
+            self._release_resources()
+
+    def cleanup(self, timeout=1.0):
+        """Bounded shutdown; never close SPI concurrently with an in-flight write."""
+        with self._condition:
+            self._stop.set()
+            self._pending_frame = None
+            self._condition.notify_all()
+        if self._worker is None:
+            self._release_resources()
+            return True
+        self._worker.join(timeout=timeout)
+        return not self._worker.is_alive()
+
+    def _release_resources(self):
+        with self._cleanup_lock:
+            if self._cleaned:
+                return
+            self._cleaned = True
+            resource = self.screen if self.screen is not None else self.serial
             try:
-                self.screen.cleanup()
-            except Exception:
-                pass
-        elif self.serial is not None:
-            try:
-                self.serial.cleanup()
+                if resource is not None:
+                    resource.cleanup()
             except Exception:
                 pass

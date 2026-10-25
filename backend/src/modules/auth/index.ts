@@ -1,4 +1,6 @@
-export { authRouter } from './auth.routes.js';
-export * from './auth.service.js';
-export * from './auth.repository.js';
-export * from './auth.dto.js';
+/**
+ * Auth Module Public API (Facade)
+ */
+export * from './auth.service.js'
+export * from './auth.dto.js'
+export { authRouter } from './auth.routes.js'

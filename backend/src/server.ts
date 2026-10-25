@@ -6,8 +6,8 @@ import { env } from './config/env.js'
 import { prisma } from './config/database.js'
 import { connectMqtt, disconnectMqtt } from './config/mqtt.js'
 import { socketAuthMiddleware } from './sockets/socket.auth.js'
-import { initializeAttendanceGateway } from './sockets/attendance.gateway.js'
-import { initializeDeviceGateway } from './sockets/device.gateway.js'
+import { initializeAttendanceGateway } from './modules/attendance/attendance.gateway.js'
+import { initializeDeviceGateway } from './modules/devices/device.gateway.js'
 import { registerDeviceMqttHandlers } from './modules/devices/device.mqtt.handler.js'
 import { startAttendanceCron, stopAttendanceCron } from './modules/attendance/attendance.cron.js'
 import { logger } from './common/logger.js'
@@ -19,6 +19,7 @@ const httpServer = createServer(app)
 const io = new Server(httpServer, {
   cors: {
     origin: env.CORS_ORIGIN.split(',').map((x) => x.trim()),
+    credentials: true,
   },
 })
 
@@ -101,4 +102,3 @@ async function gracefulShutdown(signal: string) {
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => gracefulShutdown(signal))
 }
-

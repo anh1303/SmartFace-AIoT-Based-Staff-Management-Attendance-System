@@ -4,6 +4,11 @@ Phát luồng H.264 qua RTSP tới MediaMTX Server.
 """
 
 import subprocess
+import os
+import select
+import threading
+import queue
+import time
 import cv2
 import numpy as np
 
@@ -19,10 +24,15 @@ class RTSPStreamer:
         self.enabled = enabled
         self.process = None
 
+        self._frames = queue.Queue(maxsize=1)
+        self._stop = threading.Event()
+        self._worker = None
         if self.enabled:
-            self.start_ffmpeg()
+            self._worker = threading.Thread(target=self._run, daemon=True)
+            self._worker.start()
 
     def start_ffmpeg(self):
+        self._close_process()
         command = [
             "ffmpeg",
             "-y",
@@ -43,8 +53,11 @@ class RTSPStreamer:
         ]
         try:
             self.process = subprocess.Popen(
-                command, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL
+                command, stdin=subprocess.PIPE, stderr=subprocess.PIPE
             )
+            os.set_blocking(self.process.stdin.fileno(), False)
+            if self.process.stderr:
+                os.set_blocking(self.process.stderr.fileno(), False)
             print(f"[STREAM] Đang đẩy luồng video RTSP tới MediaMTX: {self.rtsp_url}")
         except FileNotFoundError:
             print("[STREAM WARN] Không tìm thấy lệnh 'ffmpeg'! Live stream tạm tắt.")
@@ -54,20 +67,87 @@ class RTSPStreamer:
             self.process = None
 
     def write_frame(self, frame: np.ndarray):
-        if not self.enabled or self.process is None:
+        if not self.enabled or self._stop.is_set():
             return
+        if frame.shape[1] != self.width or frame.shape[0] != self.height:
+            frame = cv2.resize(frame, (self.width, self.height))
+        snapshot = frame.copy()
         try:
-            if frame.shape[1] != self.width or frame.shape[0] != self.height:
-                frame = cv2.resize(frame, (self.width, self.height))
-            self.process.stdin.write(frame.tobytes())
-        except (BrokenPipeError, IOError):
-            print("[STREAM] Mất kết nối MediaMTX RTSP, đang khởi động lại ống dẫn FFmpeg...")
-            self.start_ffmpeg()
+            self._frames.put_nowait(snapshot)
+        except queue.Full:
+            try: self._frames.get_nowait()
+            except queue.Empty: pass
+            try: self._frames.put_nowait(snapshot)
+            except queue.Full: pass
+
+    def _run(self):
+        while not self._stop.is_set():
+            if self.process is None or self.process.poll() is not None:
+                self.start_ffmpeg()
+                if self.process is None:
+                    self._stop.wait(3)
+                    continue
+            try:
+                frame = self._frames.get(timeout=0.2)
+                data = memoryview(frame.tobytes())
+                deadline = time.monotonic() + 2
+                fd = self.process.stdin.fileno()
+                while data and not self._stop.is_set():
+                    if time.monotonic() > deadline:
+                        raise TimeoutError('FFmpeg stdin bị nghẽn')
+                    if select.select([], [fd], [], 0.1)[1]:
+                        try: data = data[os.write(fd, data):]
+                        except BlockingIOError: pass
+            except queue.Empty:
+                continue
+            except (OSError, ValueError, TimeoutError) as exc:
+                print(f'[STREAM] {exc}; khởi động lại sau 3 giây.')
+                self._close_process()
+                self._stop.wait(3)
+        self._close_process()
+
+    def _close_process(self):
+        process, self.process = self.process, None
+        if process:
+            stderr_msg = ""
+            if getattr(process, 'stderr', None):
+                try:
+                    raw = process.stderr.read()
+                    if raw:
+                        lines = [l.strip() for l in raw.decode('utf-8', errors='ignore').splitlines() if l.strip()]
+                        ignored_prefixes = ("conversion failed", "video:", "frame=", "[libx264")
+                        error_lines = [
+                            l for l in lines
+                            if any(k in l.lower() for k in ("error", "failed", "refused", "timeout", "no route", "cannot", "denied", "unreachable"))
+                            and not l.lower().startswith(ignored_prefixes)
+                        ]
+                        if error_lines:
+                            stderr_msg = error_lines[-1]
+                        else:
+                            fallback = [l for l in lines if not l.lower().startswith(ignored_prefixes)]
+                            stderr_msg = fallback[-1] if fallback else (lines[-1] if lines else "")
+                except Exception:
+                    pass
+                try:
+                    process.stderr.close()
+                except Exception:
+                    pass
+            try:
+                process.terminate()
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=1)
+            finally:
+                if getattr(process, 'stdin', None):
+                    try:
+                        process.stdin.close()
+                    except Exception:
+                        pass
+            if stderr_msg:
+                print(f"[STREAM ERROR] Chi tiết FFmpeg: {stderr_msg}")
 
     def stop(self):
-        if self.process:
-            try:
-                self.process.terminate()
-            except Exception:
-                pass
-            self.process = None
+        self._stop.set()
+        if self._worker:
+            self._worker.join(timeout=4)

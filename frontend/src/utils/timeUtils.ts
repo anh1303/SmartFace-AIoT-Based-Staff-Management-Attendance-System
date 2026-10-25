@@ -1,14 +1,9 @@
-export const parseTimeToSeconds = (timeStr?: string): number | null => {
-  if (!timeStr || timeStr === '--:--:--' || timeStr === '--') return null;
-  if (timeStr.includes('T')) {
-    const d = new Date(timeStr);
-    return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-  }
-  const parts = timeStr.split(':').map(Number);
-  if (parts.length >= 2) {
-    return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
-  }
-  return null;
+/** Draft input rounding. Backend remains authoritative for paid time. */
+export const roundPayableHours = (seconds: number): number => {
+  const duration = Math.max(0, seconds);
+  const whole = Math.floor(duration / 3600);
+  const remainder = duration - whole * 3600;
+  return whole + (remainder >= 2700 ? 1 : remainder >= 1800 ? 0.5 : 0);
 };
 
 export const formatSecondsToHHMMSS = (totalSec: number): string => {
@@ -19,9 +14,36 @@ export const formatSecondsToHHMMSS = (totalSec: number): string => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
+export const parseTimeToSeconds = (timeStr?: string): number | null => {
+  if (!timeStr) return null;
+  const parts = timeStr.trim().split(':');
+  if (parts.length < 2) return null;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const s = parts.length > 2 ? parseInt(parts[2], 10) : 0;
+  if (isNaN(h) || isNaN(m)) return null;
+  return h * 3600 + m * 60 + (isNaN(s) ? 0 : s);
+};
+
+/**
+ * Quy tắc làm tròn thời gian (áp dụng cho Tăng ca và Đi trễ / Về sớm):
+ * - Từ 0 đến 29 phút: quy về phần giờ + 0 giờ (0 phút)
+ * - Từ 30 đến 59 phút: quy về phần giờ + 0.5 giờ (30 phút = 1800s)
+ */
+export const roundToHalfHour = (totalSec: number): number => {
+  if (totalSec <= 0) return 0;
+  const totalMinutes = Math.floor(totalSec / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours + (minutes >= 30 ? 0.5 : 0);
+};
+
 export const roundTo30Minutes = (totalSec: number): number => {
   if (totalSec <= 0) return 0;
-  return Math.round(totalSec / 1800) * 1800;
+  const totalMinutes = Math.floor(totalSec / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours * 3600 + (minutes >= 30 ? 1800 : 0);
 };
 
 export const calculateRawLateEarlySec = (
@@ -68,8 +90,23 @@ export const calculateRawInitialOTSec = (
   return rawOT > 0 ? rawOT : 0;
 };
 
+/**
+ * Tính số giờ làm việc chuẩn trong ngày = thời gian kết thúc ca - thời gian bắt đầu ca
+ * (Ví dụ ca hành chính: 17:30 - 08:30 = 9.0 giờ)
+ */
+export const calculateShiftWorkingHours = (
+  shift: { start_time?: string; end_time?: string }
+): number => {
+  const startSec = parseTimeToSeconds(shift.start_time || '08:30');
+  const endSec = parseTimeToSeconds(shift.end_time || '17:30');
+  if (startSec === null || endSec === null) return 9;
+  let diffSec = endSec - startSec;
+  if (diffSec < 0) diffSec += 24 * 3600;
+  return Math.round((diffSec / 3600) * 100) / 100;
+};
 export const getStatusBadge = (status: string) => {
   switch (status) {
+    case 'PRESENT':
     case 'ON_TIME':
       return { label: 'Đúng giờ', color: 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' };
     case 'LATE':
@@ -80,6 +117,9 @@ export const getStatusBadge = (status: string) => {
       return { label: 'Trễ & Sớm', color: 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' };
     case 'ABSENT':
       return { label: 'Vắng mặt', color: 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' };
+    case 'OFF': return { label: 'Ngày OFF', color: 'text-slate-500' };
+    case 'SCHEDULED': return { label: 'Chưa đến ca', color: 'text-slate-500' };
+    case 'INCOMPLETE': return { label: 'Thiếu cặp IN/OUT', color: 'text-amber-600' };
     case 'NO_SHIFT':
       return { label: 'Không có ca', color: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' };
     default:

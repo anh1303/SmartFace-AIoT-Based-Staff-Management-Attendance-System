@@ -8,7 +8,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { PageHeaderBanner } from '../../../components/common';
-import { formatDateToYYYYMMDD } from '../utils/scheduleUtils';
+import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
 
 export interface ScheduleHeaderProps {
   currentMonday: Date;

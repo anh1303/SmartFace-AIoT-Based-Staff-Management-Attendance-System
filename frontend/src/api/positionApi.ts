@@ -3,17 +3,9 @@ import { logger } from '../utils/logger';
 
 const positionLogger = logger.child('PositionApi');
 
-export interface PositionItem {
-  id: number;
-  position_code?: string;
-  department_code: string;
-  name: string;
-  employee_count: number;
-  created_at?: string;
-  level?: 'MANAGER' | 'EMPLOYEE';
-  department_id?: number;
-  department_name?: string;
-}
+import { PositionItem } from '../types';
+
+export type { PositionItem };
 
 export async function fetchPositionsApi(): Promise<PositionItem[]> {
   try {

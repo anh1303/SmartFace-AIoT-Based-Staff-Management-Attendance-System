@@ -46,13 +46,16 @@ export const Modal: React.FC<ModalProps> = ({
   const modalNode = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
         className={`w-full ${maxWidthClass} bg-white dark:bg-[#13162b] text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-[#21264b] rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] transition-colors`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 dark:border-[#21264b] bg-slate-50/50 dark:bg-[#0f1224]/50 gap-4">
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-heading truncate" title={title}>
+            <h3 id="modal-title" className="text-lg font-bold text-slate-900 dark:text-white font-heading truncate" title={title}>
               {title}
             </h3>
             {subtitle && (
@@ -64,6 +67,7 @@ export const Modal: React.FC<ModalProps> = ({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Đóng hộp thoại"
             className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#181c38] transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />

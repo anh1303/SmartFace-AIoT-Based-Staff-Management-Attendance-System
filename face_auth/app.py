@@ -32,6 +32,7 @@ from recognition.worker import RecognitionWorker
 from alignment.aligner import get_input_face
 from database.vector_db import VectorDB, decide_identity
 from tracking.tracker import FaceTracker
+from vision_pipeline import _pad_face_skip_reason, update_track_pad, limit_faces
 
 # ── Chọn detector theo APP_DETECTOR trong config / .env ────────────────────
 if config.APP_DETECTOR == "scrfd":
@@ -86,6 +87,11 @@ def draw_track(
         - Unknown (đỏ đậm)   : không khớp ai trong DB.
     """
     x1, y1, x2, y2 = bbox
+    # Keep operational waits/errors visible; hide recognition backend telemetry.
+    recognition_status = " | ".join(
+        part.strip() for part in recognition_status.split("|")
+        if part.strip() and part.strip().split()[0].upper() not in ("CLOUD", "CACHE")
+    )
 
     if is_spoof:
         color = COLOR_SPOOF
@@ -124,10 +130,9 @@ def draw_track(
     if stable_label and not (is_spoof or is_pad_pending or pad_invalid_reason or recognition_error):
         if not is_pending and name != "UNKNOWN":
             label = f"[ID] {name}"
-            detail = f"score={score:.2f} | "
             if is_reverifying:
-                detail += "RECHECK | "
-        detail += recognition_status
+                detail = "RECHECK"
+        detail = " | ".join(part for part in (detail, recognition_status) if part)
         if is_pending and recognition_status.startswith(("WAIT", "QUEUE")):
             color = COLOR_REVERIFY
     elif recognition_status and not (is_spoof or is_pad_pending or pad_invalid_reason):
@@ -155,6 +160,39 @@ def draw_track(
                     font, 0.45, color, 1, cv2.LINE_AA)
 
 
+def draw_pad_margin(frame, bbox, track, threshold):
+    """Display the latest raw PAD margin separately from the temporal verdict."""
+    if track.last_pad_threshold is not None:
+        threshold = track.last_pad_threshold
+    score = track.last_pad_score
+    stale = (
+        track.last_pad_time is not None
+        and config.PAD_STALE_TIMEOUT_SECONDS > 0
+        and time.monotonic() - track.last_pad_time > config.PAD_STALE_TIMEOUT_SECONDS
+    )
+    if track.pad_invalid_reason or score is None or stale or not math.isfinite(score):
+        reason = "INVALID" if track.pad_invalid_reason else "STALE" if stale else "WAIT"
+        lines = [f"PAD d: -- ({reason})", f"t={threshold:+.3f}   d-t: --"]
+        color = COLOR_PENDING
+    else:
+        gap = score - threshold
+        raw = "REAL" if gap >= 0 else "SPOOF"
+        lines = [f"d={score:+.3f}   t={threshold:+.3f}",
+                 f"d-t={gap:+.3f}   raw {raw}"]
+        color = (110, 235, 150) if gap >= 0 else (110, 130, 255)
+
+    font, scale = cv2.FONT_HERSHEY_SIMPLEX, 0.50
+    width = max(cv2.getTextSize(line, font, scale, 1)[0][0] for line in lines) + 12
+    height = 48
+    x = max(0, min(int(bbox[0]), frame.shape[1] - width))
+    y = max(0, min(int(bbox[3]) + 28, frame.shape[0] - height))
+    cv2.rectangle(frame, (x, y), (min(x + width, frame.shape[1] - 1), y + height - 1),
+                  (25, 25, 25), cv2.FILLED)
+    for index, line in enumerate(lines):
+        cv2.putText(frame, line, (x + 5, y + 18 + index * 22), font, scale,
+                    (235, 235, 235) if index == 0 else color, 1, cv2.LINE_AA)
+
+
 def draw_fps(frame, fps: float):
     """Vẽ FPS ở góc trên-trái của frame."""
     label = f"FPS: {fps:.1f}"
@@ -164,7 +202,7 @@ def draw_fps(frame, fps: float):
 
 def draw_pad_badge(frame, enabled: bool):
     """Vẽ badge nhỏ cho biết module PAD đang bật hay tắt."""
-    text  = "PAD: ON" if enabled else "PAD: OFF"
+    text  = "PAD: ON | d=z_real-z_fake" if enabled else "PAD: OFF"
     color = (0, 200, 80) if enabled else (100, 100, 100)
     cv2.putText(frame, text, (10, 56),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
@@ -280,9 +318,10 @@ def orchestrate_track_step(
 def collect_recognition_results(worker, tracked, pad_enabled_rt):
     """Only the camera thread mutates tracks; late results need valid continuity."""
     valid = {}
-    for _, track in tracked:
+    visible = {track.track_id: track for _, track in tracked}
+    for track_id, track in {**worker.visible_tracks, **visible}.items():
         key = (track.track_id, track.verification_generation)
-        eligible = track.missing_frames == 0 and (
+        eligible = track_id in visible and track.missing_frames == 0 and (
             not pad_enabled_rt or (track.is_real and not track.pad_invalid_reason)
         )
         if eligible:
@@ -295,6 +334,7 @@ def collect_recognition_results(worker, tracked, pad_enabled_rt):
             track.invalidate_recognition()
             track.recognition_status = ""
             track.recognition_eligible = False
+    worker.visible_tracks = visible
     worker.retain(set(valid))
     for result in worker.poll():
         track = valid.get(result.key)
@@ -313,6 +353,12 @@ def collect_recognition_results(worker, tracked, pad_enabled_rt):
             )
             track.recognition_status = f"{result.source} {result.latency:.1f}s"
         print(f"[Recognition] track_id={track.track_id} {track.recognition_status}")
+
+
+def attendance_confirmation_ready(track):
+    """Readiness only; the demo never writes attendance directly."""
+    return bool(track.employee_id is not None and not track.recognition_error
+                and track.stable_recognitions >= config.ATTENDANCE_STABLE_COUNT)
 
 
 def submit_recognition_step(worker, track, detection, frame, embedder, pad_enabled_rt):
@@ -344,149 +390,6 @@ def submit_recognition_step(worker, track, detection, frame, embedder, pad_enabl
     return dict(is_spoof=is_spoof, is_pad_pending=is_pad_pending,
                 pad_invalid_reason=track.pad_invalid_reason if pad_enabled_rt else None,
                 recognition_called=submitted)
-
-
-def _pad_face_skip_reason(detection, frame_shape):
-    """Reject low-confidence or incomplete faces near the camera-frame edge."""
-    try:
-        frame_h, frame_w = frame_shape[:2]
-        bbox = detection["bbox"]
-        if len(bbox) != 4:
-            return "invalid_bbox"
-        x1, y1, x2, y2 = (float(value) for value in bbox)
-        score = float(detection.get("score"))
-    except (KeyError, TypeError, ValueError):
-        return "missing_geometry_or_score"
-
-    if not all(math.isfinite(value) for value in (x1, y1, x2, y2, score)):
-        return "non_finite_geometry_or_score"
-    if x2 <= x1 or y2 <= y1:
-        return "invalid_bbox"
-    if score < config.PAD_MIN_DETECTOR_CONFIDENCE:
-        return "low_detector_confidence"
-
-    landmarks = detection.get("landmarks")
-    try:
-        if landmarks is None or len(landmarks) != 5:
-            return "incomplete_landmarks"
-        points = [(float(point[0]), float(point[1])) for point in landmarks]
-    except (TypeError, ValueError, IndexError):
-        return "invalid_landmarks"
-    if len(points) != 5:
-        return "incomplete_landmarks"
-    box_w, box_h = x2 - x1, y2 - y1
-    landmark_margin = max(1.0, min(box_w, box_h) * 0.02)
-    if any(
-        not math.isfinite(x) or not math.isfinite(y)
-        or x <= x1 + landmark_margin or x >= x2 - landmark_margin
-        or y <= y1 + landmark_margin or y >= y2 - landmark_margin
-        for x, y in points
-    ):
-        return "landmark_at_face_edge"
-
-    edge_margin = max(2.0, min(box_w, box_h) * 0.02)
-    if (
-        x1 <= edge_margin or y1 <= edge_margin
-        or x2 >= frame_w - edge_margin
-        or y2 >= frame_h - edge_margin
-    ):
-        return "face_too_close_to_frame_edge"
-    return None
-
-
-def update_track_pad(
-    tracked, frame, predictor, interval_seconds,
-    frame_id=0, detector_called=False, diagnostic_log=False,
-    crop_smoothing=False,
-) -> int:
-    """Update due tracks atomically; inference errors invalidate cached verdicts."""
-    from antispoof.preprocess import crop_for_runtime as pad_crop
-
-    crops, due = [], []
-    crop_mode = getattr(predictor, "crop_mode", config.PAD_CROP_MODE)
-    if not isinstance(crop_mode, str):
-        crop_mode = config.PAD_CROP_MODE
-    model_img_size = getattr(predictor, "model_img_size", config.PAD_MODEL_IMG_SIZE)
-    if not isinstance(model_img_size, int):
-        model_img_size = config.PAD_MODEL_IMG_SIZE
-
-    def fail(track):
-        track.invalidate_verification()
-        # Pace failed attempts too, while keeping the empty vote window pending.
-        track.last_pad_time = time.monotonic()
-
-    for detection, track in tracked:
-        skip_reason = _pad_face_skip_reason(detection, frame.shape)
-        if skip_reason is not None:
-            track.invalidate_verification()
-            track.pad_invalid_reason = skip_reason
-            if diagnostic_log:
-                print(
-                    f"[PAD skip] frame_id={frame_id} track_id={track.track_id} "
-                    f"reason={skip_reason} score={detection.get('score')} "
-                    f"bbox={detection.get('bbox')}"
-                )
-            continue
-        track.pad_invalid_reason = None
-        if not track.needs_pad(interval_seconds):
-            continue
-        try:
-            crop_bbox = detection["bbox"]
-            if crop_smoothing:
-                crop_bbox = track.pad_crop_bbox(
-                    crop_bbox, frame.shape, predictor.bbox_expansion_factor,
-                )
-            crops.append(
-                pad_crop(
-                    frame,
-                    crop_bbox,
-                    predictor.bbox_expansion_factor,
-                    model_img_size,
-                    crop_mode,
-                )
-            )
-            due.append((detection, track, crop_bbox))
-        except Exception as exc:
-            fail(track)
-            print(f"[PAD crop error] track_id={track.track_id}: {exc}")
-    if not crops:
-        return 0
-    try:
-        results = predictor.predict_crops(crops)
-        if len(results) != len(due):
-            raise ValueError("PAD batch result count does not match input count")
-        # Validate the entire batch before accepting any vote.
-        for res in results:
-            if not isinstance(res.get("is_real"), bool):
-                raise ValueError("PAD result has no boolean is_real verdict")
-            score = float(res.get("pad_score", res.get("logit_diff", float("nan"))))
-            if not math.isfinite(score):
-                raise ValueError("PAD result has a non-finite score")
-    except Exception as exc:
-        for _, track, _ in due:
-            fail(track)
-        print(f"[PAD error] {exc}")
-        return 0
-
-    for (detection, track, crop_bbox), res in zip(due, results):
-        score = float(res.get("pad_score", res.get("logit_diff")))
-        track.update_pad(res["is_real"], score)
-        if diagnostic_log:
-            exp_score = math.exp(-abs(score))
-            p_real = 1.0 / (1.0 + exp_score) if score >= 0 else exp_score / (1.0 + exp_score)
-            print(
-                f"[PAD] frame_id={frame_id} timestamp={time.time():.6f} "
-                f"track_id={track.track_id} detector_called={detector_called} "
-                f"bbox_source={detection.get('bbox_source', 'UNKNOWN')} "
-                f"bbox={track.bbox} face_width={track.bbox[2]-track.bbox[0]} "
-                f"face_height={track.bbox[3]-track.bbox[1]} "
-                f"crop_smoothing={crop_smoothing} pad_crop_bbox={tuple(round(float(v), 3) for v in crop_bbox)} "
-                f"logits=({res.get('real_logit')},{res.get('spoof_logit')}) "
-                f"d={score:.6f} p_real={p_real:.6f} "
-                f"threshold_logit={res.get('threshold_logit', predictor.logit_threshold):.6f} "
-                f"raw={'REAL' if res['is_real'] else 'SPOOF'} smoothed={track.pad_status}"
-            )
-    return len(results)
 
 
 def resolve_pad_model_path(model_path):
@@ -552,6 +455,11 @@ def parse_args():
         "--mode", type=str, default=config.ATTENDANCE_MODE, choices=["checkin", "checkout", "none"],
         help=f"Chế độ ứng dụng: checkin, checkout hoặc none (mặc định: {config.ATTENDANCE_MODE})"
     )
+    parser.add_argument('--capture-dir', help='Thư mục lưu crop PAD; nhấn C để chụp')
+    parser.add_argument('--subject', default='unspecified', help='Mã người được chụp (không phải nhãn real/spoof)')
+    parser.add_argument('--condition', default='unspecified', help='Điều kiện ánh sáng / camera của phiên')
+    parser.add_argument('--label', choices=['real', 'fake'], default=None,
+                        help='Gán nhãn ground-truth tự động cho phiên chụp (real hoặc fake)')
     return parser.parse_args()
 
 
@@ -559,6 +467,12 @@ def parse_args():
 
 def main():
     args = parse_args()
+    capture = None
+    if args.capture_dir:
+        from pad_capture import PADCapture
+        capture = PADCapture(args.capture_dir, args.subject, args.condition, label=args.label)
+        label_info = f" [nhãn tự động: '{args.label}']" if args.label else " [chưa gán nhãn]"
+        print(f'[Capture] C: lưu crop vào {capture.directory}{label_info}')
     effective_pad_threshold_logit = args.pad_threshold_logit
     if effective_pad_threshold_logit is None and args.pad_threshold == config.PAD_THRESHOLD:
         effective_pad_threshold_logit = config.PAD_THRESHOLD_LOGIT
@@ -763,7 +677,7 @@ def main():
             if detector_due or tracker.needs_redetection():
                 detector_t0 = time.perf_counter()
                 try:
-                    detections = detector.detect(frame)
+                    detections = limit_faces(detector.detect(frame))
                 except Exception as e:
                     print(f"[Detector error] {e}")
                     detections = []
@@ -775,6 +689,10 @@ def main():
                 tracked = tracker.update(detections, frame=frame, detector_called=True)
                 counters["tracker_ms"] += (time.perf_counter() - tracker_t0) * 1000.0
                 counters["tracker_updates"] += 1
+
+            selected = limit_faces([d for d, _ in tracked])
+            selected_ids = {id(d) for d in selected}
+            tracked = [(d, t) for d, t in tracked if id(d) in selected_ids]
 
             # ── PAD batch ────────────────────────────────────────────────
             if pad_enabled_rt and pad_predictor is not None and tracked:
@@ -847,6 +765,8 @@ def main():
                     ),
                     stable_label=True,
                 )
+                if pad_enabled_rt and pad_predictor is not None:
+                    draw_pad_margin(display_frame, bbox, track, pad_predictor.logit_threshold)
 
 
             # ── Overlay FPS & PAD badge ───────────────────────────────────────
@@ -861,6 +781,11 @@ def main():
                 cv2.putText(display_frame, attendance_msg, (10, frame.shape[0] - 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, attendance_msg_color, 2, cv2.LINE_AA)
 
+            if capture is not None:
+                lbl_tag = f" [{capture.label}]" if capture.label else ""
+                capture_text = f"C: Save sample{lbl_tag} | Captured: {capture.saved_count}"
+                cv2.putText(display_frame, capture_text, (10, frame.shape[0] - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2, cv2.LINE_AA)
             cv2.imshow("SmartFace — Face Auth", display_frame)
 
             # ── Key handling ─────────────────────────────────────────────────
@@ -875,6 +800,15 @@ def main():
 
             if key == ord("q") or key == 27:
                 break
+            elif key == ord("c") and capture is not None:
+                try:
+                    paths = capture.save(frame, tracked, pad_predictor)
+                    if paths:
+                        print(f'[Capture] +{len(paths)} mat moi -> Tong so anh da chup: {capture.saved_count} ({capture.directory})')
+                    else:
+                        print('[Capture] Khong phat hien khuon mat de chup!')
+                except Exception as exc:
+                    print(f'[Capture error] {exc}')
             elif key == ord("p"):
                 if pad_predictor is None:
                     try:

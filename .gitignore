@@ -2,9 +2,11 @@
 # 1. BẢO MẬT & BẢO VỆ DỮ LIỆU NHẠY CẢM (Secrets & Environment)
 # ==============================================================================
 .env
+face_auth/pad_captures*
 .env.*
 !.env.example
 !.env.compose.example
+!.env.iot.example
 *.pem
 *.key
 *.crt
@@ -108,3 +110,30 @@ face_auth/md/research/
 face_auth/scripts/benchmark_performance.py
 face_auth/edge_client.py
 md/
+
+# Local notebook archive; keep out of Git (large generated ZIP).
+/face_auth/antispoof/notebooks/final/binary_crossdomain_v2.zip
+
+# Local PAD calibration/search experiments (keep files locally, exclude from Git).
+# Captures, face_auth/output/ and final notebooks are ignored above/in face_auth/.gitignore.
+/docs/experiments/2026-10-21-pad-domain/
+/docs/experiments/2026-10-21-pad-crossdataset/
+/face_auth/scripts/search_pad_*.py
+/face_auth/scripts/test_pad_*.py
+/face_auth/scripts/verify_pad_*.py
+/face_auth/scripts/analyze_pad_*.py
+/face_auth/scripts/evaluate_pad_*.py
+/face_auth/scripts/evaluate_subset*_local*.py
+/face_auth/scripts/calibrate_pad_*.py
+/face_auth/scripts/pad_quality_analysis.py
+/face_auth/scripts/pad_target_transforms.py
+/face_auth/scripts/pad_shadow_policy.py
+/face_auth/scripts/optimize_pad_domain.py
+/face_auth/scripts/refine_pad_robustness.py
+/face_auth/scripts/fit_pad_adaptive_threshold.py
+/face_auth/scripts/summarize_pad_domain.py
+/face_auth/tests/test_evaluate_pad_lcc_casia.py
+/face_auth/tests/test_pad_target_transforms.py
+/face_auth/tests/test_pad_shadow_policy.py
+/face_auth/tests/test_pad_domain_optimization.py
+/docs/experiments/2026-10-22-pad-final/

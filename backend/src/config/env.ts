@@ -20,6 +20,15 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error', 'silent']).optional(),
   LOG_FORMAT: z.enum(['pretty', 'json']).default('pretty'),
 
+  // ThingsBoard IoT Gateway Configuration (cấu hình qua .env, không để default nhạy cảm)
+  TB_HOST: z.string().optional().default(''),
+  TB_HTTP_PORT: z.string().optional().default('8080'),
+  TB_DEVICE_TOKEN: z.string().optional().default(''),
+  TB_DEVICE_UUID: z.string().optional().default(''),
+  TB_USERNAME: z.string().optional().default(''),
+  TB_PASSWORD: z.string().optional().default(''),
+  FACE_MATCH_THRESHOLD: z.string().optional().default('0.45').transform(Number),
+
   // SMTP / Email Configuration for automated notifications
   SMTP_HOST: z.string().optional().default('smtp.gmail.com'),
   SMTP_PORT: z.string().optional().default('587').transform((val) => Number(val) || 587),

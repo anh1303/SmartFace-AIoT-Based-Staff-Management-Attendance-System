@@ -270,12 +270,16 @@ export function useAttendancePairs(
           methodLabel,
           device_id: log.device_id || '--',
           score: log.verification_score !== undefined && log.verification_score !== null ? log.verification_score : null,
-          status: log.punctuality || (log.status === 'VALID' ? 'ON_TIME' : log.status),
+          status: log.punctuality === 'LATE'
+            ? 'LATE'
+            : log.punctuality === 'EARLY_LEAVE'
+              ? 'EARLY_LEAVE'
+              : 'ON_TIME',
           statusText: log.punctuality === 'LATE'
             ? 'Đi muộn'
             : log.punctuality === 'EARLY_LEAVE'
               ? 'Về sớm'
-              : log.status === 'VALID' ? 'Đúng giờ' : log.status,
+              : 'Đúng giờ',
         };
       });
 
@@ -369,13 +373,11 @@ export function useAttendancePairs(
         device_id: checkInLog?.device_id || '--',
         score: checkInLog?.verification_score ?? null,
         status: checkInLog
-          ? checkInLog.punctuality || (checkInLog.status === 'VALID' ? 'ON_TIME' : checkInLog.status)
-          : isOffDay ? 'OFF' : 'UNRECORDED',
+          ? (checkInLog.punctuality === 'LATE' ? 'LATE' : 'ON_TIME')
+          : 'UNRECORDED',
         statusText: checkInLog
-          ? (checkInLog.punctuality || (checkInLog.status === 'VALID' ? 'ON_TIME' : checkInLog.status)) === 'LATE'
-            ? 'Đi muộn'
-            : 'Đúng giờ'
-          : isOffDay ? 'Nghỉ (OFF)' : 'Chưa điểm danh',
+          ? (checkInLog.punctuality === 'LATE' ? 'Đi muộn' : 'Đúng giờ')
+          : '--',
       };
 
       const outPunc = checkOutLog
@@ -391,14 +393,12 @@ export function useAttendancePairs(
         methodLabel: checkOutLog ? (isCheckOutFace ? 'Face-id' : 'Vân tay') : 'UNRECORDED',
         device_id: checkOutLog?.device_id || '--',
         score: checkOutLog?.verification_score ?? null,
-        status: checkOutLog ? outPunc || 'VALID' : checkInLog ? 'WORKING' : (isOffDay ? 'OFF' : 'UNRECORDED'),
+        status: checkOutLog
+          ? (outPunc === 'EARLY_LEAVE' ? 'EARLY_LEAVE' : 'ON_TIME')
+          : 'UNRECORDED',
         statusText: checkOutLog
-          ? outPunc === 'EARLY_LEAVE'
-            ? 'Về sớm'
-            : 'Đúng giờ'
-          : checkInLog
-            ? 'Đang làm'
-            : isOffDay ? 'Nghỉ (OFF)' : 'Chưa điểm danh',
+          ? (outPunc === 'EARLY_LEAVE' ? 'Về sớm' : 'Đúng giờ')
+          : '--',
       };
 
       return {

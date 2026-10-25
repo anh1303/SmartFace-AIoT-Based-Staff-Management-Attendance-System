@@ -598,12 +598,12 @@
       },
       "b1a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d": {
         "id": "b1a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-        "type": "latest",
-        "typeFullFqn": "system.cards.html_value_card",
+        "type": "timeseries",
+        "typeFullFqn": "system.time_series_chart",
         "sizeX": 8,
         "sizeY": 6,
-        "row": 7,
-        "col": 8,
+        "row": 0,
+        "col": 0,
         "config": {
           "datasources": [
             {
@@ -613,88 +613,286 @@
                 {
                   "name": "distance",
                   "type": "timeseries",
-                  "label": "distance",
+                  "label": "Khoảng cách (cm)",
                   "color": "#38bdf8",
-                  "settings": {},
-                  "_hash": 0.7001
-                },
-                {
-                  "name": "ai_state",
-                  "type": "timeseries",
-                  "label": "ai_state",
-                  "color": "#10b981",
-                  "settings": {},
-                  "_hash": 0.7002
-                },
-                {
-                  "name": "attendance_latch",
-                  "type": "timeseries",
-                  "label": "attendance_latch",
-                  "color": "#a855f7",
-                  "settings": {},
-                  "_hash": 0.7003
-                },
-                {
-                  "name": "person_present",
-                  "type": "timeseries",
-                  "label": "person_present",
-                  "color": "#f59e0b",
-                  "settings": {},
-                  "_hash": 0.7004
+                  "settings": {
+                    "yAxisId": "default",
+                    "showInLegend": true,
+                    "type": "line",
+                    "lineSettings": {
+                      "showLine": true,
+                      "smooth": true,
+                      "lineWidth": 3
+                    }
+                  },
+                  "_hash": 0.54321
                 }
               ]
             }
           ],
           "timewindow": {
-            "displayValue": "",
+            "hideAggregation": false,
+            "hideAggInterval": false,
+            "hideTimezone": false,
             "selectedTab": 0,
             "realtime": {
-              "realtimeType": 1,
-              "interval": 1000,
+              "realtimeType": 0,
               "timewindowMs": 60000,
               "quickInterval": "CURRENT_DAY",
-              "hideInterval": false,
-              "hideLastInterval": false,
-              "hideQuickInterval": false
-            },
-            "history": {
-              "historyType": 0,
-              "interval": 1000,
-              "timewindowMs": 60000,
-              "fixedTimewindow": {
-                "startTimeMs": 1791950996911,
-                "endTimeMs": 1792037396911
-              },
-              "quickInterval": "CURRENT_DAY",
-              "hideInterval": false,
-              "hideLastInterval": false,
-              "hideFixedInterval": false,
-              "hideQuickInterval": false
+              "interval": 1000
             },
             "aggregation": {
               "type": "AVG",
               "limit": 25000
-            }
+            },
+            "timezone": null
           },
           "showTitle": true,
-          "title": "Cảm Biến Khoảng Cách (HC-SR04)",
-          "backgroundColor": "#fff",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
           "color": "rgba(0, 0, 0, 0.87)",
           "padding": "0px",
           "settings": {
-            "cardHtml": "<div class=\"sensor-card\">\n  <div class=\"sensor-header\">\n    <div class=\"sensor-title\">\n      <span>📡</span> CẢM BIẾN SIÊU ÂM (HC-SR04)\n    </div>\n    <div class=\"sensor-badge badge-${ai_state}\">\n      ● ${ai_state}\n    </div>\n  </div>\n  \n  <div class=\"sensor-body\">\n    <div class=\"distance-main\">\n      <span class=\"distance-num\">${distance:1}</span>\n      <span class=\"distance-unit\">cm</span>\n    </div>\n    <div class=\"proximity-indicator\">\n      <div class=\"target-zone-label\">\n        <span>0cm</span>\n        <span class=\"threshold-tag\">Vùng Kích Hoạt (&le; 50cm)</span>\n        <span>100cm</span>\n      </div>\n      <div class=\"progress-track\">\n        <div class=\"threshold-marker\" style=\"left: 50%;\"></div>\n      </div>\n    </div>\n  </div>\n  \n  <div class=\"sensor-footer\">\n    <div class=\"meta-item\">\n      Trạng thái AI: <span class=\"highlight-${ai_state}\">${ai_state}</span>\n    </div>\n    <div class=\"meta-item\">\n      Chốt gửi: <span class=\"latch-status\">${attendance_latch}</span>\n    </div>\n  </div>\n</div>",
-            "cardCss": ".sensor-card {\n  width: 100%;\n  height: 100%;\n  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);\n  border: 1px solid #334155;\n  border-radius: 12px;\n  padding: 18px 22px;\n  display: flex;\n  flex-direction: column;\n  justify-content: space-between;\n  box-sizing: border-box;\n  font-family: 'Inter', -apple-system, sans-serif;\n  color: #f8fafc;\n}\n.sensor-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\n.sensor-title {\n  color: #94a3b8;\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.05em;\n  text-transform: uppercase;\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.sensor-badge {\n  padding: 4px 10px;\n  border-radius: 20px;\n  font-size: 11px;\n  font-weight: 800;\n  letter-spacing: 0.05em;\n}\n.badge-AWAKE {\n  background: rgba(16, 185, 129, 0.2);\n  color: #10b981;\n  border: 1px solid rgba(16, 185, 129, 0.5);\n  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);\n}\n.badge-SLEEP {\n  background: rgba(100, 116, 139, 0.2);\n  color: #94a3b8;\n  border: 1px solid rgba(100, 116, 139, 0.4);\n}\n.sensor-body {\n  margin: 8px 0;\n  text-align: center;\n}\n.distance-main {\n  display: flex;\n  align-items: baseline;\n  justify-content: center;\n  gap: 6px;\n}\n.distance-num {\n  font-size: 42px;\n  font-weight: 900;\n  color: #38bdf8;\n  letter-spacing: -0.03em;\n  text-shadow: 0 0 25px rgba(56, 189, 248, 0.35);\n  font-variant-numeric: tabular-nums;\n}\n.distance-unit {\n  font-size: 18px;\n  font-weight: 600;\n  color: #94a3b8;\n}\n.proximity-indicator {\n  margin-top: 6px;\n  padding: 0 4px;\n}\n.target-zone-label {\n  display: flex;\n  justify-content: space-between;\n  font-size: 10px;\n  color: #64748b;\n  margin-bottom: 4px;\n}\n.threshold-tag {\n  color: #10b981;\n  font-weight: 700;\n}\n.progress-track {\n  position: relative;\n  width: 100%;\n  height: 6px;\n  background: #334155;\n  border-radius: 4px;\n}\n.threshold-marker {\n  position: absolute;\n  top: -3px;\n  width: 2px;\n  height: 12px;\n  background: #10b981;\n  box-shadow: 0 0 6px #10b981;\n  border-radius: 2px;\n}\n.sensor-footer {\n  display: flex;\n  justify-content: space-between;\n  border-top: 1px solid #334155;\n  padding-top: 10px;\n  font-size: 11px;\n  color: #64748b;\n}\n.highlight-AWAKE {\n  color: #10b981;\n  font-weight: 700;\n}\n.highlight-SLEEP {\n  color: #94a3b8;\n  font-weight: 600;\n}\n.latch-status {\n  color: #a855f7;\n  font-weight: 700;\n}"
+            "showLegend": true,
+            "legendConfig": {
+              "direction": "column",
+              "position": "top",
+              "sortDataKeys": false,
+              "showMin": false,
+              "showMax": false,
+              "showAvg": true,
+              "showTotal": false,
+              "showLatest": false
+            },
+            "thresholds": [
+              {
+                "thresholdValue": 50,
+                "thresholdColor": "#10b981",
+                "thresholdName": "Ngưỡng Kích Hoạt (≤ 50cm)"
+              }
+            ],
+            "dataZoom": true,
+            "stack": false,
+            "yAxis": {
+              "show": true,
+              "label": "",
+              "labelFont": {
+                "family": "Roboto",
+                "size": 12,
+                "sizeUnit": "px",
+                "style": "normal",
+                "weight": "600",
+                "lineHeight": "1"
+              },
+              "labelColor": "rgba(0, 0, 0, 0.54)",
+              "position": "left",
+              "showTickLabels": true,
+              "tickLabelFont": {
+                "family": "Roboto",
+                "size": 12,
+                "sizeUnit": "px",
+                "style": "normal",
+                "weight": "400",
+                "lineHeight": "1"
+              },
+              "tickLabelColor": "rgba(0, 0, 0, 0.54)",
+              "showTicks": true,
+              "ticksColor": "rgba(0, 0, 0, 0.54)",
+              "showLine": true,
+              "lineColor": "rgba(0, 0, 0, 0.54)",
+              "showSplitLines": true,
+              "splitLinesColor": "rgba(0, 0, 0, 0.12)"
+            },
+            "xAxis": {
+              "show": true,
+              "label": "",
+              "labelFont": {
+                "family": "Roboto",
+                "size": 12,
+                "sizeUnit": "px",
+                "style": "normal",
+                "weight": "600",
+                "lineHeight": "1"
+              },
+              "labelColor": "rgba(0, 0, 0, 0.54)",
+              "position": "bottom",
+              "showTickLabels": true,
+              "tickLabelFont": {
+                "family": "Roboto",
+                "size": 10,
+                "sizeUnit": "px",
+                "style": "normal",
+                "weight": "400",
+                "lineHeight": "1"
+              },
+              "tickLabelColor": "rgba(0, 0, 0, 0.54)",
+              "ticksFormat": {},
+              "showTicks": true,
+              "ticksColor": "rgba(0, 0, 0, 0.54)",
+              "showLine": true,
+              "lineColor": "rgba(0, 0, 0, 0.54)",
+              "showSplitLines": true,
+              "splitLinesColor": "rgba(0, 0, 0, 0.12)"
+            },
+            "legendLabelFont": {
+              "family": "Roboto",
+              "size": 12,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "400",
+              "lineHeight": "16px"
+            },
+            "legendLabelColor": "rgba(0, 0, 0, 0.76)",
+            "showTooltip": true,
+            "tooltipTrigger": "axis",
+            "tooltipValueFont": {
+              "family": "Roboto",
+              "size": 12,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "500",
+              "lineHeight": "16px"
+            },
+            "tooltipValueColor": "rgba(0, 0, 0, 0.76)",
+            "tooltipShowDate": true,
+            "tooltipDateFormat": {
+              "format": null,
+              "lastUpdateAgo": false,
+              "custom": false,
+              "auto": true,
+              "autoDateFormatSettings": {}
+            },
+            "tooltipDateFont": {
+              "family": "Roboto",
+              "size": 11,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "400",
+              "lineHeight": "16px"
+            },
+            "tooltipDateColor": "rgba(0, 0, 0, 0.76)",
+            "tooltipDateInterval": true,
+            "tooltipBackgroundColor": "rgba(255, 255, 255, 0.76)",
+            "tooltipBackgroundBlur": 4,
+            "background": {
+              "type": "color",
+              "color": "#fff",
+              "overlay": {
+                "enabled": false,
+                "color": "rgba(255,255,255,0.72)",
+                "blur": 3
+              }
+            },
+            "yAxes": {
+              "default": {
+                "units": "cm",
+                "decimals": 1,
+                "show": true,
+                "label": "",
+                "labelFont": {
+                  "family": "Roboto",
+                  "size": 12,
+                  "sizeUnit": "px",
+                  "style": "normal",
+                  "weight": "600",
+                  "lineHeight": "1"
+                },
+                "labelColor": "rgba(0, 0, 0, 0.54)",
+                "position": "left",
+                "showTickLabels": true,
+                "tickLabelFont": {
+                  "family": "Roboto",
+                  "size": 12,
+                  "sizeUnit": "px",
+                  "style": "normal",
+                  "weight": "400",
+                  "lineHeight": "1"
+                },
+                "tickLabelColor": "rgba(0, 0, 0, 0.54)",
+                "ticksFormatter": null,
+                "showTicks": true,
+                "ticksColor": "rgba(0, 0, 0, 0.54)",
+                "showLine": true,
+                "lineColor": "rgba(0, 0, 0, 0.54)",
+                "showSplitLines": true,
+                "splitLinesColor": "rgba(0, 0, 0, 0.12)",
+                "id": "default",
+                "order": 0,
+                "min": 0,
+                "max": 100
+              }
+            },
+            "noAggregationBarWidthSettings": {
+              "strategy": "group",
+              "groupWidth": {
+                "relative": true,
+                "relativeWidth": 2,
+                "absoluteWidth": 1000
+              },
+              "barWidth": {
+                "relative": true,
+                "relativeWidth": 2,
+                "absoluteWidth": 1000
+              }
+            },
+            "animation": {
+              "animation": true,
+              "animationThreshold": 2000,
+              "animationDuration": 500,
+              "animationEasing": "cubicOut",
+              "animationDelay": 0,
+              "animationDurationUpdate": 300,
+              "animationEasingUpdate": "cubicOut",
+              "animationDelayUpdate": 0
+            },
+            "padding": "12px"
           },
-          "dropShadow": false,
+          "title": "Cảm Biến Khoảng Cách (HC-SR04)",
+          "dropShadow": true,
           "enableFullscreen": true,
-          "widgetStyle": {},
-          "titleStyle": {
-            "fontSize": "16px",
-            "fontWeight": 400
+          "titleStyle": null,
+          "mobileHeight": null,
+          "configMode": "basic",
+          "actions": {},
+          "showTitleIcon": false,
+          "titleIcon": "thermostat",
+          "iconColor": "#1F6BDD",
+          "useDashboardTimewindow": false,
+          "displayTimewindow": true,
+          "titleFont": {
+            "size": 16,
+            "sizeUnit": "px",
+            "family": "Roboto",
+            "weight": "500",
+            "style": "normal",
+            "lineHeight": "24px"
           },
-          "useDashboardTimewindow": true,
-          "showLegend": false,
-          "actions": {}
+          "titleColor": "rgba(0, 0, 0, 0.87)",
+          "titleTooltip": "",
+          "widgetStyle": {},
+          "widgetCss": "",
+          "pageSize": 1024,
+          "units": "cm",
+          "decimals": 1,
+          "noDataDisplayMessage": "",
+          "timewindowStyle": {
+            "showIcon": false,
+            "iconSize": "24px",
+            "icon": null,
+            "iconPosition": "left",
+            "font": {
+              "size": 12,
+              "sizeUnit": "px",
+              "family": "Roboto",
+              "weight": "400",
+              "style": "normal",
+              "lineHeight": "16px"
+            },
+            "color": "rgba(0, 0, 0, 0.38)",
+            "displayTypePrefix": true
+          },
+          "margin": "0px",
+          "borderRadius": "0px",
+          "iconSize": "0px"
         }
       }
     },
@@ -811,6 +1009,6 @@
     "id": "74c05500-c7f6-11f1-9b9a-73474c36c48d"
   },
   "assignedCustomers": null,
-  "version": 15,
+  "version": 17,
   "externalId": null
 }

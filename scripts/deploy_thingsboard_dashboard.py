@@ -87,7 +87,10 @@ def main():
             html = html.replace("640x480 @ 15fps", "640x480 (cấu hình 15 FPS)")
             cfg["settings"]["cardHtml"] = html
         if widget["type"] == "timeseries":
-            cfg["title"] = "Liveness Confidence — mỗi lượt gửi RPC"
+            if any(k.get("name") == "antispoof_score" for ds in cfg.get("datasources", []) for k in ds.get("dataKeys", [])):
+                cfg["title"] = "Liveness Confidence — mỗi lượt gửi RPC"
+            elif any(k.get("name") == "distance" for ds in cfg.get("datasources", []) for k in ds.get("dataKeys", [])):
+                cfg["title"] = "Cảm Biến Khoảng Cách (HC-SR04)"
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     existing = [d for d in api("/api/tenant/dashboards?pageSize=100&page=0")["data"]
                 if d["title"] == dashboard["title"]]

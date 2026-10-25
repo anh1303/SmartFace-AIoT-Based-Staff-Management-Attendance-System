@@ -39,7 +39,7 @@ export const EmployeeSalaryHistory: React.FC = () => {
         .sort((a, b) => (b.period || '').localeCompare(a.period || ''))
     : [];
 
-  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5;
+  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000;
   const penaltyRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
 
   // Dùng đơn giá snapshot của phiếu trong preview nếu có, thay vì lấy cấu hình mới áp lên phiếu cũ

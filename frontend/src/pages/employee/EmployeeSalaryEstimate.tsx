@@ -38,8 +38,8 @@ export const EmployeeSalaryEstimate: React.FC = () => {
 
   const currentPayroll = myPayrolls.find(p => (p.period || p.payroll_period) === selectedEmployeePeriod)
     || myPayrolls[0]
-    || payroll.find(p => p.employee_id === empCode)
-    || payroll[0];
+    || (empCode ? payroll.find(p => p.employee_id === empCode) : null)
+    || null;
 
   // Dùng đơn giá snapshot của phiếu trong preview nếu có, thay vì lấy cấu hình mới áp lên phiếu cũ
   const hourlyRate = currentPayroll?.hourly_rate !== undefined && currentPayroll?.hourly_rate !== null
@@ -50,7 +50,7 @@ export const EmployeeSalaryEstimate: React.FC = () => {
   const allowance = currentPayroll?.allowance ?? 0;
   const otRate = currentPayroll?.overtime_rate !== undefined && currentPayroll?.overtime_rate !== null
     ? Number(currentPayroll.overtime_rate)
-    : (bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5);
+    : (bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000);
   const penaltyRate = currentPayroll?.late_early_penalty !== undefined && currentPayroll?.late_early_penalty !== null
     ? Number(currentPayroll.late_early_penalty)
     : (bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000);
@@ -96,7 +96,9 @@ export const EmployeeSalaryEstimate: React.FC = () => {
                   ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
                   : currentPayroll?.status === 'CONFIRMED'
                   ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
-                  : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                  : currentPayroll
+                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                  : 'bg-slate-500/10 text-slate-500 border-slate-500/20'
               }`}
             >
               {currentPayroll?.status === 'PAID'
@@ -105,7 +107,9 @@ export const EmployeeSalaryEstimate: React.FC = () => {
                 ? 'ĐÃ CHỐT'
                 : currentPayroll?.status === 'CONFIRMED'
                 ? 'ĐÃ XÁC NHẬN'
-                : 'ĐANG TÍCH LŨY CÔNG'}
+                : currentPayroll
+                ? 'ĐANG TÍCH LŨY CÔNG'
+                : 'CHƯA CÓ DỮ LIỆU'}
             </span>
           </div>
         </div>

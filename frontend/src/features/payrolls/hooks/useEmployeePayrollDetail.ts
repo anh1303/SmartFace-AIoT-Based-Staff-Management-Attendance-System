@@ -49,7 +49,7 @@ export function useEmployeePayrollDetail(options: UseEmployeePayrollDetailOption
 
   const otRate = currentMonthPayroll?.overtime_rate !== undefined && currentMonthPayroll?.overtime_rate !== null
     ? Number(currentMonthPayroll.overtime_rate)
-    : (bonusPenalty ? Number(bonusPenalty.overtime_rate) : 1.5);
+    : (bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000);
 
   const penaltyRate = currentMonthPayroll?.late_early_penalty !== undefined && currentMonthPayroll?.late_early_penalty !== null
     ? Number(currentMonthPayroll.late_early_penalty)

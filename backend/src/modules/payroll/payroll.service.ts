@@ -387,8 +387,25 @@ export async function finalizePeriod(period: string, actorUserId?: string, actor
       assertCannotModifySelfControlData(actor, row.employee.user_id, 'chốt lương của mình')
       assertCannotModifyOtherManager(actor, row.employee, 'chốt lương')
     }
-    const pending = await tx.daily_attendance_summary.count({ where: { employee_id: { in: rows.map(r => r.employeeId) },
-      work_date: { gte: bounds.start, lt: bounds.end }, OR: [{ requires_review: true }, { overtime_status: 'PENDING' }, { policy_version: null }, { policy_version: { not: ATTENDANCE_POLICY_VERSION } }] } })
+    const lockedRows = await tx.attendance_locks.findMany({
+      where: { work_date: { gte: bounds.start, lt: bounds.end }, is_locked: true },
+      select: { work_date: true },
+    })
+    const lockedWorkDates = lockedRows.map((l: { work_date: Date }) => l.work_date)
+    const pending = await tx.daily_attendance_summary.count({
+      where: {
+        employee_id: { in: rows.map(r => r.employeeId) },
+        work_date: { gte: bounds.start, lt: bounds.end },
+        OR: [
+          { requires_review: true },
+          { overtime_status: 'PENDING' },
+          { policy_version: null },
+          ...(lockedWorkDates.length
+            ? [{ work_date: { notIn: lockedWorkDates }, policy_version: { not: ATTENDANCE_POLICY_VERSION } }]
+            : [{ policy_version: { not: ATTENDANCE_POLICY_VERSION } }]),
+        ],
+      },
+    })
     if (pending) throw AppError.conflict('Còn ngày công/OT cần xác minh hoặc duyệt trước khi chốt lương')
     for (const row of rows.filter(r => r.status === 'PENDING')) {
       const source = await tx.daily_attendance_summary.findMany({ where: { employee_id: row.employeeId, work_date: { gte: bounds.start, lt: bounds.end } } })
@@ -440,7 +457,6 @@ export async function generate(payroll_period: string, employeeId?: string, acto
       }
       const summaries = await tx.daily_attendance_summary.findMany({ where: { employee_id: emp.id,
         work_date: { gte: start, lt: end, lte: new Date(`${today}T00:00:00Z`) } } })
-      if (summaries.some(s => s.policy_version !== ATTENDANCE_POLICY_VERSION)) throw AppError.conflict('Có ngày công cũ đang khóa; cần rà soát theo chính sách mới trước khi tính lương')
       const sum = (field: 'total_working_hours' | 'late_early') => summaries.reduce((n, s) => n + Number(s[field]), 0)
       const total_working_hours = sum('total_working_hours'), total_late_early = sum('late_early')
       const total_overtime = summaries.filter(s => s.overtime_status === 'APPROVED').reduce((n, s) => n + Number(s.overtime), 0)

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { ToastContainer } from '../common/Toast';
 import { FloatingNotificationBubble } from '../../features/notifications';
 
 /**
@@ -34,7 +33,6 @@ export const AppLayout: React.FC = () => {
       </div>
 
       {/* Reusable Global Overlays */}
-      <ToastContainer />
       <FloatingNotificationBubble />
     </div>
   );

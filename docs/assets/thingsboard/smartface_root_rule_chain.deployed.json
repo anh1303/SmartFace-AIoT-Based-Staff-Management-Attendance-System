@@ -18,7 +18,7 @@
     "root": true,
     "debugMode": false,
     "externalId": null,
-    "version": 9,
+    "version": 10,
     "configuration": null,
     "additionalInfo": null
   },
@@ -27,7 +27,7 @@
       "entityType": "RULE_CHAIN",
       "id": "74fb1410-c7f6-11f1-9b9a-73474c36c48d"
     },
-    "version": 9,
+    "version": 10,
     "firstNodeIndex": 6,
     "nodes": [
       {

@@ -40,7 +40,7 @@ export const FaceConfirmModal: React.FC<FaceConfirmModalProps> = ({
             <code className="text-purple-600 dark:text-purple-400">face_embeddings</code> của database PBL6.
           </p>
           <div className="pt-2 border-t border-slate-200/60 dark:border-[#21264b] flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">
-            <span>ĐIỀU KIỆN: ĐỦ 3 ẢNH</span>
+            <span>ĐIỀU KIỆN: TỐI THIỂU 3 ẢNH (HIỆN CÓ {photoCount} ẢNH)</span>
           </div>
         </div>
 

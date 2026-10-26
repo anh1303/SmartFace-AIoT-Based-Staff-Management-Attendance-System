@@ -253,13 +253,15 @@ export const ManagerBiometrics: React.FC = () => {
         onOpenManageModal={(emp) => setManageModalEmployee(emp)}
       />
 
-      {/* Camera eKYC 3-Angle Modal */}
+      {/* Camera eKYC Multi-Photo Modal (Min 3, Max 10) */}
       <CameraEkycModal
         isOpen={isEkycModalOpen}
         onClose={() => setIsEkycModalOpen(false)}
         onComplete={handleEkycComplete}
         employeeName={currentEmp?.full_name || ''}
         employeeCode={currentEmp?.employee_id || ''}
+        existingPhotoCount={uploadedPhotos.length}
+        maxPhotos={10}
       />
 
       {/* Confirmation & Result Modals */}

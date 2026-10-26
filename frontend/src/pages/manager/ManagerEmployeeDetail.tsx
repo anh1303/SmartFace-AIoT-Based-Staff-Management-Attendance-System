@@ -349,6 +349,12 @@ export const ManagerEmployeeDetail: React.FC = () => {
         onPrint={handlePrint}
       />
 
+      {activeTab === 'overview' && <div className="flex justify-end">
+        <button type="button" onClick={() => setActiveTab('attendance')} className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 text-sm font-semibold">
+          Xem lịch sử checkin / checkout
+        </button>
+      </div>}
+
       {/* 2. TAB 1: OVERVIEW & BIOMETRICS */}
       {activeTab === 'overview' && (
         <EmployeeOverviewTab

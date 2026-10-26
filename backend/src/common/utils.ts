@@ -137,13 +137,14 @@ export interface SalaryCalculationInput {
   allowance: number;
   overtime_rate: number;
   late_early_penalty: number;
+  total_absence_penalty?: number;
 }
 
 /**
  * Pure Function để tính lương thực lĩnh (net_salary) dùng chung thống nhất toàn hệ thống.
  */
 export function calculateNetSalary(params: SalaryCalculationInput): number {
-  if (!Object.values(params).every(v => Number.isFinite(v) && v >= 0)) throw AppError.badRequest('Dữ liệu tính lương phải hữu hạn và không âm');
+  if (!Object.values(params).every(v => v === undefined || Number.isFinite(v) && v >= 0)) throw AppError.badRequest('Dữ liệu tính lương phải hữu hạn và không âm');
   const {
     hourly_rate,
     total_working_hours,
@@ -164,7 +165,7 @@ export function calculateNetSalary(params: SalaryCalculationInput): number {
 
   const baseSalaryTotal = hourly_rate * total_working_hours;
 
-  const net = Math.max(0, Math.round(baseSalaryTotal + overtimePay - latePenaltyDeduction + allowance));
+  const net = Math.max(0, Math.round(baseSalaryTotal + overtimePay - latePenaltyDeduction - (params.total_absence_penalty ?? 0) + allowance));
   if (!Number.isFinite(net) || net >= 1e13) throw AppError.badRequest('Số tiền vượt giới hạn lưu trữ phiếu lương');
   return net;
 }

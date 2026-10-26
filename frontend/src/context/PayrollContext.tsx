@@ -12,7 +12,7 @@ export interface PayrollContextType {
   updatePayrollItem: (id: string, updates: Partial<PayrollRecord> & { working_hours?: number; reason?: string }) => Promise<PayrollRecord | void>;
   finalizePayrollPeriod: (period: string) => void;
   unlockPayrollPeriod: (period: string) => void;
-  updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => Promise<BonusPenaltyPolicy | void>;
+  updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; absence_penalty_rate?: number; description?: string }) => Promise<BonusPenaltyPolicy | void>;
 }
 
 const PayrollContext = createContext<PayrollContextType | undefined>(undefined);

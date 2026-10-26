@@ -1,3 +1,4 @@
+import { AttendanceDayDetails } from './AttendanceDayDetails';
 import React, { useState } from 'react';
 import { ScanFace, Fingerprint, Edit, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { AttendancePairItem, AttendanceEventItem } from '../hooks/useAttendancePairs';
@@ -192,13 +193,13 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                         <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate" title={employee.employee_id}>
                           {employee.employee_id}
                         </p>
-                        {item.rawEvents && item.rawEvents.length > 2 && (
+                        {item.rawEvents && item.rawEvents.length > 0 && (
                           <button
                             type="button"
                             onClick={() => toggleExpand(rowKey)}
                             className="mt-0.5 text-[9px] text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 flex items-center gap-0.5 cursor-pointer font-sans"
                           >
-                            <span>{isExpanded ? 'Ẩn' : `${item.rawEvents.length} quẹt thẻ`}</span>
+                            <span>{isExpanded ? 'Ẩn' : `${item.rawEvents.length} lượt · xem chi tiết`}</span>
                             {isExpanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
                           </button>
                         )}
@@ -341,38 +342,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                 {isExpanded && item.rawEvents && item.rawEvents.length > 0 && (
                   <tr className="bg-slate-50/80 dark:bg-[#0c0e1e] border-b border-slate-200 dark:border-[#202752]">
                     <td colSpan={10} className="py-3 px-6">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-purple-600" />
-                            Toàn bộ lịch sử quẹt thẻ gốc ({item.rawEvents.length} lượt ghi nhận máy):
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                          {item.rawEvents.map((ev, eIdx) => (
-                            <div
-                              key={eIdx}
-                              className="p-2 rounded-lg bg-white dark:bg-[#13162b] border border-slate-200 dark:border-[#21264b] text-[11px] space-y-0.5"
-                            >
-                              <div className="flex items-center justify-between font-mono font-semibold">
-                                <span className={ev.type === 'CHECK_IN' ? 'text-indigo-600 dark:text-indigo-400' : 'text-purple-600 dark:text-purple-400'}>
-                                  {ev.label}
-                                </span>
-                                <span className="text-slate-900 dark:text-white">{ev.time}</span>
-                              </div>
-                              <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
-                                <span>{ev.methodLabel}</span>
-                                <span>{ev.device_id}</span>
-                              </div>
-                              {ev.score !== null && (
-                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">
-                                  Tin cậy: {(ev.score * 100).toFixed(0)}%
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                      <AttendanceDayDetails item={item} />
                     </td>
                   </tr>
                 )}

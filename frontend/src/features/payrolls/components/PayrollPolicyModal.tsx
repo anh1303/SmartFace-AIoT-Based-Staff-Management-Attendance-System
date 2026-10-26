@@ -4,6 +4,7 @@ import { Modal } from '../../../components/common/Modal';
 export interface PolicyFormData {
   overtime_rate: number;
   late_early_penalty: number;
+  absence_penalty_rate: number;
   description: string;
 }
 
@@ -30,6 +31,13 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
       subtitle="Thiết lập hệ số tăng ca (OT) và định mức vi phạm đi trễ / về sớm (Quyền hạn: Admin)"
     >
       <form onSubmit={onSavePolicy} className="space-y-4">
+        <div>
+          <label className="block text-xs mb-1" htmlFor="absence-penalty-rate">Phạt vắng ca (% tiền công của ca)</label>
+          <input id="absence-penalty-rate" type="number" min="0" max="100" step="0.01" required value={Number((policyData.absence_penalty_rate * 100).toFixed(2))}
+            onChange={e => onChangePolicyData(p => ({ ...p, absence_penalty_rate: Number(e.target.value) / 100 }))}
+            className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2" />
+          <p className="text-xs text-slate-500 mt-1">Mặc định 25% × số giờ ca × lương giờ. Manager duyệt từng ngày trước khi trừ lương.</p>
+        </div>
         <div>
           <label className="block text-xs text-slate-700 dark:text-slate-400 font-medium mb-1">
             Mức thưởng OT (Hệ số x hoặc ₫/h)

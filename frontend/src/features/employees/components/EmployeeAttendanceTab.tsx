@@ -1,21 +1,10 @@
-import React, { useMemo } from 'react';
-import {
-  Clock,
-  ScanFace,
-  Fingerprint
-} from 'lucide-react';
+import { AttendanceDayDetails, AttendanceLogFilterSelect, type AttendanceLogFilter } from '../../attendances/components/AttendanceDayDetails';
+import { AdjustmentReviewPanel } from '../../payrolls/components/AdjustmentReviewPanel';
+import React, { useMemo, useState } from 'react';
+import { Clock } from 'lucide-react';
 import { AttendanceRecord, Employee } from '../../../types';
 import { useApp } from '../../../context/AppContext';
-import { useAttendancePairs, useAttendanceSummaries, AttendanceStats } from '@/features/attendances';
-import { getStatusBadge } from '../../../utils/timeUtils';
-import {
-  TableContainer,
-  TableHead,
-  TableHeadRow,
-  TableHeadCell,
-  TableBody,
-  TableEmpty
-} from '../../../components/common';
+import { useAttendance, useAttendancePairs, useAttendanceSummaries, AttendanceStats } from '@/features/attendances';
 
 interface EmployeeAttendanceTabProps {
   currentEmp?: Employee;
@@ -50,18 +39,26 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
   attendanceStats,
   employeeAttendanceLogs
 }) => {
-  const { workShifts, attendance, employees } = useApp();
+  const { workShifts, employees } = useApp();
+  const [logFilter, setLogFilter] = useState<AttendanceLogFilter>('ALL');
+  const logsQuery = useAttendance({ employeeId: currentEmp?.employee_id, startDate: startDate || undefined, endDate: endDate || undefined, fetchAllPages: true });
+  const attendance = logsQuery.attendance;
 
   const targetEmployees = useMemo(() => {
     if (currentEmp) return [currentEmp];
     return employees;
   }, [currentEmp, employees]);
 
-  const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap } = useAttendanceSummaries(
-    startDate,
-    endDate,
+  // Adjacent summaries identify checkout events owned by an overnight shift
+  // outside the selected work-date range, without re-pairing in the browser.
+  const summaryStart = startDate ? new Date(+new Date(`${startDate}T00:00:00Z`) - 86400000).toISOString().slice(0,10) : undefined;
+  const summaryEnd = endDate ? new Date(+new Date(`${endDate}T00:00:00Z`) + 86400000).toISOString().slice(0,10) : undefined;
+  const summariesQuery = useAttendanceSummaries(
+    summaryStart,
+    summaryEnd,
     currentEmp?.employee_id
   );
+  const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap } = summariesQuery;
 
   const employeePairs = useAttendancePairs(
     targetEmployees,
@@ -82,14 +79,14 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
   // Chỉ hiển thị khi đã chấm công ít nhất 1 lần trong ca
   const recordedPairs = useMemo(() => {
     return employeePairs.filter((item) => {
-      const hasAttendance = item.hasCheckedIn || item.hasCheckedOut;
+      const hasAttendance = item.rawEvents.length > 0;
       if (!hasAttendance) return false;
 
-      if (attendanceTypeFilter === 'CHECK_IN' && !item.hasCheckedIn) return false;
-      if (attendanceTypeFilter === 'CHECK_OUT' && !item.hasCheckedOut) return false;
+      if (attendanceTypeFilter === 'CHECK_IN' && !item.rawEvents.some(e => e.type === 'CHECK_IN')) return false;
+      if (attendanceTypeFilter === 'CHECK_OUT' && !item.rawEvents.some(e => e.type === 'CHECK_OUT')) return false;
 
       return true;
-    });
+    }).sort((a,b) => b.date.localeCompare(a.date));
   }, [employeePairs, attendanceTypeFilter]);
   return (
     <div className="space-y-6">
@@ -247,171 +244,20 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
         </div>
       </div>
 
-      {/* Attendance Log Table */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider font-mono">
-            Bản ghi chấm công ({recordedPairs.length} ca làm việc)
-          </span>
-        </div>
-
-        <TableContainer minWidth="900px">
-          <TableHead>
-            <TableHeadRow>
-              <TableHeadCell width="150px">Ca làm việc</TableHeadCell>
-              <TableHeadCell width="120px">Sự kiện</TableHeadCell>
-              <TableHeadCell width="100px">Thời gian</TableHeadCell>
-              <TableHeadCell width="130px">Phương thức</TableHeadCell>
-              <TableHeadCell width="90px">Độ tin cậy</TableHeadCell>
-              <TableHeadCell width="110px">Trạng thái</TableHeadCell>
-              <TableHeadCell width="100px">Trễ / Sớm</TableHeadCell>
-              <TableHeadCell width="100px" isLast>Tăng ca</TableHeadCell>
-            </TableHeadRow>
-          </TableHead>
-          <TableBody>
-            {recordedPairs.length === 0 ? (
-              <TableEmpty
-                colSpan={8}
-                message={`Không tìm thấy bản ghi chấm công nào phù hợp ${
-                  startDate === endDate ? `cho ngày ${startDate}` : `trong khoảng từ ${startDate} đến ${endDate}`
-                }`}
-              />
-            ) : (
-              recordedPairs.map((item) => {
-                const { shift, events, lateEarlyStr, overtimeStr } = item;
-                const checkInEv = events[0];
-                const checkOutEv = events[1];
-
-                const inBadge = getStatusBadge(checkInEv.status);
-                const outBadge = getStatusBadge(checkOutEv.status);
-
-                return (
-                  <React.Fragment key={`${item.employee.employee_id}-${item.date}-${shift.name}`}>
-                    {/* Row 1: Check-in */}
-                    <tr className="hover:bg-slate-50/90 dark:hover:bg-[#1a1e3a]/50 transition-colors border-b border-slate-200 dark:border-[#202752]">
-                      {/* Shift Info - rowSpan 2 */}
-                      <td rowSpan={2} className="py-3 px-4 align-middle text-center border-r border-b-2 border-slate-300 dark:border-[#28305c] bg-white dark:bg-[#13162b] max-w-[150px]">
-                        <div className="space-y-1 flex flex-col items-center justify-center text-center">
-                          <span
-                            className="inline-block px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-950/40 text-[10px] font-mono font-semibold text-purple-600 dark:text-purple-400 border border-purple-200/80 dark:border-purple-800/40 truncate max-w-full"
-                            title={item.date}
-                          >
-                            {item.date}
-                          </span>
-                          <p className="font-semibold text-slate-800 dark:text-slate-200 truncate text-xs w-full" title={shift.name}>
-                            {shift.name}
-                          </p>
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate w-full" title={shift.timeRange}>
-                            {shift.timeRange}
-                          </p>
-                        </div>
-                      </td>
-
-                      {/* Check-In Event */}
-                      <td className="py-2.5 px-4 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-[#202752] text-center">
-                        <span className="inline-flex items-center justify-center gap-1.5 text-indigo-600 dark:text-indigo-400">
-                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />
-                          {checkInEv.label}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-4 font-mono font-semibold text-slate-900 dark:text-white border-r border-slate-200 dark:border-[#202752] text-center">
-                        {checkInEv.time}
-                      </td>
-                      <td className="py-2.5 px-4 border-r border-slate-200 dark:border-[#202752] text-center">
-                        {checkInEv.methodLabel === 'UNRECORDED' ? (
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${getStatusBadge('UNRECORDED').color}`}>
-                            UNRECORDED
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-700 dark:text-slate-200">
-                            {checkInEv.isFace ? (
-                              <ScanFace className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                            ) : (
-                              <Fingerprint className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                            )}
-                            {checkInEv.methodLabel}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-4 font-mono text-[11px] border-r border-slate-200 dark:border-[#202752] text-center">
-                        {checkInEv.score !== null ? (
-                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">{(checkInEv.score * 100).toFixed(0)}%</span>
-                        ) : (
-                          <span className="text-slate-400 dark:text-slate-600">--</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-4 border-r border-slate-200 dark:border-[#202752] text-center">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${inBadge.color}`}>
-                          {inBadge.label}
-                        </span>
-                      </td>
-
-                      {/* Late/Early - rowSpan 2 */}
-                      <td rowSpan={2} className="py-3 px-4 align-middle font-mono font-bold border-r border-b-2 border-slate-300 dark:border-[#28305c] bg-white dark:bg-[#13162b] text-center truncate" title={item.currentLateEarlySec > 0 ? lateEarlyStr : '00:00:00'}>
-                        {item.currentLateEarlySec > 0 ? (
-                          <span className="text-rose-600 dark:text-rose-400">{lateEarlyStr}</span>
-                        ) : (
-                          <span className="text-slate-400 dark:text-slate-500">00:00:00</span>
-                        )}
-                      </td>
-
-                      {/* Overtime - rowSpan 2 */}
-                      <td rowSpan={2} className="py-3 px-4 align-middle font-mono font-bold border-b-2 border-slate-300 dark:border-[#28305c] bg-white dark:bg-[#13162b] text-center truncate" title={overtimeStr}>
-                        {item.currentOTSec > 0 ? (
-                          <span className="text-emerald-600 dark:text-emerald-400">{overtimeStr}</span>
-                        ) : (
-                          <span className="text-slate-400 dark:text-slate-500">{overtimeStr}</span>
-                        )}
-                      </td>
-                    </tr>
-
-                    {/* Row 2: Check-out */}
-                    <tr className="hover:bg-slate-50/90 dark:hover:bg-[#1a1e3a]/50 transition-colors border-b-2 border-slate-300 dark:border-[#28305c]">
-                      <td className="py-2.5 px-4 font-medium text-slate-700 dark:text-slate-300 border-r border-slate-200 dark:border-[#202752] text-center">
-                        <span className="inline-flex items-center justify-center gap-1.5 text-purple-600 dark:text-purple-400">
-                          <span className="w-1.5 h-1.5 rounded-full bg-purple-500 dark:bg-purple-400" />
-                          {checkOutEv.label}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-4 font-mono font-semibold text-slate-900 dark:text-white border-r border-slate-200 dark:border-[#202752] text-center">
-                        {checkOutEv.time}
-                      </td>
-                      <td className="py-2.5 px-4 border-r border-slate-200 dark:border-[#202752] text-center">
-                        {checkOutEv.methodLabel === 'UNRECORDED' ? (
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${getStatusBadge('UNRECORDED').color}`}>
-                            UNRECORDED
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-700 dark:text-slate-200">
-                            {checkOutEv.isFace ? (
-                              <ScanFace className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                            ) : (
-                              <Fingerprint className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                            )}
-                            {checkOutEv.methodLabel}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-4 font-mono text-[11px] border-r border-slate-200 dark:border-[#202752] text-center">
-                        {checkOutEv.score !== null ? (
-                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">{(checkOutEv.score * 100).toFixed(0)}%</span>
-                        ) : (
-                          <span className="text-slate-400 dark:text-slate-600">--</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-4 border-r border-slate-200 dark:border-[#202752] text-center">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${outBadge.color}`}>
-                          {outBadge.label}
-                        </span>
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                );
-              })
-            )}
-          </TableBody>
-        </TableContainer>
-      </div>
+      {currentEmp && <AdjustmentReviewPanel period={(startDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })).slice(0,7)} employeeId={currentEmp.employee_id} />}
+      <section className="space-y-3">
+        <h3 className="font-bold text-slate-900 dark:text-white">Chi tiết các lượt vào / ra theo ngày</h3>
+        <AttendanceLogFilterSelect value={logFilter} onChange={setLogFilter} />
+        {(logsQuery.isLoading || summariesQuery.isLoading) && <p role="status">Đang tải lịch sử và kết quả công…</p>}
+        {(logsQuery.isError || summariesQuery.isError) && <p role="alert" className="text-rose-600">Không tải đủ dữ liệu chấm công. <button type="button" onClick={() => { logsQuery.refetchAttendance(); summariesQuery.refetch(); }}>Thử lại</button></p>}
+        {recordedPairs.length === 0 && !logsQuery.isLoading && <p className="text-sm text-slate-500">Không có lượt ghi nhận trong khoảng đã chọn.</p>}
+        {recordedPairs.map((item,index) => <details open={index === 0} key={`${item.employee.employee_id}-${item.date}`} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#13162b] p-4">
+          <summary className="cursor-pointer font-semibold text-slate-900 dark:text-white">
+            {item.date} · {item.shift.name} ({item.shift.timeRange}) · {item.rawEvents.length} lượt · {item.workingHours}h công
+          </summary>
+          <div className="mt-4"><AttendanceDayDetails item={item} filter={logFilter} showFilter={false} /></div>
+        </details>)}
+      </section>
     </div>
   );
 };

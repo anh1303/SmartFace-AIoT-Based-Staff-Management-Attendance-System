@@ -39,19 +39,14 @@ export const emitAttendanceEvent = (event: string, payload: unknown, room?: stri
     return
   }
 
-  // Mặc định phát tới các cấp quản lý ADMIN và MANAGER
-  nsp.to('ADMIN').to('MANAGER').emit(event, payload)
-
-  // Nếu sự kiện gắn liền với một nhân viên cụ thể, phát thêm tới room cá nhân của nhân viên đó
+  // Use a union of rooms so a manager receiving their own event gets one copy.
   const p = payload as any
   const empId = p?.employee_id || p?.employeeId || p?.employee_uuid || p?.employees?.id || p?.employees?.employee_code
-  if (empId) {
-    nsp.to(`employee:${empId}`).emit(event, payload)
-  }
-  const userId = p?.user_id || p?.userId || p?.employees?.user_id
-  if (userId) {
-    nsp.to(`user:${userId}`).emit(event, payload)
-  }
+  const userId = p?.employee_user_id || p?.user_id || p?.userId || p?.employees?.user_id
+  let recipients = nsp.to('ADMIN').to('MANAGER')
+  if (empId) recipients = recipients.to(`employee:${empId}`)
+  if (userId) recipients = recipients.to(`user:${userId}`)
+  recipients.emit(event, payload)
 }
 
 // Tự động lắng nghe Domain Events từ EventBus và broadcast tới Socket.IO clients

@@ -47,13 +47,14 @@ export const EmployeePayrollTab: React.FC<EmployeePayrollTabProps> = ({
               <TableHeadCell width="110px" align="center">Tổng giờ làm</TableHeadCell>
               <TableHeadCell width="110px" align="center">Số giờ tăng ca</TableHeadCell>
               <TableHeadCell width="140px" align="center">Số giờ đi trễ/về sớm</TableHeadCell>
+              <TableHeadCell width="120px" align="center">Phạt vắng ca</TableHeadCell>
               <TableHeadCell width="120px" align="center">Phụ cấp</TableHeadCell>
               <TableHeadCell width="130px" align="center" isLast>Thực lĩnh</TableHeadCell>
             </TableHeadRow>
           </TableHead>
           <TableBody>
             {pastPayrolls.length === 0 ? (
-              <TableEmpty colSpan={7} message="Chưa có lịch sử bảng lương cho nhân viên này." />
+              <TableEmpty colSpan={8} message="Chưa có lịch sử bảng lương cho nhân viên này." />
             ) : (
               pastPayrolls.map((p, idx) => {
                 const hourly = Number(p.hourly_rate ?? hourlyRate ?? 0);
@@ -86,6 +87,7 @@ export const EmployeePayrollTab: React.FC<EmployeePayrollTabProps> = ({
                     <TableCell className="font-mono text-amber-600 dark:text-amber-400 truncate" title={lateEarly > 0 ? `${lateEarly}h` : '0h'}>
                       {lateEarly > 0 ? `${lateEarly}h` : '0h'}
                     </TableCell>
+                    <TableCell className="font-mono text-rose-600">{(p.total_absence_penalty || 0).toLocaleString('vi-VN')} ₫</TableCell>
                     <TableCell className="font-mono text-purple-600 dark:text-purple-400 truncate" title={allw > 0 ? `+${allw.toLocaleString('vi-VN')} ₫` : '0 ₫'}>
                       {allw > 0 ? `+${allw.toLocaleString('vi-VN')} ₫` : '0 ₫'}
                     </TableCell>

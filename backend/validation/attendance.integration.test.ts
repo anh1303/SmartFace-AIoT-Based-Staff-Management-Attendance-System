@@ -7,7 +7,7 @@ if (enabled && ![process.env.DATABASE_URL, process.env.DIRECT_URL].every(url => 
 }
 const suite = enabled ? describe : describe.skip
 suite('PostgreSQL policy integration (isolated database only)', () => {
-  let db: any, service: any, payroll: any, emp: any, admin: any
+  let db: any, service: any, payroll: any, adjustments: any, emp: any, admin: any
   const date = '2026-10-02', period = '2026-10'
   const at = (time: string) => +new Date(`${date}T${time}+07:00`)
   beforeAll(async () => {
@@ -15,6 +15,7 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
     db = (await import('../src/config/database.js')).prisma
     service = await import('../src/modules/attendance/attendance.service.js')
     payroll = await import('../src/modules/payroll/payroll.service.js')
+    adjustments = await import('../src/modules/payroll/payroll.adjustments.js')
     await payroll.updateBonusPenalty({overtime_rate:1.5,late_early_penalty:50000})
     const role = await db.roles.upsert({ where: { role_name: 'ADMIN' }, create: { role_name: 'ADMIN' }, update: {} })
     admin = await db.user.create({ data: { username: `policy-${randomUUID().slice(0,8)}`, passwordHash: 'test-only', role_id: role.id } })
@@ -31,12 +32,14 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
     await service.checkIn({employeeId:emp.id},undefined,{...capture,eventId:'next-event-1234',capturedAt:at('09:00:00')})
     await service.checkOut(emp.id,undefined,undefined,{...capture,eventId:'out-event-1234',capturedAt:at('18:10:00')})
     const summary = await db.daily_attendance_summary.findFirst({where:{employee_id:emp.id}})
-    expect(Number(summary.total_working_hours)).toBe(8.5);expect(Number(summary.overtime)).toBe(0)
+    expect(Number(summary.total_working_hours)).toBe(9.5);expect(Number(summary.overtime)).toBe(0)
     expect(summary.overtime_seconds).toBe(2400);expect(Number(summary.overtime_candidate_hours)).toBe(0.5);expect(summary.overtime_status).toBe('PENDING')
   })
   it('requires an approval reason and permits more OT than measured', async () => {
     await expect(service.adjustAttendance({employeeId:emp.id,date,late_early:1,overtime:2,reason:''},admin.id,'ADMIN')).rejects.toThrow()
     await service.adjustAttendance({employeeId:emp.id,date,late_early:1,overtime:2.74,reason:'Sự cố thiếu ghi nhận'},admin.id,'ADMIN')
+    const items = await db.attendanceAdjustment.findMany({where:{employee_id:emp.id,status:'PENDING'}})
+    for (const item of items) await adjustments.reviewAdjustment(String(item.id),{status:'APPROVED',note:'Đã kiểm tra',updated_at:item.updated_at.toISOString()},{id:admin.id,role:'ADMIN'})
     await service.aggregateDailyAttendance(10,2026,emp.id)
     const summary = await db.daily_attendance_summary.findFirst({where:{employee_id:emp.id}})
     expect(summary.overtime_status).toBe('APPROVED');expect(Number(summary.overtime)).toBe(2.5)
@@ -44,13 +47,15 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
   })
   it('generates zero-safe wages, snapshots rates and blocks stale finalize', async () => {
     const generated = await payroll.generate(period,emp.id,admin.id,{id:admin.id,role:'ADMIN'})
-    expect(generated[0].total_working_hours).toBe(8.5);expect(generated[0].total_overtime).toBe(2.5)
-    expect(generated[0].net_salary).toBe(2675000)
+    expect(generated[0].total_working_hours).toBe(9.5);expect(generated[0].total_overtime).toBe(2.5)
+    expect(generated[0].net_salary).toBe(2775000)
     await payroll.updateBonusPenalty({overtime_rate:2,late_early_penalty:80000},admin.id)
     await payroll.generate(period,emp.id,admin.id,{id:admin.id,role:'ADMIN'})
     const current = await db.payrollRecord.findFirst({where:{employeeId:emp.id}})
     expect(Number(current.overtime_rate)).toBe(1.5)
     await service.adjustAttendance({employeeId:emp.id,date,late_early:1,overtime:1,reason:'Duyệt lại 1 giờ'},admin.id,'ADMIN')
+    const ot = await db.attendanceAdjustment.findFirst({where:{employee_id:emp.id,kind:'OVERTIME'}})
+    await adjustments.reviewAdjustment(String(ot.id),{status:'APPROVED',note:'Duyệt lại',updated_at:ot.updated_at.toISOString()},{id:admin.id,role:'ADMIN'})
     await expect(payroll.finalizePeriod(period,admin.id,'ADMIN')).rejects.toThrow(/thay đổi/)
   })
   it('preserves finalized wages and blocks edits/generation on a closed row', async () => {

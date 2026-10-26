@@ -13,6 +13,13 @@ export interface AttendanceIntervalItem {
   method?: string;
   device_id?: string;
   score?: number | null;
+  inId?: string;
+  outId?: string;
+  counted?: boolean;
+  regularSeconds?: number;
+  overtimeSeconds?: number;
+  creditedRegularSeconds?: number;
+  creditReason?: string;
 }
 
 export interface AttendanceEventItem {
@@ -26,6 +33,9 @@ export interface AttendanceEventItem {
   score: number | null;
   status: string;
   statusText: string;
+  rawStatus?: string;
+  timestamp?: string;
+  pairingReason?: string;
 }
 
 export interface AttendancePairItem {
@@ -66,6 +76,7 @@ export interface AttendancePairItem {
   overtimeStatus: string;
   candidateHours: number;
   pairIntervals: string[];
+  hasPairData?: boolean;
 }
 
 export function useAttendancePairs(
@@ -138,6 +149,16 @@ export function useAttendancePairs(
       });
     }
 
+    for (const log of attendance) {
+      const emp = employees.find(e => e.employee_id === log.employee_id || e.id === log.employee_id);
+      if (!emp) continue;
+      const date = formatVNDateISO(log.timestamp);
+      if (startDate && date < startDate || endDate && date > endDate) continue;
+      if (scheduledShiftKeys.has(`${emp.employee_id}_${date}`) || emp.id && scheduledShiftKeys.has(`${emp.id}_${date}`)) continue;
+      scheduledShiftKeys.add(`${emp.employee_id}_${date}`);
+      unassignedEntries.push({employee_id:emp.employee_id,date,shift_type:'UNASSIGNED',start_time:'--:--',end_time:'--:--'});
+    }
+
     const allShiftEntries = [
       ...targetShifts.map(s => ({
         employee_id: s.employee_id,
@@ -180,7 +201,7 @@ export function useAttendancePairs(
         ? 'Ngày OFF'
         : isUnassigned
           ? 'Chưa phân ca'
-          : empShift.shift_type === 'MORNING'
+          : empShift.end_time < empShift.start_time ? 'Ca qua đêm' : empShift.shift_type === 'MORNING'
             ? 'Ca sáng'
             : empShift.shift_type === 'AFTERNOON'
               ? 'Ca chiều'
@@ -233,20 +254,27 @@ export function useAttendancePairs(
       const initialOTSec = currentOTSec;
 
       // Cờ rà soát và phiên bản chính sách
-      const needsReview = summary?.needs_review ?? false;
+      const needsReview = summary?.requires_review ?? summary?.needs_review ?? false;
       const reviewReason = summary?.review_reason ?? null;
       const policyVersion = summary?.policy_version ?? null;
       const isLegacyNoPolicy = summary ? summary.is_legacy_no_policy : false;
 
       // 4. Lấy danh sách log thực tế của nhân viên trong ngày (sắp xếp tăng dần theo thời gian)
-      const empLogs = attendance
-        .filter(log => {
-          const isEmpMatch = log.employee_id === emp.employee_id || (emp.id && log.employee_id === emp.id);
-          if (!isEmpMatch) return false;
-          const logDateStr = formatVNDateISO(log.timestamp);
-          return logDateStr === shiftDate;
-        })
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const sourceEvents = summary?.calculation_details?.events;
+      const savedLogs: AttendanceRecord[] = Array.isArray(sourceEvents) ? sourceEvents.map((ev: any) => {
+        const raw = attendance.find(log => (log.id || log.attendance_id) === ev.id);
+        return { ...raw, id: ev.id, attendance_id: ev.id, employee_id: emp.employee_id, type: ev.type,
+          timestamp: ev.time, status: ev.status, method: ev.method || raw?.method || 'MANUAL',
+          device_id: ev.device_info || raw?.device_id || '--', verification_score: ev.verification_score ?? raw?.verification_score ?? null };
+      }) : attendance.filter(log => (log.employee_id === emp.employee_id || (emp.id && log.employee_id === emp.id)) && formatVNDateISO(log.timestamp) === shiftDate)
+        .sort((a,b) => +new Date(a.timestamp) - +new Date(b.timestamp));
+      const foreignIds = new Set(Object.values(summaryMap).filter((s: any) => s && s.date !== shiftDate && (s.employee_id === emp.employee_id || s.employee_uuid === emp.id))
+        .flatMap((s: any) => (s.calculation_details?.pairs || []).flatMap((p: any) => [p.inId, p.outId])));
+      const savedIds = new Set(savedLogs.map(l => l.id || l.attendance_id));
+      const empLogs = [...savedLogs, ...attendance.filter(l => (l.employee_id === emp.employee_id || l.employee_id === emp.id)
+        && formatVNDateISO(l.timestamp) === shiftDate && !savedIds.has(l.id || l.attendance_id) && !foreignIds.has(l.id || l.attendance_id))]
+        .filter(l => !foreignIds.has(l.id || l.attendance_id))
+        .sort((a,b) => +new Date(a.timestamp) - +new Date(b.timestamp));
 
       const isNoShift = isOffDay || isUnassigned;
 
@@ -266,7 +294,10 @@ export function useAttendancePairs(
         const isEventUnrecorded = isNoShift || log.punctuality === 'UNRECORDED';
 
         return {
-          id: `${emp.employee_id}-${shiftDate}-raw-${idx}-${log.attendance_id || idx}`,
+          id: log.id || log.attendance_id,
+          timestamp: log.timestamp,
+          rawStatus: log.raw_status || log.status,
+          pairingReason: summary?.calculation_details?.ignored?.find((i: any) => i.id === (log.id || log.attendance_id))?.reason,
           type: log.type === 'CHECK_OUT' || log.type === 'TAN_CA' ? 'CHECK_OUT' : 'CHECK_IN',
           label: log.type === 'CHECK_OUT' || log.type === 'TAN_CA' ? 'Hết ca' : 'Vào Ca',
           time: formatVNTime(log.timestamp),
@@ -292,81 +323,21 @@ export function useAttendancePairs(
       });
 
       // 5. Bóc tách từng khoảng IN -> OUT hợp lệ
-      const validIntervals: AttendanceIntervalItem[] = [];
-      if (summary?.pairs && summary.pairs.length > 0) {
-        summary.pairs.forEach((p: any) => {
-          validIntervals.push({
-            inTime: p.in_time,
-            outTime: p.out_time,
-            durationSeconds: p.duration_seconds,
-            durationStr: formatSecondsToHHMMSS(p.duration_seconds),
-            isValid: p.is_valid,
-            method: p.method,
-            device_id: p.device_info || '--',
-            score: p.score ?? null,
-          });
-        });
-      } else {
-        // Tự động phân tách cặp theo thứ tự xuất hiện nếu backend chưa có summary.pairs
-        let i = 0;
-        while (i < empLogs.length) {
-          const cur = empLogs[i];
-          if (cur.type === 'CHECK_IN') {
-            const next = empLogs[i + 1];
-            if (next && (next.type === 'CHECK_OUT' || next.type === 'TAN_CA')) {
-              const durSec = Math.max(0, Math.round((new Date(next.timestamp).getTime() - new Date(cur.timestamp).getTime()) / 1000));
-              validIntervals.push({
-                inTime: formatVNTime(cur.timestamp),
-                outTime: formatVNTime(next.timestamp),
-                durationSeconds: durSec,
-                durationStr: formatSecondsToHHMMSS(durSec),
-                isValid: true,
-                method: cur.method,
-                device_id: cur.device_id || '--',
-                score: cur.verification_score ?? null,
-              });
-              i += 2;
-            } else {
-              validIntervals.push({
-                inTime: formatVNTime(cur.timestamp),
-                outTime: null,
-                durationSeconds: 0,
-                durationStr: '--:--:--',
-                isValid: false,
-                method: cur.method,
-                device_id: cur.device_id || '--',
-                score: cur.verification_score ?? null,
-              });
-              i++;
-            }
-          } else {
-            validIntervals.push({
-              inTime: null,
-              outTime: formatVNTime(cur.timestamp),
-              durationSeconds: 0,
-              durationStr: '--:--:--',
-              isValid: false,
-              method: cur.method,
-              device_id: cur.device_id || '--',
-              score: cur.verification_score ?? null,
-            });
-            i++;
-          }
-        }
-      }
-
-      // Check-in đầu tiên và Check-out cuối cùng để hiển thị dòng tóm tắt
-      const checkInLog = empLogs.find(l => l.type === 'CHECK_IN') || (empLogs.length > 0 ? empLogs[0] : undefined);
-      const checkOutLog = empLogs
-        .slice()
-        .reverse()
-        .find(l => (l.type === 'CHECK_OUT' || l.type === 'TAN_CA') && l !== checkInLog);
-
-      const checkInTime = checkInLog ? formatVNTime(checkInLog.timestamp) : '--:--:--';
-      const checkOutTime = checkOutLog ? formatVNTime(checkOutLog.timestamp) : '--:--:--';
-
-      const hasCheckedIn = checkInLog !== undefined && checkInTime !== '--:--:--';
-      const hasCheckedOut = checkOutLog !== undefined && checkOutTime !== '--:--:--';
+      const policyPairs: Array<{ inId: string; outId: string; start: string; end: string; counted?: boolean; regular_seconds?: number; overtime_seconds?: number; credited_regular_seconds?: number; credit_reason?: string }> = summary?.calculation_details?.pairs || [];
+      const validIntervals: AttendanceIntervalItem[] = policyPairs.map(p => ({
+        inTime: `${formatVNDateISO(p.start)} ${formatVNTime(p.start)}`, outTime: `${formatVNDateISO(p.end)} ${formatVNTime(p.end)}`,
+        durationSeconds: (+new Date(p.end) - +new Date(p.start)) / 1000,
+        durationStr: formatSecondsToHHMMSS((+new Date(p.end) - +new Date(p.start)) / 1000), isValid: true,
+        inId: p.inId, outId: p.outId, counted: p.counted, regularSeconds: p.regular_seconds, overtimeSeconds: p.overtime_seconds,
+        creditedRegularSeconds: p.credited_regular_seconds, creditReason: p.credit_reason,
+      }));
+      // The server owns overview boundaries. A loose OUT must never become an IN.
+      const checkInLog = summary?.first_check_in ? empLogs.find(l => l.type === 'CHECK_IN' && +new Date(l.timestamp) === +new Date(summary.first_check_in)) : undefined;
+      const checkOutLog = summary?.last_check_out ? empLogs.find(l => (l.type === 'CHECK_OUT' || l.type === 'TAN_CA') && +new Date(l.timestamp) === +new Date(summary.last_check_out)) : undefined;
+      const checkInTime = summary?.first_check_in ? formatVNTime(summary.first_check_in) : '--:--:--';
+      const checkOutTime = summary?.last_check_out ? formatVNTime(summary.last_check_out) : '--:--:--';
+      const hasCheckedIn = checkInTime !== '--:--:--';
+      const hasCheckedOut = checkOutTime !== '--:--:--';
 
       const isCheckInFace = checkInLog?.method === 'FACE';
       const isCheckOutFace = checkOutLog?.method === 'FACE';
@@ -383,7 +354,7 @@ export function useAttendancePairs(
         status: isNoShift
           ? 'UNRECORDED'
           : checkInLog
-            ? (checkInLog.punctuality === 'LATE'
+            ? (['LATE', 'LATE_AND_EARLY'].includes(summary?.status)
                 ? 'LATE'
                 : checkInLog.punctuality === 'UNRECORDED'
                   ? 'UNRECORDED'
@@ -392,7 +363,7 @@ export function useAttendancePairs(
         statusText: isNoShift
           ? (checkInLog ? 'UNRECORDED' : '--')
           : checkInLog
-            ? (checkInLog.punctuality === 'LATE'
+            ? (['LATE', 'LATE_AND_EARLY'].includes(summary?.status)
                 ? 'Đi muộn'
                 : checkInLog.punctuality === 'UNRECORDED'
                   ? 'UNRECORDED'
@@ -400,9 +371,7 @@ export function useAttendancePairs(
             : '--',
       };
 
-      const outPunc = checkOutLog
-        ? checkOutLog.punctuality || (checkOutLog.status === 'VALID' ? 'ON_TIME' : checkOutLog.status)
-        : null;
+      const outPunc = ['EARLY_LEAVE', 'LATE_AND_EARLY'].includes(summary?.status) ? 'EARLY_LEAVE' : checkOutLog?.punctuality || 'ON_TIME';
 
       const checkOutRow: AttendanceEventItem = {
         id: `${emp.employee_id}-${shiftDate}-out`,
@@ -470,6 +439,7 @@ export function useAttendancePairs(
         isLegacyNoPolicy,
         overtimeStatus: (summary as any)?.overtime_status || 'NONE',
         candidateHours: Number((summary as any)?.overtime_candidate_hours || 0),
+        hasPairData: Array.isArray(summary?.calculation_details?.pairs),
         pairIntervals: Array.isArray((summary as any)?.calculation_details?.pairs)
           ? (summary as any).calculation_details.pairs.map((p: any) => `${formatVNTime(p.start)} → ${formatVNTime(p.end)}`)
           : [],

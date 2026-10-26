@@ -1,3 +1,6 @@
+import * as adjustments from './payroll.adjustments.js';
+import { reviewAdjustmentSchema } from './payroll.dto.js';
+import { z } from 'zod';
 import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
 import * as service from './payroll.service.js';
@@ -48,4 +51,13 @@ export const finalizePeriod = async (req: Request, res: Response) => {
 export const unlockPeriod = async (req: Request, res: Response) => {
   const period = req.params.period as string;
   successResponse(res, await service.unlockPeriod(period, req.user?.id), 'Payroll period unlocked');
+};
+
+export const listAdjustments = async (req: Request, res: Response) => {
+  const query = z.object({ period: z.string(), employeeId: z.string().optional() }).parse(req.query);
+  successResponse(res, await adjustments.listAdjustments(query.period, query.employeeId, req.user!));
+};
+export const reviewAdjustment = async (req: Request, res: Response) => {
+  const id = z.string().regex(/^\d+$/).parse(req.params.id);
+  successResponse(res, await adjustments.reviewAdjustment(id, reviewAdjustmentSchema.parse(req.body), req.user!));
 };

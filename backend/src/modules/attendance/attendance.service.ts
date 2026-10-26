@@ -1,7 +1,9 @@
+import { projectAttendanceDetails } from './attendance.details.js'
+import { syncDayAdjustments, flushAdjustmentBatch } from './attendance.adjustments.js'
 import { observeRecognition } from './recognition-confirmation.js'
 import { Prisma } from '@prisma/client'
 import { createHash } from 'node:crypto'
-import { calculateDay, pairAttendance, vnDay, ATTENDANCE_POLICY_VERSION, MAX_PAIR_MS, roundHours } from './attendance.policy.js'
+import { calculateDay, pairAttendance, attendanceWorkDate, vnDay, ATTENDANCE_POLICY_VERSION, MAX_PAIR_MS, roundHours } from './attendance.policy.js'
 import { prisma } from '../../config/database.js'
 import { assertCanAccessEmployeeDetail } from '../../common/permission.helper.js'
 import { AppError } from '../../common/AppError.js'
@@ -336,7 +338,7 @@ export async function getDailySummaries(
     requires_review: s.requires_review,
     review_reason: s.review_reason,
     policy_version: s.policy_version,
-    calculation_details: s.calculation_details,
+    calculation_details: projectAttendanceDetails(s.calculation_details, Number(s.total_working_hours), Number(s.overtime_candidate_hours)),
     regular_seconds: s.regular_seconds,
     overtime_seconds: s.overtime_seconds,
     late_early_seconds: s.late_early_seconds,
@@ -380,16 +382,19 @@ export async function adjustAttendance(
       where: { id: existing.id },
       data: {
         late_early: late,
-        overtime,
+        overtime: 0,
+        overtime_candidate_hours: overtime,
         manual_adjustment: true,
-        overtime_status: overtime > 0 ? 'APPROVED' : 'REJECTED',
+        overtime_status: overtime > 0 ? 'PENDING' : 'NONE',
         overtime_reason: data.reason.trim(),
-        approved_by: actorUserId,
-        approved_at: new Date(),
+        approved_by: null,
+        approved_at: null,
         requires_review: false,
         review_reason: null,
       },
     })
+    const adjustmentPolicy = await tx.bonusPenalty.findFirst({ orderBy: { id: 'desc' } })
+    await syncDayAdjustments(tx, updated, Number(emp.hourly_rate || 0), Number(adjustmentPolicy?.absence_penalty_rate ?? 0.25))
     await tx.auditLog.create({
       data: {
         userId: actorUserId,
@@ -407,6 +412,7 @@ export async function adjustAttendance(
     id: String(result.id),
     employee_id: emp.employee_code,
     employee_uuid: emp.id,
+    employee_user_id: emp.user_id,
     date: data.date,
     total_working_hours: Number(result.total_working_hours),
     late_early: Number(result.late_early),
@@ -416,7 +422,6 @@ export async function adjustAttendance(
     reason: data.reason.trim(),
   }
 
-  emitAttendanceEvent('attendance-summary-updated', { employee_user_id: emp.user_id, ...summaryResult })
   eventBus.publish('attendance:summary-updated', {
     employeeId: emp.id,
     workDate: data.date,
@@ -469,8 +474,11 @@ async function recordAttendance(
       where: { employee_id: employee.id, status: 'VALID', event_time: { lte: eventTime } },
       orderBy: [{ event_time: 'desc' }, { id: 'desc' }],
     })
+    const eventDay = new Date(`${vnDay(eventTime)}T00:00:00Z`)
+    const nearShifts = await tx.employee_shifts.findMany({ where: { employee_id: employee.id, work_date: { gte: new Date(+eventDay - MAX_PAIR_MS), lte: eventDay } }, include: { work_shifts: true } })
+    const schedule = nearShifts.map(s => ({ ...s, start_time: s.start_time ?? s.work_shifts.start_time, end_time: s.end_time ?? s.work_shifts.end_time }))
     const date = type === 'CHECK_OUT' && previous?.type === 'CHECK_IN' && +eventTime - +previous.event_time <= MAX_PAIR_MS
-      ? vnDay(previous.event_time) : vnDay(eventTime)
+      ? attendanceWorkDate(previous.event_time, schedule) : attendanceWorkDate(eventTime, schedule)
     const closedPeriod = await tx.payrollRecord.findFirst({ where: { employeeId: employee.id, payroll_period: date.slice(0, 7), status: { in: ['FINALIZED', 'CONFIRMED', 'PAID'] } } })
     const created = await tx.attendance_logs.create({
       data: {
@@ -487,7 +495,8 @@ async function recordAttendance(
       },
       include: attendanceInclude,
     })
-    const affected = [...new Set([date, vnDay(eventTime), ...(previous ? [vnDay(previous.event_time)] : [])])]
+    const previousDay = previous && +eventTime - +previous.event_time <= MAX_PAIR_MS ? attendanceWorkDate(previous.event_time, schedule) : null
+    const affected = [...new Set([date, vnDay(eventTime), ...(previousDay ? [previousDay] : [])])]
     for (const day of affected) {
       const closed = await tx.payrollRecord.findFirst({ where: { employeeId: employee.id, payroll_period: day.slice(0, 7), status: { in: ['FINALIZED', 'CONFIRMED', 'PAID'] } } })
       if (!closed) {
@@ -501,16 +510,17 @@ async function recordAttendance(
       }
     }
     return { created, affected, duplicate: false }
-  })
+  }, { timeout: 15000, maxWait: 10000 })
   // Raw logs are durable even if a summary calculation fails. A replay retries the same summaries.
+  const updatedSummaries: Array<Record<string, unknown>> = []
   for (const date of affected) {
-    await aggregateDailyAttendance(Number(date.slice(5, 7)), Number(date.slice(0, 4)), employee.id, date)
+    const calculated = await aggregateDailyAttendance(Number(date.slice(5, 7)), Number(date.slice(0, 4)), employee.id, date)
+    updatedSummaries.push(...calculated.details)
   }
 
-  const result = { ...formatAttendanceRecord(created), duplicate, work_date: vnDay(created.work_date || created.event_time) }
+  const result = { ...formatAttendanceRecord(created), duplicate, summaries: updatedSummaries, work_date: vnDay(created.work_date || created.event_time) }
   emitAttendanceEvent('attendance-summary-updated', { employee_id: employee.employee_code, employee_user_id: employee.user_id, dates: affected })
-  emitAttendanceEvent(type === 'CHECK_IN' ? 'checked-in' : 'checked-out', result)
-  eventBus.publish(type === 'CHECK_IN' ? 'attendance:checked-in' : 'attendance:checked-out', {
+  if (!duplicate) eventBus.publish(type === 'CHECK_IN' ? 'attendance:checked-in' : 'attendance:checked-out', {
     employeeId: employee.id,
     logId: String(created.id),
     eventTime: created.event_time,
@@ -615,9 +625,15 @@ export async function getLocks() {
 
 export async function toggleLock(dateStr: string, is_locked: boolean, actorUserId?: string) {
   const work_date = new Date(`${dateStr}T00:00:00.000Z`)
+  if (is_locked) await aggregateDailyAttendance(Number(dateStr.slice(5,7)), Number(dateStr.slice(0,4)), undefined, dateStr)
   const lock = await prisma.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${dateStr.slice(0, 7)}`}))`
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${dateStr}`}))`
+    if (is_locked) {
+      const days = await tx.daily_attendance_summary.findMany({ where: { work_date }, select: { calculation_details: true } })
+      if (days.some(d => { const details = d.calculation_details as Record<string, unknown> | null; return details && !details.off && +new Date(String(details.scheduledEnd)) > Date.now() })) throw AppError.conflict('Ca chưa kết thúc, bao gồm ca qua đêm; chưa thể khóa ngày')
+    }
+    if (is_locked && await tx.attendanceAdjustment.count({ where: { work_date, status: 'PENDING' } })) throw AppError.conflict('Còn khoản OT/phạt chờ duyệt trước khi khóa ngày')
     if (is_locked && await tx.daily_attendance_summary.count({ where: { work_date, OR: [{ requires_review: true }, { overtime_status: 'PENDING' }, { policy_version: null }] } })) throw AppError.conflict('Cần rà soát công và duyệt OT trước khi khóa ngày')
     const lock = await tx.attendance_locks.upsert({ where: { work_date },
       update: { is_locked, locked_at: new Date(), locked_by: actorUserId || 'MANAGER' },
@@ -646,7 +662,8 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
     if (typeof (tx as any).$executeRaw === 'function') {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${year}-${String(month).padStart(2, '0')}`}))`
     }
-    const start = new Date(Date.UTC(year, month - 1, 1)), end = new Date(Date.UTC(year, month, 1))
+    const start = onlyDate ? new Date(`${onlyDate}T00:00:00Z`) : new Date(Date.UTC(year, month - 1, 1))
+    const end = onlyDate ? new Date(+start + MAX_PAIR_MS) : new Date(Date.UTC(year, month, 1))
     const first = `${year}-${String(month).padStart(2, '0')}-01`
     const today = vnDay(new Date())
     const employees = await tx.employee.findMany({ where: employeeId ? buildIdOrCodeWhere(employeeId) : {
@@ -654,34 +671,38 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
     } })
     const ids = employees.map(e => e.id)
     if (!ids.length) return { month, year, totalSummaries: 0, details: [] }
-    const [shifts, logs, summaries, locks, closedPayroll] = await Promise.all([
-      tx.employee_shifts.findMany({ where: { employee_id: { in: ids }, work_date: { gte: start, lt: end } }, include: { work_shifts: true } }),
+    const [shifts, logs, summaries, locks, closedPayroll, adjustmentRows] = await Promise.all([
+      tx.employee_shifts.findMany({ where: { employee_id: { in: ids }, work_date: { gte: new Date(+start - MAX_PAIR_MS), lt: new Date(+end + MAX_PAIR_MS) } }, include: { work_shifts: true } }),
       tx.attendance_logs.findMany({ where: { employee_id: { in: ids }, event_time: {
-        gte: new Date(+new Date(`${first}T00:00:00+07:00`) - MAX_PAIR_MS),
+        gte: new Date(+new Date(`${onlyDate || first}T00:00:00+07:00`) - MAX_PAIR_MS),
         lt: new Date(+end + MAX_PAIR_MS),
       } }, orderBy: [{ event_time: 'asc' }, { id: 'asc' }] }),
       tx.daily_attendance_summary.findMany({ where: { employee_id: { in: ids }, work_date: { gte: start, lt: end } } }),
       tx.attendance_locks.findMany({ where: { work_date: { gte: start, lt: end }, is_locked: true } }),
       tx.payrollRecord.findMany({ where: { employeeId: { in: ids }, payroll_period: first.slice(0, 7), status: { in: ['FINALIZED', 'CONFIRMED', 'PAID'] } }, select: { employeeId: true } }),
+      tx.attendanceAdjustment.findMany({ where: { employee_id: { in: ids }, work_date: { gte: start, lt: end } } }),
     ])
+    const adjustmentBatch = { existing: new Map(adjustmentRows.map(r => [`${r.employee_id}:${r.work_date.toISOString().slice(0,10)}:${r.kind}`, r])), writes: [] as Prisma.AttendanceAdjustmentCreateManyInput[], audits: [] as Prisma.AuditLogCreateManyInput[] }
     const lockedDates = new Set(locks.map(l => vnDay(l.work_date)))
     const closedEmployees = new Set(closedPayroll.map(p => p.employeeId))
     const pendingWrites: Array<Record<string, unknown>> = []
     const invalidations: Prisma.AuditLogCreateManyInput[] = []
     const details: Array<Record<string, unknown>> = []
+    const adjustmentPolicy = await tx.bonusPenalty.findFirst({ orderBy: { id: 'desc' } })
     for (const emp of employees) {
       const empLogs = logs.filter(l => l.employee_id === emp.id)
-      const pairing = pairAttendance(empLogs)
+      const empShifts = shifts.filter(s => s.employee_id === emp.id).map(s => ({ ...s, start_time: s.start_time ?? s.work_shifts.start_time, end_time: s.end_time ?? s.work_shifts.end_time }))
+      const pairing = pairAttendance(empLogs, empShifts)
       const pairedOuts = new Set(pairing.pairs.map(p => p.outId))
       const dates = new Set([
         ...shifts.filter(s => s.employee_id === emp.id).map(s => vnDay(s.work_date)),
-        ...empLogs.filter(l => !pairedOuts.has(String(l.id))).map(l => vnDay(l.event_time)),
+        ...empLogs.filter(l => !pairedOuts.has(String(l.id))).map(l => attendanceWorkDate(l.event_time, empShifts)),
         ...summaries.filter(s => s.employee_id === emp.id).map(s => vnDay(s.work_date)),
       ])
       for (const date of [...dates].sort()) {
         if (date.slice(0, 7) !== first.slice(0, 7) || date > today || (onlyDate && date !== onlyDate)) continue
-        const assigned = shifts.find(s => s.employee_id === emp.id && vnDay(s.work_date) === date)
-        const calculation = calculateDay(date, empLogs, assigned || null)
+        const assigned = empShifts.find(s => vnDay(s.work_date) === date)
+        const calculation = calculateDay(date, empLogs, assigned || null, new Date(), empShifts)
         const workDate = new Date(`${date}T00:00:00Z`)
         const summary = (() => {
           const previous = summaries.find(s => s.employee_id === emp.id && vnDay(s.work_date) === date)
@@ -697,8 +718,8 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
             late_early: manual ? previous!.late_early : calculation.lateEarlyHours,
             overtime: approved ? previous!.overtime : 0,
             regular_seconds: Math.round(calculation.regularSeconds), overtime_seconds: Math.round(calculation.overtimeSeconds),
-            late_early_seconds: Math.round(calculation.lateEarlySeconds), overtime_candidate_hours: calculation.overtimeCandidateHours,
-            overtime_status: approved ? 'APPROVED' : previous?.overtime_status === 'REJECTED' && !changed ? 'REJECTED' : calculation.overtimeCandidateHours > 0 ? 'PENDING' : 'NONE',
+            late_early_seconds: Math.round(calculation.lateEarlySeconds), overtime_candidate_hours: manual ? Number(previous!.overtime_candidate_hours) : calculation.overtimeCandidateHours,
+            overtime_status: approved ? 'APPROVED' : previous?.overtime_status === 'REJECTED' && !changed ? 'REJECTED' : (manual ? Number(previous!.overtime_candidate_hours) : calculation.overtimeCandidateHours) > 0 ? 'PENDING' : 'NONE',
             overtime_reason: changed ? null : previous?.overtime_reason,
             approved_by: changed ? null : previous?.approved_by, approved_at: changed ? null : previous?.approved_at,
             manual_adjustment: Boolean(manual), attendance_status: calculation.status,
@@ -710,25 +731,26 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
             target_table: 'daily_attendance_summary', record_id: String(previous.id),
             old_values: { overtime: Number(previous.overtime), late_early: Number(previous.late_early), reason: previous.overtime_reason },
             new_values: { reason: 'SOURCE_CHANGED', overtime: 0 } })
-          if (changed || previous?.policy_version !== ATTENDANCE_POLICY_VERSION || previous?.attendance_status !== data.attendance_status || previous?.shift_id !== data.shift_id) {
+          if (changed || previousDetails?.details_version !== calculation.details.details_version || previous?.policy_version !== ATTENDANCE_POLICY_VERSION || previous?.attendance_status !== data.attendance_status || previous?.shift_id !== data.shift_id) {
             pendingWrites.push({ employee_id: emp.id, work_date: date, ...data, updated_at: new Date().toISOString() })
           }
           return data
         })()
+        if (summary && !lockedDates.has(date) && !closedEmployees.has(emp.id)) {
+          await syncDayAdjustments(tx, { ...summary, employee_id: emp.id, work_date: workDate }, Number(emp.hourly_rate || 0), Number(adjustmentPolicy?.absence_penalty_rate ?? 0.25), adjustmentBatch)
+        }
         if (summary) details.push({ employee_code: emp.employee_code, employee_name: emp.full_name, date,
-          total_working_hours: Number(summary.total_working_hours), overtime: Number(summary.overtime || summary.overtime_candidate_hours),
+          total_working_hours: Number(summary.total_working_hours), overtime: Number(summary.overtime), overtime_status: summary.overtime_status,
           overtime_candidate_hours: Number(summary.overtime_candidate_hours), late_early: Number(summary.late_early), status: summary.attendance_status })
       }
     }
-    for (const write of pendingWrites) {
-      if (typeof (tx as any).daily_attendance_summary?.upsert === 'function') {
-        const { employee_id, work_date, updated_at, ...rest } = write as any
-        await (tx as any).daily_attendance_summary.upsert({
-          where: { employee_id_work_date: { employee_id, work_date: new Date(`${work_date}T00:00:00Z`) } },
-          create: { employee_id, work_date: new Date(`${work_date}T00:00:00Z`), ...rest },
-          update: { ...rest, updated_at: new Date() },
-        }).catch(() => {})
-      }
+    if (process.env.NODE_ENV === 'test') for (const write of pendingWrites) {
+      const { employee_id, work_date, updated_at, ...rest } = write as any
+      await tx.daily_attendance_summary.upsert({
+        where: { employee_id_work_date: { employee_id, work_date: new Date(`${work_date}T00:00:00Z`) } },
+        create: { employee_id, work_date: new Date(`${work_date}T00:00:00Z`), ...rest },
+        update: { ...rest, updated_at: new Date() },
+      })
     }
     // One parametrized JSON batch avoids a DB round trip for every employee/day.
     if (typeof (tx as any).$executeRaw === 'function' && process.env.NODE_ENV !== 'test') {
@@ -753,6 +775,7 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
           ON CONFLICT (employee_id, work_date) DO UPDATE SET ${updates}`
       }
     }
+    await flushAdjustmentBatch(tx, adjustmentBatch)
     if (invalidations.length) await tx.auditLog.createMany({ data: invalidations })
     return { month, year, totalSummaries: details.length, details }
   }, { timeout: 60000 })

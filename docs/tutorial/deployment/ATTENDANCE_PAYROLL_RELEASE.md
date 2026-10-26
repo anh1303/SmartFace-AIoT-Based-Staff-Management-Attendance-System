@@ -1,5 +1,7 @@
 # Hồ sơ sửa logic điểm danh và tính lương — 19/10/2026
 
+> Đây là hồ sơ phát hành ngày 19/10. Với nâng cấp ca đêm và duyệt từng khoản OT/phạt ngày 26/10/2026, đọc [hướng dẫn nâng cấp hiện tại](../../ATTENDANCE_OT_PENALTY_UPGRADE_2026-10-26.md) và [rule phiên bản 2026-10-26-v5](../../rule/COMPANY_POLICY.md). Trạng thái migration Neon bên dưới chỉ mô tả đợt 19/10, không xác nhận các migration mới đã áp dụng lên cloud.
+
 Đọc theo thứ tự:
 
 1. [Chính sách công ty đã chốt, công thức và ví dụ](../../rule/COMPANY_POLICY.md).

@@ -73,11 +73,12 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
   const ignored = result.ignored.filter(p => p.date === workDate)
   const open = result.pending && vnDay(result.pending.event_time) === workDate
   const off = shift?.shift_type === 'OFF'
+  const isZeroDuration = !off && clock(shift?.start_time, '08:00') === clock(shift?.end_time, '17:00')
   const start = new Date(`${workDate}T${clock(shift?.start_time, '08:00')}+07:00`)
-  const end = new Date(`${workDate}T${clock(shift?.end_time, '17:30')}+07:00`)
-  if (!off && end <= start) end.setUTCDate(end.getUTCDate() + 1)
+  const end = new Date(`${workDate}T${clock(shift?.end_time, '17:00')}+07:00`)
+  if (!off && !isZeroDuration && end <= start) end.setUTCDate(end.getUTCDate() + 1)
 
-  const scheduledShiftSeconds = shift && !off ? Math.max(0, (+end - +start) / 1000) : 0
+  const scheduledShiftSeconds = shift && !off && !isZeroDuration ? Math.max(0, (+end - +start) / 1000) : 0
   let actualWorkedSecondsInShift = 0
   let rawOvertimeSeconds = 0
   if (shift && !off) {

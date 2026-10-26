@@ -6,5 +6,7 @@ export { ScheduleLegend } from './components/ScheduleLegend';
 export { ShiftEditModal } from './components/ShiftEditModal';
 export type { EditingShiftTarget } from './components/ShiftEditModal';
 export { BulkShiftModal } from './components/BulkShiftModal';
+export type { ShiftType, WorkShift } from '../../types/shift.types';
 export { getMonday, formatDateToYYYYMMDD, getISOWeekNumber } from '../../utils/dateUtils';
 export { useShifts, SHIFTS_QUERY_KEY } from './hooks/useShifts';
+export { ShiftTimeInput } from './components/ShiftTimeInput';

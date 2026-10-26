@@ -97,9 +97,9 @@ export const calculateRawInitialOTSec = (
 export const calculateShiftWorkingHours = (
   shift: { start_time?: string; end_time?: string }
 ): number => {
-  const startSec = parseTimeToSeconds(shift.start_time || '08:30');
-  const endSec = parseTimeToSeconds(shift.end_time || '17:30');
-  if (startSec === null || endSec === null) return 9;
+  const startSec = parseTimeToSeconds(shift.start_time || '08:00');
+  const endSec = parseTimeToSeconds(shift.end_time || '17:00');
+  if (startSec === null || endSec === null) return 8;
   let diffSec = endSec - startSec;
   if (diffSec < 0) diffSec += 24 * 3600;
   return Math.round((diffSec / 3600) * 100) / 100;

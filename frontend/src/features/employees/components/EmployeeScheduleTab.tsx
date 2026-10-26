@@ -66,6 +66,8 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
           if (shift.shift_type !== 'MORNING') return false;
         } else if (shiftFilter === 'AFTERNOON') {
           if (shift.shift_type !== 'AFTERNOON') return false;
+        } else if (shiftFilter === 'OTHER') {
+          if (shift.shift_type !== 'OTHER') return false;
         }
       }
 
@@ -181,6 +183,7 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
               <option value="OFFICE_HOURS">Ca hành chính</option>
               <option value="MORNING">Ca sáng</option>
               <option value="AFTERNOON">Ca chiều</option>
+              <option value="OTHER">Ca khác</option>
             </select>
           </div>
         </div>
@@ -216,7 +219,9 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
                   ? 'Ca chiều'
                   : shift.shift_type === 'OFF'
                     ? 'Nghỉ ca'
-                    : 'Ca hành chính';
+                    : shift.shift_type === 'OTHER'
+                      ? 'Ca khác'
+                      : 'Ca hành chính';
               const shiftTime = shift.shift_type !== 'OFF' && shift.start_time && shift.end_time
                 ? ` (${shift.start_time} – ${shift.end_time})`
                 : '';

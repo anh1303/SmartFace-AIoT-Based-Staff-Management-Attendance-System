@@ -1,7 +1,7 @@
 import { workDateSchema } from '../../common/date.schema.js'
 import { z } from 'zod'
 
-export const VALID_SHIFT_TYPES = ['OFFICE_HOURS', 'MORNING', 'AFTERNOON', 'OFF'] as const
+export const VALID_SHIFT_TYPES = ['OFFICE_HOURS', 'MORNING', 'AFTERNOON', 'OTHER', 'OFF'] as const
 
 export const assignShiftSchema = z
   .object({
@@ -14,10 +14,12 @@ export const assignShiftSchema = z
       'OFFICE_HOURS',
       'MORNING',
       'AFTERNOON',
+      'OTHER',
       'OFF',
       'office_hours',
       'morning',
       'afternoon',
+      'other',
       'off',
     ]),
     start_time: z.string().optional(),

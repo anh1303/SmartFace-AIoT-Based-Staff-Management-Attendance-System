@@ -203,7 +203,9 @@ export const EmployeeSchedule: React.FC = () => {
                           ? 'Ca Sáng'
                           : shift?.shift_type === 'AFTERNOON'
                             ? 'Ca Chiều'
-                            : 'Nghỉ Ca'}
+                            : shift?.shift_type === 'OTHER'
+                              ? 'Ca khác'
+                              : 'Nghỉ Ca'}
                     </p>
                     {shift?.shift_type !== 'OFF' && (
                       <p className="text-[11px] font-mono text-slate-700 dark:text-slate-300 mt-1">

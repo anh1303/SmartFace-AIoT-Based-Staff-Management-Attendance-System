@@ -87,7 +87,7 @@ export const EmployeeDashboard: React.FC = () => {
       in: inText,
       out: outText,
       status,
-      type: dayShift?.shift_type === 'OFFICE_HOURS' ? 'Ca Chuẩn' : dayShift?.shift_type === 'MORNING' ? 'Ca Sáng' : dayShift?.shift_type === 'AFTERNOON' ? 'Ca Chiều' : 'Nghỉ ca',
+      type: dayShift?.shift_type === 'OFFICE_HOURS' ? 'Ca Chuẩn' : dayShift?.shift_type === 'MORNING' ? 'Ca Sáng' : dayShift?.shift_type === 'AFTERNOON' ? 'Ca Chiều' : dayShift?.shift_type === 'OTHER' ? 'Ca khác' : 'Nghỉ ca',
     };
   });
 
@@ -364,7 +364,9 @@ export const EmployeeDashboard: React.FC = () => {
                             ? 'Ca Sáng'
                             : shift.shift_type === 'AFTERNOON'
                               ? 'Ca Chiều'
-                              : 'Nghỉ ca'}
+                              : shift.shift_type === 'OTHER'
+                                ? 'Ca khác'
+                                : 'Nghỉ ca'}
                         {shift.note ? ` • ${shift.note}` : ''}
                       </p>
                       <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">

@@ -1,12 +1,11 @@
 import type { Prisma } from '@prisma/client'
-import { assertEditableDay, aggregateDailyAttendance } from '../attendance/attendance.service.js'
+import { assertEditableDay, aggregateDailyAttendance, isAttendanceDateLocked } from '../attendance/index.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, formatVNDateISO } from '../../common/utils.js'
-import { logAction } from '../audit-logs/audit.service.js'
+import { logAction } from '../audit-logs/index.js'
 import { isEmployeeManager, assertCanAccessEmployeeDetail } from '../../common/permission.helper.js'
 import { findEmployeeByIdOrCode, findEmployeeByUserId } from '../employees/index.js'
-import { isAttendanceDateLocked } from '../attendance/attendance.lock.js'
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 
@@ -19,25 +18,36 @@ export const STANDARD_SHIFT_CONFIGS = {
     code: 'OFFICE_HOURS',
     name: 'Ca Hành Chính',
     start_time: '08:00',
-    end_time: '17:30',
+    end_time: '17:00',
+    is_fixed: true,
   },
   MORNING: {
     code: 'MORNING',
     name: 'Ca Sáng',
-    start_time: '08:30',
-    end_time: '17:30',
+    start_time: '08:00',
+    end_time: '12:00',
+    is_fixed: true,
   },
   AFTERNOON: {
     code: 'AFTERNOON',
     name: 'Ca Chiều',
     start_time: '13:00',
-    end_time: '21:30',
+    end_time: '17:00',
+    is_fixed: true,
+  },
+  OTHER: {
+    code: 'OTHER',
+    name: 'Ca khác',
+    start_time: '00:00',
+    end_time: '00:00',
+    is_fixed: false,
   },
   OFF: {
     code: 'OFF',
-    name: 'Nghỉ ca (OFF)',
+    name: 'Nghỉ ca',
     start_time: '00:00',
     end_time: '00:00',
+    is_fixed: true,
   },
 } as const
 
@@ -96,7 +106,7 @@ export function formatShift(s: RawShift) {
     date: dateStr,
     work_day: workDay,
     start_time: formatTimeHHMM(s.start_time, '08:00'),
-    end_time: formatTimeHHMM(s.end_time, '17:30'),
+    end_time: formatTimeHHMM(s.end_time, '17:00'),
     shift_type: s.shift_type || 'OFFICE_HOURS',
     department: s.employees?.department?.name || '',
     note: s.note || '',
@@ -176,19 +186,36 @@ export async function assignOrUpdate(data: {
   const dayIndex = work_date.getUTCDay()
   const work_day = data.work_day || DAY_NAMES[dayIndex] || 'Thứ Hai'
 
-  // Quy định: Hệ thống chỉ có 3 ca làm việc mặc định và giờ bắt đầu, kết thúc đều là cố định, KHÔNG THỂ SỬA
+  // Quy định: 3 ca làm việc mặc định có giờ cố định KHÔNG THỂ SỬA. Ca khác (OTHER) cho phép sửa giờ nhưng KHÔNG ĐƯỢC để 00:00 - 00:00.
   const normalizedType = (data.shift_type || 'OFFICE_HOURS').toUpperCase() as keyof typeof STANDARD_SHIFT_CONFIGS
   const standardConfig = STANDARD_SHIFT_CONFIGS[normalizedType]
   if (!standardConfig) {
     throw new AppError(
       400,
-      'Loại ca không hợp lệ! Hệ thống chỉ hỗ trợ 3 ca làm việc mặc định: Ca Hành Chính (OFFICE_HOURS: 08:00 - 17:30), Ca Sáng (MORNING: 08:30 - 17:30), Ca Chiều (AFTERNOON: 13:00 - 21:30) hoặc Nghỉ ca (OFF)'
+      'Loại ca không hợp lệ! Hệ thống hỗ trợ: Ca Hành Chính (OFFICE_HOURS: 08:00 - 17:00), Ca Sáng (MORNING: 08:00 - 12:00), Ca Chiều (AFTERNOON: 13:00 - 17:00), Ca khác (OTHER: tùy chỉnh giờ) hoặc Nghỉ ca'
     )
   }
 
-  // Luôn luôn áp dụng giờ bắt đầu và kết thúc cố định theo quy định của hệ thống
-  const startTimeDate = parseTimeStringToDate(standardConfig.start_time, '08:00')
-  const endTimeDate = parseTimeStringToDate(standardConfig.end_time, '17:30')
+  let startTimeDate: Date
+  let endTimeDate: Date
+
+  if (standardConfig.is_fixed) {
+    // 3 Ca chuẩn và OFF: Ép cứng giờ theo quy định doanh nghiệp
+    startTimeDate = parseTimeStringToDate(standardConfig.start_time, '08:00')
+    endTimeDate = parseTimeStringToDate(standardConfig.end_time, '17:00')
+  } else {
+    // Ca khác (OTHER): Bắt buộc người dùng phải thiết lập giờ bắt đầu nhỏ hơn giờ kết thúc (không được để 00:00 - 00:00)
+    const rawStart = data.start_time?.trim() || ''
+    const rawEnd = data.end_time?.trim() || ''
+    if (!rawStart || !rawEnd || (rawStart === '00:00' && rawEnd === '00:00') || rawStart >= rawEnd) {
+      throw new AppError(
+        400,
+        'Giờ bắt đầu ca làm việc phải nhỏ hơn giờ kết thúc (không được để mặc định 00:00 - 00:00)!'
+      )
+    }
+    startTimeDate = parseTimeStringToDate(rawStart, '00:00')
+    endTimeDate = parseTimeStringToDate(rawEnd, '00:00')
+  }
 
   const shiftRecord = await prisma.$transaction(async tx => {
     await assertEditableDay(tx, data.date, emp.id)
@@ -198,7 +225,8 @@ export async function assignOrUpdate(data: {
     if (standardConfig.code === 'OFFICE_HOURS') shiftNameMatches.push('Full time', 'Ca Hành Chính', 'Ca hành chính')
     else if (standardConfig.code === 'MORNING') shiftNameMatches.push('Part time: Ca sáng', 'Ca Sáng', 'Ca sáng')
     else if (standardConfig.code === 'AFTERNOON') shiftNameMatches.push('Part time: Ca chiều', 'Ca Chiều', 'Ca chiều')
-    else if (standardConfig.code === 'OFF') shiftNameMatches.push('Nghỉ (OFF)', 'Nghỉ ca (OFF)', 'OFF')
+    else if (standardConfig.code === 'OTHER') shiftNameMatches.push('Ca khác', 'Ca Khác', 'OTHER', 'Other')
+    else if (standardConfig.code === 'OFF') shiftNameMatches.push('Nghỉ ca', 'Nghỉ (OFF)', 'OFF')
 
     let defaultWorkShift = await tx.work_shifts.findFirst({
       where: { shift_name: { in: shiftNameMatches } },
@@ -207,8 +235,8 @@ export async function assignOrUpdate(data: {
       defaultWorkShift = await tx.work_shifts.create({
         data: {
           shift_name: standardConfig.name,
-          start_time: startTimeDate,
-          end_time: endTimeDate,
+          start_time: standardConfig.is_fixed ? startTimeDate : parseTimeStringToDate('00:00'),
+          end_time: standardConfig.is_fixed ? endTimeDate : parseTimeStringToDate('00:00'),
         },
       })
     }
@@ -269,7 +297,7 @@ export async function assignOrUpdate(data: {
           work_date: existingShift.work_date.toISOString(),
           shift_type: existingShift.shift_type,
           start_time: formatTimeHHMM(existingShift.start_time, '08:00'),
-          end_time: formatTimeHHMM(existingShift.end_time, '17:30'),
+          end_time: formatTimeHHMM(existingShift.end_time, '17:00'),
         }
         : undefined,
       new_values: {
@@ -278,7 +306,7 @@ export async function assignOrUpdate(data: {
         work_date: work_date.toISOString(),
         shift_type: data.shift_type,
         start_time: formatTimeHHMM(startTimeDate, '08:00'),
-        end_time: formatTimeHHMM(endTimeDate, '17:30'),
+        end_time: formatTimeHHMM(endTimeDate, '17:00'),
       },
     } })
 

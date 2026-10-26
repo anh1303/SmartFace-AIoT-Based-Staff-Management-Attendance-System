@@ -51,15 +51,15 @@ export function useEmployeePayrollDetail(options: UseEmployeePayrollDetailOption
     ? Number(currentMonthPayroll.overtime_rate)
     : (bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000);
 
-  const penaltyRate = currentMonthPayroll?.late_early_penalty !== undefined && currentMonthPayroll?.late_early_penalty !== null
-    ? Number(currentMonthPayroll.late_early_penalty)
+  const penaltyRate = currentMonthPayroll?.late_penalty_rate !== undefined && currentMonthPayroll?.late_penalty_rate !== null
+    ? Number(currentMonthPayroll.late_penalty_rate)
     : (bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000);
 
   const otAmount = calcPayrollAmount(overtimeHours, otRate, hourlyRate);
-  const penaltyAmount = calcPayrollAmount(lateEarlyHours, penaltyRate, hourlyRate);
+  const penaltyAmount = calcPayrollAmount(lateEarlyHours, penaltyRate, hourlyRate) + (currentMonthPayroll?.total_absence_penalty || 0);
 
   const baseSalary = standardHours * hourlyRate;
-  const currentNetSalary = currentMonthPayroll?.net_salary
+  const currentNetSalary = currentMonthPayroll?.net_salary !== undefined
     ? Number(currentMonthPayroll.net_salary)
     : Math.max(0, Math.round(baseSalary + otAmount - penaltyAmount + allowance));
 

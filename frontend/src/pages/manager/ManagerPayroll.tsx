@@ -1,3 +1,4 @@
+import { AdjustmentReviewPanel } from '../../features/payrolls/components/AdjustmentReviewPanel';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -71,6 +72,7 @@ export const ManagerPayroll: React.FC = () => {
   const [policyData, setPolicyData] = useState<PolicyFormData>({
     overtime_rate: 100000,
     late_early_penalty: 50000,
+    absence_penalty_rate: 0.25,
     description: '',
   });
 
@@ -82,6 +84,7 @@ export const ManagerPayroll: React.FC = () => {
     setPolicyData({
       overtime_rate: bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000,
       late_early_penalty: bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000,
+      absence_penalty_rate: bonusPenalty?.absence_penalty_rate ?? 0.25,
       description: bonusPenalty?.description || '',
     });
     setIsPolicyModalOpen(true);
@@ -306,6 +309,7 @@ export const ManagerPayroll: React.FC = () => {
       'Tổng Giờ Làm (h)',
       'Số Giờ Tăng Ca (h)',
       'Số Giờ Đi Trễ / Về Sớm (h)',
+      'Phạt Vắng Ca (VNĐ)',
       'Phụ Cấp (VNĐ)',
       'Thực Lĩnh Net (VNĐ)',
       'Trạng Thái',
@@ -331,6 +335,7 @@ export const ManagerPayroll: React.FC = () => {
         r.total_working_hours || 0,
         r.total_overtime ?? 0,
         r.total_late_early ?? 0,
+        r.total_absence_penalty || 0,
         r.allowance || 0,
         r.net_salary || 0,
         `"${statusStr}"`,
@@ -374,6 +379,8 @@ export const ManagerPayroll: React.FC = () => {
         totalExpense={totalExpense}
         onOpenPolicyModal={handleOpenPolicyModal}
       />
+
+      <AdjustmentReviewPanel period={selectedPeriod} />
 
       {/* Bento Table with Search & Position Filter */}
       <PayrollTable

@@ -18,9 +18,9 @@ describe('Floating Notifications Feature', () => {
     expect(formatRelativeTime(twoHoursAgo.toISOString())).toBe('2 giờ trước');
   });
 
-  it('renders NotificationEmptyState correctly with NO NEW NOTIFICATIONS text', () => {
+  it('renders NotificationEmptyState correctly with Không có thông báo mới text', () => {
     const html = renderToStaticMarkup(<NotificationEmptyState />);
-    expect(html).toContain('NO NEW NOTIFICATIONS');
+    expect(html).toContain('Không có thông báo mới');
   });
 
   it('guarantees that logout purges notification cache from storage', () => {

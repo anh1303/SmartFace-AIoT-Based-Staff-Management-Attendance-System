@@ -19,6 +19,7 @@ export function useAttendance(params?: FetchAttendanceParams) {
     const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
+      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     };
     for (const event of ['connect', 'checked-in', 'checked-out', 'attendance-summary-updated']) socket.on(event, refresh);
     return () => { socket.disconnect(); };
@@ -55,6 +56,7 @@ export function useAttendance(params?: FetchAttendanceParams) {
       showToast('Điểm danh thành công', 'success');
       queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
+      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (error: Error) => {
       showToast(`Lỗi khi điểm danh: ${error.message || 'Không thể kết nối đến máy chủ'}`, 'error');

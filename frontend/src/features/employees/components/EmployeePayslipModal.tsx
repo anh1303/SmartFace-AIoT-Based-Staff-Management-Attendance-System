@@ -32,8 +32,8 @@ export const EmployeePayslipModal: React.FC<EmployeePayslipModalProps> = ({
     ? Number(payslip.overtime_rate)
     : otRate;
 
-  const effectivePenaltyRate = payslip.late_early_penalty !== undefined && payslip.late_early_penalty !== null
-    ? Number(payslip.late_early_penalty)
+  const effectivePenaltyRate = payslip.late_penalty_rate !== undefined && payslip.late_penalty_rate !== null
+    ? Number(payslip.late_penalty_rate)
     : penaltyRate;
 
   const slipWorking = Number(payslip.total_working_hours ?? payslip.working_hours ?? 0);
@@ -109,6 +109,10 @@ export const EmployeePayslipModal: React.FC<EmployeePayslipModalProps> = ({
             <span className={`font-mono font-semibold ${slipLateAmount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`}>
               {slipLateAmount > 0 ? `-${slipLateAmount.toLocaleString('vi-VN')} ₫` : '0 ₫'}
             </span>
+          </div>
+          <div className="flex justify-between py-2 border-b border-slate-100 dark:border-[#21264b]">
+            <span className="text-slate-500 dark:text-slate-400">Phạt vắng ca đã duyệt:</span>
+            <span className="font-mono text-rose-600">-{(payslip.total_absence_penalty || 0).toLocaleString('vi-VN')} ₫</span>
           </div>
           <div className="flex justify-between py-2 border-b border-slate-100 dark:border-[#21264b]">
             <span className="text-slate-500 dark:text-slate-400">Phụ cấp chức vụ (Allowance):</span>

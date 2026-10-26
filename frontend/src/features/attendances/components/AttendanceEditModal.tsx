@@ -159,6 +159,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white font-heading">
               Điều Chỉnh Thời Gian Chấm Công
+              <span className="block text-xs font-normal text-slate-500 mt-1">Lưu đề xuất; duyệt từng khoản trong mục OT và phạt ở bảng lương.</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Nhân viên: <span className="text-slate-900 dark:text-white font-semibold">{editingItem.employee.full_name}</span> ({editingItem.employee.employee_id})

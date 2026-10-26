@@ -1,3 +1,4 @@
+import { adjustmentFingerprint } from '../attendance/attendance.adjustments.js'
 import { roundHours, ATTENDANCE_POLICY_VERSION } from '../attendance/attendance.policy.js'
 import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
@@ -28,6 +29,7 @@ export interface RawPayrollRecord {
   hourly_rate?: { toString(): string } | number | string | null
   total_working_hours?: { toString(): string } | number | string | null
   total_overtime?: { toString(): string } | number | string | null
+  total_absence_penalty?: unknown
   total_late_early?: { toString(): string } | number | string | null
   allowance?: { toString(): string } | number | string | null
   net_salary?: { toString(): string } | number | string | null
@@ -65,6 +67,7 @@ export function formatPayrollRecord(record: RawPayrollRecord) {
     total_working_hours,
     total_overtime,
     total_late_early,
+    total_absence_penalty: Number(record.total_absence_penalty || 0),
     allowance,
     net_salary,
     overtime_rate: record.overtime_rate == null ? null : Number(record.overtime_rate),
@@ -82,6 +85,7 @@ export async function getBonusPenalty() {
       id: 1,
       overtime_rate: 100000,
       late_early_penalty: 50000,
+      absence_penalty_rate: 0.25,
       description: 'Chính sách áp dụng chuẩn: OT 100.000 ₫/h, phạt trễ/sớm 50.000 ₫/h',
     }
   }
@@ -89,6 +93,7 @@ export async function getBonusPenalty() {
     id: policy.id,
     overtime_rate: Number(policy.overtime_rate),
     late_early_penalty: Number(policy.late_early_penalty),
+    absence_penalty_rate: Number(policy.absence_penalty_rate),
     description: policy.description || 'Chính sách áp dụng chuẩn từ hệ thống',
   }
 }
@@ -96,6 +101,7 @@ export async function getBonusPenalty() {
 export async function updateBonusPenalty(data: {
   overtime_rate?: number
   late_early_penalty?: number
+  absence_penalty_rate?: number
   description?: string
 }, actorUserId?: string) {
   return prisma.$transaction(async (tx) => {
@@ -108,6 +114,7 @@ export async function updateBonusPenalty(data: {
         data: {
           ...(data.overtime_rate !== undefined ? { overtime_rate: data.overtime_rate } : {}),
           ...(data.late_early_penalty !== undefined ? { late_early_penalty: data.late_early_penalty } : {}),
+          ...(data.absence_penalty_rate !== undefined ? { absence_penalty_rate: data.absence_penalty_rate } : {}),
           ...(data.description !== undefined ? { description: data.description } : {}),
           updated_at: new Date(),
         },
@@ -117,6 +124,7 @@ export async function updateBonusPenalty(data: {
         data: {
           overtime_rate: data.overtime_rate ?? 100000,
           late_early_penalty: data.late_early_penalty ?? 50000,
+          absence_penalty_rate: data.absence_penalty_rate ?? 0.25,
           description: data.description || 'Quy định thưởng phạt áp dụng năm 2026',
         },
       })
@@ -133,12 +141,14 @@ export async function updateBonusPenalty(data: {
           ? {
               overtime_rate: Number(existing.overtime_rate),
               late_early_penalty: Number(existing.late_early_penalty),
+              absence_penalty_rate: Number(existing.absence_penalty_rate),
               description: existing.description,
             }
           : undefined,
         new_values: {
           overtime_rate: Number(updatedPolicy.overtime_rate),
           late_early_penalty: Number(updatedPolicy.late_early_penalty),
+          absence_penalty_rate: Number(updatedPolicy.absence_penalty_rate),
           description: updatedPolicy.description,
         },
       },
@@ -148,6 +158,7 @@ export async function updateBonusPenalty(data: {
       id: updatedPolicy.id,
       overtime_rate: Number(updatedPolicy.overtime_rate),
       late_early_penalty: Number(updatedPolicy.late_early_penalty),
+      absence_penalty_rate: Number(updatedPolicy.absence_penalty_rate),
       description: updatedPolicy.description || '',
     }
   })
@@ -286,6 +297,7 @@ export async function updateItem(
 
   if (updates.status && updates.status !== record.status) throw AppError.badRequest('Dùng thao tác chốt/mở khóa kỳ để đổi trạng thái')
   if ((updates.total_overtime !== undefined || updates.total_working_hours !== undefined || updates.working_hours !== undefined || updates.total_late_early !== undefined) && !updates.reason?.trim()) throw AppError.badRequest('Cần lý do điều chỉnh giờ công/OT')
+  if (updates.total_overtime !== undefined && updates.total_overtime !== Number(record.total_overtime) || updates.total_late_early !== undefined && updates.total_late_early !== Number(record.total_late_early)) throw AppError.badRequest('Duyệt từng khoản OT/phạt theo ngày, không sửa tổng kỳ')
   const bonusPenalty = await getBonusPenalty()
   const overtimeRate = Number(record.overtime_rate ?? bonusPenalty.overtime_rate)
   const latePenaltyRate = Number(record.late_penalty_rate ?? bonusPenalty.late_early_penalty)
@@ -298,6 +310,7 @@ export async function updateItem(
     allowance,
     overtime_rate: overtimeRate,
     late_early_penalty: latePenaltyRate,
+    total_absence_penalty: Number(record.total_absence_penalty),
   })
 
   const updated = await prisma.$transaction(async tx => {
@@ -306,6 +319,8 @@ export async function updateItem(
     if (+fresh.updated_at !== +record.updated_at) throw AppError.conflict('Phiếu lương vừa thay đổi; tải lại trước khi sửa')
     const bounds = validatePeriod(record.payroll_period)
     const source = await tx.daily_attendance_summary.findMany({ where: { employee_id: record.employeeId, work_date: { gte: bounds.start, lt: bounds.end } } })
+    const adjustments = await tx.attendanceAdjustment.findMany({ where: { employee_id: record.employeeId, work_date: { gte: bounds.start, lt: bounds.end } } })
+    if ((record.calculation_details as Record<string, unknown> | null)?.adjustment_fingerprint !== adjustmentFingerprint(adjustments)) throw AppError.conflict('Các khoản OT/phạt đã thay đổi; tính lại lương trước khi chỉnh phiếu')
     if (['FINALIZED', 'CONFIRMED', 'PAID'].includes(fresh.status)) throw AppError.conflict('Kỳ lương đã khóa')
   const updated = await tx.payrollRecord.update({
     where: { id: record.id },
@@ -317,7 +332,7 @@ export async function updateItem(
       allowance,
       net_salary,
       overtime_rate: overtimeRate, late_penalty_rate: latePenaltyRate,
-      calculation_details: { ...((record.calculation_details as Record<string, unknown>) || {}), policy: ATTENDANCE_POLICY_VERSION, source_fingerprint: summaryFingerprint(source), manual: true, reason: updates.reason || 'PAYROLL_EDIT' },
+      calculation_details: { ...((record.calculation_details as Record<string, unknown>) || {}), policy: ATTENDANCE_POLICY_VERSION, source_fingerprint: summaryFingerprint(source), adjustment_fingerprint: adjustmentFingerprint(adjustments), manual: true, reason: updates.reason || 'PAYROLL_EDIT' },
       ...(updates.status ? { status: updates.status } : {}),
       updated_at: new Date(),
     },
@@ -376,6 +391,7 @@ function validatePeriod(period: string) {
 
 export async function finalizePeriod(period: string, actorUserId?: string, actorRole?: string) {
   const bounds = validatePeriod(period)
+  await aggregateDailyAttendance(bounds.month, bounds.year)
   await prisma.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${period}`}))`
     const allRows = await tx.payrollRecord.findMany({ where: { payroll_period: period }, include: { employee: { include: { users: { include: { roles: true } }, department: true, position: true } } } })
@@ -406,9 +422,14 @@ export async function finalizePeriod(period: string, actorUserId?: string, actor
         ],
       },
     })
+    const pendingAdjustments = await tx.attendanceAdjustment.count({ where: { employee_id: { in: rows.map(r => r.employeeId) }, work_date: { gte: bounds.start, lt: bounds.end }, status: 'PENDING' } })
+    if (pendingAdjustments) throw AppError.conflict('Còn khoản OT/phạt chờ duyệt trước khi chốt lương')
     if (pending) throw AppError.conflict('Còn ngày công/OT cần xác minh hoặc duyệt trước khi chốt lương')
     for (const row of rows.filter(r => r.status === 'PENDING')) {
       const source = await tx.daily_attendance_summary.findMany({ where: { employee_id: row.employeeId, work_date: { gte: bounds.start, lt: bounds.end } } })
+      if (source.some(s => { const details = s.calculation_details as Record<string, unknown> | null; return details && !details.off && +new Date(String(details.scheduledEnd)) > Date.now() })) throw AppError.conflict('Còn ca chưa kết thúc, bao gồm ca qua đêm; chưa thể chốt lương')
+      const adjustments = await tx.attendanceAdjustment.findMany({ where: { employee_id: row.employeeId, work_date: { gte: bounds.start, lt: bounds.end } } })
+      if ((row.calculation_details as Record<string, unknown> | null)?.adjustment_fingerprint !== adjustmentFingerprint(adjustments)) throw AppError.conflict('Các khoản OT/phạt đã thay đổi; cần tính lại lương')
       if ((row.calculation_details as Record<string, unknown> | null)?.source_fingerprint !== summaryFingerprint(source)) throw AppError.conflict('Công/OT đã thay đổi sau lần tính lương; cần tính lại hoặc rà soát phiếu chỉnh tay trước khi chốt')
     }
     if (rows.some(r => (r.calculation_details as Record<string, unknown> | null)?.policy !== ATTENDANCE_POLICY_VERSION)) throw AppError.conflict('Cần tính lại bảng lương cũ theo chính sách đã chốt')
@@ -452,24 +473,29 @@ export async function generate(payroll_period: string, employeeId?: string, acto
         if (employeeId) throw AppError.conflict('Kỳ lương đã khóa/đã trả')
         continue
       }
-      if ((existing?.calculation_details as Record<string, unknown> | null)?.manual) {
-        results.push(await tx.payrollRecord.findUniqueOrThrow({ where: { id: existing!.id }, include: { employee: { include: { department: true } } } })); continue
-      }
+      const manual = Boolean((existing?.calculation_details as Record<string, unknown> | null)?.manual)
       const summaries = await tx.daily_attendance_summary.findMany({ where: { employee_id: emp.id,
         work_date: { gte: start, lt: end, lte: new Date(`${today}T00:00:00Z`) } } })
       const sum = (field: 'total_working_hours' | 'late_early') => summaries.reduce((n, s) => n + Number(s[field]), 0)
-      const total_working_hours = sum('total_working_hours'), total_late_early = sum('late_early')
-      const total_overtime = summaries.filter(s => s.overtime_status === 'APPROVED').reduce((n, s) => n + Number(s.overtime), 0)
-      const hourly_rate = Number(emp.hourly_rate ?? existing?.hourly_rate ?? 0)
+      const adjustments = await tx.attendanceAdjustment.findMany({ where: { employee_id: emp.id, work_date: { gte: start, lt: end } } })
+      const approved = adjustments.filter(a => a.status === 'APPROVED')
+      const total_working_hours = manual ? Number(existing!.total_working_hours) : sum('total_working_hours')
+      const total_late_early = approved.filter(a => a.kind === 'LATE_EARLY').reduce((n,a) => n + Number(a.hours), 0)
+      const total_overtime = approved.filter(a => a.kind === 'OVERTIME').reduce((n,a) => n + Number(a.hours), 0)
+      const total_absence_penalty = approved.filter(a => a.kind === 'ABSENCE').reduce((n,a) => n + Number(a.amount), 0)
+      const hourly_rate = Number(manual ? existing!.hourly_rate : emp.hourly_rate ?? existing?.hourly_rate ?? 0)
       const allowance = existing ? Number(existing.allowance) : 1500000
       const overtime_rate = Number(existing?.overtime_rate ?? policy.overtime_rate)
       const late_penalty_rate = Number(existing?.late_penalty_rate ?? policy.late_early_penalty)
       const net_salary = calculateNetSalary({ hourly_rate, total_working_hours, total_overtime, total_late_early, allowance,
-        overtime_rate, late_early_penalty: late_penalty_rate })
-      const data = { hourly_rate, total_working_hours, total_overtime, total_late_early, allowance, net_salary,
+        overtime_rate, late_early_penalty: late_penalty_rate, total_absence_penalty })
+      const data = { hourly_rate, total_working_hours, total_overtime, total_late_early, total_absence_penalty, allowance, net_salary,
         overtime_rate, late_penalty_rate, status: 'PENDING', calculation_details: {
+          manual, reason: manual ? ((existing?.calculation_details as Record<string, unknown>)?.reason ?? 'PAYROLL_EDIT') : null,
           policy: ATTENDANCE_POLICY_VERSION, policy_id: policy.id, generated_at: new Date().toISOString(),
           source_fingerprint: summaryFingerprint(summaries),
+          adjustment_fingerprint: adjustmentFingerprint(adjustments),
+          adjustment_ids: approved.map(a => String(a.id)),
           summary_ids: summaries.map(s => String(s.id)), overtime_rate, late_penalty_rate,
           pending_review_days: summaries.filter(s => s.requires_review || s.overtime_status === 'PENDING').map(s => s.work_date.toISOString().slice(0, 10)),
         } }

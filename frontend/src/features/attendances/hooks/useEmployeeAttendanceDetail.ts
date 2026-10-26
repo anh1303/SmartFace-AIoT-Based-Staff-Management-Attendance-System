@@ -68,8 +68,8 @@ export function useEmployeeAttendanceDetail(options: UseEmployeeAttendanceDetail
     const lateCount = empLogs.filter((r) => r.punctuality === 'LATE').length;
     const earlyLeaveCount = empLogs.filter((r) => r.punctuality === 'EARLY_LEAVE').length;
 
-    const scores = empLogs.map((r) => Number(r.verification_score || 0.98)).filter((s) => s > 0);
-    const avgConfidence = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length) * 100 : 98.5;
+    const scores = empLogs.map((r) => Number(r.verification_score ?? 0)).filter((s) => s > 0);
+    const avgConfidence = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length) * 100 : 0;
 
     return {
       totalLogs: empLogs.length,

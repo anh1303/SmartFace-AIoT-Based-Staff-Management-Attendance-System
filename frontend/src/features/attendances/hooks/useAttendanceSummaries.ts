@@ -19,6 +19,10 @@ export interface BackendAttendanceSummaryItem {
   first_check_in: string | null;
   last_check_out: string | null;
   needs_review: boolean;
+  requires_review?: boolean;
+  overtime_status?: string;
+  overtime_candidate_hours?: number;
+  calculation_details?: { pairs?: Array<{ inId: string; outId: string; start: string; end: string; counted?: boolean; regular_seconds?: number; overtime_seconds?: number; credited_regular_seconds?: number; credit_reason?: string }>; events?: Array<{ id: string; type: string; time: string; status: string; method?: string; device_info?: string; verification_score?: number | null }>; ignored?: Array<{ id: string; reason: string }>; [key: string]: unknown };
   review_reason: string | null;
   policy_version: string | null;
   is_legacy_no_policy: boolean;
@@ -70,6 +74,7 @@ export function useAttendanceSummaries(startDate?: string, endDate?: string, emp
       const qs = searchParams.toString();
       const url = qs ? `/api/attendance/summaries?${qs}` : '/api/attendance/summaries';
       const res = await apiFetch(url);
+      if (!res.success) throw new Error(res.message || 'Không tải được kết quả tổng hợp công');
 
       const otMap: Record<string, number> = {};
       const leMap: Record<string, number> = {};
@@ -132,6 +137,7 @@ export function useAttendanceSummaries(startDate?: string, endDate?: string, emp
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
+      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
     },
     onError: (err: Error) => {
@@ -147,6 +153,9 @@ export function useAttendanceSummaries(startDate?: string, endDate?: string, emp
     summaryMap: query.data?.summaryMap || {},
     summaries: query.data?.summaries || [],
     isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
     adjustAttendance: adjustMutation.mutateAsync,
   };
 }

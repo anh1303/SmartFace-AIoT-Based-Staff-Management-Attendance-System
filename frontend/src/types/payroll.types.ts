@@ -4,6 +4,7 @@ export interface BonusPenaltyPolicy {
   id?: number;
   overtime_rate: number;
   late_early_penalty: number;
+  absence_penalty_rate?: number;
   description?: string;
 }
 
@@ -20,6 +21,7 @@ export interface PayrollRecord {
   working_hours?: number;
   total_overtime: number;
   total_late_early: number;
+  total_absence_penalty?: number;
   allowance: number;
   net_salary: number;
   status: PayrollStatus;

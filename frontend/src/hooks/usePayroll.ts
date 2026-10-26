@@ -44,6 +44,7 @@ export function usePayroll() {
       setSelectedPeriod(period);
       showToast(`Đã tính toán bảng lương kỳ ${period} từ CSDL`, 'success');
       queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (err: Error, period) => {
       showToast(`Lỗi khi tính toán bảng lương kỳ ${period}: ${err.message || ''}`, 'error');
@@ -55,6 +56,7 @@ export function usePayroll() {
       updatePayrollItemApi(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (err: Error) => {
       showToast(`Lỗi khi cập nhật phiếu lương: ${err.message || ''}`, 'error');
@@ -66,6 +68,7 @@ export function usePayroll() {
     onSuccess: (_data, period) => {
       showToast(`Đã chốt bảng lương kỳ ${period} trong CSDL`, 'success');
       queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (err: Error, period) => {
       showToast(`Lỗi khi chốt bảng lương kỳ ${period}: ${err.message || ''}`, 'error');
@@ -77,6 +80,7 @@ export function usePayroll() {
     onSuccess: (_records, period) => {
       showToast(`Đã mở khoá bảng lương kỳ ${period} trong CSDL`, 'warning');
       queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (err: Error, period) => {
       showToast(`Lỗi khi mở khoá bảng lương kỳ ${period}: ${err.message || ''}`, 'error');
@@ -84,11 +88,12 @@ export function usePayroll() {
   });
 
   const updateBonusPenaltyMutation = useMutation({
-    mutationFn: (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => updateBonusPenaltyApi(data),
+    mutationFn: (data: { overtime_rate?: number; late_early_penalty?: number; absence_penalty_rate?: number; description?: string }) => updateBonusPenaltyApi(data),
     onSuccess: () => {
       showToast('Cập nhật chính sách thưởng/phạt vào CSDL thành công', 'success');
       queryClient.invalidateQueries({ queryKey: BONUS_PENALTY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (err: Error) => {
       showToast(`Lỗi khi cập nhật chính sách thưởng/phạt: ${err.message || ''}`, 'error');
@@ -106,6 +111,6 @@ export function usePayroll() {
       updatePayrollItemMutation.mutateAsync({ id, updates }),
     finalizePayrollPeriod: (period: string) => finalizePayrollPeriodMutation.mutate(period),
     unlockPayrollPeriod: (period: string) => unlockPayrollPeriodMutation.mutate(period),
-    updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => updateBonusPenaltyMutation.mutateAsync(data),
+    updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; absence_penalty_rate?: number; description?: string }) => updateBonusPenaltyMutation.mutateAsync(data),
   };
 }

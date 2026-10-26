@@ -57,6 +57,7 @@ export const PayrollItemEditModal: React.FC<PayrollItemEditModalProps> = ({
       maxWidth="md"
     >
       <form onSubmit={onConfirmSave} className="space-y-4">
+        <p className="text-xs text-slate-500">OT và phạt được duyệt từng khoản theo ngày. Phạt vắng đã duyệt: {(editingItem.record.total_absence_penalty || 0).toLocaleString('vi-VN')} ₫.</p>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -108,6 +109,8 @@ export const PayrollItemEditModal: React.FC<PayrollItemEditModalProps> = ({
               type="number"
               step="0.5"
               min="0"
+              readOnly
+              title="Duyệt từng khoản theo ngày trong mục OT và phạt"
               value={editingItem.total_overtime}
               onChange={(e) =>
                 onChangeEditingItem({
@@ -127,6 +130,8 @@ export const PayrollItemEditModal: React.FC<PayrollItemEditModalProps> = ({
               type="number"
               step="0.5"
               min="0"
+              readOnly
+              title="Duyệt từng khoản theo ngày trong mục OT và phạt"
               value={editingItem.total_late_early}
               onChange={(e) =>
                 onChangeEditingItem({
@@ -218,7 +223,8 @@ export const PayrollItemEditModal: React.FC<PayrollItemEditModalProps> = ({
                 Math.round(
                   editingItem.hourly_rate * editingItem.working_hours +
                     calcPayrollAmount(editingItem.total_overtime, effectiveOtRate, editingItem.hourly_rate) -
-                    calcPayrollAmount(editingItem.total_late_early, effectiveLateRate, editingItem.hourly_rate) +
+                    calcPayrollAmount(editingItem.total_late_early, effectiveLateRate, editingItem.hourly_rate) -
+                    (editingItem.record.total_absence_penalty || 0) +
                     editingItem.allowance
                 )
               ).toLocaleString('vi-VN')}{' '}

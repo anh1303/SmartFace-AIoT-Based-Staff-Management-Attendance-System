@@ -96,6 +96,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
             <TableHeadCell width="100px">Tổng giờ làm</TableHeadCell>
             <TableHeadCell width="110px">Số giờ tăng ca</TableHeadCell>
             <TableHeadCell width="130px">Số giờ đi trễ/về sớm</TableHeadCell>
+            <TableHeadCell width="120px">Phạt vắng ca</TableHeadCell>
             <TableHeadCell width="110px">Phụ cấp</TableHeadCell>
             <TableHeadCell width="130px">Thực lĩnh</TableHeadCell>
             <TableHeadCell width="120px">Trạng thái</TableHeadCell>
@@ -104,7 +105,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
         </TableHead>
         <TableBody>
           {currentRecords.length === 0 ? (
-            <TableEmpty colSpan={9} message="Không tìm thấy bảng lương nào phù hợp với bộ lọc." />
+            <TableEmpty colSpan={10} message="Không tìm thấy bảng lương nào phù hợp với bộ lọc." />
           ) : (
             currentRecords.map((record) => {
               const emp = employees.find((e) => e.employee_id === record.employee_id);
@@ -180,6 +181,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
                     )}
                   </TableCell>
 
+                  <TableCell className="font-mono text-rose-600 dark:text-rose-400">{(record.total_absence_penalty || 0).toLocaleString('vi-VN')} ₫</TableCell>
                   {/* 6. Phụ cấp */}
                   <TableCell className="font-mono text-emerald-600 dark:text-emerald-400 font-medium truncate" title={allowance > 0 ? `+${allowance.toLocaleString('vi-VN')} ₫` : '0 ₫'}>
                     {allowance > 0 ? `+${allowance.toLocaleString('vi-VN')} ₫` : '0 ₫'}

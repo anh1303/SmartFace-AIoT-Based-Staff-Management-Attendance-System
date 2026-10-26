@@ -4,6 +4,7 @@ import { PAYROLL_STATUS } from '../../common/constants.js'
 export const updateBonusPenaltySchema = z.object({
   overtime_rate: z.number().finite().min(0).max(99999999.99).optional(),
   late_early_penalty: z.number().finite().min(0).max(1000000000).optional(),
+  absence_penalty_rate: z.number().finite().min(0).max(1).optional(),
   description: z.string().optional(),
 })
 
@@ -42,3 +43,9 @@ export const updatePayrollSchema = z.object({
 export type UpdateBonusPenaltyDto = z.infer<typeof updateBonusPenaltySchema>
 export type GeneratePayrollDto = z.infer<typeof generatePayrollSchema>
 export type UpdatePayrollDto = z.infer<typeof updatePayrollSchema>
+
+export const reviewAdjustmentSchema = z.object({
+  status: z.enum(['APPROVED', 'REJECTED']),
+  note: z.string().trim().max(2000).optional(),
+  updated_at: z.string().datetime(),
+})

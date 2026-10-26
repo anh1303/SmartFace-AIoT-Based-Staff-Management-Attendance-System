@@ -51,17 +51,17 @@ export const EmployeeSalaryEstimate: React.FC = () => {
   const otRate = currentPayroll?.overtime_rate !== undefined && currentPayroll?.overtime_rate !== null
     ? Number(currentPayroll.overtime_rate)
     : (bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000);
-  const penaltyRate = currentPayroll?.late_early_penalty !== undefined && currentPayroll?.late_early_penalty !== null
-    ? Number(currentPayroll.late_early_penalty)
+  const penaltyRate = currentPayroll?.late_penalty_rate !== undefined && currentPayroll?.late_penalty_rate !== null
+    ? Number(currentPayroll.late_penalty_rate)
     : (bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000);
 
   // Calculation using centralized payrollUtils
   const otAmount = calcPayrollAmount(overtimeHours, otRate, hourlyRate);
-  const penaltyAmount = calcPayrollAmount(lateEarlyHours, penaltyRate, hourlyRate);
+  const penaltyAmount = calcPayrollAmount(lateEarlyHours, penaltyRate, hourlyRate) + (currentPayroll?.total_absence_penalty || 0);
 
   const standardHours = currentPayroll?.total_working_hours ?? currentPayroll?.working_hours ?? 0;
   const baseSalary = standardHours * hourlyRate;
-  const netSalary = currentPayroll?.net_salary
+  const netSalary = currentPayroll?.net_salary !== undefined
     ? Number(currentPayroll.net_salary)
     : Math.max(0, Math.round(baseSalary + otAmount - penaltyAmount + allowance));
 
@@ -227,7 +227,7 @@ export const EmployeeSalaryEstimate: React.FC = () => {
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-slate-900 dark:text-white">Phạt đi muộn / về sớm</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">{lateEarlyHours}h vi phạm × {penaltyRateLabel}</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">{lateEarlyHours}h trễ/sớm × {penaltyRateLabel} + {(currentPayroll?.total_absence_penalty || 0).toLocaleString('vi-VN')} ₫ phạt vắng đã duyệt</p>
               </div>
               <span className={`font-mono text-xs font-bold ${penaltyAmount > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-400'}`}>
                 {penaltyAmount > 0 ? `- ${penaltyAmount.toLocaleString('vi-VN')} ₫` : '0 ₫'}
@@ -245,4 +245,4 @@ export const EmployeeSalaryEstimate: React.FC = () => {
       </div>
     </div>
   );
-};
+};

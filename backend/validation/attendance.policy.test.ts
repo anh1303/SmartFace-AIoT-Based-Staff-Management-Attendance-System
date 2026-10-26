@@ -85,3 +85,68 @@ describe('Company policy boundaries', () => {
     expect(r.workingHours).toBe(2)
   })
 })
+
+describe('Absence and overnight ownership', () => {
+  it('proposes absence only after end of an assigned empty shift', () => {
+    expect(calculateDay(day, [], shift, new Date(`${day}T12:00:00+07:00`)).absenceCandidate).toBe(false)
+    expect(calc([]).absenceCandidate).toBe(true)
+    expect(calculateDay(day, [], null).absenceCandidate).toBe(false)
+    expect(calc([], { ...shift, shift_type: 'OFF' }).absenceCandidate).toBe(false)
+    for (const logs of [[log(1,'CHECK_IN','08:00:00')], [log(1,'CHECK_OUT','17:00:00')], [{...log(1,'CHECK_IN','08:00:00'), status:'INVALID'}]]) {
+      expect(calc(logs).absenceCandidate).toBe(false)
+      expect(calc(logs).requiresReview).toBe(true)
+    }
+  })
+  it('keeps late/early independent of gaps between valid pairs', () => {
+    const r = calc([log(1,'CHECK_IN','09:00:00'),log(2,'CHECK_OUT','12:00:00'),log(3,'CHECK_IN','13:00:00'),log(4,'CHECK_OUT','17:00:00')])
+    expect(r.workingHours).toBe(9.5); expect(r.lateEarlyHours).toBe(1.5)
+    expect(r.details.internalGapSeconds).toBe(3600)
+    expect(r.details.pairs.map(p => p.regular_seconds)).toEqual([10800,14400])
+  })
+  it('does not use very early scans or an unpaired OUT as overview boundaries', () => {
+    const r = calc([log(1,'CHECK_IN','06:00:00'),log(2,'CHECK_OUT','07:00:00'),log(3,'CHECK_IN','08:00:00'),log(4,'CHECK_OUT','17:30:00'),log(5,'CHECK_OUT','22:00:00')])
+    expect(r.first?.toISOString()).toBe(new Date(`${day}T08:00:00+07:00`).toISOString())
+    expect(r.last?.toISOString()).toBe(new Date(`${day}T17:30:00+07:00`).toISOString())
+  })
+  it('joins checkout after midnight and re-entry to the previous overnight shift', () => {
+    const night = { start_time: '22:00', end_time: '06:00', shift_type:'NIGHT' }
+    const next = '2026-10-03'
+    const assignments = [{...night,work_date:day},{...shift,work_date:next}]
+    const logs = [log(1,'CHECK_IN','22:00:00'),log(2,'CHECK_OUT','01:00:00',next),log(3,'CHECK_IN','01:30:00',next),log(4,'CHECK_OUT','07:00:00',next)]
+    const previous = calculateDay(day, logs, night, new Date(`${next}T08:00:00+07:00`), assignments)
+    expect(previous.details.pairs).toHaveLength(2)
+    expect(previous.workingHours).toBe(8)
+    expect(previous.overtimeCandidateHours).toBe(1)
+    expect(previous.lateEarlyHours).toBe(0)
+    expect(previous.details.events).toHaveLength(4)
+    expect(previous.details.pairs[1].regular_seconds).toBe(4.5 * 3600)
+    expect(calculateDay(next, logs, shift, new Date(`${next}T18:00:00+07:00`), assignments).details.pairs).toHaveLength(0)
+  })
+  it('does not declare a night-shift absence at midnight', () => {
+    const r = calculateDay(day, [], { start_time:'22:00',end_time:'06:00',shift_type:'NIGHT' }, new Date('2026-10-03T00:30:00+07:00'))
+    expect(r.status).toBe('SCHEDULED'); expect(r.absenceCandidate).toBe(false)
+  })
+  it('carries an overnight pair across a month boundary without double counting', () => {
+    const logs = [log(1,'CHECK_IN','22:00:00','2026-09-30'),log(2,'CHECK_OUT','07:00:00','2026-10-01')]
+    const night = { start_time:'22:00',end_time:'06:00',shift_type:'NIGHT' }
+    const assignments = [{...night,work_date:'2026-09-30'}]
+    const r = calculateDay('2026-09-30', logs, night, new Date('2026-10-01T08:00:00+07:00'), assignments)
+    expect(r.workingHours).toBe(8);expect(r.overtimeCandidateHours).toBe(1)
+    expect(calculateDay('2026-10-01',logs,null,new Date('2026-10-01T08:00:00+07:00'),assignments).details.events).toHaveLength(0)
+  })
+  it('keeps an active overnight shift ahead of the next shift pre-entry window', () => {
+    const night={start_time:'22:00',end_time:'06:00',shift_type:'NIGHT'}
+    const morning={start_time:'06:00',end_time:'14:00',shift_type:'MORNING'}
+    const assignments=[{...night,work_date:'2026-09-30'},{...morning,work_date:'2026-10-01'}]
+    const logs=[log(1,'CHECK_IN','22:00:00','2026-09-30'),log(2,'CHECK_OUT','05:00:00','2026-10-01'),log(3,'CHECK_IN','05:30:00','2026-10-01'),log(4,'CHECK_OUT','06:00:00','2026-10-01')]
+    const r=calculateDay('2026-09-30',logs,night,new Date('2026-10-01T15:00:00+07:00'),assignments)
+    expect(r.details.pairs).toHaveLength(2);expect(r.details.actualWorkedSecondsInShift).toBe(7.5*3600)
+  })
+
+  it('shows the last matched checkout even when OT has a separate post-shift pair', () => {
+    const r=calc([log(1,'CHECK_IN','08:00:00'),log(2,'CHECK_OUT','17:30:00'),log(3,'CHECK_IN','18:00:00'),log(4,'CHECK_OUT','20:00:00'),log(5,'CHECK_OUT','21:00:00')])
+    expect(r.last?.toISOString()).toBe(new Date(`${day}T20:00:00+07:00`).toISOString())
+    expect(r.overtimeCandidateHours).toBe(2)
+  })
+
+})

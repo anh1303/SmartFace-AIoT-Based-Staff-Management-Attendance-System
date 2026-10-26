@@ -69,7 +69,7 @@ export async function unlockPayrollPeriodApi(period: string): Promise<PayrollRec
   throw new Error(res.message || 'Lỗi mở khoá bảng lương');
 }
 
-export async function updateBonusPenaltyApi(data: { overtime_rate?: number; late_early_penalty?: number; description?: string }): Promise<BonusPenaltyPolicy> {
+export async function updateBonusPenaltyApi(data: { overtime_rate?: number; late_early_penalty?: number; absence_penalty_rate?: number; description?: string }): Promise<BonusPenaltyPolicy> {
   const res = await apiFetch('/api/payroll/bonus-penalty', {
     method: 'PUT',
     body: JSON.stringify(data),

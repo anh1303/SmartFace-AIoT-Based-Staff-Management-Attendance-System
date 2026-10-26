@@ -79,9 +79,6 @@ export const FaceEnrollmentSection: React.FC<FaceEnrollmentSectionProps> = ({
           <p className="text-sm font-bold text-slate-900 dark:text-white">
             Kéo thả ảnh vào đây hoặc bấm để chọn tệp
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Tối thiểu 3 ảnh các góc (Chính diện, Quay trái, Quay phải)
-          </p>
         </div>
       ) : (
         <div className="space-y-3">

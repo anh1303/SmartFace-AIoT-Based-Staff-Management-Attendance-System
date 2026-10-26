@@ -11,7 +11,7 @@ export const NotificationEmptyState: React.FC<NotificationEmptyStateProps> = () 
       <div className="flex items-center gap-2.5">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
         <span className="text-xs font-semibold tracking-wider text-slate-200 uppercase font-mono">
-          NO NEW NOTIFICATIONS
+          Không có thông báo mới
         </span>
       </div>
       <div className="flex items-center gap-2 text-slate-400">

@@ -116,31 +116,38 @@ async function main() {
     data: {
       shift_name: 'Ca Hành Chính',
       start_time: new Date('1970-01-01T08:00:00.000Z'),
-      end_time: new Date('1970-01-01T17:30:00.000Z'),
+      end_time: new Date('1970-01-01T17:00:00.000Z'),
     },
   })
   await prisma.work_shifts.create({
     data: {
       shift_name: 'Ca Sáng',
-      start_time: new Date('1970-01-01T08:30:00.000Z'),
-      end_time: new Date('1970-01-01T17:30:00.000Z'),
+      start_time: new Date('1970-01-01T08:00:00.000Z'),
+      end_time: new Date('1970-01-01T12:00:00.000Z'),
     },
   })
   await prisma.work_shifts.create({
     data: {
       shift_name: 'Ca Chiều',
       start_time: new Date('1970-01-01T13:00:00.000Z'),
-      end_time: new Date('1970-01-01T21:30:00.000Z'),
+      end_time: new Date('1970-01-01T17:00:00.000Z'),
     },
   })
   await prisma.work_shifts.create({
     data: {
-      shift_name: 'Nghỉ ca (OFF)',
+      shift_name: 'Ca khác',
       start_time: new Date('1970-01-01T00:00:00.000Z'),
       end_time: new Date('1970-01-01T00:00:00.000Z'),
     },
   })
-  console.log('✅ 4. Bảng work_shifts (4 ca làm việc: Ca Hành Chính, Ca Sáng, Ca Chiều, Nghỉ ca OFF)')
+  await prisma.work_shifts.create({
+    data: {
+      shift_name: 'Nghỉ ca',
+      start_time: new Date('1970-01-01T00:00:00.000Z'),
+      end_time: new Date('1970-01-01T00:00:00.000Z'),
+    },
+  })
+  console.log('✅ 4. Bảng work_shifts (5 ca làm việc: Ca Hành Chính, Ca Sáng, Ca Chiều, Ca khác, Nghỉ ca OFF)')
 
   // 6. Bảng Users (1 Quản trị viên Admin hệ thống)
   const hashedPassword = await bcrypt.hash('Admin@123456', 10)

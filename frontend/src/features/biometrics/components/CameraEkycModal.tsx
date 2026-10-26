@@ -8,7 +8,9 @@ import {
   RotateCcw,
   ShieldCheck,
   Check,
-  Info
+  Info,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { logger } from '../../../utils/logger';
 
@@ -17,7 +19,7 @@ const cameraLogger = logger.child('CameraEkyc');
 
 export interface CapturedFaceSample {
   id: string;
-  angle: 'FRONTAL' | 'LEFT' | 'RIGHT';
+  angle: string;
   label: string;
   instruction: string;
   dataUrl: string;
@@ -29,16 +31,23 @@ interface CameraEkycModalProps {
   onComplete: (samples: CapturedFaceSample[]) => void;
   employeeName: string;
   employeeCode: string;
+  existingPhotoCount?: number;
+  maxPhotos?: number;
 }
 
-const STEPS: Array<{
-  angle: 'FRONTAL' | 'LEFT' | 'RIGHT';
+interface StepConfig {
+  id: string;
+  angle: string;
   title: string;
   shortLabel: string;
   instruction: string;
   detailHint: string;
-}> = [
+  isCustom?: boolean;
+}
+
+const DEFAULT_STEPS: StepConfig[] = [
   {
+    id: 'FRONTAL',
     angle: 'FRONTAL',
     title: 'Góc 1: Chính diện (Frontal)',
     shortLabel: 'Chính diện',
@@ -46,6 +55,7 @@ const STEPS: Array<{
     detailHint: 'Mắt mở to, nhìn thẳng tâm camera, không nghiêng đầu.'
   },
   {
+    id: 'LEFT',
     angle: 'LEFT',
     title: 'Góc 2: Quay trái (Turn Left)',
     shortLabel: 'Quay trái (~25°)',
@@ -53,11 +63,12 @@ const STEPS: Array<{
     detailHint: 'Quay nhẹ từ từ sang trái cho đến khi viền elip bao trọn khuôn mặt.'
   },
   {
+    id: 'RIGHT',
     angle: 'RIGHT',
     title: 'Góc 3: Quay phải (Turn Right)',
     shortLabel: 'Quay phải (~25°)',
     instruction: 'Nghiêng mặt nhẹ sang bên PHẢI khoảng 20° - 30°, giữ mắt hướng về camera',
-    detailHint: 'Quay nhẹ từ từ sang phải để hoàn tất thu thập đủ 3 góc đa chiều.'
+    detailHint: 'Quay nhẹ từ từ sang phải để hoàn tất thu thập đủ 3 góc cơ bản.'
   }
 ];
 
@@ -66,8 +77,13 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
   onClose,
   onComplete,
   employeeName,
-  employeeCode
+  employeeCode,
+  existingPhotoCount = 0,
+  maxPhotos = 10
 }) => {
+  const maxAllowedInModal = Math.max(3, maxPhotos - existingPhotoCount);
+
+  const [steps, setSteps] = useState<StepConfig[]>(DEFAULT_STEPS);
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [samples, setSamples] = useState<Record<string, CapturedFaceSample | null>>({
     FRONTAL: null,
@@ -149,12 +165,16 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      setSteps(DEFAULT_STEPS);
+      setSamples({ FRONTAL: null, LEFT: null, RIGHT: null });
+      setCurrentStepIndex(0);
       startCamera();
     } else {
       stopCamera();
       document.body.style.overflow = 'unset';
       setIsProcessing(false);
       setCurrentStepIndex(0);
+      setSteps(DEFAULT_STEPS);
       setSamples({ FRONTAL: null, LEFT: null, RIGHT: null });
     }
     return () => {
@@ -162,6 +182,47 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
       document.body.style.overflow = 'unset';
     };
   }, [isOpen, startCamera, stopCamera]);
+
+  // Add extra step/photo slot
+  const handleAddStep = useCallback(() => {
+    if (steps.length >= maxAllowedInModal) return;
+
+    const nextNum = steps.length + 1;
+    const newStepId = `EXTRA_${nextNum}_${Date.now()}`;
+    const newStep: StepConfig = {
+      id: newStepId,
+      angle: `EXTRA_${nextNum}`,
+      title: `Ảnh ${nextNum}`,
+      shortLabel: `Ảnh ${nextNum}`,
+      instruction: 'Chụp thêm góc mặt tự do, góc ngửa hoặc biểu cảm khác để tăng độ chính xác nhận diện',
+      detailHint: 'Giữ khuôn mặt rõ nét trong khung elip, ánh sáng đồng đều.',
+      isCustom: true
+    };
+
+    setSteps(prev => [...prev, newStep]);
+    setSamples(prev => ({ ...prev, [newStepId]: null }));
+    setCurrentStepIndex(steps.length);
+  }, [steps.length, maxAllowedInModal]);
+
+  // Remove custom extra step
+  const handleRemoveStep = useCallback((stepId: string) => {
+    const targetIdx = steps.findIndex(s => s.id === stepId);
+    if (targetIdx === -1 || !steps[targetIdx].isCustom) return;
+
+    setSteps(prev => prev.filter(s => s.id !== stepId));
+    setSamples(prev => {
+      const copy = { ...prev };
+      delete copy[stepId];
+      return copy;
+    });
+
+    setCurrentStepIndex(prev => {
+      if (prev >= targetIdx) {
+        return Math.max(0, prev - 1);
+      }
+      return prev;
+    });
+  }, [steps]);
 
   // Capture frame from video
   const takeSnapshot = useCallback(() => {
@@ -185,7 +246,8 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-    const activeStep = STEPS[currentStepIndex];
+    const activeStep = steps[currentStepIndex];
+    if (!activeStep) return;
 
     setIsProcessing(true);
 
@@ -200,42 +262,44 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
 
       setSamples(prev => ({
         ...prev,
-        [activeStep.angle]: newSample
+        [activeStep.id]: newSample
       }));
 
       setIsProcessing(false);
 
-      // Advance to next step if available
-      if (currentStepIndex < STEPS.length - 1) {
+      // Advance to next step if exists
+      if (currentStepIndex < steps.length - 1) {
         setCurrentStepIndex(prev => prev + 1);
       }
     }, 350);
-  }, [currentStepIndex, streamReady]);
-
-
+  }, [currentStepIndex, steps, streamReady]);
 
   const handleRetakeStep = (index: number) => {
     setCurrentStepIndex(index);
-    const angle = STEPS[index].angle;
-    setSamples(prev => ({
-      ...prev,
-      [angle]: null
-    }));
+    const stepId = steps[index]?.id;
+    if (stepId) {
+      setSamples(prev => ({
+        ...prev,
+        [stepId]: null
+      }));
+    }
   };
 
-  const allCaptured = STEPS.every(step => Boolean(samples[step.angle]));
+  const capturedCount = Object.values(samples).filter(Boolean).length;
 
   const handleFinish = () => {
-    if (!allCaptured) return;
-    const sampleList = STEPS.map(step => samples[step.angle]!).filter(Boolean);
+    const sampleList = steps
+      .map(step => samples[step.id])
+      .filter((s): s is CapturedFaceSample => Boolean(s));
+
+    if (sampleList.length === 0) return;
     onComplete(sampleList);
     onClose();
   };
 
   if (!isOpen) return null;
 
-  const currentStep = STEPS[currentStepIndex];
-  const capturedCount = STEPS.filter(s => Boolean(samples[s.angle])).length;
+  const currentStep = steps[currentStepIndex] || steps[0];
 
   const modalNode = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
@@ -268,48 +332,74 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
           </button>
         </div>
 
-        {/* 3-Step Progress Indicator Bar */}
-        <div className="bg-slate-50/50 dark:bg-[#0f1224]/60 border-b border-slate-200/80 dark:border-[#21264b] px-6 py-2.5">
-          <div className="flex items-center justify-between gap-2 max-w-xl mx-auto">
-            {STEPS.map((step, idx) => {
-              const isDone = Boolean(samples[step.angle]);
+        {/* Step Progress Indicator Bar (Scrollable when many photos) */}
+        <div className="bg-slate-50/50 dark:bg-[#0f1224]/60 border-b border-slate-200/80 dark:border-[#21264b] px-4 sm:px-6 py-2.5 overflow-x-auto">
+          <div className="flex items-center gap-2 min-w-max mx-auto justify-center">
+            {steps.map((step, idx) => {
+              const isDone = Boolean(samples[step.id]);
               const isCurrent = currentStepIndex === idx;
 
               return (
-                <button
-                  key={step.angle}
-                  type="button"
-                  onClick={() => setCurrentStepIndex(idx)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                    isCurrent
-                      ? 'bg-purple-50 dark:bg-purple-600/20 border-purple-500 text-purple-700 dark:text-purple-400 shadow-xs'
-                      : isDone
-                      ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
-                      : 'bg-white dark:bg-[#13162b] border-slate-200 dark:border-[#21264b] text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
-                >
-                  <span
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold ${
-                      isDone
-                        ? 'bg-emerald-500 text-white'
-                        : isCurrent
-                        ? 'bg-purple-600 text-white animate-pulse'
-                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                <div key={step.id} className="relative flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStepIndex(idx)}
+                    className={`flex items-center gap-1.5 py-1.5 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                      isCurrent
+                        ? 'bg-purple-50 dark:bg-purple-600/20 border-purple-500 text-purple-700 dark:text-purple-400 shadow-xs'
+                        : isDone
+                        ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-white dark:bg-[#13162b] border-slate-200 dark:border-[#21264b] text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
-                    {isDone ? '✓' : idx + 1}
-                  </span>
-                  <span className="truncate">{step.shortLabel}</span>
-                </button>
+                    <span
+                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold shrink-0 ${
+                        isDone
+                          ? 'bg-emerald-500 text-white'
+                          : isCurrent
+                          ? 'bg-purple-600 text-white animate-pulse'
+                          : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {isDone ? '✓' : idx + 1}
+                    </span>
+                    <span className="truncate max-w-[110px]">{step.shortLabel}</span>
+                  </button>
+                  {step.isCustom && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveStep(step.id);
+                      }}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center text-[9px] shadow-sm cursor-pointer z-10"
+                      title="Xóa góc này"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               );
             })}
+
+            {steps.length < maxAllowedInModal && (
+              <button
+                type="button"
+                onClick={handleAddStep}
+                className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl border border-dashed border-purple-400/60 dark:border-purple-500/40 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 text-xs font-semibold transition-all cursor-pointer"
+                title="Chụp thêm ảnh nữa"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Thêm ảnh ({steps.length + 1})</span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* Main Content Body */}
         <div className="p-5 overflow-y-auto flex-1 flex flex-col items-center">
 
-          {/* Camera Viewport with Elliptical Overlay (Explicit height to prevent collapsing) */}
+          {/* Camera Viewport with Elliptical Overlay */}
           <div className="relative w-full max-w-[480px] h-[360px] sm:h-[390px] shrink-0 rounded-xl overflow-hidden bg-slate-950 border-2 border-slate-700 shadow-2xl flex items-center justify-center">
             {/* Real Video Element */}
             <video
@@ -384,12 +474,12 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
                     rx="120"
                     ry="155"
                     fill="none"
-                    stroke={samples[currentStep.angle] ? '#10b981' : '#8b5cf6'}
+                    stroke={samples[currentStep.id] ? '#10b981' : '#8b5cf6'}
                     strokeWidth="3.5"
-                    strokeDasharray={samples[currentStep.angle] ? 'none' : '10, 6'}
+                    strokeDasharray={samples[currentStep.id] ? 'none' : '10, 6'}
                     className="transition-all duration-300"
                     style={{
-                      filter: samples[currentStep.angle]
+                      filter: samples[currentStep.id]
                         ? 'drop-shadow(0 0 14px rgba(16, 185, 129, 0.85))'
                         : 'drop-shadow(0 0 14px rgba(139, 92, 246, 0.85))'
                     }}
@@ -442,6 +532,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
                     {currentStep.angle === 'FRONTAL' && <span>👁️ NHÌN THẲNG CHÍNH DIỆN</span>}
                     {currentStep.angle === 'LEFT' && <span>⬅️ QUAY MẶT SANG TRÁI (~25°)</span>}
                     {currentStep.angle === 'RIGHT' && <span>➡️ QUAY MẶT SANG PHẢI (~25°)</span>}
+                    {currentStep.isCustom && <span>📸 ẢNH BỔ SUNG {currentStepIndex + 1} (GÓC TỰ DO)</span>}
                   </div>
                 </div>
               </div>
@@ -449,92 +540,46 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
           </div>
 
           {/* Shutter & Controls Dock */}
-          <div className="mt-4 flex items-center justify-center">
-            <button
-              type="button"
-              disabled={!streamReady || isProcessing}
-              onClick={takeSnapshot}
-              className={`px-8 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-md cursor-pointer ${
-                streamReady && !isProcessing
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-500/25 hover:scale-105 active:scale-95'
-                  : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
-              }`}
-            >
-              <Camera className="w-4 h-4" />
-              <span>Chụp ngay góc này</span>
-            </button>
-          </div>
+          <div className="mt-4 flex items-center justify-center gap-3">
+            {samples[currentStep.id] ? (
+              <>
+                <button
+                  type="button"
+                  disabled={!streamReady || isProcessing}
+                  onClick={takeSnapshot}
+                  className="px-5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-sm bg-slate-100 hover:bg-slate-200 dark:bg-[#181c38] dark:hover:bg-[#20254b] text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span>Chụp lại góc này</span>
+                </button>
 
-          {/* 3 Captured Samples Horizontal Progress Tray */}
-          <div className="w-full max-w-xl mt-4 pt-3 border-t border-slate-200 dark:border-[#21264b]">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                Tiến độ thu thập 3 góc:
-              </span>
-              <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400">
-                {capturedCount}/3 góc hoàn thành
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2.5">
-              {STEPS.map((step, idx) => {
-                const sample = samples[step.angle];
-                const isCurrent = currentStepIndex === idx;
-
-                return (
-                  <div
-                    key={step.angle}
-                    onClick={() => setCurrentStepIndex(idx)}
-                    className={`flex items-center gap-2.5 p-2 rounded-xl border cursor-pointer transition-all shadow-xs ${
-                      sample
-                        ? 'bg-emerald-50/60 dark:bg-[#0e221c] border-emerald-300 dark:border-emerald-500/40 shadow-xs'
-                        : isCurrent
-                        ? 'bg-purple-50/60 dark:bg-[#18152e] border-purple-500 ring-2 ring-purple-500/20'
-                        : 'bg-slate-50 dark:bg-[#0f1224]/60 border-slate-200 dark:border-[#21264b]'
-                    }`}
+                {steps.length < maxAllowedInModal && (
+                  <button
+                    type="button"
+                    disabled={!streamReady || isProcessing}
+                    onClick={handleAddStep}
+                    className="px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-md bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-500/25 hover:scale-105 active:scale-95 cursor-pointer"
                   >
-                    <div className="w-11 h-11 rounded-lg overflow-hidden bg-slate-100 dark:bg-[#0b0d19] border border-slate-200 dark:border-[#21264b] flex items-center justify-center shrink-0 relative">
-                      {sample ? (
-                        <>
-                          <img
-                            src={sample.dataUrl}
-                            alt={step.shortLabel}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center">
-                            <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 font-bold" />
-                          </div>
-                        </>
-                      ) : (
-                        <Camera className="w-4 h-4 text-slate-400 dark:text-slate-600" />
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">{step.shortLabel}</p>
-                      <p className={`text-[10px] font-mono mt-0.5 ${sample ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                        {sample ? 'Đã chụp' : 'Chờ chụp'}
-                      </p>
-                    </div>
-
-                    {sample && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRetakeStep(idx);
-                        }}
-                        className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
-                        title="Chụp lại góc này"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                    <Plus className="w-4 h-4" />
+                    <span>Chụp thêm ảnh nữa ({steps.length + 1})</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={!streamReady || isProcessing}
+                onClick={takeSnapshot}
+                className={`px-8 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-md cursor-pointer ${
+                  streamReady && !isProcessing
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-500/25 hover:scale-105 active:scale-95'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
+                }`}
+              >
+                <Camera className="w-4 h-4" />
+                <span>Chụp ngay góc này</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -545,25 +590,24 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer border border-slate-200 dark:border-[#272d5a]"
           >
-            Đóng / Hủy bỏ
+            Hủy bỏ
           </button>
 
           <div className="flex items-center gap-3">
-            {!allCaptured ? (
-              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-medium">
-                <Info className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
-                Cần chụp đủ cả 3 góc (Hiện có {capturedCount}/3)
-              </p>
-            ) : (
-              <button
-                type="button"
-                onClick={handleFinish}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 shadow-md transition-all hover:scale-105 cursor-pointer"
-              >
-                <Check className="w-4 h-4" />
-                <span>Sử dụng 3 ảnh này để cập nhật Face ID</span>
-              </button>
-            )}
+
+            <button
+              type="button"
+              disabled={capturedCount === 0}
+              onClick={handleFinish}
+              className={`px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all cursor-pointer ${
+                capturedCount > 0
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white hover:scale-105'
+                  : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed shadow-none'
+              }`}
+            >
+              <Check className="w-4 h-4" />
+              <span>Xác nhận{capturedCount > 0 ? ` (${capturedCount} ảnh)` : ''}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -572,3 +616,5 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
 
   return createPortal(modalNode, document.body);
 };
+
+

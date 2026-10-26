@@ -390,7 +390,7 @@ async function main() {
     if (isMultiDay) {
       const isSunday = dayStatOff === schedules.length
       if (isSunday) {
-        console.log(`📅 ${targetDateStr} (Chủ Nhật): 🏖️ Tất cả ${dayStatOff} nhân viên nghỉ ca (OFF)`)
+        console.log(`📅 ${targetDateStr} (Chủ Nhật): 🏖️ Tất cả ${dayStatOff} nhân viên nghỉ ca`)
       } else {
         console.log(
           `📅 ${targetDateStr}: ${dayWorkCount} NV làm việc -> ✅ ${dayStatOnTime} Đúng giờ | ⚠️ ${dayStatLate} Muộn | ❌ ${dayStatAbsent} Vắng | 📝 ${logsToCreate.length} Logs`
@@ -422,7 +422,7 @@ async function main() {
     )
   }
   if (grandStatOff > 0) {
-    console.log(`   - Lượt nghỉ ca (OFF):                 ${grandStatOff} lượt`)
+    console.log(`   - Lượt nghỉ ca:                       ${grandStatOff} lượt`)
   }
   console.log(`   - Tổng số lượt quẹt thẻ (Logs):        ${totalLogsCreated} lượt`)
   console.log(`   - Tổng số bản ghi summary:            ${totalSummariesCreated} bản ghi`)

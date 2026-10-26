@@ -53,14 +53,14 @@ export const ManagerSchedule: React.FC = () => {
   const [bulkDepartment, setBulkDepartment] = useState('Nhân viên');
   const [bulkShiftType, setBulkShiftType] = useState<WorkShift['shift_type']>('OFFICE_HOURS');
   const [bulkStartTime, setBulkStartTime] = useState('08:00');
-  const [bulkEndTime, setBulkEndTime] = useState('17:30');
+  const [bulkEndTime, setBulkEndTime] = useState('17:00');
   const [bulkDays, setBulkDays] = useState<number[]>([0, 1, 2, 3, 4]); // Mon-Fri default
   const [bulkNote, setBulkNote] = useState('');
 
   // Form state inside modal
   const [modalShiftType, setModalShiftType] = useState<WorkShift['shift_type']>('OFFICE_HOURS');
   const [modalStartTime, setModalStartTime] = useState('08:00');
-  const [modalEndTime, setModalEndTime] = useState('17:30');
+  const [modalEndTime, setModalEndTime] = useState('17:00');
   const [modalNote, setModalNote] = useState('');
 
   const daysOfWeek = [0, 1, 2, 3, 4, 5, 6].map(offset => {
@@ -163,7 +163,7 @@ export const ManagerSchedule: React.FC = () => {
     } else {
       setModalShiftType('OFFICE_HOURS');
       setModalStartTime('08:00');
-      setModalEndTime('17:30');
+      setModalEndTime('17:00');
       setModalNote('');
     }
   };
@@ -171,6 +171,15 @@ export const ManagerSchedule: React.FC = () => {
   const handleShiftSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingShift) return;
+
+    if (modalShiftType === 'OTHER') {
+      const s = modalStartTime?.trim();
+      const endT = modalEndTime?.trim();
+      if (!s || !endT || (s === '00:00' && endT === '00:00') || s >= endT) {
+        showToast('Giờ bắt đầu phải nhỏ hơn giờ kết thúc (không được để 00:00 - 00:00)!', 'error');
+        return;
+      }
+    }
 
     const emp = employees.find(e => e.employee_id === editingShift.employeeId);
     const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
@@ -198,6 +207,15 @@ export const ManagerSchedule: React.FC = () => {
     if (bulkDays.length === 0) {
       showToast('Vui lòng chọn ít nhất 1 ngày trong tuần để áp dụng ca!', 'warning');
       return;
+    }
+
+    if (bulkShiftType === 'OTHER') {
+      const s = bulkStartTime?.trim();
+      const endT = bulkEndTime?.trim();
+      if (!s || !endT || (s === '00:00' && endT === '00:00') || s >= endT) {
+        showToast('Giờ bắt đầu phải nhỏ hơn giờ kết thúc (không được để 00:00 - 00:00)!', 'error');
+        return;
+      }
     }
 
     let targetEmps = employees.filter(e => e.status !== 'INACTIVE');

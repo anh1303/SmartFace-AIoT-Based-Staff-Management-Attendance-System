@@ -12,6 +12,8 @@ import { CapturedFaceSample } from '../components/CameraEkycModal';
 
 const biometricLogger = logger.child('useBiometricEnrollment');
 
+export const MAX_FACE_PHOTOS = 10;
+
 export interface UseBiometricEnrollmentOptions {
   defaultTab?: 'FACE' | 'FINGERPRINT';
 }
@@ -139,7 +141,24 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const fileList = Array.from(files);
+    if (uploadedPhotos.length >= MAX_FACE_PHOTOS) {
+      showToast(
+        `Đã đạt giới hạn tối đa ${MAX_FACE_PHOTOS} ảnh mẫu sinh trắc học!`,
+        'warning'
+      );
+      e.target.value = '';
+      return;
+    }
+
+    const remainingSlots = MAX_FACE_PHOTOS - uploadedPhotos.length;
+    const fileList = Array.from(files).slice(0, remainingSlots);
+    if (files.length > remainingSlots) {
+      showToast(
+        `Chỉ có thể tải lên thêm ${remainingSlots} ảnh do giới hạn tối đa ${MAX_FACE_PHOTOS} ảnh.`,
+        'warning'
+      );
+    }
+
     const newPhotos: FacePhotoItem[] = [];
     let loadedCount = 0;
 
@@ -163,31 +182,76 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
         if (loadedCount === fileList.length) {
           setUploadedPhotos((prev) => [...prev, ...newPhotos]);
           setAnalyzingFace(false);
+          showToast(`Đã thêm ${fileList.length} ảnh vào danh sách mẫu!`, 'success');
         }
       };
       reader.readAsDataURL(file);
     });
 
     e.target.value = '';
-  }, [isEnrollmentBlocked, isSelf, showToast, uploadedPhotos.length]);
+  }, [isEnrollmentBlocked, getBlockedMessage, showToast, uploadedPhotos.length]);
 
   const handleRemovePhoto = useCallback((id: string) => {
     setUploadedPhotos((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
   const handleEkycComplete = useCallback((samples: CapturedFaceSample[]) => {
-    const newItems: FacePhotoItem[] = samples.map((s) => ({
-      id: s.id,
-      url: s.dataUrl,
-      name: `${s.label} (Camera eKYC)`,
-      tag: s.label,
-    }));
+    if (!samples || samples.length === 0) return;
 
-    setUploadedPhotos(newItems);
-    showToast(
-      `Đã thu thập đủ 3 góc khuôn mặt chuẩn eKYC cho ${currentEmp?.full_name}!`,
-      'success'
-    );
+    setUploadedPhotos((prev) => {
+      const remainingSlots = MAX_FACE_PHOTOS - prev.length;
+      if (remainingSlots <= 0) {
+        showToast(
+          `Đã đạt giới hạn tối đa ${MAX_FACE_PHOTOS} ảnh mẫu sinh trắc học!`,
+          'warning'
+        );
+        return prev;
+      }
+
+      const samplesToAdd = samples.slice(0, remainingSlots);
+      if (samples.length > remainingSlots) {
+        showToast(
+          `Chỉ thêm tối đa ${remainingSlots} ảnh do đã đạt giới hạn ${MAX_FACE_PHOTOS} ảnh.`,
+          'warning'
+        );
+      }
+
+      const newItems: FacePhotoItem[] = samplesToAdd.map((s, idx) => {
+        const overallIndex = prev.length + idx;
+        // Đặt nhãn: bỏ dấu # hoàn toàn, từ ảnh 4 trở đi ghi rõ số thứ tự gọn gàng
+        let tag = s.label.replace(/#/g, '').trim();
+        if (overallIndex >= 3) {
+          if (tag.startsWith('Ảnh')) {
+            tag = `Ảnh ${overallIndex + 1}`;
+          } else {
+            tag = `${tag} (${overallIndex + 1})`;
+          }
+        }
+
+        return {
+          id: `ekyc_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 7)}`,
+          url: s.dataUrl,
+          name: `${tag} (Camera eKYC)`,
+          tag,
+        };
+      });
+
+      const updated = [...prev, ...newItems];
+
+      if (prev.length === 0) {
+        showToast(
+          `Đã chụp ${newItems.length} ảnh khuôn mặt (Tối thiểu 3 ảnh) cho ${currentEmp?.full_name || 'nhân viên'}!`,
+          'success'
+        );
+      } else {
+        showToast(
+          `Đã thêm ${newItems.length} ảnh chụp từ Camera vào danh sách mẫu (Hiện có ${updated.length}/${MAX_FACE_PHOTOS} ảnh)!`,
+          'success'
+        );
+      }
+
+      return updated;
+    });
   }, [currentEmp?.full_name, showToast]);
 
   const handleConfirmFaceSave = useCallback(async () => {

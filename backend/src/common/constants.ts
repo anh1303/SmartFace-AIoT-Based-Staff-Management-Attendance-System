@@ -78,8 +78,10 @@ export const SHIFT_TYPE = {
   OFFICE_HOURS: 'OFFICE_HOURS',
   MORNING: 'MORNING',
   AFTERNOON: 'AFTERNOON',
+  OTHER: 'OTHER',
   NIGHT: 'NIGHT',
   OVERTIME: 'OVERTIME',
+  OFF: 'OFF',
 } as const
 
 export type ShiftType = (typeof SHIFT_TYPE)[keyof typeof SHIFT_TYPE]

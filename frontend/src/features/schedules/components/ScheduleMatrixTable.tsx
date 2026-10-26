@@ -25,7 +25,7 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
     if (!shift || shift.shift_type === 'OFF') {
       return (
         <div className="py-2 px-1 rounded-lg bg-slate-100 dark:bg-[#0b0d19] text-slate-400 dark:text-slate-500 text-[11px] text-center border border-slate-200/80 dark:border-[#21264b] group-hover:border-slate-300 dark:group-hover:border-purple-900/50 transition-colors truncate">
-          Nghỉ ca (OFF)
+          Nghỉ ca
         </div>
       );
     }
@@ -34,11 +34,14 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
     let typeName = 'Hành chính';
 
     if (shift.shift_type === 'MORNING') {
-      colorClass = 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/40';
+      colorClass = 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40';
       typeName = 'Ca Sáng';
     } else if (shift.shift_type === 'AFTERNOON') {
-      colorClass = 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/40';
+      colorClass = 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/40';
       typeName = 'Ca Chiều';
+    } else if (shift.shift_type === 'OTHER') {
+      colorClass = 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/40';
+      typeName = 'Ca khác';
     }
 
     const tooltipText = shift.note

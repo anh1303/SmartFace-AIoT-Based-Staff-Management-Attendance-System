@@ -10,6 +10,7 @@ services:
       EMBEDDING_MODEL_VERSION: ${PBL6_FACE_MODEL_PACK:-buffalo_s}
       MODEL_CTX_ID: -1
       PAD_RUNTIME_CONFIG_PATH: ''
+      PAD_ADAPTIVE_ENABLED: 'false'
     ports:
     - 127.0.0.1:${PBL6_FACE_API_PORT:-5000}:5000
     volumes:

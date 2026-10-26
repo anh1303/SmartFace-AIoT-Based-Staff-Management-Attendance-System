@@ -1,9 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  BellOff,
   Trash2,
-  CheckCheck,
   X,
+  ChevronDown,
 } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { useDraggable } from '../hooks/useDraggable';
@@ -26,6 +25,8 @@ export const FloatingNotificationBubble: React.FC = () => {
     markAsRead,
   } = useNotifications();
 
+  const [visibleCount, setVisibleCount] = useState(5);
+
   const {
     position,
     isDragging,
@@ -38,6 +39,13 @@ export const FloatingNotificationBubble: React.FC = () => {
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Reset visibleCount to 5 whenever popover closes
+  useEffect(() => {
+    if (!isOpen) {
+      setVisibleCount(5);
+    }
+  }, [isOpen]);
 
   // Toggle open popup only when user clicks (not when dragging)
   const handleBubbleClick = (e: React.MouseEvent) => {
@@ -109,8 +117,8 @@ export const FloatingNotificationBubble: React.FC = () => {
     return style;
   };
 
-  // Slice maximum 5 visible notifications as per specification (with scroll if > 5)
-  const displayNotifications = notifications.slice(0, 5);
+  // Slice visible notifications based on visibleCount
+  const displayNotifications = notifications.slice(0, visibleCount);
 
   return (
     <div ref={containerRef}>
@@ -182,32 +190,21 @@ export const FloatingNotificationBubble: React.FC = () => {
               </span>
               {notifications.length > 0 && (
                 <span className="px-2 py-0.5 text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40 rounded-full">
-                  {notifications.length} mục
+                  {notifications.length}
                 </span>
               )}
             </div>
 
             <div className="flex items-center gap-1">
               {notifications.length > 0 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={markAllAsRead}
-                    title="Đánh dấu tất cả đã đọc"
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-slate-200/60 dark:hover:bg-[#1e2448] dark:hover:text-blue-400 transition-colors cursor-pointer text-xs flex items-center gap-1"
-                  >
-                    <CheckCheck className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={clearAll}
-                    title="Xóa tất cả thông báo"
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors cursor-pointer text-xs flex items-center gap-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  title="Xóa tất cả thông báo"
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors cursor-pointer text-xs flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               )}
 
               <button
@@ -229,7 +226,7 @@ export const FloatingNotificationBubble: React.FC = () => {
                 <NotificationEmptyState />
               </div>
             ) : (
-              // List of up to 5 notifications
+              // List of visible notifications
               <>
                 {displayNotifications.map((item) => (
                   <NotificationItem
@@ -240,10 +237,17 @@ export const FloatingNotificationBubble: React.FC = () => {
                   />
                 ))}
 
-                {notifications.length > 5 && (
-                  <p className="text-center text-[11px] text-slate-400 dark:text-slate-500 pt-1 pb-0.5">
-                    Đang hiển thị 5 thông báo mới nhất (còn {notifications.length - 5} thông báo cũ)
-                  </p>
+                {notifications.length > visibleCount && (
+                  <div className="pt-1 pb-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount((prev) => prev + 5)}
+                      className="w-full py-2 px-3 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50/70 hover:bg-blue-100/80 dark:bg-[#151a38] dark:hover:bg-[#1c224b] border border-blue-200/60 dark:border-[#272f60] rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      <span>Xem thêm</span>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )}
               </>
             )}

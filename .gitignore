@@ -113,6 +113,7 @@ md/
 
 # Local notebook archive; keep out of Git (large generated ZIP).
 /face_auth/antispoof/notebooks/final/binary_crossdomain_v2.zip
+/face_auth/md/source_of_truth/*.zip
 
 # Local PAD calibration/search experiments (keep files locally, exclude from Git).
 # Captures, face_auth/output/ and final notebooks are ignored above/in face_auth/.gitignore.

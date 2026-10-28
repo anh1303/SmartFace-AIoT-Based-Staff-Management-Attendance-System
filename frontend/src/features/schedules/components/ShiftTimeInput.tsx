@@ -101,7 +101,7 @@ export const ShiftTimeInput: React.FC<ShiftTimeInputProps> = ({
             ? 'bg-slate-100/70 dark:bg-[#13162b] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-[#21264b] cursor-not-allowed select-none'
             : hasError
             ? 'bg-white dark:bg-[#0f1224] text-slate-900 dark:text-white border-rose-400 dark:border-rose-500 focus:border-rose-500'
-            : 'bg-white dark:bg-[#0f1224] text-slate-900 dark:text-white border-slate-300 dark:border-[#272d5a] focus:border-purple-500'
+            : 'bg-white dark:bg-[#0f1224] text-slate-900 dark:text-white border-slate-300 dark:border-[#272d5a] focus:border-blue-500'
         }`}
       />
       <div

@@ -19,7 +19,7 @@ export const DeviceStatusCards: React.FC<DeviceStatusCardsProps> = ({ devices, i
   if (devices.length === 0) {
     return (
       <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#13162b]/50 border border-slate-200/80 dark:border-[#21264b] text-center text-xs text-slate-500 dark:text-slate-400">
-        Không có thiết bị AIoT nào được cấu hình hoặc thiết bị đang ngoại tuyến.
+        Chưa có thiết bị đăng ký trong hệ thống.
       </div>
     );
   }
@@ -36,7 +36,7 @@ export const DeviceStatusCards: React.FC<DeviceStatusCardsProps> = ({ devices, i
         return (
           <div
             key={dev.name}
-            className="p-4 rounded-xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-[#2f3668] transition-all shadow-xs"
+            className="p-4 rounded-xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-[#2f3668] transition-all shadow-xs"
           >
             <div className="flex justify-between items-start">
               <div>
@@ -44,7 +44,7 @@ export const DeviceStatusCards: React.FC<DeviceStatusCardsProps> = ({ devices, i
                   {isFingerprint ? (
                     <Fingerprint className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   ) : (
-                    <ScanFace className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <ScanFace className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   )}
                   {dev.name}
                 </p>
@@ -62,7 +62,7 @@ export const DeviceStatusCards: React.FC<DeviceStatusCardsProps> = ({ devices, i
                     isOnline ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'
                   }`}
                 />
-                {dev.status}
+                {dev.status === 'ONLINE' ? 'Trực tuyến' : dev.status === 'MAINTENANCE' ? 'Bảo trì' : 'Ngoại tuyến'}
               </span>
             </div>
           </div>

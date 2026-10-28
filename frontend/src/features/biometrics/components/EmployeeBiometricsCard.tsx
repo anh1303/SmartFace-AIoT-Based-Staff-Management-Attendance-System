@@ -69,7 +69,7 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           title={selectedLabel}
-          className="w-full max-w-[180px] sm:max-w-[240px] px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer flex items-center justify-between gap-1.5 transition-colors"
+          className="w-full max-w-[180px] sm:max-w-[240px] px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer flex items-center justify-between gap-1.5 transition-colors"
         >
           <span className="truncate min-w-0 text-left flex-1" title={selectedLabel}>
             {selectedLabel}
@@ -92,7 +92,7 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
                     placeholder="Tìm kiếm..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-7 pr-2 py-1 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+                    className="w-full pl-7 pr-2 py-1 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
                     autoFocus
                   />
                 </div>
@@ -122,7 +122,7 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
                       }}
                       title={isSelf && role !== 'admin' ? `${label} (Chỉ xem - Không thể tự sửa)` : label}
                       className={`w-full h-9 px-3 text-left text-xs transition-colors cursor-pointer flex items-center justify-between gap-1.5 min-w-0 ${isSelected
-                          ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-semibold'
+                          ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
                           : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1a1e3a]'
                         }`}
                     >
@@ -153,7 +153,7 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
                 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
               }
               alt={currentEmp.full_name}
-              className="w-14 h-14 rounded-xl object-cover border border-purple-200 dark:border-purple-800 shrink-0"
+              className="w-14 h-14 rounded-xl object-cover border border-blue-200 dark:border-blue-800 shrink-0"
             />
             <div className="min-w-0 flex-1">
               <h3
@@ -163,7 +163,7 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
                 {currentEmp.full_name}
               </h3>
               <p
-                className="text-xs text-purple-600 dark:text-purple-400 font-mono max-w-[150px] sm:max-w-[180px] truncate"
+                className="text-xs text-blue-600 dark:text-blue-400 font-mono max-w-[150px] sm:max-w-[180px] truncate"
                 title={currentEmp.employee_id}
               >
                 {currentEmp.employee_id}
@@ -180,7 +180,7 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
           <div className="pt-3 border-t border-slate-200/60 dark:border-[#21264b] space-y-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <ScanFace className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                <ScanFace className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 Face ID:
               </span>
               <BiometricStatusBadge

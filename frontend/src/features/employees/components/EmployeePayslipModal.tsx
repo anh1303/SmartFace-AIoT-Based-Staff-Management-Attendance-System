@@ -2,6 +2,7 @@ import React from 'react';
 import { CreditCard, Printer } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
 import { PayrollRecord, Employee } from '../../../types';
+import { PayslipBreakdown } from '../../payrolls/components/PayslipBreakdown';
 import { calcPayrollAmount } from '../../../utils/payrollUtils';
 
 interface EmployeePayslipModalProps {
@@ -49,8 +50,8 @@ export const EmployeePayslipModal: React.FC<EmployeePayslipModalProps> = ({
       isOpen={Boolean(payslip)}
       onClose={onClose}
       title={`Phiếu Lương Chi Tiết - Kỳ ${payslip.period || payslip.payroll_period}`}
-      subtitle="Hệ thống tự động tính lương theo CSDL chuẩn AIoT"
-      maxWidth="lg"
+      subtitle="Đối chiếu thu nhập, phụ cấp và các khoản đã duyệt."
+      maxWidth="2xl"
     >
       <div className="space-y-4">
         {/* Header Info */}
@@ -70,7 +71,7 @@ export const EmployeePayslipModal: React.FC<EmployeePayslipModalProps> = ({
                 : payslip.status === 'FINALIZED'
                 ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50'
                 : payslip.status === 'CONFIRMED'
-                ? 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800/50'
+                ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/50'
                 : 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/50'
             }`}
           >
@@ -84,54 +85,7 @@ export const EmployeePayslipModal: React.FC<EmployeePayslipModalProps> = ({
           </span>
         </div>
 
-        {/* Payslip Lines */}
-        <div className="space-y-2 text-xs">
-          <div className="flex justify-between py-2 border-b border-slate-100 dark:border-[#21264b]">
-            <span className="text-slate-500 dark:text-slate-400">Lương theo giờ (Hourly Rate):</span>
-            <span className="font-mono text-slate-900 dark:text-white font-semibold">
-              {slipHourly.toLocaleString('vi-VN')} ₫/h
-            </span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-slate-100 dark:border-[#21264b]">
-            <span className="text-slate-500 dark:text-slate-400">Lương cơ bản ({slipWorking} giờ làm):</span>
-            <span className="font-mono text-slate-900 dark:text-white font-semibold">
-              {slipBase.toLocaleString('vi-VN')} ₫
-            </span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-slate-100 dark:border-[#21264b]">
-            <span className="text-slate-500 dark:text-slate-400">Thưởng tăng ca ({slipOT}h OT):</span>
-            <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-              +{slipOTAmount.toLocaleString('vi-VN')} ₫
-            </span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-slate-100 dark:border-[#21264b]">
-            <span className="text-slate-500 dark:text-slate-400">Phạt trễ/sớm ({slipLate}h):</span>
-            <span className={`font-mono font-semibold ${slipLateAmount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`}>
-              {slipLateAmount > 0 ? `-${slipLateAmount.toLocaleString('vi-VN')} ₫` : '0 ₫'}
-            </span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-slate-100 dark:border-[#21264b]">
-            <span className="text-slate-500 dark:text-slate-400">Phạt vắng ca đã duyệt:</span>
-            <span className="font-mono text-rose-600">-{(payslip.total_absence_penalty || 0).toLocaleString('vi-VN')} ₫</span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-slate-100 dark:border-[#21264b]">
-            <span className="text-slate-500 dark:text-slate-400">Phụ cấp chức vụ (Allowance):</span>
-            <span className="font-mono text-purple-600 dark:text-purple-400 font-semibold">
-              +{slipAllowance.toLocaleString('vi-VN')} ₫
-            </span>
-          </div>
-          <div className="flex justify-between py-3 border-t border-slate-100 dark:border-[#21264b] text-sm">
-            <span className="font-bold text-slate-900 dark:text-white">THỰC LĨNH (NET SALARY):</span>
-            <span className="font-mono font-extrabold text-purple-600 dark:text-purple-400 text-base">
-              {Number(payslip.net_salary ?? 0).toLocaleString('vi-VN')} ₫
-            </span>
-          </div>
-        </div>
-
-        <div className="p-3 bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] rounded-xl text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2">
-          <CreditCard className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-          <span>Số tài khoản và tiền lương tự động được chuyển khoản định kỳ.</span>
-        </div>
+        <PayslipBreakdown record={payslip} otRate={otRate} penaltyRate={penaltyRate}/>
 
         <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-[#21264b]">
           <button
@@ -145,7 +99,7 @@ export const EmployeePayslipModal: React.FC<EmployeePayslipModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors shadow-sm shadow-purple-600/20 cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors shadow-sm shadow-blue-600/20 cursor-pointer"
           >
             Đóng
           </button>

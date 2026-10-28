@@ -89,7 +89,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
     return (
       <div className="flex items-center justify-center gap-1.5 text-xs text-slate-200 whitespace-nowrap">
         {ev.isFace ? (
-          <ScanFace className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+          <ScanFace className="w-3.5 h-3.5 text-blue-400 shrink-0" />
         ) : (
           <Fingerprint className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
         )}
@@ -182,7 +182,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                           className="w-8 h-8 rounded-full object-cover border border-slate-300 dark:border-slate-700 shrink-0"
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-700/50 flex items-center justify-center font-bold text-purple-600 dark:text-purple-300 shrink-0 text-xs">
+                        <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-700/50 flex items-center justify-center font-bold text-blue-600 dark:text-blue-300 shrink-0 text-xs">
                           {employee.full_name.charAt(0)}
                         </div>
                       )}
@@ -197,7 +197,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                           <button
                             type="button"
                             onClick={() => toggleExpand(rowKey)}
-                            className="mt-0.5 text-[9px] text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 flex items-center gap-0.5 cursor-pointer font-sans"
+                            className="mt-0.5 text-[9px] text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-0.5 cursor-pointer font-sans"
                           >
                             <span>{isExpanded ? 'Ẩn' : `${item.rawEvents.length} lượt · xem chi tiết`}</span>
                             {isExpanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
@@ -214,7 +214,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                   >
                     <div className="space-y-0.5 flex flex-col items-center justify-center">
                       <span
-                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 dark:bg-[#3b174a]/60 text-purple-600 dark:text-[#d884ff] border border-purple-200/80 dark:border-[#792e99]/60 whitespace-nowrap"
+                        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 dark:bg-[#3b174a]/60 text-blue-600 dark:text-[#d884ff] border border-blue-200/80 dark:border-[#792e99]/60 whitespace-nowrap"
                         title={item.date}
                       >
                         {item.date}

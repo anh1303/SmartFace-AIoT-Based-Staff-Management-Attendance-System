@@ -30,6 +30,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
   const seenEventIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    if (import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === 'true') return;
     const socketBase = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
     const socket = io(`${socketBase}/attendance`, {
       withCredentials: true,

@@ -93,13 +93,13 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
     <div className="space-y-3">
       {/* Draft Add Form */}
       {isAddingPos && (
-        <div className="p-4 rounded-2xl bg-purple-50/70 dark:bg-[#18152e] border-2 border-purple-400/80 dark:border-purple-500/70 shadow-md animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-purple-200 dark:border-purple-500/30">
+        <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-[#18152e] border-2 border-blue-400/80 dark:border-blue-500/70 shadow-md animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-blue-200 dark:border-blue-500/30">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-purple-600 text-white">
+              <div className="p-1.5 rounded-lg bg-blue-600 text-white">
                 <Briefcase className="w-4 h-4" />
               </div>
-              <span className="text-xs font-bold text-purple-900 dark:text-purple-200 uppercase tracking-wide">
+              <span className="text-xs font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wide">
                 Tạo chức vụ mới
               </span>
             </div>
@@ -127,7 +127,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
                   if (e.key === 'Enter') handleSaveNewPos();
                   if (e.key === 'Escape') setIsAddingPos(false);
                 }}
-                className="w-full bg-white dark:bg-[#0f1224] border border-purple-300 dark:border-purple-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                className="w-full bg-white dark:bg-[#0f1224] border border-blue-300 dark:border-blue-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
               />
             </div>
 
@@ -138,7 +138,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
               <select
                 value={newPosDeptId || ''}
                 onChange={(e) => setNewPosDeptId(Number(e.target.value))}
-                className="w-full bg-white dark:bg-[#0f1224] border border-purple-300 dark:border-purple-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer"
+                className="w-full bg-white dark:bg-[#0f1224] border border-blue-300 dark:border-blue-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
               >
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>
@@ -157,7 +157,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
                 onChange={(e) =>
                   setNewPosLevel(e.target.value as 'EMPLOYEE' | 'MANAGER')
                 }
-                className="w-full bg-white dark:bg-[#0f1224] border border-purple-300 dark:border-purple-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer"
+                className="w-full bg-white dark:bg-[#0f1224] border border-blue-300 dark:border-blue-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
               >
                 <option value="EMPLOYEE">Nhân viên</option>
                 <option value="MANAGER">Quản lý</option>
@@ -194,7 +194,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
       {/* Loading state */}
       {loading && positions.length === 0 ? (
         <div className="py-16 flex flex-col items-center justify-center gap-2 text-slate-400">
-          <Loader2 className="w-7 h-7 animate-spin text-purple-600 dark:text-purple-400" />
+          <Loader2 className="w-7 h-7 animate-spin text-blue-600 dark:text-blue-400" />
           <span className="text-xs">Đang tải danh sách chức vụ từ CSDL...</span>
         </div>
       ) : filteredPositions.length === 0 ? (
@@ -292,7 +292,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
                       type="button"
                       disabled={savingEditPos}
                       onClick={() => handleSaveEditPos(pos.id)}
-                      className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                      className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
                     >
                       {savingEditPos ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -311,7 +311,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
             return (
               <div
                 key={pos.id}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#0f1224]/70 border border-slate-200/90 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-[#2e3566] transition-all group shadow-xs space-y-2.5"
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#0f1224]/70 border border-slate-200/90 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-[#2e3566] transition-all group shadow-xs space-y-2.5"
               >
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                   <div className="flex items-start sm:items-center gap-3">
@@ -344,7 +344,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
                     <button
                       type="button"
                       onClick={() => handleStartEditPos(pos)}
-                      className="p-1.5 rounded-xl text-slate-500 hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-[#1f244d] transition-all cursor-pointer"
+                      className="p-1.5 rounded-xl text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-[#1f244d] transition-all cursor-pointer"
                       title="Sửa chức vụ"
                     >
                       <Edit2 className="w-4 h-4" />

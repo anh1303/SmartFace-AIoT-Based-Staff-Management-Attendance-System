@@ -30,7 +30,7 @@ export const EmployeePayrollTab: React.FC<EmployeePayrollTabProps> = ({
         {/* Thanh riêng cho tiêu đề Lịch Sử Phiếu Lương */}
         <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:px-5 sm:py-3.5 shadow-xs transition-colors flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-900 dark:text-white font-heading flex items-center gap-2">
-            <History className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <History className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             Lịch Sử Phiếu Lương
           </h3>
 
@@ -68,6 +68,8 @@ export const EmployeePayrollTab: React.FC<EmployeePayrollTabProps> = ({
                 return (
                   <TableRow
                     key={p.payroll_id || idx}
+                    tabIndex={0}
+                    onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelectPayslip(p);}}}
                     onClick={() => onSelectPayslip(p)}
                     className="cursor-pointer"
                     title="Nhấp để xem chi tiết phiếu lương"
@@ -88,7 +90,7 @@ export const EmployeePayrollTab: React.FC<EmployeePayrollTabProps> = ({
                       {lateEarly > 0 ? `${lateEarly}h` : '0h'}
                     </TableCell>
                     <TableCell className="font-mono text-rose-600">{(p.total_absence_penalty || 0).toLocaleString('vi-VN')} ₫</TableCell>
-                    <TableCell className="font-mono text-purple-600 dark:text-purple-400 truncate" title={allw > 0 ? `+${allw.toLocaleString('vi-VN')} ₫` : '0 ₫'}>
+                    <TableCell className="font-mono text-blue-600 dark:text-blue-400 truncate" title={allw > 0 ? `+${allw.toLocaleString('vi-VN')} ₫` : '0 ₫'}>
                       {allw > 0 ? `+${allw.toLocaleString('vi-VN')} ₫` : '0 ₫'}
                     </TableCell>
                     <TableCell isLast className="font-mono font-extrabold text-slate-900 dark:text-white text-sm truncate" title={`${net.toLocaleString('vi-VN')} ₫`}>

@@ -29,6 +29,8 @@ export const ManagerSchedule: React.FC = () => {
   });
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [saving,setSaving]=useState(false);
+  const [shiftError,setShiftError]=useState('');
   const [editingShift, setEditingShift] = useState<EditingShiftTarget | null>(null);
 
   useEffect(() => {
@@ -147,6 +149,7 @@ export const ManagerSchedule: React.FC = () => {
     }
 
     const existing = workShifts.find(s => s.employee_id === empId && s.date === date);
+    setShiftError('');
     setEditingShift({
       employeeId: empId,
       employeeName: empName,
@@ -168,7 +171,7 @@ export const ManagerSchedule: React.FC = () => {
     }
   };
 
-  const handleShiftSave = (e: React.FormEvent) => {
+  const handleShiftSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingShift) return;
 
@@ -186,7 +189,8 @@ export const ManagerSchedule: React.FC = () => {
     const dayIndex = new Date(`${editingShift.date}T00:00:00.000Z`).getUTCDay();
     const workDay = editingShift.shift?.work_day || dayNames[dayIndex];
 
-    assignOrUpdateShift({
+    setSaving(true);setShiftError('');
+    try {await assignOrUpdateShift({
       shift_id: editingShift.shift?.shift_id,
       employee_id: editingShift.employeeId,
       date: editingShift.date,
@@ -198,11 +202,12 @@ export const ManagerSchedule: React.FC = () => {
       note: modalNote,
     });
 
-    setEditingShift(null);
+    setEditingShift(null);showToast('Đã lưu lịch làm việc.','success');
+    } catch(error) {setShiftError((error as Error).message||'Chưa lưu được ca.');} finally {setSaving(false);}
   };
 
   // Bulk shift assignment submission
-  const handleBulkSubmit = (e: React.FormEvent) => {
+  const handleBulkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (bulkDays.length === 0) {
       showToast('Vui lòng chọn ít nhất 1 ngày trong tuần để áp dụng ca!', 'warning');
@@ -218,7 +223,7 @@ export const ManagerSchedule: React.FC = () => {
       }
     }
 
-    let targetEmps = employees.filter(e => e.status !== 'INACTIVE');
+    let targetEmps = employees.filter(e => e.status === 'ACTIVE');
     if (bulkTarget === 'DEPARTMENT') {
       targetEmps = targetEmps.filter(e => e.department === bulkDepartment);
     } else if (bulkTarget !== 'ALL') {
@@ -242,14 +247,13 @@ export const ManagerSchedule: React.FC = () => {
     const dayNames = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
     let count = 0;
 
-    targetEmps.forEach(emp => {
-      bulkDays.forEach(dayOffset => {
-        const d = new Date(currentMonday);
-        d.setDate(currentMonday.getDate() + dayOffset);
-        const dateStr = formatDateToYYYYMMDD(d);
-        const existing = workShifts.find(s => s.employee_id === emp.employee_id && s.date === dateStr);
-
-        assignOrUpdateShift({
+    let failed=0;setSaving(true);setShiftError('');
+    for (const emp of targetEmps) {
+      for (const dayOffset of bulkDays) {
+        const d=new Date(currentMonday);d.setDate(currentMonday.getDate()+dayOffset);
+        const dateStr=formatDateToYYYYMMDD(d);
+        const existing=workShifts.find(s=>s.employee_id===emp.employee_id&&s.date===dateStr);
+        try {await assignOrUpdateShift({
           shift_id: existing?.shift_id,
           employee_id: emp.employee_id,
           date: dateStr,
@@ -260,22 +264,22 @@ export const ManagerSchedule: React.FC = () => {
           department: emp.department || 'Nhân viên',
           note: bulkNote,
         });
-        count++;
-      });
-    });
-
-    setBulkModalOpen(false);
-    showToast(`Đã phân ca hàng loạt thành công cho ${targetEmps.length} nhân sự (${count} ca trực)!`, 'success');
+        count++;}catch{failed++;}
+      }
+    }
+    setSaving(false);
+    if(failed){setShiftError(`Đã lưu ${count} ca; ${failed} ca chưa lưu được. Kiểm tra quyền, ngày đã khóa hoặc kết nối rồi thử lại. Các ca đã lưu vẫn được giữ.`);}
+    else {setBulkModalOpen(false);showToast(`Đã lưu ${count} ca cho ${targetEmps.length} nhân sự.`,'success');}
   };
 
   // Copy shifts from previous week
-  const handleCopyPreviousWeek = () => {
+  const handleCopyPreviousWeek = async () => {
     const prevMonday = new Date(currentMonday);
     prevMonday.setDate(currentMonday.getDate() - 7);
     const dayNames = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
 
     let copiedCount = 0;
-    let activeEmps = employees.filter(e => e.status !== 'INACTIVE');
+    let activeEmps = employees.filter(e => e.status === 'ACTIVE');
 
     if (role !== 'admin') {
       activeEmps = activeEmps.filter(e => {
@@ -285,8 +289,9 @@ export const ManagerSchedule: React.FC = () => {
       });
     }
 
-    activeEmps.forEach(emp => {
-      [0, 1, 2, 3, 4, 5, 6].forEach(offset => {
+    let failed=0;setSaving(true);
+    for(const emp of activeEmps) {
+      for(const offset of [0,1,2,3,4,5,6]) {
         const prevDateObj = new Date(prevMonday);
         prevDateObj.setDate(prevMonday.getDate() + offset);
         const prevDateStr = formatDateToYYYYMMDD(prevDateObj);
@@ -299,7 +304,7 @@ export const ManagerSchedule: React.FC = () => {
         const currShift = workShifts.find(s => s.employee_id === emp.employee_id && s.date === currDateStr);
 
         if (prevShift) {
-          assignOrUpdateShift({
+          try {await assignOrUpdateShift({
             shift_id: currShift?.shift_id,
             employee_id: emp.employee_id,
             date: currDateStr,
@@ -310,12 +315,14 @@ export const ManagerSchedule: React.FC = () => {
             department: emp.department || 'Nhân viên',
             note: prevShift.note || 'Sao chép tuần trước',
           });
-          copiedCount++;
+          copiedCount++;}catch{failed++;}
         }
-      });
-    });
+      }
+    }
+    setSaving(false);
 
-    if (copiedCount > 0) {
+    if(failed){showToast(`Đã sao chép ${copiedCount} ca; ${failed} ca chưa lưu được. Vui lòng kiểm tra lại.`,'warning');}
+    else if (copiedCount > 0) {
       showToast(`Đã sao chép thành công ${copiedCount} ca làm việc từ tuần trước!`, 'success');
     } else {
       showToast('Không tìm thấy dữ liệu ca làm việc ở tuần trước để sao chép!', 'warning');
@@ -326,6 +333,7 @@ export const ManagerSchedule: React.FC = () => {
     <div className="space-y-6">
       {/* 1. Header with week navigator, bulk & copy actions */}
       <ScheduleHeader
+        busy={saving}
         currentMonday={currentMonday}
         weekNumber={weekNumber}
         startLabel={startLabel}
@@ -335,7 +343,7 @@ export const ManagerSchedule: React.FC = () => {
         onGoCurrentWeek={handleGoCurrentWeek}
         onDateSelect={handleDateSelect}
         onCopyPreviousWeek={handleCopyPreviousWeek}
-        onOpenBulkModal={() => setBulkModalOpen(true)}
+        onOpenBulkModal={() => {setShiftError('');setBulkModalOpen(true);}}
       />
 
       {/* 2. Filters */}
@@ -367,7 +375,9 @@ export const ManagerSchedule: React.FC = () => {
       {/* 5. Edit Shift Modal */}
       <ShiftEditModal
         editingShift={editingShift}
-        onClose={() => setEditingShift(null)}
+        isSubmitting={saving}
+        error={shiftError}
+        onClose={() => {if(!saving)setEditingShift(null);}}
         shiftType={modalShiftType}
         setShiftType={setModalShiftType}
         startTime={modalStartTime}
@@ -382,7 +392,9 @@ export const ManagerSchedule: React.FC = () => {
       {/* 6. Bulk Shift Assignment Modal */}
       <BulkShiftModal
         isOpen={bulkModalOpen}
-        onClose={() => setBulkModalOpen(false)}
+        isSubmitting={saving}
+        error={shiftError}
+        onClose={() => {if(!saving)setBulkModalOpen(false);}}
         weekNumber={weekNumber}
         startLabel={startLabel}
         endLabel={endLabel}

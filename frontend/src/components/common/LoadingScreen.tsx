@@ -9,7 +9,7 @@ interface LoadingScreenProps {
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({
   message = 'Đang đồng bộ phiên làm việc...',
-  subMessage = 'Bảo mật AES-256 • Xác thực thời gian thực',
+  subMessage = 'Vui lòng chờ trong giây lát',
   fullScreen = true,
 }) => {
   return (
@@ -19,17 +19,17 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
       }`}
     >
       {/* Background glow */}
-      <div className="absolute w-72 h-72 bg-purple-500/10 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute w-72 h-72 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
 
       {/* Cyberpunk Scan Graphic */}
       <div className="relative w-20 h-20 flex items-center justify-center mb-6">
         {/* Outer pulsing ring */}
-        <div className="absolute inset-0 rounded-xl border border-purple-500/30 animate-ping opacity-60 pointer-events-none" />
+        <div className="absolute inset-0 rounded-xl border border-blue-500/30 animate-ping opacity-60 pointer-events-none" />
         {/* Rotating ring */}
-        <div className="w-16 h-16 rounded-xl border-2 border-slate-200 dark:border-slate-800 border-t-purple-600 border-r-indigo-500 animate-spin" />
+        <div className="w-16 h-16 rounded-xl border-2 border-slate-200 dark:border-slate-800 border-t-blue-600 border-r-indigo-500 animate-spin" />
         {/* Inner Icon */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <ScanFace className="w-7 h-7 text-purple-600 dark:text-purple-400 animate-pulse" />
+          <ScanFace className="w-7 h-7 text-blue-600 dark:text-blue-400 animate-pulse" />
         </div>
       </div>
 

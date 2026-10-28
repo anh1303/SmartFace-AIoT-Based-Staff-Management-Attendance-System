@@ -87,7 +87,7 @@ export const ReportsBreakdownAndLeaderboard: React.FC<ReportsBreakdownAndLeaderb
               {methodBreakdown.map((m) => (
                 <div
                   key={m.name}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors"
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors"
                 >
                   <div className="flex items-center gap-2.5">
                     <div
@@ -137,7 +137,7 @@ export const ReportsBreakdownAndLeaderboard: React.FC<ReportsBreakdownAndLeaderb
             empStats.map((item, idx) => (
               <div
                 key={item.id}
-                className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center justify-between hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors"
+                className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div
@@ -162,7 +162,7 @@ export const ReportsBreakdownAndLeaderboard: React.FC<ReportsBreakdownAndLeaderb
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs font-bold text-purple-600 dark:text-purple-400">
+                  <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
                     {item.rate}
                   </span>
                   <span
@@ -170,7 +170,7 @@ export const ReportsBreakdownAndLeaderboard: React.FC<ReportsBreakdownAndLeaderb
                       item.badge === 'XUẤT SẮC'
                         ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20'
                         : item.badge === 'TỐT'
-                        ? 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20'
+                        ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20'
                         : item.badge === 'CẦN LƯU Ý'
                         ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'

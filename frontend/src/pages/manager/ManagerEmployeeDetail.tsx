@@ -106,8 +106,9 @@ export const ManagerEmployeeDetail: React.FC = () => {
       return;
     }
     setSelectedEmpCode(emp.employee_id);
-    navigate(`/app/manager/employee-detail?id=${emp.employee_id}`, { replace: true });
-    setSearchParams({ id: emp.employee_id });
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('id');nextParams.delete('employee_id');nextParams.set('tab',activeTab);
+    navigate(`/app/manager/employees/${encodeURIComponent(emp.employee_id)}?${nextParams}`);
   };
 
   const handlePrevEmployee = () => {
@@ -134,11 +135,14 @@ export const ManagerEmployeeDetail: React.FC = () => {
   const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
   const startOfCurrentMonth = `${currentYear}-${currentMonth}-01`;
 
-  const [startDate, setStartDate] = useState<string>(() => startOfCurrentMonth);
-  const [endDate, setEndDate] = useState<string>(() => todayVN);
+  const [startDate, setStartDate] = useState<string>(() => searchParams.get('date') || startOfCurrentMonth);
+  const [endDate, setEndDate] = useState<string>(() => searchParams.get('date') || todayVN);
   const [attendanceTypeFilter, setAttendanceTypeFilter] = useState<string>('ALL');
   const [attendanceStatusFilter, setAttendanceStatusFilter] = useState<string>('ALL');
-  const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'payroll' | 'schedule' | 'account'>('overview');
+  const [activeTab, setActiveTabState] = useState<'overview' | 'attendance' | 'payroll' | 'schedule' | 'account'>(() => { const tab=searchParams.get('tab'); return tab && ['overview','attendance','payroll','schedule','account'].includes(tab) ? tab as 'overview'|'attendance'|'payroll'|'schedule'|'account' : 'overview'; });
+  const setActiveTab = (tab: 'overview'|'attendance'|'payroll'|'schedule'|'account') => {setActiveTabState(tab);setSearchParams(previous=>{const next=new URLSearchParams(previous);next.set('tab',tab);return next;},{replace:true});};
+  useEffect(()=>{const tab=searchParams.get('tab');if(tab&&['overview','attendance','payroll','schedule','account'].includes(tab))setActiveTabState(tab as typeof activeTab);},[searchParams]);
+
   const [quickPreset, setQuickPreset] = useState<'today' | 'month' | 'all' | 'custom'>('month');
 
   // Quick Date Range Preset helper
@@ -229,7 +233,7 @@ export const ManagerEmployeeDetail: React.FC = () => {
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Vui lòng thêm nhân viên mới vào hệ thống.</p>
         <button
           onClick={() => navigate('/app/manager/employees')}
-          className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-purple-600/20 cursor-pointer"
+          className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-blue-600/20 cursor-pointer"
         >
           Đến trang danh sách nhân viên
         </button>
@@ -249,14 +253,14 @@ export const ManagerEmployeeDetail: React.FC = () => {
             Giới Hạn Quyền Xem Theo Phòng Ban
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-2.5 leading-relaxed">
-            Bạn đang đăng nhập với vai trò <strong className="text-purple-600 dark:text-purple-400">Quản lý ({managerDept || 'phòng ban'})</strong>.
+            Bạn đang đăng nhập với vai trò <strong className="text-blue-600 dark:text-blue-400">Quản lý ({managerDept || 'phòng ban'})</strong>.
             Theo quy định phân quyền, Quản lý chỉ có quyền xem thông tin nhân viên thuộc phòng ban mình phụ trách.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
               onClick={() => navigate('/app/manager/employees')}
-              className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer"
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer"
             >
               Quay lại danh sách nhân viên
             </button>
@@ -301,7 +305,7 @@ export const ManagerEmployeeDetail: React.FC = () => {
             Giới Hạn Quyền Xem Chi Tiết
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-2.5 leading-relaxed">
-            Bạn đang đăng nhập với vai trò <strong className="text-purple-600 dark:text-purple-400">Quản lý (Manager)</strong>.
+            Bạn đang đăng nhập với vai trò <strong className="text-blue-600 dark:text-blue-400">Quản lý (Manager)</strong>.
             Theo quy định phân quyền, Quản lý có thể xem danh sách nhân viên nhưng{' '}
             <strong className="text-rose-600 dark:text-rose-400">
               không có quyền xem trang chi tiết của Quản lý khác
@@ -312,7 +316,7 @@ export const ManagerEmployeeDetail: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/app/manager/employees')}
-              className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer"
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer"
             >
               Quay lại danh sách nhân viên
             </button>
@@ -350,7 +354,7 @@ export const ManagerEmployeeDetail: React.FC = () => {
       />
 
       {activeTab === 'overview' && <div className="flex justify-end">
-        <button type="button" onClick={() => setActiveTab('attendance')} className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 text-sm font-semibold">
+        <button type="button" onClick={() => setActiveTab('attendance')} className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-semibold">
           Xem lịch sử checkin / checkout
         </button>
       </div>}

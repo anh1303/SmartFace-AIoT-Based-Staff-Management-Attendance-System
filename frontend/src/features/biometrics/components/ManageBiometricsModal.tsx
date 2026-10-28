@@ -43,13 +43,13 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
                 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
               }
               alt={employee.full_name}
-              className="w-12 h-12 rounded-xl object-cover border border-purple-200 dark:border-purple-800 shrink-0"
+              className="w-12 h-12 rounded-xl object-cover border border-blue-200 dark:border-blue-800 shrink-0"
             />
             <div className="min-w-0 flex-1">
               <h4 className="text-sm font-bold text-slate-900 dark:text-white max-w-[150px] sm:max-w-[180px] truncate" title={employee.full_name}>
                 {employee.full_name}
               </h4>
-              <p className="text-xs font-mono text-purple-600 dark:text-purple-400 max-w-[150px] sm:max-w-[180px] truncate" title={employee.employee_id}>
+              <p className="text-xs font-mono text-blue-600 dark:text-blue-400 max-w-[150px] sm:max-w-[180px] truncate" title={employee.employee_id}>
                 {employee.employee_id}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[150px] sm:max-w-[180px] truncate" title={`${employee.department} • ${employee.position}`}>
@@ -63,7 +63,7 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
         <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700/50 flex items-center justify-center text-purple-600 dark:text-purple-400">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
                 <ScanFace className="w-4 h-4" />
               </div>
               <div>
@@ -84,7 +84,7 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
               <button
                 type="button"
                 onClick={() => onStartEditFace(employee)}
-                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shadow-purple-600/20 whitespace-nowrap"
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm shadow-blue-600/20 whitespace-nowrap"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>

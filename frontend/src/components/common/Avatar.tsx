@@ -1,0 +1,3 @@
+import React,{useState,useEffect} from 'react';
+import {User} from 'lucide-react';
+export function Avatar({src,name,size=40}:{src?:string|null;name?:string;size?:number}){const [broken,setBroken]=useState(false);useEffect(()=>setBroken(false),[src]);return <span className="sf-avatar" style={{width:size,height:size,overflow:'hidden'}}>{src&&!broken?<img src={src} alt={name||'Ảnh đại diện'} className="w-full h-full object-cover" onError={()=>setBroken(true)}/>:name?<span className="text-sm font-semibold" aria-label={name}>{name.split(' ').filter(Boolean).slice(-2).map(n=>n[0]).join('')}</span>:<User size={size/2}/>}</span>;}

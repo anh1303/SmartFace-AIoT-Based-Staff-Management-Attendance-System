@@ -1,0 +1,14 @@
+import {Router} from 'express';
+import {rateLimit} from 'express-rate-limit';
+import {authenticate} from '../../middlewares/auth.middleware.js';
+import {asyncHandler} from '../../middlewares/asyncHandler.js';
+import {successResponse} from '../../common/response.js';
+import {getCookieOptions} from './auth.controller.js';
+import {profileSchema,changePasswordSchema} from './profile.dto.js';
+import {getProfile,updateProfile,changePassword} from './profile.service.js';
+export const profileRouter=Router();
+profileRouter.use(authenticate);
+profileRouter.get('/profile',asyncHandler(async(req,res)=>{successResponse(res,await getProfile(req.user!.id));}));
+profileRouter.patch('/profile',asyncHandler(async(req,res)=>{const input=profileSchema.parse(req.body);successResponse(res,await updateProfile(req.user!.id,input),'Đã lưu hồ sơ tài khoản');}));
+const passwordLimiter=rateLimit({windowMs:15*60*1000,limit:5,standardHeaders:'draft-8',legacyHeaders:false,keyGenerator:req=>req.user!.id,message:{success:false,message:'Đã thử quá nhiều lần. Vui lòng thử lại sau 15 phút.'}});
+profileRouter.post('/change-password',passwordLimiter,asyncHandler(async(req,res)=>{const input=changePasswordSchema.parse(req.body);await changePassword(req.user!.id,input.current_password,input.new_password);const {maxAge,expires,...options}=getCookieOptions(false);res.clearCookie('token',options);successResponse(res,null,'Đã đổi mật khẩu. Vui lòng đăng nhập lại.');}));

@@ -136,7 +136,7 @@ export const FingerprintEnrollmentSection: React.FC<FingerprintEnrollmentSection
                   fingerprintStep === 'IDLE'
                     ? 'border-slate-300 dark:border-slate-700 text-slate-400'
                     : fingerprintStep === 'SENDING'
-                    ? 'border-purple-500 text-purple-600 dark:text-purple-400 animate-pulse'
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400 animate-pulse'
                     : fingerprintStep === 'WAITING_TOUCH'
                     ? 'border-amber-400 text-amber-500 animate-bounce'
                     : 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40'

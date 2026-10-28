@@ -90,13 +90,13 @@ export const EmployeeSchedule: React.FC = () => {
       <PageHeaderBanner
         title="Lịch trình làm việc & Phân bổ ca"
         badge={
-          <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-mono font-medium border border-purple-200 dark:border-purple-700/50">
+          <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-mono font-medium border border-blue-200 dark:border-blue-700/50">
             {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
           </span>
         }
         actions={
           <>
-            <div className="flex items-center bg-white/80 dark:bg-[#0f1224] border border-purple-200/80 dark:border-[#272d5a] rounded-xl p-1 shadow-inner backdrop-blur-sm">
+            <div className="flex items-center bg-white/80 dark:bg-[#0f1224] border border-blue-200/80 dark:border-[#272d5a] rounded-xl p-1 shadow-inner backdrop-blur-sm">
               <button
                 type="button"
                 onClick={handlePrevWeek}
@@ -119,7 +119,7 @@ export const EmployeeSchedule: React.FC = () => {
             <button
               type="button"
               onClick={() => setExchangeModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm shadow-purple-500/20 transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm shadow-blue-500/20 transition-all cursor-pointer"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
               <span>Đổi ca trực</span>
@@ -130,25 +130,25 @@ export const EmployeeSchedule: React.FC = () => {
 
       {/* 4 Bento Telemetry Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
           <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Tổng giờ tuần</span>
           <div className="mt-2 text-2xl font-bold font-mono text-slate-900 dark:text-white">{totalHours.toFixed(1)}h</div>
-          <p className="text-[11px] text-purple-600 dark:text-purple-400 mt-1">{weekShifts.length} ca đã phân bổ</p>
+          <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-1">{weekShifts.length} ca đã phân bổ</p>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
           <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Số ca hoàn thành</span>
           <div className="mt-2 text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{completedShifts} / {weekShifts.length} ca</div>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Đạt {weekShifts.length > 0 ? Math.round((completedShifts / weekShifts.length) * 100) : 100}% tiến độ</p>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
           <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Tổng lượt quẹt</span>
           <div className="mt-2 text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">{myAttendance.length} lượt</div>
           <p className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-1">Ghi nhận qua AI Cam</p>
         </div>
 
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
           <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Tỷ lệ đúng giờ</span>
           <div className="mt-2 text-2xl font-bold font-mono text-slate-900 dark:text-white">{onTimeRate}%</div>
           <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">{onTimeCount} lượt đúng giờ</p>
@@ -176,10 +176,10 @@ export const EmployeeSchedule: React.FC = () => {
               <div
                 key={day.date}
                 className={`p-4 rounded-xl border flex flex-col justify-between min-h-[190px] transition-all ${isToday
-                  ? 'bg-purple-50/60 dark:bg-purple-950/30 border-purple-400 dark:border-purple-500 shadow-sm shadow-purple-500/10 ring-1 ring-purple-400/40'
+                  ? 'bg-blue-50/60 dark:bg-blue-950/30 border-blue-400 dark:border-blue-500 shadow-sm shadow-blue-500/10 ring-1 ring-blue-400/40'
                   : shift?.shift_type === 'OFF'
                     ? 'bg-slate-50/50 dark:bg-[#0f1224]/50 border-slate-100 dark:border-[#21264b]/60 opacity-60'
-                    : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40'
+                    : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40'
                   }`}
               >
                 <div>
@@ -189,14 +189,14 @@ export const EmployeeSchedule: React.FC = () => {
                       <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500">{day.label}</p>
                     </div>
                     {isToday && (
-                      <span className="text-[9px] bg-purple-600 text-white font-bold px-1.5 py-0.5 rounded-md">
+                      <span className="text-[9px] bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded-md">
                         HÔM NAY
                       </span>
                     )}
                   </div>
 
                   <div className="mt-3">
-                    <p className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                    <p className="text-xs font-bold text-blue-600 dark:text-blue-400">
                       {shift?.shift_type === 'OFFICE_HOURS'
                         ? 'Ca Hành Chính'
                         : shift?.shift_type === 'MORNING'
@@ -226,7 +226,7 @@ export const EmployeeSchedule: React.FC = () => {
                       <CheckCircle2 className="w-3 h-3" /> Đã qua
                     </span>
                   ) : isToday ? (
-                    <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
                       <Clock className="w-3 h-3 animate-pulse" /> Đang ca
                     </span>
                   ) : shift?.shift_type === 'OFF' ? (
@@ -254,14 +254,14 @@ export const EmployeeSchedule: React.FC = () => {
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">Danh sách nhân sự đang cùng làm việc tại trụ sở</p>
           </div>
-          <span className="text-xs text-purple-600 dark:text-purple-400 font-mono">{teammates.length} đồng đội</span>
+          <span className="text-xs text-blue-600 dark:text-blue-400 font-mono">{teammates.length} đồng đội</span>
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {teammates.map(emp => (
             <div
               key={emp.employee_id}
-              className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors flex items-center justify-between shadow-xs"
+              className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors flex items-center justify-between shadow-xs"
             >
               <div className="flex items-center gap-3">
                 <img
@@ -272,7 +272,7 @@ export const EmployeeSchedule: React.FC = () => {
                 <div>
                   <p className="text-xs font-semibold text-slate-900 dark:text-white">{emp.full_name}</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">{emp.position}</p>
-                  <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400">{emp.department}</span>
+                  <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400">{emp.department}</span>
                 </div>
               </div>
 
@@ -300,7 +300,7 @@ export const EmployeeSchedule: React.FC = () => {
               type="date"
               value={exchangeDate}
               onChange={e => setExchangeDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
             />
           </div>
 
@@ -309,7 +309,7 @@ export const EmployeeSchedule: React.FC = () => {
             <select
               value={exchangeTargetEmp}
               onChange={e => setExchangeTargetEmp(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="" className="bg-white dark:bg-[#13162b]">-- Chọn đồng đội --</option>
               {teammates.map(t => (
@@ -328,7 +328,7 @@ export const EmployeeSchedule: React.FC = () => {
               value={exchangeReason}
               onChange={e => setExchangeReason(e.target.value)}
               placeholder="Ghi rõ lý do (ví dụ: bận việc gia đình, đã thỏa thuận trực thay ngày 12/09)..."
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -342,7 +342,7 @@ export const EmployeeSchedule: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/20 cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 cursor-pointer"
             >
               Gửi yêu cầu đổi ca
             </button>
@@ -351,4 +351,4 @@ export const EmployeeSchedule: React.FC = () => {
       </Modal>
     </div>
   );
-};
+};

@@ -1,3 +1,4 @@
+import { Avatar } from '../../components/common/Avatar';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatVNTime, getTodayVNString, formatVNDateISO, getMonday } from '../../utils/dateUtils';
@@ -95,7 +96,7 @@ export const EmployeeDashboard: React.FC = () => {
     e.preventDefault();
     // TODO: Tích hợp gọi API gửi giải trình khi Backend hoàn thiện module yêu cầu nhân viên (/api/employee-requests hoặc /api/attendance/explanation).
     // Hiện tại thông báo phản hồi giả lập giao diện cho nhân sự.
-    showToast('Đã gửi đơn giải trình chấm công đến quản lý!', 'success');
+    showToast('Chức năng gửi giải trình chưa có API tiếp nhận. Nội dung chưa được gửi.', 'warning');
     setExplainModalOpen(false);
     setExplainReason('');
   };
@@ -105,17 +106,13 @@ export const EmployeeDashboard: React.FC = () => {
       {/* Top Greeting & Biometric Punch Status (Bento Header with Continuous Shifting Gradient & Floating Blobs) */}
       <div className="bento-hero-gradient rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
         {/* Ambient Floating & Morphing Blurred Blobs */}
-        <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-purple-500/30 to-fuchsia-500/25 dark:from-purple-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
+        <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-blue-500/30 to-fuchsia-500/25 dark:from-blue-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
         <div className="absolute -bottom-16 left-1/4 w-64 h-64 bg-gradient-to-tr from-indigo-500/30 to-blue-500/20 dark:from-indigo-600/30 dark:to-blue-600/20 rounded-full blur-3xl pointer-events-none animate-blob-2" />
         <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
 
         <div className="relative z-10 flex items-center gap-4">
           <div className="relative">
-            <img
-              src={currentUser?.avatar || currentEmp?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"}
-              alt={currentUser?.full_name}
-              className="w-16 h-16 rounded-2xl object-cover border-2 border-purple-400 dark:border-purple-600 shadow-md"
-            />
+            <Avatar src={currentUser?.avatar || currentEmp?.avatar} name={currentUser?.full_name} size={56}/>
             <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#13162b] flex items-center justify-center">
               <CheckCircle2 className="w-3.5 h-3.5 text-white" />
             </div>
@@ -126,7 +123,7 @@ export const EmployeeDashboard: React.FC = () => {
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
                 Xin chào, {currentUser?.full_name || currentEmp?.full_name || 'Nguyễn Văn A'} 👋
               </h1>
-              <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50">
+              <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700/50">
                 {empCode}
               </span>
             </div>
@@ -149,13 +146,13 @@ export const EmployeeDashboard: React.FC = () => {
           <button
             type="button"
             onClick={() => setExplainModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-white/80 dark:bg-[#181c38]/90 hover:bg-white dark:hover:bg-[#20254b] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-purple-200/80 dark:border-[#272d5a] backdrop-blur-sm transition-colors cursor-pointer shadow-xs"
+            className="px-4 py-2 rounded-xl bg-white/80 dark:bg-[#181c38]/90 hover:bg-white dark:hover:bg-[#20254b] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-blue-200/80 dark:border-[#272d5a] backdrop-blur-sm transition-colors cursor-pointer shadow-xs"
           >
-            <FileText className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-            <span>Gửi giải trình</span>
+            <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span>Soạn giải trình</span>
           </button>
-          <div className="px-3.5 py-2 rounded-xl bg-purple-50/80 dark:bg-[#0f1224]/80 border border-purple-200/80 dark:border-[#272d5a] text-xs font-mono text-purple-600 dark:text-purple-400 flex items-center gap-1.5 shadow-xs">
-            <Clock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 animate-pulse" />
+          <div className="px-3.5 py-2 rounded-xl bg-blue-50/80 dark:bg-[#0f1224]/80 border border-blue-200/80 dark:border-[#272d5a] text-xs font-mono text-blue-600 dark:text-blue-400 flex items-center gap-1.5 shadow-xs">
+            <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-pulse" />
             <span>Đã ghi nhận: {myAttendance.length} lượt</span>
           </div>
         </div>
@@ -164,7 +161,7 @@ export const EmployeeDashboard: React.FC = () => {
       {/* 4 Bento Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Hôm nay */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
           <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
             Hôm nay ({todayShift ? todayShift.shift_type : 'Hành chính'})
           </span>
@@ -173,7 +170,7 @@ export const EmployeeDashboard: React.FC = () => {
               {todayShift ? `${todayShift.start_time} - ${todayShift.end_time}` : '08:00 - 18:00'}
             </div>
             <div className="flex items-center gap-2 mt-2">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 uppercase font-mono border border-purple-200 dark:border-purple-700/50">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 uppercase font-mono border border-blue-200 dark:border-blue-700/50">
                 {todayShift?.work_day || 'Thứ Hai'}
               </span>
               <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[130px]">{todayShift?.note || 'Đúng tiến độ'}</span>
@@ -182,7 +179,7 @@ export const EmployeeDashboard: React.FC = () => {
         </div>
 
         {/* Card 2: Tuần này */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
           <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
             Lịch phân ca tuần
           </span>
@@ -192,7 +189,7 @@ export const EmployeeDashboard: React.FC = () => {
               <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">ca đã đăng ký</span>
             </div>
             <div className="w-full bg-slate-100 dark:bg-[#0f1224] h-2 rounded-full mt-2.5 overflow-hidden border border-slate-200 dark:border-[#272d5a]">
-              <div className="bg-purple-600 h-full rounded-full" style={{ width: `${Math.min(100, (myShifts.length / 7) * 100)}%` }} />
+              <div className="bg-blue-600 h-full rounded-full" style={{ width: `${Math.min(100, (myShifts.length / 7) * 100)}%` }} />
             </div>
             <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-2 flex items-center gap-1 font-medium">
               <ArrowUpRight className="w-3 h-3" /> Đầy đủ phân bổ
@@ -201,7 +198,7 @@ export const EmployeeDashboard: React.FC = () => {
         </div>
 
         {/* Card 3: Công tháng */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
           <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
             Ngày công tích lũy
           </span>
@@ -219,7 +216,7 @@ export const EmployeeDashboard: React.FC = () => {
         </div>
 
         {/* Card 4: Lương tạm tính */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors shadow-xs">
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
           <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
             Lương tạm tính kỳ này
           </span>
@@ -227,7 +224,7 @@ export const EmployeeDashboard: React.FC = () => {
             <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
               {netSalaryFormatted}
             </div>
-            <p className="text-[11px] text-purple-600 dark:text-purple-400 mt-2 font-medium">
+            <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-2 font-medium">
               Lương/giờ: {Number(currentEmp?.hourly_rate || 120000).toLocaleString('vi-VN')} ₫/h
             </p>
           </div>
@@ -253,7 +250,7 @@ export const EmployeeDashboard: React.FC = () => {
             <div
               key={idx}
               className={`p-3.5 rounded-xl border text-xs transition-all ${item.status === 'ON_TIME'
-                ? 'bg-slate-50 dark:bg-[#0f1224] border-slate-200/80 dark:border-[#21264b] hover:border-purple-400 dark:hover:border-purple-600'
+                ? 'bg-slate-50 dark:bg-[#0f1224] border-slate-200/80 dark:border-[#21264b] hover:border-blue-400 dark:hover:border-blue-600'
                 : item.status === 'LATE'
                   ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-500/40'
                   : item.status === 'OFF'
@@ -302,7 +299,7 @@ export const EmployeeDashboard: React.FC = () => {
           </div>
 
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700/40 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
               <ScanFace className="w-6 h-6" />
             </div>
             <div>
@@ -328,7 +325,7 @@ export const EmployeeDashboard: React.FC = () => {
           </div>
 
           <div className="p-3 bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] rounded-xl text-xs text-slate-500 dark:text-slate-400">
-            <span className="font-semibold text-purple-600 dark:text-purple-400">Lưu ý an ninh:</span> Dữ liệu khuôn mặt được mã hoá một chiều chuẩn AES-256 nội bộ, không lưu trữ ảnh thô trên cloud.
+            <span className="font-semibold text-blue-600 dark:text-blue-400">Lưu ý an ninh:</span> Chỉ sử dụng tài khoản được cấp và giữ riêng thông tin truy cập của bạn.
           </div>
         </div>
 
@@ -342,17 +339,17 @@ export const EmployeeDashboard: React.FC = () => {
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Lịch phân bổ từ Trưởng bộ phận</p>
               </div>
-              <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">3 ca sắp tới</span>
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">3 ca sắp tới</span>
             </div>
 
             <div className="space-y-3">
               {myShifts.slice(0, 3).map((shift, idx) => (
                 <div
                   key={shift.shift_id || idx}
-                  className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center justify-between hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors"
+                  className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700/40 flex flex-col items-center justify-center font-mono text-xs">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40 flex flex-col items-center justify-center font-mono text-xs">
                       <span className="text-[10px] text-slate-400">T9</span>
                       <span className="font-bold text-slate-900 dark:text-white">{shift.date.split('-')[2]}</span>
                     </div>
@@ -375,7 +372,7 @@ export const EmployeeDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50 font-mono">
+                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700/50 font-mono">
                     ĐÃ XÁC NHẬN
                   </span>
                 </div>
@@ -388,9 +385,9 @@ export const EmployeeDashboard: React.FC = () => {
             <button
               type="button"
               onClick={() => setExplainModalOpen(true)}
-              className="text-purple-600 dark:text-purple-400 hover:underline font-medium cursor-pointer"
+              className="text-blue-600 dark:text-blue-400 hover:underline font-medium cursor-pointer"
             >
-              Gửi yêu cầu đổi ca &rarr;
+              Soạn yêu cầu đổi ca &rarr;
             </button>
           </div>
         </div>
@@ -400,8 +397,8 @@ export const EmployeeDashboard: React.FC = () => {
       <Modal
         isOpen={explainModalOpen}
         onClose={() => setExplainModalOpen(false)}
-        title="Gửi đơn giải trình / Đổi ca"
-        subtitle="Đơn sẽ được gửi trực tiếp đến Trưởng bộ phận xét duyệt"
+        title="Soạn nội dung giải trình / Đổi ca"
+        subtitle="Chưa có API tiếp nhận. Nội dung chưa được gửi đến quản lý."
       >
         <form onSubmit={handleExplainSubmit} className="space-y-4">
           <div>
@@ -410,13 +407,13 @@ export const EmployeeDashboard: React.FC = () => {
               type="date"
               value={explainDate}
               onChange={e => setExplainDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Loại yêu cầu</label>
-            <select className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer">
+            <select className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer">
               <option className="bg-white dark:bg-[#13162b]">Quên chấm công (Điểm danh bù)</option>
               <option className="bg-white dark:bg-[#13162b]">Giải trình đi muộn / Về sớm do công tác</option>
               <option className="bg-white dark:bg-[#13162b]">Đăng ký đổi ca trực với đồng đội</option>
@@ -432,7 +429,7 @@ export const EmployeeDashboard: React.FC = () => {
               value={explainReason}
               onChange={e => setExplainReason(e.target.value)}
               placeholder="Ghi rõ lý do và đính kèm thời gian dự kiến..."
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -446,13 +443,14 @@ export const EmployeeDashboard: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/20 cursor-pointer"
+              disabled
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 cursor-pointer"
             >
-              Gửi đơn phê duyệt
+              Chức năng gửi chưa được hỗ trợ
             </button>
           </div>
         </form>
       </Modal>
     </div>
   );
-};
+};

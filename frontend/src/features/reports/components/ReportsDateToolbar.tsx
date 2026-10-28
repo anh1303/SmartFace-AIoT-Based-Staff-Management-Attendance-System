@@ -27,12 +27,12 @@ export const ReportsDateToolbar: React.FC<ReportsDateToolbarProps> = ({
       {/* Date Range Pickers: Từ ngày - Đến ngày */}
       <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
         {/* Từ ngày */}
-        <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-1.5 focus-within:border-purple-500 transition-colors">
+        <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-1.5 focus-within:border-blue-500 transition-colors">
           <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
             Từ ngày:
           </span>
           <div className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+            <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
             <input
               type="date"
               value={startDate}
@@ -48,12 +48,12 @@ export const ReportsDateToolbar: React.FC<ReportsDateToolbarProps> = ({
         </span>
 
         {/* Đến ngày */}
-        <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-1.5 focus-within:border-purple-500 transition-colors">
+        <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-1.5 focus-within:border-blue-500 transition-colors">
           <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
             Đến ngày:
           </span>
           <div className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+            <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
             <input
               type="date"
               value={endDate}
@@ -70,7 +70,7 @@ export const ReportsDateToolbar: React.FC<ReportsDateToolbarProps> = ({
           onClick={onSelectToday}
           className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
             isTodaySelected
-              ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
+              ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700/50'
               : 'bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#272d5a]'
           }`}
         >
@@ -86,7 +86,7 @@ export const ReportsDateToolbar: React.FC<ReportsDateToolbarProps> = ({
             {isSameDay ? `Ngày: ${startDate}` : `Khoảng: ${startDate} → ${endDate}`}
           </span>
           <span className="text-slate-300 dark:text-slate-600">|</span>
-          <span className="text-purple-600 dark:text-purple-400 font-bold">
+          <span className="text-blue-600 dark:text-blue-400 font-bold">
             {totalAttendanceCount} lượt chấm công
           </span>
         </div>

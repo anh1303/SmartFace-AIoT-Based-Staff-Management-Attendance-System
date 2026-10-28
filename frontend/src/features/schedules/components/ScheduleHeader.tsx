@@ -1,3 +1,4 @@
+import {ShiftTemplateManager} from './ShiftTemplates';
 import React from 'react';
 import {
   Copy,
@@ -11,6 +12,7 @@ import { PageHeaderBanner } from '../../../components/common';
 import { formatDateToYYYYMMDD } from '@/utils/dateUtils';
 
 export interface ScheduleHeaderProps {
+  busy?: boolean;
   currentMonday: Date;
   weekNumber: number;
   startLabel: string;
@@ -24,6 +26,7 @@ export interface ScheduleHeaderProps {
 }
 
 export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
+  busy=false,
   currentMonday,
   weekNumber,
   startLabel,
@@ -41,7 +44,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
       titleExtra={
         <div className="flex items-center gap-2 flex-wrap">
           {/* Week Selector */}
-          <div className="flex items-center gap-1.5 bg-white/80 dark:bg-[#0f1224] border border-purple-200/80 dark:border-[#272d5a] px-3 py-1.5 rounded-xl shadow-inner backdrop-blur-sm">
+          <div className="flex items-center gap-1.5 bg-white/80 dark:bg-[#0f1224] border border-blue-200/80 dark:border-[#272d5a] px-3 py-1.5 rounded-xl shadow-inner backdrop-blur-sm">
             <button
               type="button"
               onClick={onPrevWeek}
@@ -52,10 +55,10 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
             </button>
 
             <div
-              className="relative flex items-center gap-1.5 font-mono text-xs text-purple-600 dark:text-purple-400 font-semibold px-2 cursor-pointer group"
+              className="relative flex items-center gap-1.5 font-mono text-xs text-blue-600 dark:text-blue-400 font-semibold px-2 cursor-pointer group"
               title="Bấm để chọn tuần theo lịch dương"
             >
-              <CalendarRange className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform" />
+              <CalendarRange className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
               <span>
                 TUẦN {weekNumber} ({startLabel} - {endLabel})
               </span>
@@ -81,16 +84,17 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
           <button
             type="button"
             onClick={onGoCurrentWeek}
-            className="px-3 py-1.5 rounded-xl bg-white/80 dark:bg-[#0f1224] hover:bg-slate-100 dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-purple-200/80 dark:border-[#272d5a] transition-colors shadow-inner backdrop-blur-sm cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-white/80 dark:bg-[#0f1224] hover:bg-slate-100 dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-blue-200/80 dark:border-[#272d5a] transition-colors shadow-inner backdrop-blur-sm cursor-pointer"
             title="Nhảy nhanh về tuần hiện tại"
           >
-            <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+            <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             <span>Hôm nay</span>
           </button>
         </div>
       }
       actions={
-        <div className="flex items-center gap-2.5 flex-nowrap shrink-0">
+        <fieldset disabled={busy} className="flex items-center gap-2.5 flex-wrap">
+          <ShiftTemplateManager/>
           {/* Copy from previous week */}
           <button
             type="button"
@@ -98,7 +102,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
             className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-[#272d5a] transition-colors shadow-xs cursor-pointer whitespace-nowrap shrink-0"
             title="Sao chép toàn bộ ca từ tuần trước sang tuần này"
           >
-            <Copy className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+            <Copy className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
             <span>Sao chép tuần trước</span>
           </button>
 
@@ -106,12 +110,12 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
           <button
             type="button"
             onClick={onOpenBulkModal}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-purple-500/20 transition-all cursor-pointer whitespace-nowrap shrink-0"
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-blue-500/20 transition-all cursor-pointer whitespace-nowrap shrink-0"
           >
             <Layers className="w-3.5 h-3.5 shrink-0" />
             <span>Phân ca nhanh hàng loạt</span>
           </button>
-        </div>
+        </fieldset>
       }
     />
   );

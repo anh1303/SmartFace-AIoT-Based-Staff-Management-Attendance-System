@@ -1,5 +1,6 @@
 import { AdjustmentReviewPanel } from '../../features/payrolls/components/AdjustmentReviewPanel';
 import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionUtils';
@@ -22,6 +23,9 @@ const payrollLogger = logger.child('ManagerPayroll');
 
 export const ManagerPayroll: React.FC = () => {
   const { role, currentUser } = useAuth();
+  const [viewParams,setViewParams]=useSearchParams();
+  const view=viewParams.get('payrollTab')||'records';
+  const selectView=(value:string)=>setViewParams(p=>{p.set('payrollTab',value);return p;});
   const {
     payroll,
     bonusPenalty,
@@ -380,7 +384,13 @@ export const ManagerPayroll: React.FC = () => {
         onOpenPolicyModal={handleOpenPolicyModal}
       />
 
-      <AdjustmentReviewPanel period={selectedPeriod} />
+      <div role="tablist" aria-label="Nội dung bảng lương" className="sf-tabs" onKeyDown={e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const next=e.key==='Home'?'records':e.key==='End'?'reviews':view==='reviews'?'records':'reviews';selectView(next);document.getElementById(next==='reviews'?'payroll-reviews-tab':'payroll-records-tab')?.focus();}}}>
+        <button role="tab" tabIndex={view!=='reviews'?0:-1} id="payroll-records-tab" aria-controls="payroll-records-panel" aria-selected={view!=='reviews'} className="sf-tab" onClick={()=>selectView('records')}>Phiếu lương & phụ cấp</button>
+        <button role="tab" tabIndex={view==='reviews'?0:-1} id="payroll-reviews-tab" aria-controls="payroll-reviews-panel" aria-selected={view==='reviews'} className="sf-tab" onClick={()=>selectView('reviews')}>Xét duyệt OT & khoản phạt</button>
+      </div>
+      {view==='reviews' && <div role="tabpanel" id="payroll-reviews-panel" aria-labelledby="payroll-reviews-tab"><AdjustmentReviewPanel period={selectedPeriod} /></div>}
+      <div hidden={view==='reviews'} role="tabpanel" id="payroll-records-panel" aria-labelledby="payroll-records-tab">
+      <p className="text-sm text-slate-500 mb-4">Mở chi tiết để đối soát phiếu lương. Phụ cấp được sửa cùng phiếu đang chờ duyệt; OT và phạt được quyết định riêng theo ngày.</p>
 
       {/* Bento Table with Search & Position Filter */}
       <PayrollTable
@@ -406,6 +416,8 @@ export const ManagerPayroll: React.FC = () => {
         isFinalized={isFinalized}
         onOpenEdit={handleOpenEdit}
       />
+
+      </div>
 
       {/* EDIT MODAL: Modifying fields with live formula preview */}
       <PayrollItemEditModal

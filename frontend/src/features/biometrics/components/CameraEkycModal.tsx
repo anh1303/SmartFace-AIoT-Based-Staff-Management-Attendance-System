@@ -310,7 +310,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-200/80 dark:border-[#21264b] bg-slate-50/80 dark:bg-[#0f1224]/90">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
               <Camera className="w-5 h-5" />
             </div>
             <div>
@@ -346,7 +346,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
                     onClick={() => setCurrentStepIndex(idx)}
                     className={`flex items-center gap-1.5 py-1.5 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                       isCurrent
-                        ? 'bg-purple-50 dark:bg-purple-600/20 border-purple-500 text-purple-700 dark:text-purple-400 shadow-xs'
+                        ? 'bg-blue-50 dark:bg-blue-600/20 border-blue-500 text-blue-700 dark:text-blue-400 shadow-xs'
                         : isDone
                         ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
                         : 'bg-white dark:bg-[#13162b] border-slate-200 dark:border-[#21264b] text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
@@ -357,7 +357,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
                         isDone
                           ? 'bg-emerald-500 text-white'
                           : isCurrent
-                          ? 'bg-purple-600 text-white animate-pulse'
+                          ? 'bg-blue-600 text-white animate-pulse'
                           : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                       }`}
                     >
@@ -386,7 +386,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
               <button
                 type="button"
                 onClick={handleAddStep}
-                className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl border border-dashed border-purple-400/60 dark:border-purple-500/40 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 text-xs font-semibold transition-all cursor-pointer"
+                className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl border border-dashed border-blue-400/60 dark:border-blue-500/40 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 text-xs font-semibold transition-all cursor-pointer"
                 title="Chụp thêm ảnh nữa"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -429,7 +429,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
                 <button
                   type="button"
                   onClick={startCamera}
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Thử lại kết nối camera</span>
@@ -440,7 +440,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
             {/* Loading state before stream starts */}
             {!streamReady && !cameraError && (
               <div className="absolute inset-0 z-20 bg-slate-950 flex flex-col items-center justify-center text-slate-400">
-                <RefreshCw className="w-8 h-8 text-purple-400 animate-spin mb-3" />
+                <RefreshCw className="w-8 h-8 text-blue-400 animate-spin mb-3" />
                 <p className="text-xs font-medium text-white">Đang khởi động webcam máy tính...</p>
                 <p className="text-[11px] text-slate-500 mt-1">Vui lòng bấm 'Allow' nếu trình duyệt hỏi quyền truy cập</p>
               </div>
@@ -512,14 +512,14 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
                 </svg>
 
                 {/* Corner Tech Brackets */}
-                <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-purple-400" />
-                <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-purple-400" />
-                <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-purple-400" />
-                <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-purple-400" />
+                <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-blue-400" />
+                <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-blue-400" />
+                <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-blue-400" />
+                <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-blue-400" />
 
                 {/* Animated Laser Scanning Beam */}
                 <div
-                  className="absolute left-[26%] right-[26%] h-1 bg-gradient-to-r from-transparent via-purple-400 to-transparent opacity-80 shadow-[0_0_15px_#8b5cf6] pointer-events-none z-20"
+                  className="absolute left-[26%] right-[26%] h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-80 shadow-[0_0_15px_#8b5cf6] pointer-events-none z-20"
                   style={{
                     animation: 'scanLaser 2.4s ease-in-out infinite alternate',
                     top: '25%'
@@ -528,7 +528,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
 
                 {/* Angle Head Direction Prompt Indicator */}
                 <div className="absolute top-4 inset-x-0 flex justify-center z-20">
-                  <div className="px-3 py-1 rounded-full bg-slate-950/85 border border-slate-700/80 text-[11px] font-mono text-purple-300 flex items-center gap-1.5 backdrop-blur-sm shadow-lg">
+                  <div className="px-3 py-1 rounded-full bg-slate-950/85 border border-slate-700/80 text-[11px] font-mono text-blue-300 flex items-center gap-1.5 backdrop-blur-sm shadow-lg">
                     {currentStep.angle === 'FRONTAL' && <span>👁️ NHÌN THẲNG CHÍNH DIỆN</span>}
                     {currentStep.angle === 'LEFT' && <span>⬅️ QUAY MẶT SANG TRÁI (~25°)</span>}
                     {currentStep.angle === 'RIGHT' && <span>➡️ QUAY MẶT SANG PHẢI (~25°)</span>}
@@ -549,7 +549,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
                   onClick={takeSnapshot}
                   className="px-5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-sm bg-slate-100 hover:bg-slate-200 dark:bg-[#181c38] dark:hover:bg-[#20254b] text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 cursor-pointer"
                 >
-                  <RotateCcw className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <RotateCcw className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span>Chụp lại góc này</span>
                 </button>
 
@@ -558,7 +558,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
                     type="button"
                     disabled={!streamReady || isProcessing}
                     onClick={handleAddStep}
-                    className="px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-md bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-500/25 hover:scale-105 active:scale-95 cursor-pointer"
+                    className="px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-md bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/25 hover:scale-105 active:scale-95 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Chụp thêm ảnh nữa ({steps.length + 1})</span>
@@ -572,7 +572,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
                 onClick={takeSnapshot}
                 className={`px-8 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all shadow-md cursor-pointer ${
                   streamReady && !isProcessing
-                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-500/25 hover:scale-105 active:scale-95'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/25 hover:scale-105 active:scale-95'
                     : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
                 }`}
               >

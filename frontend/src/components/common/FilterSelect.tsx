@@ -152,7 +152,7 @@ export const FilterSelect: React.FC<FilterSelectProps> = ({
           }}
           onKeyDown={handleKeyDown}
           title={currentTitle}
-          className={`w-full text-left truncate bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 ${
+          className={`w-full text-left truncate bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl pl-3 pr-8 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 ${
             disabled ? 'opacity-70 cursor-not-allowed bg-slate-100 dark:bg-slate-800/40' : 'cursor-pointer'
           }`}
         >
@@ -190,8 +190,8 @@ export const FilterSelect: React.FC<FilterSelectProps> = ({
                     opt.disabled
                       ? 'opacity-40 cursor-not-allowed bg-slate-50 dark:bg-[#121630] text-slate-400 dark:text-slate-600'
                       : isFocused || isSelected
-                      ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 font-medium cursor-pointer'
-                      : 'text-slate-800 dark:text-slate-200 cursor-pointer hover:bg-purple-50 dark:hover:bg-[#1a1f3d]'
+                      ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium cursor-pointer'
+                      : 'text-slate-800 dark:text-slate-200 cursor-pointer hover:bg-blue-50 dark:hover:bg-[#1a1f3d]'
                   }`}
                 >
                   <span className="truncate">{truncate(opt.label)}</span>

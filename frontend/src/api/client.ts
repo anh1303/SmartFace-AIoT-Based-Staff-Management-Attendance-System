@@ -89,6 +89,10 @@ export async function apiFetch<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
+  if (import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === 'true') {
+    const { demoRequest } = await import('../mocks/demoAdapter');
+    return demoRequest<T>(endpoint, options);
+  }
   const headers: Record<string, string> = {
     ...((options.headers as Record<string, string>) || {}),
   };

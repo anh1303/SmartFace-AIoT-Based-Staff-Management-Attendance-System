@@ -76,7 +76,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
               onChange={(e) =>
                 onChangeEditEmployee({ ...editEmployee, full_name: e.target.value })
               }
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -88,7 +88,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
               value={editEmployee.department}
               disabled={!isAdmin}
               onChange={(e) => handleDepartmentChange(e.target.value)}
-              className={`w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white ${!isAdmin ? 'cursor-not-allowed bg-slate-100 dark:bg-slate-800/50 opacity-70' : 'cursor-pointer'} focus:outline-none focus:border-purple-500`}
+              className={`w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white ${!isAdmin ? 'cursor-not-allowed bg-slate-100 dark:bg-slate-800/50 opacity-70' : 'cursor-pointer'} focus:outline-none focus:border-blue-500`}
             >
               {departmentOptions.map((dept) => (
                 <option key={dept} value={dept}>
@@ -107,7 +107,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
               onChange={(e) =>
                 onChangeEditEmployee({ ...editEmployee, position: e.target.value })
               }
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white cursor-pointer focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white cursor-pointer focus:outline-none focus:border-blue-500"
             >
               {availablePositions.map((pos) => (
                 <option key={pos} value={pos}>
@@ -134,7 +134,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                   hourly_rate: numeric,
                 });
               }}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -149,7 +149,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
               onChange={(e) =>
                 onChangeEditEmployee({ ...editEmployee, email: e.target.value })
               }
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -167,7 +167,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                 const numericOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
                 onChangeEditEmployee({ ...editEmployee, phone: numericOnly });
               }}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-500"
             />
           </div>
         </div>
@@ -191,7 +191,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
           )}
           <button
             type="submit"
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-xs transition-all cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-xs transition-all cursor-pointer"
           >
             Xác nhận cập nhật thông tin
           </button>

@@ -1,218 +1,27 @@
+import {PublicThemeToggle} from '../../components/public/PublicThemeToggle';
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { ScanFace, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import {
-  ScanFace,
-  ShieldCheck,
-  Lock,
-  Mail,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  CheckCircle2,
-  Sun,
-  Moon
-} from 'lucide-react';
-
 export const LoginPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { login } = useAuth();
-  const { theme, toggleTheme } = useTheme();
-  const [emailOrId, setEmailOrId] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-
-    if (!emailOrId.trim()) {
-      setErrorMsg('Vui lòng nhập tên đăng nhập');
-      return;
+    const navigate = useNavigate();
+    const { login } = useAuth();
+    const [identifier, setIdentifier] = useState('');
+    const [password, setPassword] = useState('');
+    const [visible, setVisible] = useState(false);
+    const [remember, setRemember] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const demo = import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === 'true';
+    const submit = async (user = identifier, pass = password) => { setBusy(true); setError(''); try {
+        const result = await login(user, pass, remember);
+        if (result.success)
+            navigate(result.role === 'employee' ? '/app/employee/dashboard' : '/app/manager/dashboard');
+        else
+            setError(result.message || 'Không thể đăng nhập. Vui lòng thử lại.');
     }
-
-    if (!password) {
-      setErrorMsg('Vui lòng nhập mật khẩu');
-      return;
-    }
-
-    setLoading(true);
-    const res = await login(emailOrId, password, rememberMe);
-    setLoading(false);
-
-    if (res.success && res.role) {
-      navigate((res.role === 'admin' || res.role === 'manager') ? '/app/manager/dashboard' : '/app/employee/dashboard');
-    } else {
-      setErrorMsg(res.message || 'Xác thực thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.');
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#f5f7fc] dark:bg-[#0b0d19] flex items-center justify-center p-4 sm:p-6 lg:p-8 font-sans transition-colors duration-200">
-      <div className="w-full max-w-4xl bg-white dark:bg-[#13162b] rounded-2xl border border-slate-200/80 dark:border-[#21264b] shadow-xl overflow-hidden grid lg:grid-cols-12">
-        {/* Left Visual Bento Panel */}
-        <div className="lg:col-span-5 bg-slate-50 dark:bg-[#0f1224] p-8 sm:p-10 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-[#21264b] relative overflow-hidden">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-purple-500/10 rounded-full blur-[80px] pointer-events-none" />
-
-          {/* Brand Top */}
-          <div className="relative z-10">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-purple-600 flex items-center justify-center shadow-md shadow-purple-500/25">
-                <ScanFace className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="font-heading font-extrabold text-slate-900 dark:text-white text-lg tracking-wider">
-                  AIoT ATTENDANCE
-                </h1>
-              </div>
-            </div>
-
-            <div className="mt-8 space-y-3">
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-heading leading-snug tracking-tight">
-                Hệ thống chấm công & quản trị sinh trắc học AIoT
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Nhận diện khuôn mặt và vân tay phân tán tại các Edge Devices với mã hóa chuẩn AES-256, tự động đồng bộ thời gian thực.
-              </p>
-            </div>
-          </div>
-
-          {/* Key bullets */}
-          <div className="relative z-10 py-6 space-y-3">
-            <div className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Chấm công thời gian thực qua 12 Edge AI Cams</span>
-            </div>
-            <div className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Cập nhật sinh trắc học & gửi tín hiệu IoT FAP30</span>
-            </div>
-            <div className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Quản lý lịch làm, bảng lương & báo cáo minh bạch</span>
-            </div>
-          </div>
-
-          {/* Security badge */}
-          <div className="relative z-10 pt-4 border-t border-slate-200 dark:border-[#21264b] flex items-center justify-between text-[11px] text-slate-500 font-mono">
-            <span>EDGE NODE 01 • ACTIVE</span>
-            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-              <ShieldCheck className="w-3.5 h-3.5" /> TLS 1.3 SECURE
-            </span>
-          </div>
-        </div>
-
-        {/* Right Form Panel */}
-        <div className="lg:col-span-7 p-8 sm:p-12 flex flex-col justify-center bg-white dark:bg-[#13162b]">
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-heading tracking-tight">Đăng nhập tài khoản</h2>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  className="p-2 rounded-xl border border-slate-200 dark:border-[#272d5a] bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1d2243] text-slate-600 dark:text-slate-300 transition-colors"
-                  title="Chuyển chế độ sáng/tối"
-                >
-                  {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-purple-600" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/')}
-                  className="text-xs text-purple-600 dark:text-purple-400 hover:underline font-medium transition-colors"
-                >
-                  Về trang chủ
-                </button>
-              </div>
-            </div>
-
-            {/* Error feedback if any */}
-            {errorMsg && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-red-400 text-xs flex items-center gap-2">
-                <span className="font-semibold">⚠️</span>
-                <span>{errorMsg}</span>
-              </div>
-            )}
-
-            {/* Standard Login Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Tên đăng nhập
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    value={emailOrId}
-                    onChange={e => setEmailOrId(e.target.value)}
-                    placeholder="Vui lòng nhập tên đăng nhập"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Mật khẩu
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Vui lòng nhập mật khẩu"
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-1">
-                <label className="flex items-center gap-2 cursor-pointer text-slate-700 dark:text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={e => setRememberMe(e.target.checked)}
-                    className="rounded bg-slate-50 dark:bg-[#0f1224] border-slate-300 dark:border-slate-700 text-purple-600 focus:ring-0"
-                  />
-                  <span>Ghi nhớ phiên đăng nhập</span>
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold text-sm shadow-md shadow-purple-500/25 transition-all flex items-center justify-center gap-2 mt-2"
-              >
-                {loading ? (
-                  <span>Đang xác thực với máy chủ...</span>
-                ) : (
-                  <>
-                    <span>Đăng nhập</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    finally {
+        setBusy(false);
+    } };
+    return <div className="sf-login"><section className="sf-login-story"><img className="sf-login-backdrop" src="/images/smartface-team.webp" width={1122} height={1402} fetchPriority="high" alt=""/><div className="sf-login-shade" aria-hidden="true"/><div className="sf-login-brand-row"><Link to="/" className="sf-brand !p-0"><ScanFace size={32}/><span>SmartFace</span></Link><PublicThemeToggle/></div><div className="sf-login-editorial"><p className="sf-eyebrow">CON NGƯỜI LÀ TRỌNG TÂM</p><h1>Công việc rõ ràng.<br/>Đội ngũ an tâm.</h1><p>Từ ngày làm việc đến kỳ lương, cùng nhau tạo nên một nơi làm việc minh bạch hơn.</p></div><p className="sf-login-note">Chấm công · Nhân sự · Tiền lương <span>· Hình ảnh minh họa</span></p></section><section className="sf-login-form"><div className="w-full max-w-sm"><p className="text-blue-700 text-sm font-semibold mb-3">CHÀO MỪNG TRỞ LẠI</p><h2 className="text-3xl font-semibold">Đăng nhập SmartFace</h2><p className="text-slate-500 mt-3 mb-8">Tiếp tục công việc của bạn.</p><form className="space-y-5" onSubmit={e => { e.preventDefault(); submit(); }}><label className="sf-field">Tên đăng nhập<input className="sf-input" name="username" autoComplete="username" value={identifier} onChange={e => setIdentifier(e.target.value)} required disabled={busy} placeholder="Tên đăng nhập hoặc email"/></label><label className="sf-field">Mật khẩu<div className="relative"><input className="sf-input pr-12" name="password" autoComplete="current-password" type={visible ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required disabled={busy}/><button className="sf-icon-button absolute right-1 top-0" type="button" aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onClick={() => setVisible(v => !v)}>{visible ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} disabled={busy}/>Ghi nhớ phiên đăng nhập</label>{error && <div role="alert" className="sf-feedback error">{error}</div>}<button className="sf-button primary w-full" disabled={busy}>{busy ? 'Đang đăng nhập…' : 'Đăng nhập'}<ArrowRight size={18}/></button></form><Link to="/" className="inline-block text-sm text-slate-500 mt-6 hover:text-blue-700">← Trang giới thiệu</Link><Link to="/policies" className="inline-block text-sm text-blue-700 mt-6 ml-5">Chính sách công ty</Link>{demo && <div className="mt-8 border-t border-slate-200 pt-5"><p className="text-xs text-amber-800 mb-3">Bản xem thử · dữ liệu minh họa, chưa kết nối backend</p><div className="flex flex-wrap gap-2">{[['admin', 'Quản trị'], ['manager', 'Quản lý'], ['employee', 'Nhân viên']].map(([role, label]) => <button key={role} className="sf-button" disabled={busy} onClick={() => submit(`demo-${role}`, 'demo')}>{label}</button>)}</div></div>}</div></section></div>;
 };

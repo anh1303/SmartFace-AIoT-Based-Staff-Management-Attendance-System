@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
+import { useDialogFocus } from './useDialogFocus';
 import { X } from 'lucide-react';
 
 export interface DrawerProps {
@@ -30,10 +31,10 @@ export const Drawer: React.FC<DrawerProps> = ({
     if (isOpen) {
       setMounted(true);
       const timer = setTimeout(() => setActive(true), 10);
-      document.body.style.overflow = 'hidden';
+
       return () => {
         clearTimeout(timer);
-        document.body.style.overflow = 'unset';
+
       };
     } else {
       setActive(false);
@@ -42,19 +43,8 @@ export const Drawer: React.FC<DrawerProps> = ({
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-    }
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+  const ref = useRef<HTMLDivElement>(null);const titleId=useId();
+  useDialogFocus(ref,isOpen,onClose);
 
   if (!mounted) return null;
 
@@ -82,9 +72,10 @@ export const Drawer: React.FC<DrawerProps> = ({
       {/* Drawer slide-over container */}
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10 pointer-events-none">
         <div
+          ref={ref}
           role="dialog"
           aria-modal="true"
-          aria-labelledby="drawer-title"
+          aria-labelledby={titleId}
           className={`w-screen ${maxWidthClass} pointer-events-auto transform transition-transform duration-300 ease-out bg-white dark:bg-[#13162b] text-slate-800 dark:text-slate-100 border-l border-slate-200/90 dark:border-[#21264b] shadow-2xl flex flex-col ${
             active ? 'translate-x-0' : 'translate-x-full'
           }`}
@@ -93,7 +84,7 @@ export const Drawer: React.FC<DrawerProps> = ({
           {/* Header */}
           <div className="px-6 py-4.5 border-b border-slate-200/90 dark:border-[#21264b] bg-slate-50/80 dark:bg-[#0f1224]/80 flex items-center justify-between gap-4 shrink-0 backdrop-blur-md">
             <div className="min-w-0 flex-1">
-              <div id="drawer-title" className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-heading tracking-tight flex items-center gap-2">
+              <div id={titleId} className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-heading tracking-tight flex items-center gap-2">
                 {title}
               </div>
               {subtitle && (

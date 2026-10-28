@@ -134,6 +134,7 @@ from antispoof import AntiSpoofPredictor
 from alignment import align_face
 from recognition import FaceEmbedder
 from recognition.worker import RecognitionWorker, IdentityCache
+from recognition.remote import RemoteFaceEmbedder, ARCFACE_SHA256
 from vision_pipeline import update_track_pad, limit_faces
 from alignment.aligner import get_input_face
 from iot import ThingsBoardClient
@@ -288,8 +289,21 @@ def main(args=None):
     fas_predictor = AntiSpoofPredictor()
     print("  [OK] Anti-Spoofing : MiniFASNet R7 (~1.7 MB)")
 
-    embedder = FaceEmbedder(intra_op_threads=vision.RECOGNITION_INTRA_OP_THREADS)
-    print("  [OK] Face Embedder : ArcFace MobileFaceNet (~13 MB)")
+    recognition_backend = get_env_str("RECOGNITION_BACKEND", "local").lower()
+    if recognition_backend == "server":
+        embedder = RemoteFaceEmbedder(
+            get_env_str("BACKEND_BASE_URL", ""), DEVICE_ID,
+            get_env_str("EDGE_RECOGNITION_TOKEN", ""),
+            get_env_str("REMOTE_ARCFACE_SHA256", ARCFACE_SHA256),
+            get_env_str("EMBEDDING_MODEL_VERSION", "buffalo_s"),
+            get_env_float("REMOTE_RECOGNITION_TIMEOUT_SECONDS", 3.0),
+        )
+        print("  [OK] Face Embedder : SERVER (ArcFace is not loaded on Pi)")
+    elif recognition_backend == "local":
+        embedder = FaceEmbedder(intra_op_threads=vision.RECOGNITION_INTRA_OP_THREADS)
+        print("  [OK] Face Embedder : LOCAL ArcFace MobileFaceNet (~13 MB)")
+    else:
+        raise ValueError("RECOGNITION_BACKEND must be local or server")
 
     # 3. Mở Camera
     cap = cv2.VideoCapture(CAM_INDEX)
@@ -639,7 +653,7 @@ def main(args=None):
                     attendance_latch = True
                     track.attendance_sent = commit
                     track.last_scan_sent = now_wall
-                    print(f"[Recognition] track={track.track_id} embedding={result.latency:.2f}s -> RPC {req_id}")
+                    print(f"[Recognition] track={track.track_id} backend={recognition_backend} extraction={result.latency:.2f}s -> RPC {req_id}")
                 elif not tb_client.connected:
                     status_banner = "TB MQTT DISCONNECTED"
                     status_banner_time = now_wall

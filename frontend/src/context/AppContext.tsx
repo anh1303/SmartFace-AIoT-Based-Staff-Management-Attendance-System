@@ -36,7 +36,7 @@ export interface AppContextType {
 
   // Shifts
   workShifts: WorkShift[];
-  assignOrUpdateShift: (shift: Omit<WorkShift, 'shift_id'> & { shift_id?: string }) => void;
+  assignOrUpdateShift: (shift: Omit<WorkShift, 'shift_id'> & { shift_id?: string }) => Promise<WorkShift>;
 
   // Attendance
   attendance: AttendanceRecord[];

@@ -23,7 +23,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {
       // Ignore localStorage errors
     }
-    return 'dark'; // Default to dark mode as requested
+    return 'light'; // SmartFace design defaults to the approved light workspace
   });
 
   useEffect(() => {

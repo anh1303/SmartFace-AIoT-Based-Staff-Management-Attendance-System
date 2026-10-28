@@ -10,8 +10,8 @@ export const ToastContainer: React.FC = () => {
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-md md:max-w-lg w-full">
       {toasts.map(toast => {
-        let icon = <Info className="w-5 h-5 text-purple-600 dark:text-purple-400 shrink-0" />;
-        let borderClass = 'border-purple-200 bg-purple-50/95 text-purple-950 dark:border-purple-500/30 dark:bg-[#18152e]/95 dark:text-purple-100 shadow-md';
+        let icon = <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />;
+        let borderClass = 'border-blue-200 bg-blue-50/95 text-blue-950 dark:border-blue-500/30 dark:bg-[#18152e]/95 dark:text-blue-100 shadow-md';
 
         if (toast.type === 'success') {
           icon = <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />;
@@ -45,4 +45,4 @@ export const ToastContainer: React.FC = () => {
       })}
     </div>
   );
-};
+};

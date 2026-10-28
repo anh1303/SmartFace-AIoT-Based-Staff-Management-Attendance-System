@@ -83,13 +83,13 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
     <div className="space-y-3">
       {/* Draft Add Form */}
       {isAddingDept && (
-        <div className="p-4 rounded-2xl bg-purple-50/70 dark:bg-[#18152e] border-2 border-purple-400/80 dark:border-purple-500/70 shadow-md animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-purple-200 dark:border-purple-500/30">
+        <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-[#18152e] border-2 border-blue-400/80 dark:border-blue-500/70 shadow-md animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-blue-200 dark:border-blue-500/30">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-purple-600 text-white">
+              <div className="p-1.5 rounded-lg bg-blue-600 text-white">
                 <Building2 className="w-4 h-4" />
               </div>
-              <span className="text-xs font-bold text-purple-900 dark:text-purple-200 uppercase tracking-wide">
+              <span className="text-xs font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wide">
                 Tạo phòng ban mới trên Database
               </span>
             </div>
@@ -127,7 +127,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                   if (e.key === 'Enter') handleSaveNewDept();
                   if (e.key === 'Escape') setIsAddingDept(false);
                 }}
-                className="w-full bg-white dark:bg-[#0f1224] border border-purple-300 dark:border-purple-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+                className="w-full bg-white dark:bg-[#0f1224] border border-blue-300 dark:border-blue-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
               />
             </div>
 
@@ -140,7 +140,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                 placeholder="Tự động sinh nếu để trống (Ví dụ: DEPT_RND)"
                 value={newDeptCode}
                 onChange={(e) => setNewDeptCode(e.target.value)}
-                className="w-full bg-white dark:bg-[#0f1224] border border-purple-300 dark:border-purple-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-400 font-mono"
+                className="w-full bg-white dark:bg-[#0f1224] border border-blue-300 dark:border-blue-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono"
               />
             </div>
           </div>
@@ -154,7 +154,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
               placeholder="Mô tả ngắn gọn về phạm vi công việc của phòng ban..."
               value={newDeptDesc}
               onChange={(e) => setNewDeptDesc(e.target.value)}
-              className="w-full bg-white dark:bg-[#0f1224] border border-purple-300 dark:border-purple-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+              className="w-full bg-white dark:bg-[#0f1224] border border-blue-300 dark:border-blue-500/60 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
             />
           </div>
 
@@ -187,7 +187,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
       {/* Loading state */}
       {loading && departments.length === 0 ? (
         <div className="py-16 flex flex-col items-center justify-center gap-2 text-slate-400">
-          <Loader2 className="w-7 h-7 animate-spin text-purple-600 dark:text-purple-400" />
+          <Loader2 className="w-7 h-7 animate-spin text-blue-600 dark:text-blue-400" />
           <span className="text-xs">Đang tải danh sách phòng ban từ CSDL...</span>
         </div>
       ) : filteredDepartments.length === 0 ? (
@@ -261,7 +261,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                       type="button"
                       disabled={savingEditDept}
                       onClick={() => handleSaveEditDept(dept.id)}
-                      className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                      className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
                     >
                       {savingEditDept ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -278,11 +278,11 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
             return (
               <div
                 key={dept.id}
-                className="p-3.5 rounded-2xl bg-white dark:bg-[#0f1224]/70 border border-slate-200/90 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-[#2e3566] transition-all group shadow-xs space-y-2.5"
+                className="p-3.5 rounded-2xl bg-white dark:bg-[#0f1224]/70 border border-slate-200/90 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-[#2e3566] transition-all group shadow-xs space-y-2.5"
               >
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
                   <div className="flex items-start sm:items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200/70 dark:border-purple-800/40 text-purple-600 dark:text-purple-400 shrink-0">
+                    <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/40 text-blue-600 dark:text-blue-400 shrink-0">
                       <Building2 className="w-5 h-5" />
                     </div>
                     <div>
@@ -305,7 +305,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                     <button
                       type="button"
                       onClick={() => handleStartEditDept(dept)}
-                      className="p-1.5 rounded-xl text-slate-500 hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-[#1f244d] transition-all cursor-pointer"
+                      className="p-1.5 rounded-xl text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-[#1f244d] transition-all cursor-pointer"
                       title="Sửa phòng ban"
                     >
                       <Edit2 className="w-4 h-4" />
@@ -324,7 +324,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                 {/* Stats footer in card */}
                 <div className="flex items-center gap-4 pt-2 border-t border-slate-100 dark:border-[#1a1f3f] text-[11px] text-slate-500 dark:text-slate-400">
                   <div className="flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-purple-500" />
+                    <Users className="w-3.5 h-3.5 text-blue-500" />
                     <span>
                       <strong>{dept.employee_count}</strong> nhân sự
                     </span>

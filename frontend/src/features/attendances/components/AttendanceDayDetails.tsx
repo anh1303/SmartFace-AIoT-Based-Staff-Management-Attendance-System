@@ -1,3 +1,4 @@
+import { AttendanceEventBadge } from '../../../components/common/AttendanceEventBadge';
 import React, { useState } from 'react';
 import { formatSecondsToHHMMSS } from '../../../utils/timeUtils';
 import { AttendancePairItem } from '../hooks/useAttendancePairs';
@@ -39,7 +40,7 @@ export function AttendanceDayDetails({ item, filter, showFilter = true }: { item
         const matched = pair || item.validIntervals.some(p => p.inId === ev.id);
         return <tr key={ev.id} className="border-t border-slate-200 dark:border-slate-700">
           <td className="p-2 font-mono whitespace-nowrap">{ev.timestamp ? formatVNDateISO(ev.timestamp) : ''} {ev.time}</td>
-          <td className="p-2">{ev.type === 'CHECK_IN' ? 'Vào' : 'Ra'}</td>
+          <td className="p-2"><AttendanceEventBadge type={ev.type}/></td>
           <td className="p-2">{ev.methodLabel} · {ev.device_id}</td>
           <td className="p-2">{ev.rawStatus || '—'} · {matched ? 'Đã ghép cặp' : ev.pairingReason ? reasons[ev.pairingReason] || ev.pairingReason : item.hasPairData === false ? 'Chờ kết quả tổng hợp' : 'Chưa ghép cặp'}</td>
           <td className="p-2">{pair ? <div className="space-y-1">

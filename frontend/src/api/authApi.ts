@@ -72,7 +72,7 @@ export async function loginApi(identifier: string, password?: string, rememberMe
       positionId: user.positionId ?? user.position_id ?? null,
       department: user.department || (targetRole === 'admin' ? 'Ban Quản Trị' : 'Chung'),
       departmentId: user.departmentId ?? user.department_id ?? null,
-      avatar: user.avatar || DEFAULT_USERS[targetRole].avatar,
+      avatar: user.avatar || '',
     };
 
     return { session, targetRole };
@@ -113,7 +113,7 @@ export async function meApi(): Promise<UserSession | null> {
         positionId: user.positionId ?? user.position_id ?? null,
         department: user.department || (targetRole === 'admin' ? 'Ban Quản Trị' : 'Chung'),
         departmentId: user.departmentId ?? user.department_id ?? null,
-        avatar: user.avatar || DEFAULT_USERS[targetRole].avatar,
+        avatar: user.avatar || '',
       };
     }
   } catch {

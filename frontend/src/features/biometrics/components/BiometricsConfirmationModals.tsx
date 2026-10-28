@@ -37,7 +37,7 @@ export const FaceConfirmModal: React.FC<FaceConfirmModalProps> = ({
           <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
             Ảnh sẽ được gửi đến Face Auth để phát hiện khuôn mặt, trích xuất vector 512-D và tạo
             centroid. Các vector được lưu trong bảng{' '}
-            <code className="text-purple-600 dark:text-purple-400">face_embeddings</code> của database PBL6.
+            <code className="text-blue-600 dark:text-blue-400">face_embeddings</code> của database PBL6.
           </p>
           <div className="pt-2 border-t border-slate-200/60 dark:border-[#21264b] flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">
             <span>ĐIỀU KIỆN: TỐI THIỂU 3 ẢNH (HIỆN CÓ {photoCount} ẢNH)</span>
@@ -59,8 +59,8 @@ export const FaceConfirmModal: React.FC<FaceConfirmModalProps> = ({
             onClick={onConfirm}
             className={`px-5 py-2 rounded-xl text-white text-xs font-semibold shadow-sm flex items-center gap-2 transition-all cursor-pointer ${
               analyzingFace
-                ? 'bg-purple-600/70 cursor-wait'
-                : 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
+                ? 'bg-blue-600/70 cursor-wait'
+                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'
             }`}
           >
             {analyzingFace ? (
@@ -118,7 +118,7 @@ export const FaceResultModal: React.FC<FaceResultModalProps> = ({
               <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">
                 Khung hình trích xuất:
               </span>
-              <span className="text-base font-bold font-mono text-purple-600 dark:text-purple-400">
+              <span className="text-base font-bold font-mono text-blue-600 dark:text-blue-400">
                 {enrollResult?.detected_faces ?? uploadedPhotoCount}/
                 {enrollResult?.total_images ?? uploadedPhotoCount} khung hình
               </span>
@@ -156,7 +156,7 @@ export const FaceResultModal: React.FC<FaceResultModalProps> = ({
             </div>
             <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-300 dark:border-slate-700">
               <div
-                className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full transition-all duration-500"
+                className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-500"
                 style={{ width: `${enrollResult?.extraction_rate ?? 100}%` }}
               />
             </div>
@@ -176,7 +176,7 @@ export const FaceResultModal: React.FC<FaceResultModalProps> = ({
 
           <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 leading-relaxed">
             Các mẫu khuôn mặt đã được lưu vào bảng{' '}
-            <code className="text-purple-600 dark:text-purple-400">face_embeddings</code> trong database PBL6.
+            <code className="text-blue-600 dark:text-blue-400">face_embeddings</code> trong database PBL6.
           </p>
         </div>
 
@@ -184,7 +184,7 @@ export const FaceResultModal: React.FC<FaceResultModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-sm shadow-purple-600/20 cursor-pointer transition-colors"
+            className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm shadow-blue-600/20 cursor-pointer transition-colors"
           >
             Hoàn tất & Đóng
           </button>

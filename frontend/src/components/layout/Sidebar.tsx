@@ -1,186 +1,30 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import {
-  ScanFace,
-  LayoutDashboard,
-  CalendarDays,
-  Clock,
-  User,
-  DollarSign,
-  FileText,
-  Users,
-  UserCheck,
-  CalendarRange,
-  Eye,
-  BarChart3,
-  Banknote,
-  Fingerprint,
-  LogOut,
-  ExternalLink
-} from 'lucide-react';
-
-interface SidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { role, currentUser, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const employeeNavItems = [
-    { label: 'Bàn làm việc', path: '/app/employee/dashboard', icon: LayoutDashboard },
-    { label: 'Lịch trình làm việc', path: '/app/employee/schedule', icon: CalendarDays },
-    { label: 'Chấm công & Check-in', path: '/app/employee/attendance', icon: Clock },
-    { label: 'Hồ sơ & Sinh trắc', path: '/app/employee/profile', icon: User },
-    { label: 'Lương tạm tính', path: '/app/employee/salary-estimate', icon: DollarSign },
-    { label: 'Lịch sử phiếu lương', path: '/app/employee/salary-history', icon: FileText },
-  ];
-
-  const managerNavItems = [
-    { label: 'Tổng quan hệ thống', path: '/app/manager/dashboard', icon: LayoutDashboard },
-    { label: 'Quản lý nhân viên', path: '/app/manager/employees', icon: Users },
-    { label: 'Chi tiết nhân viên', path: '/app/manager/employee-detail', icon: UserCheck },
-    { label: 'Sinh trắc học', path: '/app/manager/biometrics', icon: Fingerprint },
-    { label: 'Sắp xếp lịch làm', path: '/app/manager/schedule', icon: CalendarRange },
-    { label: 'Theo dõi chấm công', path: '/app/manager/attendance', icon: Eye },
-    { label: 'Quản lý lương', path: '/app/manager/payroll', icon: Banknote },
-    { label: 'Báo cáo & Thống kê', path: '/app/manager/reports', icon: BarChart3 },
-  ];
-
-  const navItems = (role === 'admin' || role === 'manager') ? managerNavItems : employeeNavItems;
-
-  return (
-    <>
-      {/* Mobile Backdrop */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 z-30 lg:hidden backdrop-blur-xs"
-          onClick={onClose}
-        />
-      )}
-
-      <aside
-        className={`fixed lg:static top-0 bottom-0 left-0 z-40 w-64 bg-white dark:bg-[#0f1224] border-r border-slate-200/80 dark:border-[#1d2243] flex flex-col transition-all duration-300 shadow-sm ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-          }`}
-      >
-        {/* Brand Header */}
-        <div className="p-6 border-b border-slate-200/80 dark:border-[#1d2243]">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center shadow-md shadow-purple-500/25">
-              <ScanFace className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-heading font-bold text-slate-900 dark:text-white text-base tracking-tight">
-                  AIoT Attendance
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Role Pill */}
-          <div className="mt-4 p-2.5 rounded-xl bg-slate-50 dark:bg-[#151936] border border-slate-200/80 dark:border-[#242b5c] flex items-center gap-2">
-            <div
-              className={`w-2 h-2 rounded-full ${role === 'admin'
-                ? 'bg-rose-500 shadow-xs shadow-rose-400/50'
-                : role === 'manager'
-                  ? 'bg-purple-500 shadow-xs shadow-purple-400/50'
-                  : 'bg-emerald-500 shadow-xs shadow-emerald-400/50'
-                }`}
-            />
-            <span className="text-xs text-slate-600 dark:text-slate-300">
-              Vai trò:{' '}
-              <strong className="text-slate-900 dark:text-white">
-                {role === 'admin'
-                  ? 'Quản trị viên'
-                  : role === 'manager'
-                    ? 'Quản lý'
-                    : 'Nhân viên'}
-              </strong>
-            </span>
-          </div>
-        </div>
-
-        {/* Navigation Menu */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
-          <div className="px-3 pb-2 text-[10px] font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-            {role === 'admin'
-              ? 'Phân hệ Quản trị tối cao'
-              : role === 'manager'
-                ? 'Phân hệ Quản trị'
-                : 'Phân hệ Nhân viên'}
-          </div>
-
-          {navItems.map(item => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                onClick={onClose}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
-                    ? 'bg-purple-50 text-purple-700 dark:bg-purple-600/20 dark:text-purple-300 font-semibold border border-purple-200/80 dark:border-purple-500/30 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-[#181c38] hover:text-slate-900 dark:hover:text-slate-200'
-                  }`
-                }
-              >
-                <Icon className="w-4.5 h-4.5 shrink-0" />
-                <span>{item.label}</span>
-              </NavLink>
-            );
-          })}
-
-          <div className="pt-4 px-3 pb-2 text-[10px] font-semibold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-            Cổng thông tin
-          </div>
-
-          {/* Public Landing Link */}
-          <NavLink
-            to="/"
-            onClick={onClose}
-            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-[#181c38] transition-colors"
-          >
-            <ExternalLink className="w-4.5 h-4.5 shrink-0" />
-            <span>Trang giới thiệu</span>
-          </NavLink>
-        </div>
-
-        {/* User Footer Profile */}
-        <div className="p-4 border-t border-slate-200/80 dark:border-[#1d2243] bg-slate-50/60 dark:bg-[#0f1224]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-[#181c38] overflow-hidden flex items-center justify-center border border-slate-200 dark:border-[#272d5a] shrink-0">
-                <img
-                  src={currentUser?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
-                  alt={currentUser?.full_name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="flex-1 min-w-0 flex items-center">
-                <p className="text-sm font-semibold truncate text-slate-900 dark:text-white leading-none">
-                  {currentUser?.full_name || 'Khách'}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              title="Đăng xuất"
-              className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-[#181c38] rounded-xl transition-colors shrink-0 cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </aside>
-    </>
-  );
+import { ScanFace, LayoutDashboard, CalendarDays, Clock, User, FileText, Users, Banknote, Fingerprint, LogOut, ExternalLink, Server, X, BarChart3 } from 'lucide-react';
+import { useDialogFocus } from '../common/useDialogFocus';
+export const Sidebar: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+}> = ({ isOpen, onClose }) => {
+    const { role, currentUser, logout } = useAuth();
+    const navigate = useNavigate();
+    const ref = useRef<HTMLElement>(null);
+    const [mobile,setMobile]=useState(()=>window.innerWidth<1024);
+    useEffect(()=>{const resize=()=>setMobile(window.innerWidth<1024);window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
+    useDialogFocus(ref, isOpen && mobile, onClose);
+    const groups = role === 'admin' || role === 'manager' ? [
+        { label: 'Không gian làm việc', items: [['Tổng quan hệ thống', 'dashboard', LayoutDashboard]] },
+        { label: 'Nhân sự', items: [['Nhân viên', 'employees', Users], ['Sinh trắc học', 'biometrics', Fingerprint]] },
+        { label: 'Vận hành', items: [['Lịch làm việc', 'schedule', CalendarDays], ['Theo dõi chấm công', 'attendance', Clock], ['Thiết bị', 'devices', Server]] },
+        { label: 'Tài chính', items: [['Bảng lương & xét duyệt', 'payroll', Banknote], ['Báo cáo & thống kê', 'reports', BarChart3]] }
+    ] : [{ label: 'Công việc', items: [['Bàn làm việc', 'dashboard', LayoutDashboard], ['Lịch làm việc', 'schedule', CalendarDays], ['Lịch sử chấm công', 'attendance', Clock]] }, { label: 'Cá nhân', items: [['Hồ sơ & sinh trắc', 'profile', User], ['Lương tạm tính', 'salary-estimate', Banknote], ['Lịch sử phiếu lương', 'salary-history', FileText]] }];
+    const base = role === 'admin' || role === 'manager' ? '/app/manager/' : '/app/employee/';
+    return <>{isOpen && <div className="sf-nav-backdrop lg:hidden" onClick={onClose}/>}
+ <aside inert={mobile && !isOpen} aria-hidden={mobile && !isOpen ? true : undefined} ref={ref} role={isOpen ? 'dialog' : undefined} aria-modal={isOpen ? true : undefined} aria-label="Điều hướng SmartFace" className={`sf-sidebar ${isOpen ? 'is-open' : ''}`}>
+ <div className="sf-brand"><ScanFace size={30}/><span>SmartFace</span><button className="sf-icon-button lg:hidden ml-auto" aria-label="Đóng điều hướng" onClick={onClose}><X size={20}/></button></div>
+ <div className="px-5 pb-5 text-xs text-slate-500">Chấm công · Nhân sự · Tiền lương</div>
+ <nav className="flex-1 overflow-y-auto px-3">{groups.map(group => <div className="mb-6" key={group.label}><p className="sf-nav-label">{group.label}</p>{group.items.map(([label, path, Icon]) => { const I = Icon as typeof User; return <NavLink key={String(path)} to={base + path} onClick={onClose} className={({ isActive }) => `sf-nav-link ${isActive ? 'active' : ''}`}><I size={19}/><span>{String(label)}</span></NavLink>; })}</div>)}<NavLink to="/app/account/profile" onClick={onClose} className={({isActive})=>`sf-nav-link ${isActive?'active':''}`}><User size={18}/>Hồ sơ tài khoản</NavLink><NavLink to="/policies" onClick={onClose} className="sf-nav-link"><FileText size={18}/>Chính sách công ty</NavLink><NavLink to="/" onClick={onClose} className="sf-nav-link"><ExternalLink size={18}/>Trang giới thiệu</NavLink></nav>
+ <div className="sf-user"><span className="sf-avatar"><User size={20}/></span><div className="min-w-0 flex-1"><p className="font-semibold text-sm truncate">{currentUser?.full_name}</p><p className="text-xs text-slate-500">{role === 'admin' ? 'Quản trị viên' : role === 'manager' ? 'Quản lý' : 'Nhân viên'}</p></div><button className="sf-icon-button" aria-label="Đăng xuất" onClick={() => { logout(); navigate('/login'); }}><LogOut size={18}/></button></div>
+ </aside></>;
 };

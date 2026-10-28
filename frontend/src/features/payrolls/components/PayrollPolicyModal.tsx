@@ -52,7 +52,7 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
                 overtime_rate: parseFloat(e.target.value) || 0,
               }))
             }
-            className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 font-mono"
+            className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
             placeholder="Ví dụ: 1.5 (gấp 1.5x) hoặc 100000 (100.000 ₫/h)"
             required
           />
@@ -76,7 +76,7 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
                 late_early_penalty: parseFloat(e.target.value) || 0,
               }))
             }
-            className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 font-mono"
+            className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
             placeholder="Ví dụ: 50000 (50.000 ₫/h)"
             required
           />
@@ -98,7 +98,7 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
                 description: e.target.value,
               }))
             }
-            className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+            className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
             placeholder="Mô tả chính sách áp dụng..."
           />
         </div>
@@ -113,7 +113,7 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
           </button>
           <button
             type="submit"
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/20 cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 cursor-pointer"
           >
             Lưu thay đổi quy định
           </button>

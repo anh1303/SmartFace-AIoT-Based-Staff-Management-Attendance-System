@@ -1,3 +1,4 @@
+import {Avatar} from '../../../components/common/Avatar';
 import React from 'react';
 import { Employee, WorkShift } from '../../../types';
 
@@ -24,13 +25,13 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
   const renderShiftBadge = (shift: WorkShift | undefined) => {
     if (!shift || shift.shift_type === 'OFF') {
       return (
-        <div className="py-2 px-1 rounded-lg bg-slate-100 dark:bg-[#0b0d19] text-slate-400 dark:text-slate-500 text-[11px] text-center border border-slate-200/80 dark:border-[#21264b] group-hover:border-slate-300 dark:group-hover:border-purple-900/50 transition-colors truncate">
+        <div className="py-2 px-1 rounded-lg bg-slate-100 dark:bg-[#0b0d19] text-slate-400 dark:text-slate-500 text-[11px] text-center border border-slate-200/80 dark:border-[#21264b] group-hover:border-slate-300 dark:group-hover:border-blue-900/50 transition-colors truncate">
           Nghỉ ca
         </div>
       );
     }
 
-    let colorClass = 'bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/40';
+    let colorClass = 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/40';
     let typeName = 'Hành chính';
 
     if (shift.shift_type === 'MORNING') {
@@ -65,8 +66,8 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
 
   return (
     <div className="bg-white dark:bg-[#13162b] border border-slate-300 dark:border-[#28305c] rounded-xl overflow-hidden shadow-xs">
-      <div className="overflow-x-auto overflow-y-auto max-h-[620px]">
-        <table className="w-full table-fixed text-left text-xs border-collapse">
+      <div role="region" aria-label="Lịch phân ca theo tuần, cuộn ngang để xem các ngày" tabIndex={0} className="overflow-x-auto overflow-y-auto max-h-[620px]">
+        <table className="w-full min-w-[1050px] table-fixed text-left text-xs border-collapse">
           <thead className="sticky top-0 z-20 bg-slate-200 dark:bg-[#0c0f1f] border-b-2 border-slate-300 dark:border-[#28305c] text-slate-800 dark:text-slate-200 font-mono text-[11px] uppercase tracking-wider font-bold">
             <tr>
               <th className="py-3.5 px-3 w-40 sm:w-44 lg:w-48 sticky left-0 top-0 bg-slate-200 dark:bg-[#0c0f1f] z-30 border-r border-b-2 border-slate-300 dark:border-[#222956] text-center">
@@ -92,26 +93,19 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
           </thead>
           <tbody className="text-slate-700 dark:text-slate-300">
             {filteredEmployees.map((emp) => {
-              const isInactive = emp.status === 'INACTIVE';
+              const isInactive = emp.status !== 'ACTIVE';
               return (
                 <tr
                   key={emp.employee_id}
                   className={`border-b border-slate-200 dark:border-[#202752] transition-colors ${isInactive
                       ? 'bg-slate-50/50 dark:bg-[#0b0d19]/40 opacity-70'
-                      : 'hover:bg-purple-50/40 dark:hover:bg-[#181c38]/50'
+                      : 'hover:bg-blue-50/40 dark:hover:bg-[#181c38]/50'
                     }`}
                 >
                   {/* Employee Fixed Column */}
                   <td className="py-2.5 px-3 sticky left-0 bg-white dark:bg-[#13162b] z-10 border-r border-slate-200 dark:border-[#202752] w-40 sm:w-44 lg:w-48 max-w-[192px]">
                     <div className="flex items-center gap-2 min-w-0">
-                      <img
-                        src={emp.avatar}
-                        alt={emp.full_name}
-                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border shrink-0 ${isInactive
-                            ? 'border-amber-500/50 grayscale'
-                            : 'border-slate-200 dark:border-slate-700'
-                          }`}
-                      />
+                      <Avatar src={emp.avatar} name={emp.full_name} size={30}/>
                       <div className="overflow-hidden min-w-0 flex-1">
                         <div className="flex items-center gap-1 min-w-0">
                           <p
@@ -127,7 +121,7 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
                           )}
                         </div>
                         <p
-                          className="text-[10px] font-mono text-purple-600 dark:text-purple-400 truncate"
+                          className="text-[10px] font-mono text-blue-600 dark:text-blue-400 truncate"
                           title={emp.employee_id}
                         >
                           {emp.employee_id}
@@ -145,23 +139,15 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
                     return (
                       <td
                         key={day.date}
-                        onClick={() =>
-                          onCellClick(
-                            emp.employee_id,
-                            emp.full_name,
-                            day.date,
-                            `${day.name} (${day.label})`
-                          )
-                        }
                         className={`py-2 px-1 ${index < daysOfWeek.length - 1
                             ? 'border-r border-slate-200 dark:border-[#202752]'
                             : ''
                           } ${isInactive
                             ? 'cursor-not-allowed opacity-60'
-                            : 'cursor-pointer group hover:bg-purple-50/50 dark:hover:bg-purple-950/20'
+                            : 'cursor-pointer group hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
                           } transition-colors`}
                       >
-                        {renderShiftBadge(shift)}
+                        <button type="button" className="w-full min-h-16 rounded-md focus-visible:outline-blue-600" aria-label={`Phân ca ${emp.full_name}, ${day.name} ngày ${day.label}`} disabled={isInactive} onClick={()=>onCellClick(emp.employee_id,emp.full_name,day.date,`${day.name} (${day.label})`)}>{renderShiftBadge(shift)}{shift?.shift_type==='OTHER'&&shift.note&&<span className="block text-xs text-slate-500 dark:text-slate-300 px-1 mt-1 truncate" title={shift.note}>{shift.note}</span>}</button>
                       </td>
                     );
                   })}

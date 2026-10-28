@@ -13,7 +13,7 @@ export function useAttendance(params?: FetchAttendanceParams) {
   const { showToast } = useToast();
   const { currentUser } = useAuth();
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || (import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === 'true')) return;
     const base = import.meta.env.VITE_SOCKET_URL || window.location.origin;
     const socket = io(`${base}/attendance`, { withCredentials: true });
     const refresh = () => {

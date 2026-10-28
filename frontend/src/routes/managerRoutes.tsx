@@ -28,6 +28,8 @@ const ManagerEmployeeDetail = lazy(() =>
   import('../pages/manager/ManagerEmployeeDetail').then(module => ({ default: module.ManagerEmployeeDetail }))
 );
 
+const ManagerDevices = lazy(() => import('../pages/manager/ManagerDevices').then(m => ({default:m.ManagerDevices})));
+
 export const managerRoutes: RouteObject = {
   path: '/app/manager',
   element: (
@@ -47,5 +49,7 @@ export const managerRoutes: RouteObject = {
     { path: 'biometrics', element: <ManagerBiometrics /> },
     { path: 'reports', element: <ManagerReports /> },
     { path: 'payroll', element: <ManagerPayroll /> },
+    { path: 'devices', element: <ManagerDevices /> },
+    { path: 'devices/:id', element: <ManagerDevices /> },
   ],
 };

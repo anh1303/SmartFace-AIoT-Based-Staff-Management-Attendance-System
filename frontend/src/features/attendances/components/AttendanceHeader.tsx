@@ -87,7 +87,7 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
             title={!isCurrentDateLocked ? 'Nút chỉ bật sau khi đã chốt ca' : 'Xuất dữ liệu chấm công sang file CSV/Excel'}
             className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
               isCurrentDateLocked
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xs hover:from-purple-500 hover:to-indigo-500 cursor-pointer'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs hover:from-blue-500 hover:to-indigo-500 cursor-pointer'
                 : 'bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700/50 cursor-not-allowed'
             }`}
           >

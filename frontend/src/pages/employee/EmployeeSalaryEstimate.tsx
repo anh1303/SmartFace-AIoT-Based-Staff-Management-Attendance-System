@@ -79,7 +79,7 @@ export const EmployeeSalaryEstimate: React.FC = () => {
       {/* Bento Banner with Continuous Shifting Gradient & Floating Blobs */}
       <div className="bento-hero-gradient rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
         {/* Ambient Floating & Morphing Blurred Blobs */}
-        <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-purple-500/30 to-fuchsia-500/25 dark:from-purple-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
+        <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-blue-500/30 to-fuchsia-500/25 dark:from-blue-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
         <div className="absolute -bottom-16 left-1/4 w-64 h-64 bg-gradient-to-tr from-indigo-500/30 to-blue-500/20 dark:from-indigo-600/30 dark:to-blue-600/20 rounded-full blur-3xl pointer-events-none animate-blob-2" />
         <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
 
@@ -95,7 +95,7 @@ export const EmployeeSalaryEstimate: React.FC = () => {
                   : currentPayroll?.status === 'FINALIZED'
                   ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
                   : currentPayroll?.status === 'CONFIRMED'
-                  ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
                   : currentPayroll
                   ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
                   : 'bg-slate-500/10 text-slate-500 border-slate-500/20'
@@ -116,8 +116,8 @@ export const EmployeeSalaryEstimate: React.FC = () => {
 
         <div className="relative z-10 flex flex-wrap items-center gap-3">
           {availablePeriods.length > 0 && (
-            <div className="flex items-center gap-2 bg-white/80 dark:bg-[#0f1224] px-3 py-1.5 rounded-xl border border-purple-200/80 dark:border-[#272d5a] backdrop-blur-sm">
-              <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+            <div className="flex items-center gap-2 bg-white/80 dark:bg-[#0f1224] px-3 py-1.5 rounded-xl border border-blue-200/80 dark:border-[#272d5a] backdrop-blur-sm">
+              <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               <span className="text-xs text-slate-500 dark:text-slate-400">Kỳ lương:</span>
               <select
                 value={selectedEmployeePeriod}
@@ -136,7 +136,7 @@ export const EmployeeSalaryEstimate: React.FC = () => {
             </div>
           )}
 
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 dark:bg-[#0f1224] border border-purple-200/80 dark:border-[#272d5a] text-purple-600 dark:text-purple-400 text-xs font-mono backdrop-blur-sm">
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 dark:bg-[#0f1224] border border-blue-200/80 dark:border-[#272d5a] text-blue-600 dark:text-blue-400 text-xs font-mono backdrop-blur-sm">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
             <span>CHỈ ĐỌC • MINH BẠCH CSDL</span>
           </div>
@@ -146,7 +146,7 @@ export const EmployeeSalaryEstimate: React.FC = () => {
       {/* Hero Bento Salary Metric Card with Continuous Shifting Gradient & Floating Blobs */}
       <div className="p-8 rounded-2xl bento-hero-gradient relative overflow-hidden transition-all">
         {/* Ambient Floating & Morphing Blurred Blobs */}
-        <div className="absolute -top-16 -right-16 w-80 h-80 bg-gradient-to-br from-purple-500/30 to-fuchsia-500/25 dark:from-purple-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
+        <div className="absolute -top-16 -right-16 w-80 h-80 bg-gradient-to-br from-blue-500/30 to-fuchsia-500/25 dark:from-blue-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
         <div className="absolute -bottom-16 left-1/4 w-72 h-72 bg-gradient-to-tr from-indigo-500/30 to-blue-500/20 dark:from-indigo-600/30 dark:to-blue-600/20 rounded-full blur-3xl pointer-events-none animate-blob-2" />
         <div className="absolute top-1/3 right-1/4 w-52 h-52 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
 
@@ -156,21 +156,21 @@ export const EmployeeSalaryEstimate: React.FC = () => {
               Ước tính thực lĩnh đến hiện tại (Net Salary)
             </span>
             <div className="text-4xl sm:text-5xl font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
-              {netSalary.toLocaleString('vi-VN')} <span className="text-2xl text-purple-600 dark:text-purple-400 font-normal">₫</span>
+              {netSalary.toLocaleString('vi-VN')} <span className="text-2xl text-blue-600 dark:text-blue-400 font-normal">₫</span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Mức lương theo giờ: <strong className="text-slate-900 dark:text-white">{hourlyRate.toLocaleString('vi-VN')} ₫/h</strong> • Đã tích lũy <strong className="text-slate-900 dark:text-white">{overtimeHours}h OT</strong> • Tổng giờ làm: <strong className="text-slate-900 dark:text-white">{standardHours}h</strong>.
             </p>
           </div>
 
-          <div className="md:col-span-5 bg-white/80 dark:bg-[#0f1224] p-5 rounded-xl border border-purple-200/80 dark:border-[#272d5a] space-y-3 backdrop-blur-sm">
+          <div className="md:col-span-5 bg-white/80 dark:bg-[#0f1224] p-5 rounded-xl border border-blue-200/80 dark:border-[#272d5a] space-y-3 backdrop-blur-sm">
             <div className="flex justify-between text-xs">
               <span className="text-slate-500 dark:text-slate-400 font-medium">Tiến độ tích lũy ngày công</span>
-              <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{workDaysCount} / 22 ngày ({progressPercent}%)</span>
+              <span className="font-mono text-blue-600 dark:text-blue-400 font-bold">{workDaysCount} / 22 ngày ({progressPercent}%)</span>
             </div>
             <div className="w-full bg-slate-200 dark:bg-[#1a1e3a] h-2.5 rounded-full overflow-hidden border border-slate-300 dark:border-slate-800">
               <div
-                className="bg-purple-600 h-full rounded-full transition-all"
+                className="bg-blue-600 h-full rounded-full transition-all"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -235,7 +235,7 @@ export const EmployeeSalaryEstimate: React.FC = () => {
             </div>
 
             <div className="p-4 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-500 dark:text-slate-400 space-y-1.5">
-              <p className="font-bold text-purple-600 dark:text-purple-400">Công thức tính:</p>
+              <p className="font-bold text-blue-600 dark:text-blue-400">Công thức tính:</p>
               <p className="font-mono text-[11px] text-slate-700 dark:text-slate-300">
                 Thực nhận = (Lương giờ × Tổng giờ ca) + (OT × Mức thưởng OT) - (Đi muộn/Về sớm × Mức phạt) + Phụ cấp
               </p>

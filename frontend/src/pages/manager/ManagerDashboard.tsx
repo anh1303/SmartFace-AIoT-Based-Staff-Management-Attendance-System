@@ -1,4 +1,5 @@
 import React from 'react';
+import { AttendanceEventBadge } from '../../components/common/AttendanceEventBadge';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
@@ -104,7 +105,7 @@ export const ManagerDashboard: React.FC = () => {
         actions={
           <button
             onClick={() => navigate('/app/manager/employees')}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-xs shadow-purple-500/25 transition-all cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs shadow-blue-500/25 transition-all cursor-pointer"
           >
             Quản lý nhân sự
           </button>
@@ -114,7 +115,7 @@ export const ManagerDashboard: React.FC = () => {
       {/* 4 Bento Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Tổng nhân sự */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-purple-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-blue-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
           <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
             Tổng nhân sự
           </span>
@@ -125,7 +126,7 @@ export const ManagerDashboard: React.FC = () => {
         </div>
 
         {/* Card 2: Có mặt hôm nay */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-purple-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-blue-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
           <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
             Lượt Check in/out ({latestDateStr})
           </span>
@@ -136,18 +137,18 @@ export const ManagerDashboard: React.FC = () => {
         </div>
 
         {/* Card 3: Tỷ lệ đúng giờ */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-purple-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-blue-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
           <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
             Tỷ lệ đúng giờ
           </span>
           <div className="flex items-end justify-between mt-3">
             <span className="text-3xl font-bold text-slate-900 dark:text-white font-mono">{onTimeRate}%</span>
-            <span className="text-purple-600 dark:text-purple-400 text-xs pb-1 font-medium">{onTimeCount} đúng giờ</span>
+            <span className="text-blue-600 dark:text-blue-400 text-xs pb-1 font-medium">{onTimeCount} đúng giờ</span>
           </div>
         </div>
 
         {/* Card 4: Cảnh báo vắng */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-purple-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
+        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 sm:p-5 flex flex-col justify-between hover:border-blue-300 dark:hover:border-[#2f3668] transition-all shadow-xs">
           <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
             Cảnh báo trễ / sớm
           </span>
@@ -168,7 +169,7 @@ export const ManagerDashboard: React.FC = () => {
             <h3 className="font-bold text-slate-900 dark:text-white text-base">Biểu đồ chấm công chuyên cần</h3>
             <div className="flex gap-4">
               <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                <span className="w-2 h-2 rounded-full bg-purple-600 dark:bg-purple-500"></span> Đúng giờ
+                <span className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-500"></span> Đúng giờ
               </span>
               <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                 <span className="w-2 h-2 rounded-full bg-amber-500 dark:bg-amber-400"></span> Đi muộn / về sớm
@@ -254,11 +255,11 @@ export const ManagerDashboard: React.FC = () => {
       {/* Bottom Bento Card: Real-time Attendance Logs */}
       <div className="space-y-3">
         <div className="p-1 flex items-center justify-between">
-          <h3 className="font-bold text-slate-900 dark:text-white text-base">Nhật ký chấm công Face ID (Real-time)</h3>
+          <h3 className="font-bold text-slate-900 dark:text-white text-base">Nhật ký chấm công gần đây</h3>
           <button
             type="button"
             onClick={() => navigate('/app/manager/attendance')}
-            className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold cursor-pointer"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold cursor-pointer"
           >
             Xem tất cả &rarr;
           </button>
@@ -268,15 +269,16 @@ export const ManagerDashboard: React.FC = () => {
           <TableHead>
             <TableHeadRow>
               <TableHeadCell width="220px" align="left">Nhân viên</TableHeadCell>
-              <TableHeadCell width="110px" align="center">Thời gian</TableHeadCell>
+              <TableHeadCell width="110px" align="center">Sự kiện</TableHeadCell>
+              <TableHeadCell width="160px" align="center">Thời điểm</TableHeadCell>
               <TableHeadCell width="140px">Thiết bị</TableHeadCell>
-              <TableHeadCell width="110px" align="center">Độ chính xác</TableHeadCell>
+              <TableHeadCell width="110px" align="center">Điểm xác thực</TableHeadCell>
               <TableHeadCell width="120px" align="center" isLast>Trạng thái</TableHeadCell>
             </TableHeadRow>
           </TableHead>
           <TableBody>
             {attendance.length === 0 ? (
-              <TableEmpty colSpan={5} message="Chưa có dữ liệu chấm công." />
+              <TableEmpty colSpan={6} message="Chưa có dữ liệu chấm công." />
             ) : (
               attendance.slice(0, 5).map(att => {
                 const emp = employees.find(e => e.employee_id === att.employee_id);
@@ -289,7 +291,7 @@ export const ManagerDashboard: React.FC = () => {
                   <TableRow key={att.attendance_id}>
                     <TableCell align="left" className="max-w-[220px]">
                       <div className="flex items-center gap-3 min-w-0 text-left" title={empName}>
-                        <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-[#181c38] border border-purple-200 dark:border-[#272d5a] flex items-center justify-center text-[10px] font-bold text-purple-700 dark:text-purple-300 shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-[#181c38] border border-blue-200 dark:border-[#272d5a] flex items-center justify-center text-[10px] font-bold text-blue-700 dark:text-blue-300 shrink-0">
                           {emp?.avatar ? (
                             <img src={emp.avatar} alt={emp.full_name} className="w-full h-full rounded-full object-cover" />
                           ) : (
@@ -302,8 +304,9 @@ export const ManagerDashboard: React.FC = () => {
                         </div>
                       </div>
                     </TableCell>
+                    <TableCell align="center"><AttendanceEventBadge type={att.type}/></TableCell>
                     <TableCell align="center" className="font-mono text-xs text-slate-600 dark:text-slate-300 truncate" title={formatVNTime(att.timestamp)}>
-                      {formatVNTime(att.timestamp)}
+                      {formatVNTime(att.timestamp)}<div className="sf-secondary">{formatVNDateISO(att.timestamp)}</div>
                     </TableCell>
                     <TableCell className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate max-w-[140px]" title={att.device_id}>
                       {att.device_id}

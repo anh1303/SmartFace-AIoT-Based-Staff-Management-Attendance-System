@@ -9,7 +9,10 @@ const LoginPage = lazy(() =>
   import('../pages/public/LoginPage').then(module => ({ default: module.LoginPage }))
 );
 
+const CompanyPolicyPage = lazy(()=>import('../pages/public/CompanyPolicyPage').then(m=>({default:m.CompanyPolicyPage})));
+
 export const publicRoutes: RouteObject[] = [
+  {path:'/policies',element:<CompanyPolicyPage/>},
   {
     path: '/',
     element: <LandingPage />,

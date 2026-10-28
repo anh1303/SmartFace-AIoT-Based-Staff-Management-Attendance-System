@@ -33,7 +33,7 @@ export const ConfirmDeleteEmployeeModal: React.FC<ConfirmDeleteEmployeeModalProp
           <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
             Nhân viên: <strong className="text-slate-900 dark:text-white">{employee.full_name}</strong>{' '}
             (Mã:{' '}
-            <span className="font-mono text-purple-600 dark:text-purple-400">
+            <span className="font-mono text-blue-600 dark:text-blue-400">
               {employee.employee_id}
             </span>{' '}
             • Chức vụ: {employee.department})
@@ -139,7 +139,7 @@ export const ConfirmStatusEmployeeModal: React.FC<ConfirmStatusEmployeeModalProp
           <button
             type="button"
             onClick={() => onConfirmToggle(employee)}
-            className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-xs cursor-pointer"
+            className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-xs cursor-pointer"
           >
             Xác nhận thay đổi
           </button>

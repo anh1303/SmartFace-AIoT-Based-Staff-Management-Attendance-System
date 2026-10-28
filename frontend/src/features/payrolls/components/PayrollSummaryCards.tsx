@@ -24,7 +24,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
       {/* Card 1: Mức thưởng tăng ca */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors flex flex-col justify-between group relative shadow-xs">
+      <div className="p-4 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors flex flex-col justify-between group relative shadow-xs">
         <div className="flex items-center justify-between">
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
             Mức thưởng tăng ca
@@ -34,7 +34,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
               <button
                 type="button"
                 onClick={onOpenPolicyModal}
-                className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline font-medium cursor-pointer"
+                className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium cursor-pointer"
               >
                 Thay đổi
               </button>
@@ -79,7 +79,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
       </div>
 
       {/* Card 2: Mức phạt đi trễ / về sớm */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors flex flex-col justify-between group relative shadow-xs">
+      <div className="p-4 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors flex flex-col justify-between group relative shadow-xs">
         <div className="flex items-center justify-between">
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
             Mức phạt đi trễ / về sớm
@@ -89,7 +89,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
               <button
                 type="button"
                 onClick={onOpenPolicyModal}
-                className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline font-medium cursor-pointer"
+                className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium cursor-pointer"
               >
                 Thay đổi
               </button>
@@ -134,7 +134,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
       </div>
 
       {/* Card 3: Trạng thái kỳ lương */}
-      <div className="p-4 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-purple-300 dark:hover:border-purple-800/40 transition-colors flex flex-col justify-between shadow-xs">
+      <div className="p-4 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors flex flex-col justify-between shadow-xs">
         <div className="flex items-center justify-between">
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
             Trạng thái kỳ lương
@@ -154,7 +154,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
         </div>
         <p className="text-[11px] text-slate-500 dark:text-slate-400">
           {allPeriodRecords.length} nhân sự • Tổng lương:{' '}
-          <span className="font-mono text-purple-600 dark:text-purple-400 font-semibold">
+          <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">
             {totalExpense.toLocaleString('vi-VN')} ₫
           </span>
         </p>

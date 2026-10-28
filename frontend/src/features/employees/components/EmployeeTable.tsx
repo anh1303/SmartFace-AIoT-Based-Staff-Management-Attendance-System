@@ -87,7 +87,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
                               'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
                             }
                             alt={emp.full_name}
-                            className={`w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-[#272d5a] transition-all shadow-xs ${restricted ? 'grayscale-25' : 'group-hover:border-purple-500'
+                            className={`w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-[#272d5a] transition-all shadow-xs ${restricted ? 'grayscale-25' : 'group-hover:border-blue-500'
                               }`}
                           />
                           {restricted && (
@@ -104,7 +104,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
                             <p
                               className={`font-bold text-xs sm:text-sm truncate ${restricted
                                 ? 'text-slate-800 dark:text-slate-200'
-                                : 'text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors'
+                                : 'text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors'
                                 }`}
                               title={emp.full_name}
                             >
@@ -184,7 +184,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
                           className={`p-1.5 rounded-lg border transition-all ${restricted
                             ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-[#181c38] text-slate-400 border-slate-200 dark:border-slate-800'
                             : emp.face_enrolled
-                              ? 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/30 hover:bg-purple-100 dark:hover:bg-purple-500/20 shadow-xs cursor-pointer hover:scale-105'
+                              ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/30 hover:bg-blue-100 dark:hover:bg-blue-500/20 shadow-xs cursor-pointer hover:scale-105'
                               : 'bg-slate-100 dark:bg-[#181c38] text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700/50 hover:bg-slate-200 dark:hover:bg-[#20254b] hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer hover:scale-105'
                             }`}
                         >

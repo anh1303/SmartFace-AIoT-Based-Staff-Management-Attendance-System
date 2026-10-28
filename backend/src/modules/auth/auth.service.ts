@@ -1,3 +1,4 @@
+import { storedProfile } from './profile.dto.js';
 import type { Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
@@ -13,6 +14,7 @@ import type { loginSchema, registerSchema } from './auth.dto.js'
 
 function safeUser(user: {
   id: string
+  profile?: unknown
   username: string
   roles: { role_name: string }
   employees: {
@@ -28,6 +30,7 @@ function safeUser(user: {
 }) {
   const roleName = user.roles.role_name.toUpperCase()
   const isManager = roleName === 'ADMIN' || roleName === 'MANAGER'
+  const profile = storedProfile(user.profile)
   const emp = user.employees
   const posName = typeof emp?.position === 'string' ? emp.position : emp?.position?.name || ''
 
@@ -39,17 +42,20 @@ function safeUser(user: {
     is_manager: isManager,
     employee_id: emp?.employee_code || user.id,
     employeeId: emp?.employee_code || user.id,
-    full_name: emp?.full_name || user.username,
+    full_name: profile.display_name || emp?.full_name || user.username,
     email: emp?.email || '',
     position: posName,
     positionId: emp?.positionId ?? (typeof emp?.position === 'object' ? emp.position?.id : null),
     department: emp?.department?.name || '',
-    avatar: emp?.avatar_url || '',
+    avatar: profile.avatar !== undefined ? profile.avatar || '' : emp?.avatar_url || '',
   }
 }
 
-const tokenFor = (user: ReturnType<typeof safeUser>) =>
-  jwt.sign(user, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] })
+const tokenFor = (user: ReturnType<typeof safeUser>) => {
+  // Profile images belong in API responses; embedding them can exceed browser cookie limits.
+  const { avatar: _avatar, ...claims } = user
+  return jwt.sign(claims, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] })
+}
 
 export async function login(input: z.infer<typeof loginSchema>) {
   const identifier = (input.identifier ?? input.email ?? '').trim()

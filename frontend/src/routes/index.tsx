@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { useRoutes, Navigate, RouteObject } from 'react-router-dom';
+import { accountRoutes } from './accountRoutes';
 import { publicRoutes } from './publicRoutes';
 import { employeeRoutes } from './employeeRoutes';
 import { staffRoutes } from './staffRoutes';
@@ -8,6 +9,7 @@ import { LoadingScreen } from '../components/common/LoadingScreen';
 
 export const routes: RouteObject[] = [
   ...publicRoutes,
+  accountRoutes,
   employeeRoutes,
   staffRoutes,
   managerRoutes,

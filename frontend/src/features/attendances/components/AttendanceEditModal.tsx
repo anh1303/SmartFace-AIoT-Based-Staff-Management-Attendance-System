@@ -225,7 +225,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                     value={inputLEHours}
                     disabled={isSubmitting}
                     onChange={(e) => handleLEChange(parseInt(e.target.value, 10) || 0, inputLEMinutes, inputLESeconds)}
-                    className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
+                    className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                   />
                 </div>
                 <div>
@@ -237,7 +237,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                     value={inputLEMinutes}
                     disabled={isSubmitting}
                     onChange={(e) => handleLEChange(inputLEHours, parseInt(e.target.value, 10) || 0, inputLESeconds)}
-                    className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
+                    className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                   />
                 </div>
                 <div>
@@ -249,7 +249,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                     value={inputLESeconds}
                     disabled={isSubmitting}
                     onChange={(e) => handleLEChange(inputLEHours, inputLEMinutes, parseInt(e.target.value, 10) || 0)}
-                    className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
+                    className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                   />
                 </div>
               </div>
@@ -277,7 +277,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                   value={inputOTHours}
                   disabled={isSubmitting}
                   onChange={(e) => handleOTChange(parseInt(e.target.value, 10) || 0, inputOTMinutes, inputOTSeconds)}
-                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                 />
               </div>
               <div>
@@ -289,7 +289,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                   value={inputOTMinutes}
                   disabled={isSubmitting}
                   onChange={(e) => handleOTChange(inputOTHours, parseInt(e.target.value, 10) || 0, inputOTSeconds)}
-                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                 />
               </div>
               <div>
@@ -301,7 +301,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                   value={inputOTSeconds}
                   disabled={isSubmitting}
                   onChange={(e) => handleOTChange(inputOTHours, inputOTMinutes, parseInt(e.target.value, 10) || 0)}
-                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                 />
               </div>
             </div>
@@ -322,11 +322,11 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
               }}
               rows={2}
               placeholder="Nhập lý do điều chỉnh (ví dụ: Phê duyệt OT ngày nghỉ, điều chỉnh giờ công theo đề xuất quản lý...)"
-              className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 resize-none placeholder:text-slate-400"
+              className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 resize-none placeholder:text-slate-400"
             />
           </div>
 
-          <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-[11px] flex items-center gap-2">
+          <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-[11px] flex items-center gap-2">
             <span>💡 <strong>Quy tắc làm tròn:</strong> 0 – 29 phút quy về 0 giờ (+0h), 30 – 59 phút quy về 0.5 giờ (+30p).</span>
           </div>
         </div>
@@ -344,7 +344,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
             type="button"
             onClick={handleSave}
             disabled={isSubmitting}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 transition-all cursor-pointer shadow-sm shadow-purple-600/20 disabled:opacity-50 flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-all cursor-pointer shadow-sm shadow-blue-600/20 disabled:opacity-50 flex items-center gap-1.5"
           >
             {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             <span>{isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}</span>

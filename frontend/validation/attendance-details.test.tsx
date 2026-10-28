@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { createRoot, Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -15,7 +16,7 @@ import { apiFetch } from '../src/api/client';
 let host: HTMLDivElement, root: Root, cache: QueryClient;
 beforeEach(() => { host=document.createElement('div');document.body.append(host);root=createRoot(host);cache=new QueryClient({defaultOptions:{queries:{retry:false}}});vi.clearAllMocks(); });
 afterEach(async () => {await act(async()=>root.unmount());host.remove();cache.clear();});
-const mount = async (component: React.ReactNode) => { await act(async()=> { root.render(<QueryClientProvider client={cache}>{component}</QueryClientProvider>); }); };
+const mount = async (component: React.ReactNode) => { await act(async()=> { root.render(<MemoryRouter><QueryClientProvider client={cache}>{component}</QueryClientProvider></MemoryRouter>); }); };
 const click = async (element: Element | null) => { expect(element).toBeTruthy();await act(async()=>{(element as HTMLElement).click();}); };
 const filter = async (value: string) => { await act(async () => { const select=host.querySelector('select[aria-label="Lọc lượt chấm công"]') as HTMLSelectElement; select.value=value;select.dispatchEvent(new Event('change',{bubbles:true})); }); };
 const settle = async () => { await act(async()=>{await new Promise(r=>setTimeout(r,10));}); };
@@ -44,9 +45,10 @@ describe('Attendance details and per-item review', () => {
       {id:'12',employee_id:'NV1',employee_name:'Nhân viên 1',date:'2026-10-02',kind:'ABSENCE',hours:8,amount:200000,status:'PENDING',note:null,updated_at:'2026-10-02T00:00:00.000Z',can_review:true},
     ]} as any);
     await mount(<AdjustmentReviewPanel period="2026-10"/>);await settle();
-    await click(host.querySelector('button[aria-expanded]'));
     const rows=host.querySelectorAll('tbody tr');expect(rows).toHaveLength(2);
-    const first=rows[0];await click(first.querySelector('button'));await settle();
+    const first=Array.from(rows).find(row=>row.textContent?.includes('2026-10-01'))!;await click(first.querySelector('button'));await settle();
+    expect(vi.mocked(apiFetch).mock.calls.some(([,options])=>options?.method==='PATCH')).toBe(false);
+    await click(document.querySelector('[role=dialog] button[type=submit]'));await settle();
     const patch=vi.mocked(apiFetch).mock.calls.find(([url,options])=>url==='/api/payroll/adjustments/11' && options?.method==='PATCH');
     expect(patch).toBeTruthy();expect(JSON.parse(patch![1]!.body as string)).toEqual({status:'APPROVED',note:'Đã làm thêm',updated_at:'2026-10-02T00:00:00.000Z'});
     expect(vi.mocked(apiFetch).mock.calls.some(([url,options])=>url==='/api/payroll/adjustments/12'&&options?.method==='PATCH')).toBe(false);

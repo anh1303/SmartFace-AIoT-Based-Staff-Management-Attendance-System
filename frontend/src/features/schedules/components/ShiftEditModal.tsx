@@ -1,3 +1,4 @@
+import {ShiftTemplatePicker,templateAssignment} from './ShiftTemplates';
 import React from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { WorkShift } from '../../../types';
@@ -23,6 +24,8 @@ interface ShiftEditModalProps {
   note: string;
   setNote: (note: string) => void;
   onSubmit: (e: React.FormEvent) => void;
+  isSubmitting?: boolean;
+  error?: string;
 }
 
 export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
@@ -37,6 +40,8 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
   note,
   setNote,
   onSubmit,
+  isSubmitting=false,
+  error,
 }) => {
   const isTimeInvalid = shiftType === 'OTHER' && startTime >= endTime;
 
@@ -49,10 +54,11 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
       maxWidth="md"
     >
       {editingShift && (
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4"><fieldset disabled={isSubmitting} className="space-y-4"><ShiftTemplatePicker onApply={template=>{const value=templateAssignment(template);setShiftType(value.shift_type);setStartTime(value.start_time);setEndTime(value.end_time);setNote(value.note);}}/>
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Ca làm việc</label>
             <select
+              aria-label="Ca làm việc"
               value={shiftType}
               onChange={e => {
                 const val = e.target.value as WorkShift['shift_type'];
@@ -74,7 +80,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
                   setEndTime('00:00');
                 }
               }}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
             >
               <option value="OFFICE_HOURS" className="bg-white dark:bg-[#13162b]">Ca Hành Chính</option>
               <option value="MORNING" className="bg-white dark:bg-[#13162b]">Ca Sáng</option>
@@ -84,13 +90,13 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
             </select>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/40 space-y-3">
+          <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 space-y-3">
             <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
               Khung giờ làm việc:
             </span>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
+                <label htmlFor="modal-shift-start" className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                   Giờ bắt đầu
                 </label>
                 <ShiftTimeInput
@@ -102,7 +108,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
+                <label htmlFor="modal-shift-end" className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
                   Giờ kết thúc
                 </label>
                 <ShiftTimeInput
@@ -128,10 +134,11 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
               placeholder="Ví dụ: Phòng Lab 02, Hỗ trợ sự kiện, OT 2h..."
               value={note}
               onChange={e => setNote(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
             />
           </div>
 
+          {error&&<div className="sf-feedback error" role="alert">{error}</div>}
           <div className="pt-4 flex justify-end items-center gap-2 border-t border-slate-200 dark:border-[#21264b]">
             <button
               type="button"
@@ -145,13 +152,13 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
               disabled={isTimeInvalid}
               className={`px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-sm transition-all ${isTimeInvalid
                 ? 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60'
-                : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20 cursor-pointer'
+                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20 cursor-pointer'
                 }`}
             >
               Lưu
             </button>
           </div>
-        </form>
+        </fieldset></form>
       )}
     </Modal>
   );

@@ -27,6 +27,9 @@ export const TableContainer: React.FC<TableContainerProps> = ({
       {...props}
     >
       <div
+        tabIndex={0}
+        role="region"
+        aria-label="Bảng dữ liệu, cuộn ngang để xem đầy đủ cột"
         className="overflow-x-auto overflow-y-auto"
         style={{ maxHeight: maxHeight === 'none' ? undefined : maxHeight }}
       >
@@ -55,7 +58,7 @@ export const TableHead: React.FC<TableHeadProps> = ({
 }) => {
   return (
     <thead
-      className={`sticky top-0 z-10 border-b-2 border-slate-300 dark:border-[#28305c] bg-slate-200 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-mono shadow-xs ${className}`}
+      className={`sticky top-0 z-10 border-b border-slate-200 dark:border-[#28305c] bg-slate-50 dark:bg-[#0c0f1f] text-[11px] font-bold text-slate-800 dark:text-slate-200 tracking-normal font-sans ${className}`}
       {...props}
     >
       {children}
@@ -104,7 +107,7 @@ export const TableHeadCell: React.FC<TableHeadCellProps> = ({
   return (
     <th
       style={{ width, ...style }}
-      className={`sticky top-0 z-10 bg-slate-200 dark:bg-[#0c0f1f] border-b-2 border-slate-300 dark:border-[#28305c] py-4 px-4 font-bold ${alignClass} ${borderClass} ${className}`}
+      className={`sticky top-0 z-10 bg-slate-50 dark:bg-[#0c0f1f] border-b border-slate-200 dark:border-[#28305c] py-4 px-4 font-bold ${alignClass} ${borderClass} ${className}`}
       {...props}
     >
       {children}
@@ -140,7 +143,7 @@ export const TableRow: React.FC<React.HTMLAttributes<HTMLTableRowElement>> = ({
 }) => {
   return (
     <tr
-      className={`hover:bg-purple-50/40 dark:hover:bg-[#181c38]/50 transition-colors border-b border-slate-200 dark:border-[#202752] ${className}`}
+      className={`hover:bg-blue-50/40 dark:hover:bg-[#181c38]/50 transition-colors border-b border-slate-200 dark:border-[#202752] ${className}`}
       {...props}
     >
       {children}
@@ -229,7 +232,7 @@ export const CodeBadge: React.FC<CodeBadgeProps> = ({
 }) => {
   const variantStyles = {
     purple:
-      'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200/80 dark:border-purple-500/20',
+      'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200/80 dark:border-blue-500/20',
     slate:
       'bg-slate-100 dark:bg-[#181c38] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700/60',
     emerald:

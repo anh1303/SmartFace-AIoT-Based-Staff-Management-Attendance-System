@@ -70,6 +70,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
 
   // Lắng nghe sự kiện đổi chế độ và reconnect từ Socket.IO
   useEffect(() => {
+    if (import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === 'true') return;
     const socketBase = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
     const socket = io(`${socketBase}/attendance`, {
       withCredentials: true,
@@ -444,7 +445,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
           </span>
           <span className="hidden md:inline-block">|</span>
           <span className="hidden md:flex items-center gap-1.5">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-purple-400" />
+            <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
             AI Pipeline: <span className="text-slate-200 font-mono">SCRFD + MiniFASNet R7 + ArcFace</span>
           </span>
         </div>

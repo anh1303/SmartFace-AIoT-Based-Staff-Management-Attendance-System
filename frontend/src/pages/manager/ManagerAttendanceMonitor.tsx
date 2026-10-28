@@ -244,7 +244,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-[#21264b] pb-4">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <FileText className="w-4 h-4 text-purple-600" />
+                <FileText className="w-4 h-4 text-blue-600" />
                 Lịch Sử Quẹt Thẻ Toàn Hệ Thống (Raw Logs Phân Trang)
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -271,7 +271,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
                   <ChevronLeft className="w-4 h-4" />
                   <span>Trang trước</span>
                 </button>
-                <span className="px-3 py-1 text-xs font-mono font-bold text-purple-600 bg-purple-50 dark:bg-purple-950/40 rounded-xl border border-purple-200 dark:border-purple-800">
+                <span className="px-3 py-1 text-xs font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800">
                   {rawLogPage}
                 </span>
                 <button
@@ -320,7 +320,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
                         <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                           log.type === 'CHECK_IN'
                             ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400'
-                            : 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400'
+                            : 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400'
                         }`}>
                           {log.type === 'CHECK_IN' ? 'Vào ca (CHECK_IN)' : 'Hết ca (CHECK_OUT)'}
                         </span>

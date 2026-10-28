@@ -1,0 +1,548 @@
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Wifi,
+  WifiHigh,
+  WifiLow,
+  WifiZero,
+  WifiOff,
+  Volume2,
+  Volume1,
+  VolumeX,
+  Headphones,
+  Bluetooth,
+  Video,
+  VideoOff,
+  Gauge,
+  SlidersHorizontal,
+  RefreshCw,
+  Play,
+  CheckCircle2,
+  AlertCircle
+} from 'lucide-react';
+import { useDeviceSettings, BluetoothDevice } from '../../features/attendances/hooks/useDeviceSettings';
+
+// Icon sóng Wi-Fi động theo cường độ tín hiệu (%)
+const renderWifiSignalIcon = (signal: number, className = 'w-4 h-4 shrink-0') => {
+  if (signal >= 75) {
+    return <Wifi className={`${className} text-emerald-500`} />;
+  }
+  if (signal >= 50) {
+    return <WifiHigh className={`${className} text-emerald-500 dark:text-emerald-400`} />;
+  }
+  if (signal >= 25) {
+    return <WifiLow className={`${className} text-amber-500`} />;
+  }
+  return <WifiZero className={`${className} text-rose-500`} />;
+};
+
+interface QuickSettingsMenuProps {
+  deviceId?: string;
+}
+
+export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
+  deviceId = 'PI4_FRONT_GATE',
+}) => {
+  const {
+    canManage,
+    settings,
+    isLoading,
+    isUpdating,
+    setVolume,
+    toggleMute,
+    toggleFps,
+    toggleStream,
+    testAudio,
+    reconnectBluetooth,
+    connectBluetooth,
+    scanBluetooth,
+  } = useDeviceSettings(deviceId);
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [isTestingSound, setIsTestingSound] = useState(false);
+  const [isReconnectingBt, setIsReconnectingBt] = useState(false);
+  const [reconnectToast, setReconnectToast] = useState<string | null>(null);
+
+  // Trạng thái chọn đổi thiết bị Loa Bluetooth
+  const [isBtPickerOpen, setIsBtPickerOpen] = useState(false);
+  const [scannedBtDevices, setScannedBtDevices] = useState<BluetoothDevice[]>([]);
+  const [isScanningBt, setIsScanningBt] = useState(false);
+  const [connectingBtAddr, setConnectingBtAddr] = useState<string | null>(null);
+
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // 1. Click-outside listener & ESC key để đóng popup mượt mà
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        isOpen &&
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  // Không hiển thị nút nếu người dùng không phải Quản lý hoặc Quản trị viên
+  if (!canManage) {
+    return null;
+  }
+
+  // Xử lý nút Test âm thanh
+  const handleTestAudio = async () => {
+    setIsTestingSound(true);
+    await testAudio();
+    setTimeout(() => {
+      setIsTestingSound(false);
+    }, 800);
+  };
+
+  // Xử lý kết nối lại Bluetooth
+  const handleReconnectBluetooth = async () => {
+    setIsReconnectingBt(true);
+    setReconnectToast(null);
+    const success = await reconnectBluetooth();
+    setIsReconnectingBt(false);
+    if (success) {
+      setReconnectToast('Đã kết nối lại loa Bluetooth thành công!');
+    } else {
+      setReconnectToast('Không thể tìm thấy loa. Vui lòng bật nguồn loa.');
+    }
+    setTimeout(() => {
+      setReconnectToast(null);
+    }, 3000);
+  };
+
+  // Mở/đóng panel chọn loa Bluetooth
+  const handleToggleBtPicker = async () => {
+    const next = !isBtPickerOpen;
+    setIsBtPickerOpen(next);
+    if (next && (!Array.isArray(scannedBtDevices) || scannedBtDevices.length === 0)) {
+      await handleScanBluetooth();
+    }
+  };
+
+  // Quét danh sách loa Bluetooth
+  const handleScanBluetooth = async () => {
+    setIsScanningBt(true);
+    try {
+      const devices = await scanBluetooth();
+      setScannedBtDevices(Array.isArray(devices) ? devices : []);
+    } catch {
+      setScannedBtDevices([]);
+    } finally {
+      setIsScanningBt(false);
+    }
+  };
+
+  // Đổi kết nối sang loa Bluetooth khác
+  const handleSelectBtDevice = async (device: BluetoothDevice) => {
+    setConnectingBtAddr(device.address);
+    setReconnectToast(null);
+    const success = await connectBluetooth(device);
+    setConnectingBtAddr(null);
+    if (success) {
+      setReconnectToast(`Đã chuyển loa thành công sang: ${device.name}`);
+      setIsBtPickerOpen(false);
+    } else {
+      setReconnectToast(`Không thể kết nối tới ${device.name}.`);
+    }
+    setTimeout(() => {
+      setReconnectToast(null);
+    }, 3500);
+  };
+
+  // Icon âm lượng động
+  const renderVolumeIcon = (className = 'w-4 h-4') => {
+    if (settings.isMuted || settings.volume === 0) {
+      return <VolumeX className={`${className} text-rose-500`} />;
+    }
+    if (settings.volume < 45) {
+      return <Volume1 className={`${className} text-purple-600 dark:text-purple-400`} />;
+    }
+    return <Volume2 className={`${className} text-purple-600 dark:text-purple-400`} />;
+  };
+
+  return (
+    <div className="relative">
+      {/* Nút bấm Topbar dạng Pill phong cách Ubuntu GNOME */}
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        title="Trung tâm điều khiển Kiosk (Quick Settings)"
+        className={`relative flex items-center gap-2.5 px-3 py-1.5 rounded-xl border transition-all duration-200 cursor-pointer shadow-xs select-none ${
+          isOpen
+            ? 'bg-purple-100 dark:bg-purple-950/60 border-purple-400 dark:border-purple-600 text-purple-900 dark:text-purple-200 ring-2 ring-purple-500/20'
+            : 'bg-slate-100 hover:bg-slate-200/90 border-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:border-[#272d5a] dark:text-purple-300'
+        }`}
+      >
+        {/* Biểu tượng Wi-Fi động theo mức sóng */}
+        {settings.wifi.connected ? (
+          renderWifiSignalIcon(settings.wifi.signalStrength, 'w-3.5 h-3.5')
+        ) : (
+          <WifiOff className="w-3.5 h-3.5 text-rose-500" />
+        )}
+
+        {/* Biểu tượng Âm lượng */}
+        <span className="flex items-center gap-1 text-xs font-semibold">
+          {renderVolumeIcon('w-3.5 h-3.5')}
+          <span className="font-mono text-[11px] hidden sm:inline">
+            {settings.isMuted ? 'Mute' : `${settings.volume}%`}
+          </span>
+        </span>
+
+        {/* Biểu tượng Cài đặt bánh răng */}
+        <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+      </button>
+
+      {/* Popover Menu neo ngay dưới nút Topbar */}
+      {isOpen && (
+        <div
+          ref={menuRef}
+          className="absolute right-0 top-full mt-2 w-84 sm:w-96 z-50 bg-white/95 dark:bg-[#12162e]/95 backdrop-blur-md border border-slate-200/90 dark:border-[#282f63] rounded-2xl shadow-2xl p-4.5 space-y-4 animate-in fade-in zoom-in-95 duration-150 origin-top-right text-slate-800 dark:text-slate-100"
+        >
+          {/* Header Popover */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#1e244d]">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <SlidersHorizontal className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                  Trung Tâm Điều Khiển Kiosk
+                </h4>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
+                {deviceId} • {settings.wifi.ip}
+              </p>
+            </div>
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 shadow-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Online
+            </span>
+          </div>
+
+          {/* KHỐI 1: KẾT NỐI KHÔNG DÂY (Wi-Fi & Bluetooth Audio) */}
+          <div className="space-y-2">
+            {/* Thẻ Wi-Fi (Trạng thái mạng Kiosk) */}
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#181c3b] border border-slate-200/80 dark:border-[#252b54] flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className={`p-2 rounded-lg ${
+                    settings.wifi.connected && settings.wifi.ssid
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {renderWifiSignalIcon(
+                    settings.wifi.connected && settings.wifi.ssid ? settings.wifi.signalStrength : 0,
+                    'w-4 h-4'
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">
+                    {settings.wifi.connected && settings.wifi.ssid ? settings.wifi.ssid : 'Chưa kết nối Wi-Fi'}
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                    {settings.wifi.connected && settings.wifi.ssid
+                      ? 'Đã kết nối • Tín hiệu tốt'
+                      : 'Chưa có tín hiệu mạng'}
+                  </div>
+                </div>
+              </div>
+              {settings.wifi.connected && settings.wifi.ip ? (
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-200/60 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 border border-slate-300/40 dark:border-slate-700/50 shrink-0">
+                  {settings.wifi.ip}
+                </span>
+              ) : null}
+            </div>
+
+            {/* Thẻ Bluetooth Loa Thông Báo */}
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#181c3b] border border-slate-200/80 dark:border-[#252b54] space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className={`p-2 rounded-lg ${
+                      settings.bluetooth.connected && settings.bluetooth.deviceName
+                        ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <Headphones className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">
+                      {settings.bluetooth.connected && settings.bluetooth.deviceName
+                        ? settings.bluetooth.deviceName
+                        : 'Chưa kết nối loa Bluetooth'}
+                    </div>
+                    <div className="text-[10px]">
+                      {settings.bluetooth.connected && settings.bluetooth.deviceName ? (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                          🟢 Đã kết nối • Sẵn sàng
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-medium">
+                          ⚪ Chưa kết nối
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {settings.bluetooth.connected && settings.bluetooth.status === 'disconnected' && (
+                    <button
+                      type="button"
+                      onClick={handleReconnectBluetooth}
+                      disabled={isReconnectingBt}
+                      title="Thử kết nối lại loa cũ"
+                      className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40 transition-colors cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isReconnectingBt ? 'animate-spin' : ''}`} />
+                      <span>{isReconnectingBt ? 'Đang thử...' : 'Nối lại'}</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleToggleBtPicker}
+                    className={`flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors cursor-pointer border ${
+                      isBtPickerOpen
+                        ? 'bg-purple-600 text-white border-purple-600 dark:bg-purple-500'
+                        : 'bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/40'
+                    }`}
+                  >
+                    <Bluetooth className="w-3 h-3" />
+                    <span>{isBtPickerOpen ? 'Đóng' : settings.bluetooth.connected && settings.bluetooth.deviceName ? 'Đổi loa' : 'Tìm loa'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Ngăn kéo chọn loa Bluetooth khả dụng */}
+              {isBtPickerOpen && (
+                <div className="pt-2 border-t border-slate-200/70 dark:border-[#222850] space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                    <span className="font-semibold uppercase tracking-wider text-[10px]">
+                      Loa Bluetooth khả dụng
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleScanBluetooth}
+                      disabled={isScanningBt}
+                      className="flex items-center gap-1 text-[10px] text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                    >
+                      <RefreshCw className={`w-2.5 h-2.5 ${isScanningBt ? 'animate-spin' : ''}`} />
+                      <span>{isScanningBt ? 'Đang quét...' : 'Quét lại'}</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                    {isScanningBt && (!Array.isArray(scannedBtDevices) || scannedBtDevices.length === 0) ? (
+                      <div className="text-center py-3 text-xs text-slate-400 flex items-center justify-center gap-2">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-purple-500" />
+                        <span>Đang tìm loa Bluetooth xung quanh...</span>
+                      </div>
+                    ) : !Array.isArray(scannedBtDevices) || scannedBtDevices.length === 0 ? (
+                      <div className="text-center py-2.5 text-xs text-slate-400">
+                        Chưa tìm thấy loa nào. Bật nguồn loa và bấm Quét lại.
+                      </div>
+                    ) : (
+                      scannedBtDevices.map((dev) => {
+                        const isCurrent =
+                          Boolean(settings.bluetooth.connected &&
+                          settings.bluetooth.deviceName &&
+                          (settings.bluetooth.deviceName.toLowerCase().includes(dev.name.toLowerCase()) ||
+                            dev.name.toLowerCase().includes(settings.bluetooth.deviceName.toLowerCase())));
+                        const isConnecting = connectingBtAddr === dev.address;
+
+                        return (
+                          <div
+                            key={dev.address}
+                            className={`flex items-center justify-between p-2 rounded-lg border text-xs transition-colors ${
+                              isCurrent
+                                ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800/60'
+                                : 'bg-white dark:bg-[#12162e] border-slate-200 dark:border-[#222850] hover:bg-slate-100/70 dark:hover:bg-[#1a1f42]'
+                            }`}
+                          >
+                            <div className="min-w-0 pr-2">
+                              <div className="font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-1.5">
+                                <Headphones className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="truncate">{dev.name}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-mono pl-5 truncate">
+                                {dev.address}
+                              </div>
+                            </div>
+
+                            {isCurrent ? (
+                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/40 shrink-0">
+                                Đang dùng
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleSelectBtDevice(dev)}
+                                disabled={isConnecting || isUpdating}
+                                className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-700 text-white transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                              >
+                                {isConnecting ? 'Đang nối...' : 'Kết nối'}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Toast phản hồi kết nối lại Bluetooth */}
+            {reconnectToast && (
+              <div className="text-[11px] p-2 rounded-lg bg-slate-100 dark:bg-[#1c224a] text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <span>{reconnectToast}</span>
+              </div>
+            )}
+          </div>
+
+          {/* KHỐI 2: ĐIỀU KHIỂN ÂM LƯỢNG LOA BLUETOOTH */}
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#181c3b] border border-slate-200/80 dark:border-[#252b54] space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-semibold">
+              <span className="text-slate-600 dark:text-slate-300">Âm Lượng Loa Bluetooth</span>
+              <span className="font-mono text-purple-700 dark:text-purple-400 font-bold">
+                {settings.isMuted ? 'MUTE (0%)' : `${settings.volume}%`}
+              </span>
+            </div>
+
+            {/* Slider track kiểu Ubuntu GNOME */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={toggleMute}
+                title={settings.isMuted ? 'Bật âm thanh' : 'Tắt tiếng (Mute)'}
+                className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-[#252c5c] text-slate-600 dark:text-slate-300 cursor-pointer transition-colors"
+              >
+                {renderVolumeIcon('w-4 h-4')}
+              </button>
+
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={settings.isMuted ? 0 : settings.volume}
+                onChange={(e) => setVolume(Number(e.target.value))}
+                disabled={!settings.bluetooth.connected}
+                className={`w-full h-2 rounded-lg appearance-none bg-slate-200 dark:bg-[#252b52] accent-purple-600 cursor-pointer transition-all ${
+                  !settings.bluetooth.connected ? 'opacity-40 cursor-not-allowed' : ''
+                }`}
+              />
+
+              <Volume2 className="w-4 h-4 text-slate-400" />
+            </div>
+
+            {/* Thông báo nếu loa Bluetooth ngắt kết nối */}
+            {!settings.bluetooth.connected && (
+              <div className="flex items-center gap-1.5 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                <AlertCircle className="w-3 h-3 shrink-0" />
+                <span>Loa ngắt kết nối. Âm thanh check-in tạm phát qua Jack 3.5mm.</span>
+              </div>
+            )}
+
+            {/* Nút Test âm thanh */}
+            <button
+              type="button"
+              onClick={handleTestAudio}
+              disabled={isTestingSound}
+              className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-[#20254c] hover:bg-slate-100 dark:hover:bg-[#282f61] text-purple-700 dark:text-purple-300 border border-slate-200 dark:border-[#30386e] transition-all cursor-pointer shadow-2xs"
+            >
+              <Play className={`w-3.5 h-3.5 ${isTestingSound ? 'animate-bounce text-emerald-500' : ''}`} />
+              <span>{isTestingSound ? 'Đang phát chuông...' : 'Phát thử âm thanh check-in'}</span>
+            </button>
+          </div>
+
+          {/* KHỐI 3: THIẾT LẬP THIẾT BỊ & HIỂN THỊ (Camera Stream & FPS LCD) */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block px-0.5">
+              Thiết bị & Màn hình Kiosk
+            </span>
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* Toggle Camera Stream */}
+              <button
+                type="button"
+                onClick={toggleStream}
+                className={`p-2.5 rounded-xl border flex flex-col gap-1.5 text-left transition-all duration-150 cursor-pointer ${
+                  settings.streamEnabled
+                    ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800/60 text-purple-950 dark:text-purple-100'
+                    : 'bg-slate-50 dark:bg-[#181c3b] border-slate-200 dark:border-[#252b54] text-slate-500 dark:text-slate-400 opacity-80'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  {settings.streamEnabled ? (
+                    <Video className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  ) : (
+                    <VideoOff className="w-4 h-4 text-slate-400" />
+                  )}
+                  <span
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                      settings.streamEnabled
+                        ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                    }`}
+                  >
+                    {settings.streamEnabled ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
+                  </span>
+                </div>
+                <span className="text-xs font-semibold">Camera Kiosk</span>
+              </button>
+
+              {/* Toggle Hiển thị FPS trên màn LCD */}
+              <button
+                type="button"
+                onClick={toggleFps}
+                className={`p-2.5 rounded-xl border flex flex-col gap-1.5 text-left transition-all duration-150 cursor-pointer ${
+                  settings.showFps
+                    ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800/60 text-emerald-950 dark:text-emerald-100'
+                    : 'bg-slate-50 dark:bg-[#181c3b] border-slate-200 dark:border-[#252b54] text-slate-500 dark:text-slate-400 opacity-80'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <Gauge
+                    className={`w-4 h-4 ${settings.showFps ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}
+                  />
+                  <span
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                      settings.showFps
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                    }`}
+                  >
+                    {settings.showFps ? 'HIỂN THỊ' : 'ẨN'}
+                  </span>
+                </div>
+                <span className="text-xs font-semibold">FPS Màn LCD</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

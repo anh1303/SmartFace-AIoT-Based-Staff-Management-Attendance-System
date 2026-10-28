@@ -42,6 +42,10 @@ eventBus.subscribe('device:mode-updated', (data) => {
   emitDeviceEvent('mode-changed', { id: data.deviceId, mode: data.mode, confirmed: data.confirmed })
 })
 
+eventBus.subscribe('device:settings-updated', (data) => {
+  emitDeviceEvent('settings-changed', data)
+})
+
 eventBus.subscribe('device:status-changed', (data) => {
   emitDeviceEvent('status', data.details || data)
 })

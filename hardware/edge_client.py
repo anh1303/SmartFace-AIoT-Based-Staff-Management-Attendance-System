@@ -139,7 +139,12 @@ from alignment.aligner import get_input_face
 from iot import ThingsBoardClient
 from streaming import RTSPStreamer
 from display import TFTDisplay
-from peripherals import UltrasonicSensor
+from peripherals import (
+    UltrasonicSensor,
+    AudioManager,
+    get_hardware_telemetry,
+    scan_bluetooth_devices,
+)
 
 # Trạng thái toàn cục
 current_mode = INITIAL_MODE
@@ -255,7 +260,61 @@ def main(args=None):
             status_banner_time = time.time()
             print(f"[EDGE] ⚠️ KHÔNG KHỚP: {res.get('message', 'Không tìm thấy')} (Sim: {sim:.2f})")
 
-    # 1. Khởi động kết nối MQTT ThingsBoard với cơ chế Two-way RPC
+    # Quản lý cài đặt ngoại vi & âm thanh
+    current_show_fps = vision.SHOW_FPS
+    current_stream_enabled = STREAM_ENABLED
+    current_volume = 75
+    current_is_muted = False
+    audio_manager = AudioManager(initial_volume=current_volume, initial_muted=current_is_muted)
+
+    def on_settings_change(new_settings: dict):
+        nonlocal current_show_fps, current_stream_enabled, current_volume, current_is_muted
+        if "show_fps" in new_settings:
+            current_show_fps = bool(new_settings["show_fps"])
+            print(f"[SETTINGS] Đã đổi FPS LCD: {current_show_fps}")
+        if "stream_enabled" in new_settings:
+            current_stream_enabled = bool(new_settings["stream_enabled"])
+            streamer.set_enabled(current_stream_enabled)
+            print(f"[SETTINGS] Đã đổi trạng thái Camera (phần cứng + stream): {'BẬT' if current_stream_enabled else 'TẮT'}")
+        if "volume" in new_settings:
+            current_volume = int(new_settings["volume"])
+            audio_manager.set_volume(current_volume)
+            print(f"[SETTINGS] Đã đổi âm lượng: {current_volume}%")
+        if "is_muted" in new_settings:
+            current_is_muted = bool(new_settings["is_muted"])
+            audio_manager.set_mute(current_is_muted)
+
+    def on_action_request(action: str, params: dict):
+        if action == "playTestSound":
+            success = audio_manager.play_test_sound()
+            return {"success": success, "message": "Played test sound"}
+        if action == "scanBluetooth":
+            devices = scan_bluetooth_devices()
+            print(f"[BLUETOOTH] Quét thực tế phát hiện {len(devices)} thiết bị")
+            return devices
+        if action == "scanWifi":
+            return []
+        if action == "connectBluetooth":
+            target_name = params.get("name", "") if isinstance(params, dict) else ""
+            target_addr = params.get("address", "") if isinstance(params, dict) else ""
+            print(f"[BLUETOOTH] Đang kết nối tới: {target_name} ({target_addr})")
+            connected = False
+            if target_addr:
+                try:
+                    res = subprocess.run(["bluetoothctl", "connect", target_addr], capture_output=True, text=True, timeout=5)
+                    connected = (res.returncode == 0)
+                except Exception as e:
+                    print(f"[BLUETOOTH] Lỗi kết nối {target_addr}: {e}")
+            return {
+                "success": True,
+                "connected": connected,
+                "deviceName": target_name,
+                "address": target_addr,
+                "status": "connected" if connected else "disconnected",
+            }
+        return {"success": True, "message": f"Handled action {action}"}
+
+    # 1. Khởi động kết nối MQTT ThingsBoard với cơ chế Two-way RPC & Settings Sync
     tb_client = ThingsBoardClient(
         host=TB_HOST,
         port=TB_PORT,
@@ -264,6 +323,11 @@ def main(args=None):
         initial_mode=current_mode,
         on_mode_change=on_mode_change,
         on_attendance_result=None,
+        initial_volume=current_volume,
+        initial_show_fps=current_show_fps,
+        initial_stream_enabled=current_stream_enabled,
+        on_settings_change=on_settings_change,
+        on_action_request=on_action_request,
     )
 
     # 2. Khởi tạo Pipeline AI: Detector + Tracker + AntiSpoof + Embedder
@@ -291,19 +355,33 @@ def main(args=None):
     embedder = FaceEmbedder(intra_op_threads=vision.RECOGNITION_INTRA_OP_THREADS)
     print("  [OK] Face Embedder : ArcFace MobileFaceNet (~13 MB)")
 
-    # 3. Mở Camera
-    cap = cv2.VideoCapture(CAM_INDEX)
-    if not cap.isOpened():
-        print(f"[ERROR] Không thể mở Camera tại index {CAM_INDEX}!")
-        tb_client.stop()
-        sys.exit(1)
+    # 3. Mở Camera (chỉ mở khi camera đang được bật; có thể tắt/bật lại từ xa)
+    def open_camera():
+        camera = cv2.VideoCapture(CAM_INDEX)
+        if not camera.isOpened():
+            camera.release()
+            return None
+        if vision.CAMERA_BUFFER_SIZE > 0:
+            camera.set(cv2.CAP_PROP_BUFFERSIZE, vision.CAMERA_BUFFER_SIZE)
+        if vision.CAMERA_FORCE_RESOLUTION:
+            camera.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
+            camera.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
+        camera.set(cv2.CAP_PROP_FPS, FPS)
+        return camera
 
-    if vision.CAMERA_BUFFER_SIZE > 0:
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, vision.CAMERA_BUFFER_SIZE)
-    if vision.CAMERA_FORCE_RESOLUTION:
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
-    cap.set(cv2.CAP_PROP_FPS, FPS)
+    cap = None
+    if current_stream_enabled:
+        cap = open_camera()
+        if cap is None:
+            print(f"[ERROR] Không thể mở Camera tại index {CAM_INDEX}!")
+            tb_client.stop()
+            sys.exit(1)
+    else:
+        print("[CAMERA] Camera đang TẮT (camera_enabled=False); không mở phần cứng camera.")
+
+    camera_off_frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
+    cv2.putText(camera_off_frame, "CAMERA OFF", (max(10, WIDTH // 2 - 120), HEIGHT // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (180, 180, 180), 2, cv2.LINE_AA)
 
     # 4. Khởi tạo Live Streamer (RTSP -> MediaMTX)
     streamer = RTSPStreamer(RTSP_URL, WIDTH, HEIGHT, FPS, enabled=STREAM_ENABLED)
@@ -351,6 +429,7 @@ def main(args=None):
     last_face_seen_time = 0.0
     last_active_track_id = None
     last_telemetry_time = 0.0
+    last_hw_telemetry_time = 0.0
     frame_id = 0
     last_submission_embedding = None
     previous_recognition_tracks = {}
@@ -366,6 +445,54 @@ def main(args=None):
                 attendance_latch = False
                 last_submission = None
                 last_mode_generation = mode_generation
+
+            # ── 0. Bật/Tắt camera phần cứng từ xa (camera_enabled) ───────────
+            if not current_stream_enabled:
+                if cap is not None:
+                    cap.release()
+                    cap = None
+                    print('[CAMERA] Đã TẮT camera phần cứng (ngừng lấy frame).')
+                    for track in previous_recognition_tracks.values():
+                        if getattr(track, 'recognition_eligible', False):
+                            track.verification_generation += 1
+                            track.invalidate_recognition()
+                            track.recognition_eligible = False
+                    previous_recognition_tracks = {}
+                    attendance_latch = False
+                    last_submission = None
+                    recognition_worker.retain(set())
+                    camera_failures = 0
+                    tb_client.send_telemetry({'ai_state': 'CAMERA_OFF', 'fps': 0.0, 'status': 'ONLINE',
+                                              'stream_enabled': False})
+                recognition_worker.poll()
+                now_idle = time.time()
+                if now_idle - last_hw_telemetry_time >= 10.0:
+                    tb_client.send_telemetry(get_hardware_telemetry({
+                        'volume': current_volume,
+                        'is_muted': current_is_muted,
+                        'show_fps': current_show_fps,
+                        'stream_enabled': False,
+                    }))
+                    last_hw_telemetry_time = now_idle
+                if now_idle - last_telemetry_time >= 5.0:
+                    tb_client.send_telemetry({'ai_state': 'CAMERA_OFF', 'fps': 0.0, 'status': 'ONLINE'})
+                    last_telemetry_time = now_idle
+                if tft_display.wants_frame():
+                    tft_display.show_frame(camera_off_frame)
+                time.sleep(0.2)
+                continue
+            if cap is None:
+                cap = open_camera()
+                if cap is None:
+                    camera_failures += 1
+                    if camera_failures == 1:
+                        print('[CAMERA] Không thể mở lại camera; sẽ thử lại.')
+                        tb_client.send_telemetry({'ai_state': 'CAMERA_ERROR', 'status': 'DEGRADED'})
+                    time.sleep(1.0)
+                    continue
+                camera_failures = 0
+                print('[CAMERA] Đã BẬT lại camera phần cứng.')
+
             ret, frame = cap.read()
             if not ret:
                 camera_failures += 1
@@ -393,7 +520,7 @@ def main(args=None):
             now_wall = time.time()
             now_mono = time.monotonic()
             tft_due = tft_display.wants_frame()
-            render_output = SHOW_GUI or STREAM_ENABLED or tft_due
+            render_output = SHOW_GUI or current_stream_enabled or tft_due
 
             # Heartbeat định kỳ 10 giây một lần gửi lên ThingsBoard
             if now_wall - last_hb_time >= 10.0:
@@ -445,6 +572,17 @@ def main(args=None):
                     "status": "ONLINE",
                 })
                 last_telemetry_time = now_wall
+
+            # ── 4.3. Đồng bộ Sức Khỏe Phần Cứng Pi 4 & Ngoại Vi (mỗi 10s non-blocking) ──
+            if now_wall - last_hw_telemetry_time >= 10.0:
+                hw_telemetry = get_hardware_telemetry({
+                    "volume": current_volume,
+                    "is_muted": current_is_muted,
+                    "show_fps": current_show_fps,
+                    "stream_enabled": current_stream_enabled,
+                })
+                tb_client.send_telemetry(hw_telemetry)
+                last_hw_telemetry_time = now_wall
 
             # ── 5. Detection Cadence + Tracking Stage (Chỉ chạy khi THỨC) ─────
             tracked = []
@@ -711,6 +849,18 @@ def main(args=None):
                     2,
                     cv2.LINE_AA
                 )
+                if current_show_fps:
+                    calc_fps = current_fps if current_fps > 0 else (fps_counter / max(0.1, (now_wall - last_hb_time)))
+                    cv2.putText(
+                        frame,
+                        f"{calc_fps:.1f} FPS",
+                        (WIDTH - 110, 24),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.55,
+                        (0, 255, 255),
+                        2,
+                        cv2.LINE_AA,
+                    )
 
             # Bottom Banner: Thông báo điểm danh vừa gửi thành công
             if render_output and status_banner and (now_wall - status_banner_time < 3.0):
@@ -766,7 +916,8 @@ def main(args=None):
     finally:
         stopped = recognition_worker.close()
         print(f"[Recognition worker] stopped={stopped}")
-        cap.release()
+        if cap is not None:
+            cap.release()
         if SHOW_GUI:
             try:
                 cv2.destroyAllWindows()

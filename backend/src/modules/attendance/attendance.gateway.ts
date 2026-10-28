@@ -80,3 +80,7 @@ eventBus.subscribe('attendance:unknown', (data) => {
 eventBus.subscribe('device:mode-updated', (data) => {
   emitAttendanceEvent('device-mode-changed', data)
 })
+
+eventBus.subscribe('device:settings-updated', (data) => {
+  emitAttendanceEvent('device-settings-changed', data)
+})

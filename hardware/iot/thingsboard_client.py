@@ -12,10 +12,20 @@ from typing import Callable, Optional
 class ThingsBoardClient:
     def __init__(self, host: str, port: int, token: str, device_id='PI4_FRONT_GATE',
                  initial_mode='CHECK_IN', on_mode_change: Optional[Callable] = None,
-                 on_attendance_result: Optional[Callable] = None):
+                 on_attendance_result: Optional[Callable] = None,
+                 initial_volume: int = 75, initial_show_fps: bool = True,
+                 initial_stream_enabled: bool = True,
+                 on_settings_change: Optional[Callable] = None,
+                 on_action_request: Optional[Callable] = None):
         self.host, self.port, self.token, self.device_id = host, port, token, device_id
         self.current_mode = initial_mode
         self.on_mode_change, self.on_attendance_result = on_mode_change, on_attendance_result
+        self.volume = max(0, min(100, int(initial_volume)))
+        self.is_muted = False
+        self.show_fps = bool(initial_show_fps)
+        self.stream_enabled = bool(initial_stream_enabled)
+        self.on_settings_change = on_settings_change
+        self.on_action_request = on_action_request
         # TB RPC protobuf requestId is int32. UUID event_id provides durable correlation.
         self._rpc_request_id = uuid.uuid4().int % (2 ** 30)
         self._pending_rpc_callbacks = {}
@@ -55,7 +65,7 @@ class ThingsBoardClient:
         print(f"[MQTT] [OK] Đã kết nối thành công ThingsBoard broker tại {self.host}:{self.port}")
         for topic in ['attributes', 'attributes/response/+', 'rpc/request/+', 'rpc/response/+']:
             client.subscribe(f'v1/devices/me/{topic}', qos=1)
-        client.publish('v1/devices/me/attributes/request/1', json.dumps({'sharedKeys': 'attendance_mode,mode_changed_at'}), qos=1)
+        client.publish('v1/devices/me/attributes/request/1', json.dumps({'sharedKeys': 'attendance_mode,mode_changed_at,volume,is_muted,show_fps,stream_enabled'}), qos=1)
 
     def on_disconnect(self, client, userdata, flags_or_rc, *args):
         self.connected = False
@@ -79,6 +89,50 @@ class ThingsBoardClient:
             self.notify_backend_mode(mode)
         return True
 
+    def set_volume(self, volume: int):
+        vol = max(0, min(100, int(volume)))
+        changed = self.volume != vol
+        self.volume = vol
+        if changed:
+            if self.on_settings_change:
+                self.on_settings_change({'volume': self.volume})
+            self.send_telemetry({'volume': self.volume})
+            self.notify_backend_settings({'volume': self.volume})
+        return self.volume
+
+    def set_mute(self, is_muted: bool):
+        val = bool(is_muted)
+        changed = self.is_muted != val
+        self.is_muted = val
+        if changed:
+            if self.on_settings_change:
+                self.on_settings_change({'is_muted': self.is_muted})
+            self.send_telemetry({'is_muted': self.is_muted})
+            self.notify_backend_settings({'is_muted': self.is_muted})
+        return self.is_muted
+
+    def set_show_fps(self, show_fps: bool):
+        val = bool(show_fps)
+        changed = self.show_fps != val
+        self.show_fps = val
+        if changed:
+            if self.on_settings_change:
+                self.on_settings_change({'show_fps': self.show_fps})
+            self.send_telemetry({'show_fps': self.show_fps})
+            self.notify_backend_settings({'show_fps': self.show_fps})
+        return self.show_fps
+
+    def set_stream_enabled(self, stream_enabled: bool):
+        val = bool(stream_enabled)
+        changed = self.stream_enabled != val
+        self.stream_enabled = val
+        if changed:
+            if self.on_settings_change:
+                self.on_settings_change({'stream_enabled': self.stream_enabled})
+            self.send_telemetry({'stream_enabled': self.stream_enabled})
+            self.notify_backend_settings({'stream_enabled': self.stream_enabled})
+        return self.stream_enabled
+
     def on_message(self, client, userdata, msg):
         try:
             payload = json.loads(msg.payload.decode('utf-8'))
@@ -101,8 +155,60 @@ class ThingsBoardClient:
                         response = {'error': 'invalid_mode'}
                     else:
                         response = self.current_mode == 'CHECK_IN'
+                elif method == 'setVolume':
+                    vol = params if isinstance(params, (int, float)) else (params.get('volume', 75) if isinstance(params, dict) else 75)
+                    self.set_volume(int(vol))
+                    response = {'success': True, 'volume': self.volume}
+                elif method == 'setShowFps':
+                    val = params if isinstance(params, bool) else (params.get('show_fps', True) if isinstance(params, dict) else True)
+                    self.set_show_fps(bool(val))
+                    response = {'success': True, 'show_fps': self.show_fps}
+                elif method == 'setStreamEnabled':
+                    val = params if isinstance(params, bool) else (params.get('stream_enabled', True) if isinstance(params, dict) else True)
+                    self.set_stream_enabled(bool(val))
+                    response = {'success': True, 'stream_enabled': self.stream_enabled}
+                elif method == 'playTestSound':
+                    if self.on_action_request:
+                        response = self.on_action_request('playTestSound', params or {})
+                    else:
+                        try:
+                            from peripherals import AudioManager
+                            mgr = AudioManager(self.volume, self.is_muted)
+                            mgr.play_test_sound()
+                            response = {'success': True, 'message': 'Chime played'}
+                        except Exception as e:
+                            response = {'success': True, 'message': f'Chime fallback: {e}'}
+                elif method == 'scanWifi':
+                    if self.on_action_request:
+                        response = self.on_action_request('scanWifi', params or {})
+                    else:
+                        response = []
+                elif method == 'scanBluetooth':
+                    if self.on_action_request:
+                        response = self.on_action_request('scanBluetooth', params or {})
+                    else:
+                        response = []
+                elif method == 'reconnectBluetooth':
+                    if self.on_action_request:
+                        response = self.on_action_request('reconnectBluetooth', params or {})
+                    else:
+                        response = {'connected': False, 'deviceName': '', 'status': 'disconnected'}
+                elif method == 'connectBluetooth':
+                    target_name = params.get('name', '') if isinstance(params, dict) else ''
+                    target_addr = params.get('address', '') if isinstance(params, dict) else ''
+                    if self.on_action_request:
+                        response = self.on_action_request('connectBluetooth', params or {})
+                    else:
+                        response = {'connected': False, 'deviceName': target_name, 'address': target_addr, 'status': 'disconnected'}
+                elif method == 'getSettings':
+                    response = {
+                        'volume': self.volume,
+                        'is_muted': self.is_muted,
+                        'show_fps': self.show_fps,
+                        'stream_enabled': self.stream_enabled,
+                    }
                 else:
-                    response = {'error': 'unknown_method'}
+                    response = {'error': f'unknown_method: {method}'}
                 client.publish(f'v1/devices/me/rpc/response/{request_id}', json.dumps(response), qos=1)
             elif isinstance(payload, dict):
                 shared = payload.get('shared', payload)
@@ -110,8 +216,51 @@ class ThingsBoardClient:
                 if mode:
                     # A legacy unversioned shared value cannot override a newer RPC.
                     self.set_mode(mode, shared.get('mode_changed_at') or 1)
+
+                # Cập nhật các thuộc tính cấu hình từ Shared Attributes
+                updated = {}
+                if 'volume' in shared:
+                    self.volume = max(0, min(100, int(shared['volume'])))
+                    updated['volume'] = self.volume
+                if 'is_muted' in shared:
+                    self.is_muted = bool(shared['is_muted'])
+                    updated['is_muted'] = self.is_muted
+                if 'show_fps' in shared:
+                    self.show_fps = bool(shared['show_fps'])
+                    updated['show_fps'] = self.show_fps
+                if 'stream_enabled' in shared:
+                    self.stream_enabled = bool(shared['stream_enabled'])
+                    updated['stream_enabled'] = self.stream_enabled
+
+                if updated and self.on_settings_change:
+                    try:
+                        self.on_settings_change(updated)
+                    except Exception as exc:
+                        print(f'[MQTT] Lỗi callback on_settings_change: {exc}')
         except (ValueError, TypeError, AttributeError) as exc:
             print(f'[MQTT] Payload không hợp lệ: {exc}')
+
+    def notify_backend_settings(self, patch: dict):
+        """Đồng bộ trạng thái cài đặt phần cứng Pi tới Web Backend theo thời gian thực."""
+        base, secret = os.getenv('BACKEND_BASE_URL', '').rstrip('/'), os.getenv('TB_WEBHOOK_SECRET', '')
+        if not base:
+            return
+        def notify():
+            import urllib.request
+            try:
+                headers = {'Content-Type': 'application/json'}
+                if secret:
+                    headers['X-TB-Webhook-Secret'] = secret
+                req = urllib.request.Request(
+                    f'{base}/api/devices/{self.device_id}/settings-notify',
+                    data=json.dumps(patch).encode(),
+                    headers=headers
+                )
+                with urllib.request.urlopen(req, timeout=3) as response:
+                    response.read()
+            except Exception as exc:
+                print(f'[MQTT] Chưa đồng bộ settings tới web: {exc}')
+        threading.Thread(target=notify, daemon=True).start()
 
     def notify_backend_mode(self, mode):
         """Optional asynchronous relay. Prefer ThingsBoard's authenticated rule-chain relay."""

@@ -7,6 +7,7 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
+import { QuickSettingsMenu } from './QuickSettingsMenu';
 
 interface TopbarProps {
   onToggleSidebar: () => void;
@@ -50,7 +51,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
         </span>
       </div>
 
-      {/* Right section: Theme Switcher, Profile & Logout */}
+      {/* Right section: Theme Switcher, Quick Settings & Profile */}
       <div className="flex items-center gap-3 sm:gap-4">
         {/* Modern Theme Switch Button */}
         <button
@@ -71,6 +72,9 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleSidebar }) => {
             </>
           )}
         </button>
+
+        {/* Ubuntu GNOME Quick Settings Menu */}
+        <QuickSettingsMenu />
       </div>
     </header>
   );

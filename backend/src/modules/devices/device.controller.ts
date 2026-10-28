@@ -66,3 +66,50 @@ export const getMode = async (req: Request, res: Response) => {
   const result = await service.getDeviceMode(String(req.params.id));
   successResponse(res, result);
 };
+
+export const settingsNotify = async (req: Request, res: Response) => {
+  if (process.env.TB_WEBHOOK_SECRET) {
+    assertDeviceWebhook(req);
+  }
+  const updated = service.recordDeviceSettingsNotify(String(req.params.id), req.body);
+  eventBus.publish('device:settings-updated', updated);
+  successResponse(res, updated, 'Device settings notification received');
+};
+
+export const getSettings = async (req: Request, res: Response) => {
+  const result = await service.getDeviceSettings(String(req.params.id));
+  successResponse(res, result);
+};
+
+export const updateSettings = async (req: Request, res: Response) => {
+  const result = await service.updateDeviceSettings(String(req.params.id), req.body);
+  eventBus.publish('device:settings-updated', result);
+  successResponse(res, result, 'Cài đặt thiết bị đã được cập nhật');
+};
+
+export const testAudio = async (req: Request, res: Response) => {
+  const result = await service.triggerDeviceAction(String(req.params.id), 'test-audio', req.body);
+  successResponse(res, result, 'Lệnh phát âm thanh thử nghiệm đã được gửi');
+};
+
+export const scanWifi = async (req: Request, res: Response) => {
+  const result = await service.triggerDeviceAction(String(req.params.id), 'scan-wifi', req.body);
+  successResponse(res, result.data, result.message);
+};
+
+export const scanBluetooth = async (req: Request, res: Response) => {
+  const result = await service.triggerDeviceAction(String(req.params.id), 'scan-bluetooth', req.body);
+  successResponse(res, result.data, result.message);
+};
+
+export const reconnectBluetooth = async (req: Request, res: Response) => {
+  const result = await service.triggerDeviceAction(String(req.params.id), 'bluetooth-reconnect', req.body);
+  eventBus.publish('device:settings-updated', await service.getDeviceSettings(String(req.params.id)));
+  successResponse(res, result.data, result.message);
+};
+
+export const connectBluetooth = async (req: Request, res: Response) => {
+  const result = await service.triggerDeviceAction(String(req.params.id), 'bluetooth-connect', req.body);
+  eventBus.publish('device:settings-updated', await service.getDeviceSettings(String(req.params.id)));
+  successResponse(res, result.data, result.message);
+};

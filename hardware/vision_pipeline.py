@@ -137,7 +137,10 @@ def update_track_pad(
 
     for (detection, track, crop_bbox), res in zip(due, results):
         score = float(res.get("pad_score", res.get("logit_diff")))
-        track.update_pad(res["is_real"], score, res.get("threshold_logit"))
+        try:
+            track.update_pad(res["is_real"], score, res.get("threshold_logit"))
+        except TypeError:
+            track.update_pad(res["is_real"], score)
         if diagnostic_log:
             exp_score = math.exp(-abs(score))
             p_real = 1.0 / (1.0 + exp_score) if score >= 0 else exp_score / (1.0 + exp_score)

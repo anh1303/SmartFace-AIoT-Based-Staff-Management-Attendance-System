@@ -49,6 +49,7 @@ class RTSPStreamer:
             "-b:v", "800k",
             "-f", "rtsp",
             "-rtsp_transport", "tcp",
+            "-stimeout", "5000000",
             self.rtsp_url
         ]
         try:
@@ -146,6 +147,21 @@ class RTSPStreamer:
                         pass
             if stderr_msg:
                 print(f"[STREAM ERROR] Chi tiết FFmpeg: {stderr_msg}")
+
+    def set_enabled(self, enabled: bool):
+        """Kích hoạt hoặc tạm dừng luồng RTSP từ xa."""
+        if self.enabled == enabled:
+            return
+        self.enabled = enabled
+        if not enabled:
+            print("[STREAM] Tạm dừng luồng RTSP (stream_enabled=False).")
+            self._close_process()
+        else:
+            print("[STREAM] Kích hoạt lại luồng RTSP (stream_enabled=True).")
+            if self._worker is None or not self._worker.is_alive():
+                self._stop.clear()
+                self._worker = threading.Thread(target=self._run, daemon=True)
+                self._worker.start()
 
     def stop(self):
         self._stop.set()

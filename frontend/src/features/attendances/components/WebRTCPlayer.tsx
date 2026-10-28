@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { apiFetch } from '../../../api/client';
+import { useDeviceSettings } from '../hooks/useDeviceSettings';
 
 interface WebRTCPlayerProps {
   streamUrl?: string; // e.g. http://10.52.138.36:8889/pi4_cam/whep
@@ -27,6 +28,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   onModeChange,
   showToast,
 }) => {
+  const { settings, toggleStream } = useDeviceSettings(deviceId);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -240,11 +242,15 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   }, [streamUrl, stopConnection]);
 
   useEffect(() => {
-    startConnection();
+    if (settings.streamEnabled) {
+      startConnection();
+    } else {
+      stopConnection();
+    }
     return () => {
       stopConnection();
     };
-  }, [startConnection, stopConnection]);
+  }, [settings.streamEnabled, startConnection, stopConnection]);
 
   const handleToggleFullscreen = () => {
     if (!containerRef.current) return;
@@ -291,7 +297,9 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
         <div className="flex items-center gap-2.5">
           <span className="flex h-3 w-3 relative">
-            {isLive ? (
+            {!settings.streamEnabled ? (
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500/70" />
+            ) : isLive ? (
               <>
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
@@ -301,8 +309,18 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
             )}
           </span>
           <span className="text-xs font-semibold tracking-wide text-white uppercase flex items-center gap-1.5">
-            <Radio className={`w-3.5 h-3.5 ${isLive ? 'text-emerald-400' : 'text-slate-400'}`} />
-            {isLive ? 'LIVE WEBRTC' : isConnecting ? 'CONNECTING...' : 'OFFLINE'}
+            <Radio
+              className={`w-3.5 h-3.5 ${
+                !settings.streamEnabled ? 'text-purple-400' : isLive ? 'text-emerald-400' : 'text-slate-400'
+              }`}
+            />
+            {!settings.streamEnabled
+              ? 'CAMERA TẮT'
+              : isLive
+              ? 'LIVE WEBRTC'
+              : isConnecting
+              ? 'CONNECTING...'
+              : 'OFFLINE'}
           </span>
           <span className="hidden sm:inline-block text-xs text-slate-300/80 font-mono">
             | {deviceName}
@@ -369,8 +387,25 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
           }`}
         />
 
-        {/* Offline / Connecting / Error State Overlay */}
-        {!isLive && (
+        {/* Stream Paused Standby Overlay */}
+        {!settings.streamEnabled ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-950/95 z-20 animate-in fade-in duration-200">
+            <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mb-3.5 shadow-lg shadow-purple-950/50">
+              <VideoOff className="w-7 h-7 text-purple-400" />
+            </div>
+            <h4 className="text-sm sm:text-base font-bold text-white mb-1">Camera Kiosk Đã Tắt</h4>
+            <p className="text-xs text-slate-400 max-w-sm mb-4 leading-relaxed">
+              Camera phần cứng trên Kiosk đã được tắt hoàn toàn (không lấy hình, không phát luồng video). Nhận diện khuôn mặt và điểm danh tạm ngừng cho đến khi bạn bật lại camera.
+            </p>
+            <button
+              type="button"
+              onClick={toggleStream}
+              className="px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 hover:bg-purple-500 text-white transition-all shadow-md shadow-purple-600/30 flex items-center gap-2 cursor-pointer"
+            >
+              <Video className="w-4 h-4" /> Bật lại Camera
+            </button>
+          </div>
+        ) : !isLive ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-950/90 z-10">
             {isConnecting ? (
               <>
@@ -397,7 +432,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
               </>
             )}
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Bottom Info Footer */}
@@ -405,7 +440,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5 font-medium text-slate-300">
             <Video className="w-3.5 h-3.5 text-blue-400" />
-            Kênh: <span className="text-emerald-400 font-mono">WebRTC WHEP ({iceState.toUpperCase()})</span>
+            Kênh: <span className="text-emerald-400 font-mono">{!settings.streamEnabled ? 'STREAM PAUSED' : `WebRTC WHEP (${iceState.toUpperCase()})`}</span>
           </span>
           <span className="hidden md:inline-block">|</span>
           <span className="hidden md:flex items-center gap-1.5">

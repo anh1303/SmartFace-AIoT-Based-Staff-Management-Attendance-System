@@ -1,0 +1,549 @@
+{
+  "version": "2026-10-26-v5",
+  "updated": "26/10/2026",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "sections": [
+    {
+      "id": "dieu-1",
+      "title": "1. Lịch làm việc",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Mỗi nhân viên được phân ca làm việc hoặc ngày nghỉ cho từng ngày. Bạn có thể xem lịch được phân trong tài khoản của mình."
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Loại ca",
+              "Bắt đầu",
+              "Kết thúc"
+            ],
+            [
+              "Hành chính",
+              "08:00",
+              "17:30"
+            ],
+            [
+              "Ca sáng",
+              "08:30",
+              "17:30"
+            ],
+            [
+              "Ca chiều",
+              "13:00",
+              "21:30"
+            ],
+            [
+              "Ngày nghỉ",
+              "Không tự tính công",
+              "Không tự tính tăng ca"
+            ]
+          ]
+        },
+        {
+          "type": "list",
+          "items": [
+            "Thời gian được trả lương bắt đầu từ giờ vào ca. Đến sớm không tự làm tăng công được trả.",
+            "Không tự khấu trừ một khoảng nghỉ trưa cố định. Thời gian giữa lượt vào và lượt ra hợp lệ được ghi nhận liên tục.",
+            "Nếu đã ra ngoài rồi quay lại, khoảng ở ngoài không phải thời gian làm việc thực tế và không bị tính thành khoản phạt giữa ca.",
+            "Ca kết thúc vào ngày hôm sau vẫn được theo dõi theo ngày bắt đầu ca. Ca chưa kết thúc chưa được kết luận là vắng."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dieu-2",
+      "title": "2. Ghi nhận lượt vào và lượt ra",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Mỗi lần chấm công cần thể hiện rõ là vào ca hay ra ca. Các lượt ghi nhận được sắp theo thời điểm thực tế để đối chiếu."
+        },
+        {
+          "type": "heading",
+          "text": "Cách xác định một lần làm việc"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Một lượt vào được ghép với lượt ra liền sau đó. Nếu có hai lượt vào liên tiếp, lượt vào sau được dùng để ghép; lượt trước vẫn được giữ để tra cứu.",
+            "Hai lượt ra liên tiếp không kéo dài lần làm việc đã kết thúc. Lượt ra không có lượt vào tương ứng chưa tạo thành thời gian được tính công.",
+            "Lượt ra phải sau lượt vào và cách nhau không quá 24 giờ. Đúng 24 giờ vẫn được xem xét; dài hơn 24 giờ cần xác minh.",
+            "Lượt bị đánh dấu không hợp lệ sẽ ngắt lần chờ ghép. Không tự điền giờ còn thiếu bằng giờ làm việc trong lịch."
+          ]
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Ví dụ ghi nhận",
+              "Cách đối chiếu"
+            ],
+            [
+              "Vào 08:00 → ra 12:00 → vào 13:00 → ra 17:30",
+              "Có hai khoảng làm việc. Không tính khoảng 12:00–13:00 là thời gian thực tế."
+            ],
+            [
+              "Vào 08:00 → vào 09:00 → ra 17:30",
+              "Ghép 09:00–17:30. Lượt vào 08:00 vẫn được lưu."
+            ],
+            [
+              "Vào 08:00 → ra 17:30 → ra 19:00",
+              "Ghép 08:00–17:30. Lượt ra 19:00 không tự tạo tăng ca."
+            ]
+          ]
+        },
+        {
+          "type": "heading",
+          "text": "Ca qua đêm và lượt ghi nhận còn thiếu"
+        },
+        {
+          "type": "paragraph",
+          "text": "Ca qua đêm được tính theo ngày bắt đầu ca, kể cả khi lượt ra nằm ở ngày hoặc tháng tiếp theo. Một khoảng làm việc chỉ được tính một lần, vào một ngày công và một kỳ lương."
+        },
+        {
+          "type": "paragraph",
+          "text": "Khi thiếu lượt vào, thiếu lượt ra hoặc có ghi nhận bất thường, quản lý cần đối chiếu trước khi kết luận. Tất cả lượt quét ban đầu vẫn được giữ, kể cả ngày nghỉ và lượt không được dùng để tính công."
+        },
+        {
+          "type": "paragraph",
+          "text": "Trong lịch sử chấm công, bạn có thể xem tất cả lượt quét, chỉ các lượt đã ghép cặp hợp lệ hoặc chỉ các lượt đủ điều kiện tính công. Ghép cặp hợp lệ chưa đồng nghĩa đã được trả công."
+        }
+      ]
+    },
+    {
+      "id": "dieu-3",
+      "title": "3. Công thường và điều kiện nửa ca",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Cần phân biệt thời gian thực tế bạn có mặt trong ca với số giờ công được trả. Điều kiện nửa ca được xét trên tổng thời gian thực tế của các khoảng vào–ra hợp lệ trong cùng ca."
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Thời gian thực tế trong ca",
+              "Cách xử lý"
+            ],
+            [
+              "Từ một nửa độ dài ca trở lên",
+              "Được ghi công cả ca theo quy tắc làm tròn. Sau đó mới xét đề xuất tăng ca và phạt trễ/sớm."
+            ],
+            [
+              "Dưới một nửa độ dài ca",
+              "Không tự ghi công thường, tăng ca hoặc giờ phạt trễ/sớm. Cần xác minh; không tự coi là vắng hoàn toàn."
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Ví dụ ca hành chính 08:00–17:30 dài 9,5 giờ, ngưỡng nửa ca là 4 giờ 45 phút. Làm thực tế từ 08:00–12:00 và 13:00–17:30 được 8,5 giờ, đủ điều kiện nhận 9,5 giờ công. Khoảng ra ngoài giữa ca không bị tính thành khoản phạt riêng."
+        },
+        {
+          "type": "paragraph",
+          "text": "Một khoảng làm việc 09:00–16:30 có 7,5 giờ thực tế nên vẫn đủ điều kiện nhận 9,5 giờ công. Giờ đi trễ và về sớm được xem xét thành khoản riêng; chỉ khấu trừ khi đã được duyệt."
+        },
+        {
+          "type": "heading",
+          "text": "Ngày nghỉ, chưa phân ca và thiếu lượt quét"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Ngày nghỉ vẫn lưu đủ các lượt vào/ra nhưng không tự tính công, tăng ca hoặc phạt vắng. Người có quyền có thể đề xuất tăng ca thủ công kèm lý do.",
+            "Ngày chưa phân ca không tự được trả công hoặc phát sinh khoản phạt vắng. Quản lý cần kiểm tra, phân ca hoặc điều chỉnh có lý do.",
+            "Có lượt quét nhưng thiếu, không hợp lệ hoặc dưới nửa ca thì phải xác minh. Không tự chuyển thành một ngày vắng hoàn toàn."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dieu-4",
+      "title": "4. Làm tròn giờ công",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Công thường, tăng ca và giờ trễ/sớm cùng áp dụng cách làm tròn theo nửa giờ. Cộng các khoảng hợp lệ trong cùng ngày trước, rồi mới làm tròn một lần."
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Phần phút lẻ",
+              "Cách tính"
+            ],
+            [
+              "Dưới 30 phút",
+              "Bỏ phần phút lẻ."
+            ],
+            [
+              "Từ 30 đến dưới 60 phút",
+              "Tính thêm 0,5 giờ."
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Đúng 45 phút vẫn tính 0,5 giờ, không làm tròn lên 1 giờ. Tổng công tháng là tổng các giờ đã tính của từng ngày."
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Thời gian trước làm tròn",
+              "Giờ được tính"
+            ],
+            [
+              "29 phút 59 giây",
+              "0 giờ"
+            ],
+            [
+              "30 phút",
+              "0,5 giờ"
+            ],
+            [
+              "45 phút",
+              "0,5 giờ"
+            ],
+            [
+              "1 giờ 45 phút",
+              "1,5 giờ"
+            ],
+            [
+              "9 giờ 30 phút",
+              "9,5 giờ"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Ca 08:00–17:30 đi đủ ca được tính 9,5 giờ công thường; 20 ca như vậy là 190 giờ. Không làm tròn từng cặp riêng rồi cộng lại."
+        },
+        {
+          "type": "paragraph",
+          "text": "Điều kiện được đề xuất tăng ca được xét trước bước làm tròn. Vì vậy, đúng 30 phút tăng ca vẫn chưa đủ điều kiện tự đề xuất."
+        }
+      ]
+    },
+    {
+      "id": "dieu-5",
+      "title": "5. Làm thêm giờ và xét duyệt tăng ca",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Tăng ca chỉ được tự đề xuất khi nhân viên có ca làm, có khoảng vào–ra hợp lệ, thực tế trong ca đạt ít nhất nửa ca và thời gian thực sự làm sau khi ca kết thúc trên 30 phút."
+        },
+        {
+          "type": "list",
+          "items": [
+            "Đúng 30 phút sau ca: không tự đề xuất tăng ca.",
+            "Trên 30 phút: lấy toàn bộ thời gian tăng ca để làm tròn, không trừ 30 phút đầu.",
+            "Đến sớm và khoảng đã ra ngoài không được cộng thành tăng ca.",
+            "Trên 4 giờ tăng ca thực tế cần được rà soát; không tự cắt bỏ phần vượt 4 giờ."
+          ]
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Ví dụ với ca kết thúc 17:30",
+              "Đề xuất tăng ca"
+            ],
+            [
+              "Ra lúc 18:00",
+              "Không tự đề xuất vì chỉ đúng 30 phút."
+            ],
+            [
+              "Ra lúc 18:10",
+              "40 phút được làm tròn thành 0,5 giờ, chờ duyệt."
+            ],
+            [
+              "Ra lúc 21:30",
+              "4 giờ, chờ duyệt."
+            ],
+            [
+              "Ra lúc 21:31",
+              "4 giờ sau làm tròn, đồng thời cần rà soát vì thực tế đã vượt 4 giờ."
+            ]
+          ]
+        },
+        {
+          "type": "heading",
+          "text": "Quyết định theo từng ngày"
+        },
+        {
+          "type": "paragraph",
+          "text": "Mỗi khoản tăng ca được xem xét riêng cho đúng nhân viên và ngày làm việc. Chỉ giờ đã duyệt mới được cộng tiền lương. Khoản chờ duyệt chưa được trả và sẽ ngăn chốt kỳ."
+        },
+        {
+          "type": "paragraph",
+          "text": "Khi cần sửa số giờ đề xuất để xử lý thiếu lượt quét hoặc sự cố, người có quyền phải nêu lý do. Việc sửa đề xuất không thay thế bước phê duyệt. Ghi chú cho một quyết định duyệt hoặc không duyệt thông thường là tùy chọn."
+        },
+        {
+          "type": "paragraph",
+          "text": "Nếu lượt quét hoặc ca làm dùng làm căn cứ thay đổi, khoản liên quan phải được xét lại. Đưa đề xuất về 0 nghĩa là khoản không còn phát sinh; khác với việc không duyệt một khoản vẫn còn phát sinh."
+        }
+      ]
+    },
+    {
+      "id": "dieu-6",
+      "title": "6. Đi trễ, về sớm và vắng ca",
+      "blocks": [
+        {
+          "type": "heading",
+          "text": "Đi trễ và về sớm"
+        },
+        {
+          "type": "paragraph",
+          "text": "Khi ngày làm việc đã đạt điều kiện nửa ca, giờ trễ được tính từ giờ bắt đầu ca đến lượt vào đầu tiên trong các cặp hợp lệ; giờ về sớm được tính từ lượt ra cuối cùng có ghép cặp đến giờ kết thúc ca. Cộng hai phần này rồi áp dụng quy tắc làm tròn."
+        },
+        {
+          "type": "list",
+          "items": [
+            "Đến sau giờ bắt đầu ca trên 15 phút được hiển thị là đi trễ. Nhãn đi trễ không đồng nghĩa đã có tiền phạt.",
+            "Trễ 20 phút có nhãn đi trễ nhưng giờ phạt sau làm tròn là 0. Trễ 30 phút đề xuất 0,5 giờ.",
+            "Trễ 20 phút và về sớm 20 phút đề xuất tổng 0,5 giờ. Các ví dụ chỉ áp dụng khi đã đạt nửa ca.",
+            "Khoảng ra ngoài rồi quay lại giữa ca không bị tính thành khoản phạt. Khoản trễ/sớm chỉ khấu trừ khi được duyệt."
+          ]
+        },
+        {
+          "type": "heading",
+          "text": "Vắng ca"
+        },
+        {
+          "type": "paragraph",
+          "text": "Chỉ đề xuất phạt vắng khi ca làm có thời lượng dương đã kết thúc, không phải ngày nghỉ, hoàn toàn không có lượt ghi nhận thuộc ngày ca và không có vấn đề thiếu lượt cần xác minh. Ca tương lai hoặc ca đêm chưa kết thúc chưa bị kết luận vắng."
+        },
+        {
+          "type": "paragraph",
+          "text": "Mức đề xuất mặc định bằng 25% tiền công của ca vắng, tính theo độ dài ca chính xác và lương giờ của nhân viên. Quản trị viên có thể điều chỉnh tỷ lệ theo chính sách áp dụng."
+        },
+        {
+          "type": "paragraph",
+          "text": "Ví dụ ca 8 giờ, lương 100.000₫/giờ: khoản phạt vắng đề xuất là 200.000₫. Khoản này vẫn phải được duyệt riêng; chưa duyệt hoặc không duyệt thì chưa khấu trừ."
+        },
+        {
+          "type": "paragraph",
+          "text": "Nghỉ có phép được xem xét bằng quyết định không duyệt khoản phạt và có thể ghi chú lý do. Có lượt quét thiếu, không hợp lệ hoặc làm dưới nửa ca thì cần xác minh, không tự áp phạt vắng."
+        }
+      ]
+    },
+    {
+      "id": "dieu-7",
+      "title": "7. Lương, phụ cấp và các khoản điều chỉnh",
+      "blocks": [
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Thành phần",
+              "Mức áp dụng trong phiên bản này"
+            ],
+            [
+              "Lương thường",
+              "Theo lương giờ trong hồ sơ từng nhân viên."
+            ],
+            [
+              "Tăng ca đã duyệt",
+              "100.000₫ cho mỗi giờ; không nhân thêm lương giờ thường."
+            ],
+            [
+              "Phạt trễ/sớm đã duyệt",
+              "50.000₫ cho mỗi giờ được duyệt."
+            ],
+            [
+              "Phạt vắng đã duyệt",
+              "Mặc định 25% tiền công ca vắng."
+            ],
+            [
+              "Phụ cấp trên phiếu mới",
+              "1.500.000₫ mỗi kỳ."
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Phụ cấp được cấp theo kỳ, không tự phân bổ theo số ngày hoặc giờ làm. Phiếu có 0 giờ thường vẫn có thể có phụ cấp. Khi tính lại một phiếu đã có, giữ số phụ cấp đã lưu, kể cả khi bằng 0."
+        },
+        {
+          "type": "heading",
+          "text": "Cách tổng hợp tiền lương"
+        },
+        {
+          "type": "paragraph",
+          "text": "Tiền lương bằng tiền công thường cộng tiền tăng ca đã duyệt, trừ phạt trễ/sớm và phạt vắng đã duyệt, rồi cộng phụ cấp. Kết quả được làm tròn đến đồng và không nhỏ hơn 0."
+        },
+        {
+          "type": "paragraph",
+          "text": "Tăng ca không nằm trong số giờ công thường. Không cộng lặp tiền công cho cùng một khoảng thời gian. Các giờ công, đơn giá và phụ cấp phải là số hợp lệ, không âm."
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Ví dụ một kỳ lương",
+              "Số tiền"
+            ],
+            [
+              "9 giờ thường × 100.000₫",
+              "900.000₫"
+            ],
+            [
+              "2 giờ tăng ca đã duyệt × 100.000₫",
+              "+200.000₫"
+            ],
+            [
+              "1 giờ trễ/sớm đã duyệt × 50.000₫",
+              "−50.000₫"
+            ],
+            [
+              "Phụ cấp",
+              "+1.500.000₫"
+            ],
+            [
+              "Thành tiền",
+              "2.550.000₫"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Nếu 2 giờ tăng ca còn chờ duyệt, chưa cộng 200.000₫ và kỳ chưa được chốt. Nếu có thêm khoản vắng ca 200.000₫ đã duyệt, khấu trừ riêng khoản này."
+        },
+        {
+          "type": "paragraph",
+          "text": "Phiếu lịch sử áp dụng đơn giá đã được lưu trên chính phiếu đó. Thay đổi chính sách mới không tự đổi đơn giá của phiếu cũ. Một số phiếu lịch sử có thể dùng hệ số lương thay cho mức tiền cố định."
+        },
+        {
+          "type": "paragraph",
+          "text": "Cách tính nêu trên chưa bao gồm thuế thu nhập, bảo hiểm hoặc các khoản khấu trừ khác ngoài phạm vi chính sách này. Phiếu đã chốt không đồng nghĩa tiền đã được chuyển."
+        }
+      ]
+    },
+    {
+      "id": "dieu-8",
+      "title": "8. Quyền và trách nhiệm của từng vai trò",
+      "blocks": [
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Vai trò",
+              "Phạm vi công việc"
+            ],
+            [
+              "Nhân viên",
+              "Xem lịch, chấm công và phiếu lương của mình. Không tự duyệt tăng ca, khoản phạt hoặc chốt lương."
+            ],
+            [
+              "Quản lý",
+              "Xử lý ca, công và các khoản cần duyệt của nhân viên thuộc phạm vi phụ trách. Không tự sửa hoặc duyệt dữ liệu kiểm soát của mình; không sửa dữ liệu của quản lý khác."
+            ],
+            [
+              "Quản trị viên",
+              "Quản lý nhân sự, chính sách đơn giá và dữ liệu công/lương trong toàn hệ thống; mở khóa kỳ đủ điều kiện để xử lý."
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Quản lý cần được gắn phòng ban để xem và duyệt sổ khoản tăng ca/phạt của nhân viên phụ trách. Phiếu và khoản cần xử lý của chính quản lý được chuyển cho quản trị viên."
+        },
+        {
+          "type": "paragraph",
+          "text": "Các thao tác cho nhiều người vẫn phải tuân thủ phạm vi quyền như khi xử lý từng người. Không được dùng thao tác hàng loạt để vượt giới hạn quyền."
+        },
+        {
+          "type": "paragraph",
+          "text": "Điểm danh thủ công phải được phân biệt với điểm danh bằng khuôn mặt. Mọi điều chỉnh giờ công, tăng ca hoặc khoản phạt cần có căn cứ; trường hợp sửa số giờ phải ghi lý do."
+        }
+      ]
+    },
+    {
+      "id": "dieu-9",
+      "title": "9. Xác minh, khóa ngày công và chốt lương",
+      "blocks": [
+        {
+          "type": "heading",
+          "text": "Khi nào cần xác minh?"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Có lượt vào chưa có lượt ra, lượt ra lẻ, thời gian ghép vượt 24 giờ hoặc không tạo được thời lượng hợp lệ.",
+            "Có lượt ghi nhận bất thường, chưa phân ca, thời gian thực tế dưới nửa ca hoặc tăng ca thực tế trên 4 giờ.",
+            "Ca làm hoặc lượt chấm công thay đổi sau khi đã xét duyệt.",
+            "Chưa đủ căn cứ để xác định chính sách đã áp dụng cho dữ liệu cũ."
+          ]
+        },
+        {
+          "type": "heading",
+          "text": "Khóa ngày công"
+        },
+        {
+          "type": "paragraph",
+          "text": "Chỉ khóa ngày khi ca đã kết thúc và các vấn đề cần xác minh, khoản tăng ca/phạt chờ xử lý đã được giải quyết. Trước khi khóa phải kiểm tra lại dữ liệu mới nhất."
+        },
+        {
+          "type": "paragraph",
+          "text": "Lượt quét đến muộn sau khi ngày đã khóa vẫn được lưu để đối chiếu. Muốn thay đổi công cần mở khóa, tính lại và xét duyệt lại khi căn cứ thay đổi."
+        },
+        {
+          "type": "heading",
+          "text": "Chốt kỳ lương"
+        },
+        {
+          "type": "table",
+          "rows": [
+            [
+              "Trạng thái phiếu",
+              "Ý nghĩa"
+            ],
+            [
+              "Đang soạn / chờ duyệt",
+              "Phiếu còn tạm tính, được xử lý theo quyền."
+            ],
+            [
+              "Đã chốt / đã xác nhận",
+              "Không sửa trực tiếp hoặc ghi đè bằng thao tác tính lại."
+            ],
+            [
+              "Đã ghi nhận trả lương",
+              "Không mở khóa bằng quy trình ghi đè phiếu; cần quy trình điều chỉnh riêng."
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Chưa chốt kỳ nếu còn vấn đề cần xác minh, khoản chờ duyệt, ca chưa kết thúc, thông tin chính sách chưa đủ hoặc dữ liệu tính lương chưa khớp các quyết định mới nhất. Sau khi xét duyệt xong cần tính lại lương trước khi chốt."
+        },
+        {
+          "type": "paragraph",
+          "text": "Quản trị viên được mở khóa kỳ chưa ghi nhận trả lương để xử lý. Một nhân viên đã chốt không tự làm khóa các khoản của nhân viên khác. Mọi thay đổi phải lưu người thực hiện, thời điểm, căn cứ và kết quả trước/sau."
+        }
+      ]
+    },
+    {
+      "id": "dieu-10",
+      "title": "10. Bảo vệ dữ liệu và xử lý sự cố",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "Chỉ coi điểm danh đã hoàn tất khi có thông báo hệ thống đã ghi nhận. Nếu đang chờ hoặc chưa được xác nhận, cần kiểm tra lại; không tự coi là thành công.",
+            "Nhận diện khuôn mặt cần các kết quả xác nhận liên tiếp phù hợp. Đổi người, mất dấu theo dõi hoặc có cảnh báo giả mạo sẽ làm gián đoạn quá trình xác nhận.",
+            "Một lượt chấm công gửi lại do mất kết nối không được tính thành lượt mới. Việc thay đổi chế độ vào/ra chỉ hoàn tất khi thiết bị xác nhận.",
+            "Cảnh báo giả mạo không phải là lượt điểm danh và không tạo công. Thời gian ghi nhận bất thường cần được đối chiếu.",
+            "Không tự xóa lượt quét gốc hoặc ghi đè phiếu lương đã chốt để xử lý sự cố. Những điều chỉnh ảnh hưởng công và lương phải có dấu vết kiểm tra."
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Nếu phát hiện sai lệch về lượt quét, lịch ca hoặc phiếu lương, nhân viên liên hệ quản lý để được đối chiếu. Người có quyền xem xét thông tin gốc trước khi quyết định điều chỉnh."
+        }
+      ]
+    }
+  ]
+}

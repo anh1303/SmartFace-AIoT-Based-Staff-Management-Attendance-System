@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
+import { useDialogFocus } from './useDialogFocus';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -19,19 +20,9 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 'md'
 }) => {
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+  const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useDialogFocus(ref,isOpen,onClose);
 
   if (!isOpen) return null;
 
@@ -46,20 +37,21 @@ export const Modal: React.FC<ModalProps> = ({
   const modalNode = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
       <div
+        ref={ref}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
-        className={`w-full ${maxWidthClass} bg-white dark:bg-[#13162b] text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-[#21264b] rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] transition-colors`}
+        aria-labelledby={titleId}
+        className={`w-full ${maxWidthClass} bg-white dark:bg-[#13162b] text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-[#21264b] rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90dvh] transition-colors`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 dark:border-[#21264b] bg-slate-50/50 dark:bg-[#0f1224]/50 gap-4">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-200/80 dark:border-[#21264b] bg-slate-50/50 dark:bg-[#0f1224]/50 gap-4">
           <div className="min-w-0 flex-1">
-            <h3 id="modal-title" className="text-lg font-bold text-slate-900 dark:text-white font-heading truncate" title={title}>
+            <h3 id={titleId} className="text-lg font-bold text-slate-900 dark:text-white font-heading leading-snug break-words" title={title}>
               {title}
             </h3>
             {subtitle && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate" title={subtitle}>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed break-words" title={subtitle}>
                 {subtitle}
               </p>
             )}
@@ -68,14 +60,14 @@ export const Modal: React.FC<ModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Đóng hộp thoại"
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#181c38] transition-colors cursor-pointer shrink-0"
+            className="min-w-10 min-h-10 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#181c38] transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0">
           {children}
         </div>
       </div>
@@ -83,4 +75,4 @@ export const Modal: React.FC<ModalProps> = ({
   );
 
   return createPortal(modalNode, document.body);
-};
+};

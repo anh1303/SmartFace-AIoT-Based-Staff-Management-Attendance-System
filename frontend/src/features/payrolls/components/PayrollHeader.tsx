@@ -29,12 +29,13 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
   const { role } = useAuth();
   return (
     <PageHeaderBanner
-      title="Quản Lý Bảng Lương & Chi Trả"
+      title="Bảng lương & xét duyệt"
       titleExtra={
-        <div className="flex items-center gap-2 bg-white/80 dark:bg-[#0f1224] px-3 py-1.5 rounded-xl border border-purple-200/80 dark:border-[#272d5a] shadow-inner backdrop-blur-sm">
-          <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+        <div className="flex items-center gap-2 bg-white/80 dark:bg-[#0f1224] px-3 py-1.5 rounded-xl border border-blue-200/80 dark:border-[#272d5a] shadow-inner backdrop-blur-sm">
+          <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Kỳ lương:</span>
           <select
+            aria-label="Kỳ lương"
             value={selectedPeriod}
             onChange={(e) => onSelectPeriod(e.target.value)}
             className="bg-transparent text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none cursor-pointer"
@@ -58,7 +59,7 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
               type="button"
               disabled={isCalculating || isFinalized}
               onClick={onCalculatePayroll}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-purple-500/20 transition-all active:scale-95 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-blue-500/20 transition-all active:scale-95 cursor-pointer"
               title={
                 isFinalized
                   ? 'Bảng lương đã chốt sổ, hãy mở khóa để tính toán lại'
@@ -66,7 +67,7 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
               }
             >
               <Sparkles className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : 'text-amber-300'}`} />
-              <span>{isCalculating ? 'Đang tổng hợp...' : 'Tự động tính lương kỳ này'}</span>
+              <span>{isCalculating ? 'Đang tổng hợp...' : 'Tính lại lương'}</span>
             </button>
 
             {isFinalized ? (
@@ -92,10 +93,10 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
               <button
                 type="button"
                 onClick={onOpenFinalizeModal}
-                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm shadow-purple-500/20 transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm shadow-blue-500/20 transition-all cursor-pointer"
               >
                 <Lock className="w-3.5 h-3.5" />
-                <span>Chốt lương kỳ này</span>
+                <span>Chốt kỳ lương</span>
               </button>
             )}
           </div>
@@ -108,8 +109,8 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
               className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
               title="Xuất bảng lương chi tiết sang file CSV/Excel"
             >
-              <Download className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-              <span>Xuất Excel / CSV</span>
+              <Download className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>Xuất CSV</span>
             </button>
           </div>
         </div>

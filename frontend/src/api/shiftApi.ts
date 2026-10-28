@@ -3,10 +3,8 @@ import { WorkShift } from '../types';
 
 export async function fetchShiftsApi(): Promise<WorkShift[]> {
   const res = await apiFetch('/api/shifts');
-  if (res.success && Array.isArray(res.data)) {
-    return res.data;
-  }
-  return [];
+  if (!res.success || !Array.isArray(res.data)) throw new Error(res.message || 'Không tải được lịch làm việc');
+  return res.data as WorkShift[];
 }
 
 export async function assignShiftApi(shiftData: Omit<WorkShift, 'shift_id'> & { shift_id?: string }) {
@@ -21,5 +19,6 @@ export async function assignShiftApi(shiftData: Omit<WorkShift, 'shift_id'> & { 
       note: shiftData.note,
     }),
   });
-  return res.data;
+  if (!res.success || !res.data?.shift_id) throw new Error(res.message || 'Chưa lưu được lịch làm việc');
+  return res.data as WorkShift;
 }

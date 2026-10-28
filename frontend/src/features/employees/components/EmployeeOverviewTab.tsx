@@ -1,3 +1,4 @@
+import { Avatar } from '../../../components/common/Avatar';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -47,11 +48,7 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
             <div className="p-5 bg-slate-50/70 dark:bg-[#0f1224]/70 flex items-center justify-between gap-4">
               <div className="flex items-center gap-4 min-w-0 flex-1">
                 <div className="relative shrink-0">
-                  <img
-                    src={currentEmp.avatar}
-                    alt={currentEmp.full_name}
-                    className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-200 dark:border-[#21264b] shadow-xs"
-                  />
+                  <Avatar src={currentEmp.avatar} name={currentEmp.full_name} size={56}/>
                   <span
                     className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-[#13162b] ${currentEmp.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-600'
                       }`}
@@ -82,7 +79,7 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-[#21264b]">
               <div className="p-4 space-y-1 min-w-0">
                 <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Mã Nhân Viên:</span>
-                <p className="text-sm font-mono font-bold text-purple-600 dark:text-purple-400 truncate" title={currentEmp.employee_id}>
+                <p className="text-sm font-mono font-bold text-blue-600 dark:text-blue-400 truncate" title={currentEmp.employee_id}>
                   {currentEmp.employee_id}
                 </p>
               </div>
@@ -120,7 +117,7 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-[#21264b]">
               <div className="p-4 space-y-1">
                 <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Lương theo giờ:</span>
-                <p className="text-sm font-mono font-extrabold text-purple-600 dark:text-purple-400">
+                <p className="text-sm font-mono font-extrabold text-blue-600 dark:text-blue-400">
                   {hourlyRate.toLocaleString('vi-VN')} <span className="text-xs font-normal text-slate-500 dark:text-slate-400">đ</span>
                 </p>
               </div>
@@ -146,7 +143,7 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
             <div className="p-4 space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <ScanFace className={`w-4 h-4 ${currentEmp.face_enrolled ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400'}`} />
+                  <ScanFace className={`w-4 h-4 ${currentEmp.face_enrolled ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`} />
                   <span className="text-xs font-bold text-slate-900 dark:text-white">Nhận diện khuôn mặt (Face ID)</span>
                 </div>
                 <BiometricStatusBadge enrolled={currentEmp.face_enrolled} />
@@ -157,7 +154,7 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
                 onClick={() => navigate(`/app/manager/biometrics?employee_id=${currentEmp.employee_id}`)}
                 className={`w-full py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${currentEmp.face_enrolled
                   ? 'bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1d2243] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#272d5a]'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-600/20'
                   }`}
               >
                 <ScanFace className="w-3.5 h-3.5" />
@@ -180,7 +177,7 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
                 onClick={() => navigate(`/app/manager/biometrics?employee_id=${currentEmp.employee_id}&tab=fingerprint`)}
                 className={`w-full py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${currentEmp.fingerprint_enrolled
                   ? 'bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1d2243] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#272d5a]'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-600/20'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-600/20'
                   }`}
               >
                 <Fingerprint className="w-3.5 h-3.5" />
@@ -204,8 +201,8 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-[#0f1224] px-3 py-1.5 rounded-xl border border-purple-200 dark:border-[#272d5a] self-start sm:self-auto">
-            <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+          <div className="flex items-center gap-2 text-xs font-mono text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-[#0f1224] px-3 py-1.5 rounded-xl border border-blue-200 dark:border-[#272d5a] self-start sm:self-auto">
+            <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             <span>Kỳ: {currentMonthKey}</span>
           </div>
         </div>
@@ -216,7 +213,7 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
           <div className="p-5 flex flex-col justify-between space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Tổng ngày công</span>
-              <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
+              <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
                 <Calendar className="w-4 h-4" />
               </div>
             </div>
@@ -279,13 +276,13 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
           <div className="p-5 flex flex-col justify-between space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Lương thực nhận tạm tính</span>
-              <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
+              <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
                 <TrendingUp className="w-4 h-4" />
               </div>
             </div>
             <div>
               <div className="flex items-baseline gap-1">
-                <span className="text-xl sm:text-2xl font-black font-mono text-purple-600 dark:text-purple-400">
+                <span className="text-xl sm:text-2xl font-black font-mono text-blue-600 dark:text-blue-400">
                   {currentNetSalary.toLocaleString('vi-VN')}
                 </span>
                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">đ</span>

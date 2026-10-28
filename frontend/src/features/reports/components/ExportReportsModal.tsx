@@ -34,14 +34,14 @@ export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
             onClick={() => onSelectExportType('attendance')}
             className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
               exportType === 'attendance'
-                ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-500 text-slate-900 dark:text-white shadow-xs'
-                : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200 dark:border-[#272d5a] hover:border-purple-300 text-slate-700 dark:text-slate-300'
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-500 text-slate-900 dark:text-white shadow-xs'
+                : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200 dark:border-[#272d5a] hover:border-blue-300 text-slate-700 dark:text-slate-300'
             }`}
           >
             <div
               className={`p-2 rounded-xl mt-0.5 ${
                 exportType === 'attendance'
-                  ? 'bg-purple-600 text-white'
+                  ? 'bg-blue-600 text-white'
                   : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
               }`}
             >
@@ -53,7 +53,7 @@ export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
                   1. Báo cáo Tổng hợp Chuyên cần (Attendance Summary)
                 </p>
                 {exportType === 'attendance' && (
-                  <Check className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 )}
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
@@ -68,14 +68,14 @@ export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
             onClick={() => onSelectExportType('payroll')}
             className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
               exportType === 'payroll'
-                ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-500 text-slate-900 dark:text-white shadow-xs'
-                : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200 dark:border-[#272d5a] hover:border-purple-300 text-slate-700 dark:text-slate-300'
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-500 text-slate-900 dark:text-white shadow-xs'
+                : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200 dark:border-[#272d5a] hover:border-blue-300 text-slate-700 dark:text-slate-300'
             }`}
           >
             <div
               className={`p-2 rounded-xl mt-0.5 ${
                 exportType === 'payroll'
-                  ? 'bg-purple-600 text-white'
+                  ? 'bg-blue-600 text-white'
                   : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
               }`}
             >
@@ -87,7 +87,7 @@ export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
                   2. Báo cáo Chi phí Lương (Payroll Report)
                 </p>
                 {exportType === 'payroll' && (
-                  <Check className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 )}
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
@@ -102,14 +102,14 @@ export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
             onClick={() => onSelectExportType('employees')}
             className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${
               exportType === 'employees'
-                ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-500 text-slate-900 dark:text-white shadow-xs'
-                : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200 dark:border-[#272d5a] hover:border-purple-300 text-slate-700 dark:text-slate-300'
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-500 text-slate-900 dark:text-white shadow-xs'
+                : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200 dark:border-[#272d5a] hover:border-blue-300 text-slate-700 dark:text-slate-300'
             }`}
           >
             <div
               className={`p-2 rounded-xl mt-0.5 ${
                 exportType === 'employees'
-                  ? 'bg-purple-600 text-white'
+                  ? 'bg-blue-600 text-white'
                   : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
               }`}
             >
@@ -121,7 +121,7 @@ export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
                   3. Hồ sơ & Đăng ký Sinh trắc (Employee Biometrics)
                 </p>
                 {exportType === 'employees' && (
-                  <Check className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 )}
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
@@ -143,7 +143,7 @@ export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
           <button
             type="button"
             onClick={onExecuteExport}
-            className="px-5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/20 flex items-center gap-1.5 cursor-pointer"
+            className="px-5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 flex items-center gap-1.5 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Tải file CSV ngay</span>

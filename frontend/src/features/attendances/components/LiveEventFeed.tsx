@@ -26,7 +26,7 @@ export const LiveEventFeed: React.FC<LiveEventFeedProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
+          <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>

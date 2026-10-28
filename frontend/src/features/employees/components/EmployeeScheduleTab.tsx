@@ -91,7 +91,7 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-white font-heading flex items-center gap-2">
-              <CalendarRange className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <CalendarRange className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               Lịch Phân Ca Làm Việc
             </h2>
           </div>
@@ -102,7 +102,7 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
               type="button"
               onClick={() => setQuickRange('today')}
               className={`px-2.5 py-1 rounded-xl text-xs font-mono transition-colors cursor-pointer ${quickPreset === 'today'
-                  ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50 font-semibold'
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700/50 font-semibold'
                   : 'bg-slate-100 dark:bg-[#0f1224] hover:bg-slate-200 dark:hover:bg-[#1d2243] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#272d5a]'
                 }`}
             >
@@ -112,7 +112,7 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
               type="button"
               onClick={() => setQuickRange('month')}
               className={`px-2.5 py-1 rounded-xl text-xs font-mono transition-colors cursor-pointer ${quickPreset === 'month'
-                  ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50 font-semibold'
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700/50 font-semibold'
                   : 'bg-slate-100 dark:bg-[#0f1224] hover:bg-slate-200 dark:hover:bg-[#1d2243] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#272d5a]'
                 }`}
             >
@@ -122,7 +122,7 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
               type="button"
               onClick={() => setQuickRange('all')}
               className={`px-2.5 py-1 rounded-xl text-xs font-mono transition-colors cursor-pointer ${quickPreset === 'all'
-                  ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50 font-semibold'
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700/50 font-semibold'
                   : 'bg-slate-100 dark:bg-[#0f1224] hover:bg-slate-200 dark:hover:bg-[#1d2243] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#272d5a]'
                 }`}
             >
@@ -146,7 +146,7 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
                   setStartDate(e.target.value);
                   setQuickPreset('custom');
                 }}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 font-mono"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
               />
             </div>
           </div>
@@ -164,7 +164,7 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
                   setEndDate(e.target.value);
                   setQuickPreset('custom');
                 }}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 font-mono"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
               />
             </div>
           </div>
@@ -177,7 +177,7 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
             <select
               value={shiftFilter}
               onChange={e => setShiftFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500 cursor-pointer"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="ALL">Tất cả ca làm</option>
               <option value="OFFICE_HOURS">Ca hành chính</option>
@@ -242,7 +242,7 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
                         {typeLabel}
                       </span>
                       {shiftTime && (
-                        <span className="font-mono text-[11px] text-purple-600 dark:text-purple-400 font-semibold truncate">
+                        <span className="font-mono text-[11px] text-blue-600 dark:text-blue-400 font-semibold truncate">
                           {shiftTime}
                         </span>
                       )}

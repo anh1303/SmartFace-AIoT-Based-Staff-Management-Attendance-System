@@ -38,7 +38,7 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
       maxWidth="3xl"
       title={
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 text-white shadow-md shadow-purple-500/25">
+          <div className="p-2 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-md shadow-blue-500/25">
             <Settings className="w-5 h-5 animate-[spin_10s_linear_infinite]" />
           </div>
           <span className="font-bold">Quản Lý Phòng Ban & Chức Vụ</span>
@@ -58,7 +58,7 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
               }}
               className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 manager.activeTab === 'departments'
-                  ? 'bg-white dark:bg-[#1b1f3d] text-purple-600 dark:text-purple-300 shadow-sm border border-slate-200/80 dark:border-[#2e3566]'
+                  ? 'bg-white dark:bg-[#1b1f3d] text-blue-600 dark:text-blue-300 shadow-sm border border-slate-200/80 dark:border-[#2e3566]'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -67,7 +67,7 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
               <span
                 className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                   manager.activeTab === 'departments'
-                    ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300'
+                    ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300'
                     : 'bg-slate-200 dark:bg-[#181c38] text-slate-600 dark:text-slate-400'
                 }`}
               >
@@ -84,7 +84,7 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
               }}
               className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 manager.activeTab === 'positions'
-                  ? 'bg-white dark:bg-[#1b1f3d] text-purple-600 dark:text-purple-300 shadow-sm border border-slate-200/80 dark:border-[#2e3566]'
+                  ? 'bg-white dark:bg-[#1b1f3d] text-blue-600 dark:text-blue-300 shadow-sm border border-slate-200/80 dark:border-[#2e3566]'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
@@ -93,7 +93,7 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
               <span
                 className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                   manager.activeTab === 'positions'
-                    ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300'
+                    ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300'
                     : 'bg-slate-200 dark:bg-[#181c38] text-slate-600 dark:text-slate-400'
                 }`}
               >
@@ -112,7 +112,7 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
                   manager.setDeleteConfirmDept(null);
                   manager.setIsAddingDept(true);
                 }}
-                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs shadow-purple-500/25 transition-all cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs shadow-blue-500/25 transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Thêm phòng ban mới</span>
@@ -127,7 +127,7 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
                   manager.setDeleteConfirmPos(null);
                   manager.setIsAddingPos(true);
                 }}
-                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs shadow-purple-500/25 transition-all cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs shadow-blue-500/25 transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Thêm chức vụ mới</span>
@@ -149,7 +149,7 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
               }
               value={manager.searchQuery}
               onChange={(e) => manager.setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/90 dark:border-[#21264b] text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-400"
+              className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/90 dark:border-[#21264b] text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
             />
             {manager.searchQuery && (
               <button
@@ -170,7 +170,7 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
               <select
                 value={manager.deptFilterForPos}
                 onChange={(e) => manager.setDeptFilterForPos(e.target.value)}
-                className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/90 dark:border-[#21264b] text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer"
+                className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/90 dark:border-[#21264b] text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
               >
                 <option value="ALL">Tất cả phòng ban</option>
                 {manager.departments.map((d) => (

@@ -70,7 +70,7 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
         <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-6 shadow-xs flex flex-col justify-between transition-colors">
           <div>
             <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100 dark:border-[#21264b]">
-              <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/40">
+              <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40">
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -116,7 +116,7 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
             <button
               type="button"
               onClick={() => setIsConfirmModalOpen(true)}
-              className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm shadow-purple-600/25 cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm shadow-blue-600/25 cursor-pointer"
             >
               <KeyRound className="w-4 h-4" />
               <span>Đặt lại mật khẩu</span>
@@ -156,7 +156,7 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
                   role="switch"
                   aria-checked={isActive}
                   onClick={handleToggleStatus}
-                  className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-600 focus:ring-offset-2 ${isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
+                  className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 ${isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
                     }`}
                   title={isActive ? 'Nhấp để tạm ngưng hoạt động' : 'Nhấp để kích hoạt tài khoản'}
                 >
@@ -212,7 +212,7 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
 
           <div className="relative bg-white dark:bg-[#13162b] border border-slate-200 dark:border-[#21264b] rounded-2xl p-6 max-w-md w-full shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center gap-3.5">
-              <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/40 shrink-0 flex items-center justify-center">
+              <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40 shrink-0 flex items-center justify-center">
                 <KeyRound className="w-6 h-6" />
               </div>
               <h4 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
@@ -227,7 +227,7 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
               </div>
               <div className="flex justify-between text-slate-700 dark:text-slate-300">
                 <span className="text-slate-500 dark:text-slate-400">Tài khoản:</span>
-                <span className="font-mono font-semibold text-purple-600 dark:text-purple-400">{username}</span>
+                <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">{username}</span>
               </div>
               <div className="flex justify-between text-slate-700 dark:text-slate-300">
                 <span className="text-slate-500 dark:text-slate-400">Gửi về email:</span>
@@ -262,8 +262,8 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
                 disabled={isResetting || !currentEmp.email}
                 onClick={handleResetPassword}
                 className={`px-4 py-2 rounded-xl text-xs font-semibold text-white flex items-center gap-2 transition-all cursor-pointer ${isResetting || !currentEmp.email
-                  ? 'bg-purple-400 cursor-not-allowed'
-                  : 'bg-purple-600 hover:bg-purple-700 shadow-sm shadow-purple-600/25'
+                  ? 'bg-blue-400 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-600/25'
                   }`}
               >
                 {isResetting ? (

@@ -65,7 +65,7 @@ export const PayrollFinalizeModal: React.FC<PayrollFinalizeModalProps> = ({
           <button
             type="button"
             onClick={onConfirm}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-sm shadow-purple-500/20 cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 cursor-pointer"
           >
             Đồng ý chốt bảng lương
           </button>

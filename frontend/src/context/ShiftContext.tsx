@@ -7,7 +7,7 @@ export interface ShiftContextType {
   isLoading: boolean;
   isError: boolean;
   refetchShifts: () => void;
-  assignOrUpdateShift: (shift: Omit<WorkShift, 'shift_id'> & { shift_id?: string }) => void;
+  assignOrUpdateShift: (shift: Omit<WorkShift, 'shift_id'> & { shift_id?: string }) => Promise<WorkShift>;
 }
 
 const ShiftContext = createContext<ShiftContextType | undefined>(undefined);

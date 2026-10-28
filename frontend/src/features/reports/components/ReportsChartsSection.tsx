@@ -47,7 +47,7 @@ export const ReportsChartsSection: React.FC<ReportsChartsSectionProps> = ({
               Tổng ngân sách chi trả thực tế các kỳ
             </p>
           </div>
-          <span className="text-xs font-mono text-purple-600 dark:text-purple-400 font-bold">
+          <span className="text-xs font-mono text-blue-600 dark:text-blue-400 font-bold">
             {payrollTrendData.length} kỳ lương
           </span>
         </div>

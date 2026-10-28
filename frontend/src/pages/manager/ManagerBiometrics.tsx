@@ -156,7 +156,7 @@ export const ManagerBiometrics: React.FC = () => {
                   onClick={() => setActiveTab('FACE')}
                   className={`w-full py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                     activeTab === 'FACE'
-                      ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a1e3a]'
                   }`}
                 >

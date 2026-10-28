@@ -4,7 +4,7 @@ import { apiFetch } from '../../../api/client';
 export interface DeviceInfo {
   name: string;
   location: string;
-  status: 'ONLINE' | 'OFFLINE';
+  status: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
 }
 
 export function useDevices() {
@@ -16,7 +16,7 @@ export function useDevices() {
         return res.data.map((d: { name?: string; location?: string; status?: string }) => ({
           name: d.name || 'Device',
           location: d.location || 'Khu vực',
-          status: (d.status === 'ONLINE' ? 'ONLINE' : 'OFFLINE') as 'ONLINE' | 'OFFLINE',
+          status: (d.status === 'MAINTENANCE' ? 'MAINTENANCE' : d.status === 'ONLINE' ? 'ONLINE' : 'OFFLINE') as DeviceInfo['status'],
         }));
       }
       return [];

@@ -1,4 +1,6 @@
+import { AttendanceEventBadge } from '../../components/common/AttendanceEventBadge';
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { formatVNTime, formatVNDate, getTodayVNString } from '../../utils/dateUtils';
 import { Employee } from '../../types';
@@ -42,6 +44,7 @@ const TYPE_OPTIONS = [
 
 export const EmployeeAttendance: React.FC = () => {
   const { currentUser, attendance, employees } = useApp();
+  const [urlParams] = useSearchParams();
   const [activeView, setActiveView] = useState<'summary' | 'raw'>('summary');
   const [methodFilter, setMethodFilter] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
@@ -52,8 +55,8 @@ export const EmployeeAttendance: React.FC = () => {
   const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
   const startOfCurrentMonth = `${currentYear}-${currentMonth}-01`;
 
-  const [startDate, setStartDate] = useState<string>(() => startOfCurrentMonth);
-  const [endDate, setEndDate] = useState<string>(() => todayVN);
+  const [startDate, setStartDate] = useState<string>(() => urlParams.get('date') || startOfCurrentMonth);
+  const [endDate, setEndDate] = useState<string>(() => urlParams.get('date') || todayVN);
   const [attendanceTypeFilter, setAttendanceTypeFilter] = useState<string>('ALL');
   const [attendanceStatusFilter, setAttendanceStatusFilter] = useState<string>('ALL');
   const [quickPreset, setQuickPreset] = useState<'today' | 'month' | 'all' | 'custom'>('month');
@@ -106,26 +109,26 @@ export const EmployeeAttendance: React.FC = () => {
       <PageHeaderBanner
         title="Lịch sử Chấm công & Điểm danh"
         badge={
-          <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-mono font-medium border border-purple-200 dark:border-purple-700/50">
+          <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-mono font-medium border border-blue-200 dark:border-blue-700/50">
             {activeView === 'summary' ? 'BẢNG CÔNG & CA LÀM VIỆC' : 'LOGS SINH TRẮC'}
           </span>
         }
         actions={
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 dark:bg-[#0f1224] border border-purple-200/80 dark:border-[#272d5a] text-purple-600 dark:text-purple-400 text-xs font-mono shadow-xs backdrop-blur-sm">
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 dark:bg-[#0f1224] border border-blue-200/80 dark:border-[#272d5a] text-blue-600 dark:text-blue-400 text-xs font-mono shadow-xs backdrop-blur-sm">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>CHỈ ĐỌC • DỮ LIỆU BẤT BIẾN</span>
+            <span>CHẾ ĐỘ XEM CÁ NHÂN</span>
           </div>
         }
       />
 
       {/* View Switcher Tabs */}
-      <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-[#13162b] border border-slate-200 dark:border-[#21264b] rounded-2xl w-fit">
+      <div className="flex flex-wrap items-center gap-2 p-1 bg-slate-100 dark:bg-[#13162b] border border-slate-200 dark:border-[#21264b] rounded-2xl w-fit">
         <button
           type="button"
           onClick={() => setActiveView('summary')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold font-mono transition-all cursor-pointer ${
             activeView === 'summary'
-              ? 'bg-white dark:bg-[#1f2444] text-purple-600 dark:text-purple-400 shadow-xs border border-purple-200/80 dark:border-purple-500/30'
+              ? 'bg-white dark:bg-[#1f2444] text-blue-600 dark:text-blue-400 shadow-xs border border-blue-200/80 dark:border-blue-500/30'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
@@ -138,7 +141,7 @@ export const EmployeeAttendance: React.FC = () => {
           onClick={() => setActiveView('raw')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold font-mono transition-all cursor-pointer ${
             activeView === 'raw'
-              ? 'bg-white dark:bg-[#1f2444] text-purple-600 dark:text-purple-400 shadow-xs border border-purple-200/80 dark:border-purple-500/30'
+              ? 'bg-white dark:bg-[#1f2444] text-blue-600 dark:text-blue-400 shadow-xs border border-blue-200/80 dark:border-blue-500/30'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
@@ -220,20 +223,13 @@ export const EmployeeAttendance: React.FC = () => {
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">{dateFormatted}</div>
                       </TableCell>
                       <TableCell>
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-lg font-bold text-[10px] uppercase font-mono ${record.type === 'CHECK_IN'
-                            ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/50'
-                            : 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700/50'
-                            }`}
-                        >
-                          {record.type === 'CHECK_IN' ? 'VÀO CA' : 'TAN CA'}
-                        </span>
+                        <AttendanceEventBadge type={record.type}/>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5 min-w-0" title={record.method === 'FACE' ? 'Face ID' : record.method === 'FINGERPRINT' ? 'Vân tay' : 'Thủ công'}>
                           {record.method === 'FACE' ? (
                             <>
-                              <ScanFace className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                              <ScanFace className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                               <span className="truncate">Face ID</span>
                             </>
                           ) : record.method === 'FINGERPRINT' ? (

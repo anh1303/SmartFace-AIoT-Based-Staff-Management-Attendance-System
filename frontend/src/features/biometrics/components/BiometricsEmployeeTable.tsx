@@ -108,7 +108,7 @@ export const BiometricsEmployeeTable: React.FC<BiometricsEmployeeTableProps> = (
                         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
                       }
                       alt={emp.full_name}
-                      className="w-9 h-9 rounded-full object-cover border border-purple-200 dark:border-[#272d5a] shrink-0"
+                      className="w-9 h-9 rounded-full object-cover border border-blue-200 dark:border-[#272d5a] shrink-0"
                     />
                     <span className="font-semibold text-slate-900 dark:text-white truncate flex-1" title={emp.full_name}>
                       {emp.full_name}

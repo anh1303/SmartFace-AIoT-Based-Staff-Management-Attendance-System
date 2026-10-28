@@ -2,38 +2,4 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { FloatingNotificationBubble } from '../../features/notifications';
-
-/**
- * AppLayout is a pure presentation component responsible ONLY for layout composition.
- * Route authentication and role authorizations are decoupled and handled by AuthGuard.
- */
-export const AppLayout: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  return (
-    <div className="min-h-screen bg-[#f5f7fc] dark:bg-[#0b0d19] text-slate-800 dark:text-slate-100 flex transition-colors duration-200">
-      {/* Sidebar */}
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        <Topbar
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-        />
-
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#f5f7fc] dark:bg-[#0b0d19] cyber-grid transition-colors duration-200">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <Outlet />
-          </div>
-        </main>
-      </div>
-
-      {/* Reusable Global Overlays */}
-      <FloatingNotificationBubble />
-    </div>
-  );
-};
+export const AppLayout: React.FC = () => { const [open, setOpen] = useState(false); return <div className="sf-app"><a className="sf-skip" href="#main-content">Đến nội dung chính</a><Sidebar isOpen={open} onClose={() => setOpen(false)}/><div className="sf-main"><Topbar onToggleSidebar={() => setOpen(v => !v)}/>{import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === 'true' && <div className="sf-demo">DỮ LIỆU MINH HỌA · Thao tác chỉ thay đổi phiên xem thử, chưa kết nối backend/Pi.</div>}<main id="main-content" tabIndex={-1} className="sf-content"><Outlet /></main></div></div>; };

@@ -1,3 +1,4 @@
+import {ShiftTemplatePicker,templateAssignment} from './ShiftTemplates';
 import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
@@ -27,6 +28,8 @@ interface BulkShiftModalProps {
   bulkNote: string;
   setBulkNote: (note: string) => void;
   onSubmit: (e: React.FormEvent) => void;
+  isSubmitting?: boolean;
+  error?: string;
 }
 
 export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
@@ -52,6 +55,8 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
   bulkNote,
   setBulkNote,
   onSubmit,
+  isSubmitting=false,
+  error,
 }) => {
   const departmentList = React.useMemo(() => {
     if (departments && departments.length > 0) {
@@ -73,7 +78,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
       subtitle={`Áp dụng cho Tuần ${weekNumber} (${startLabel} - ${endLabel})`}
       maxWidth="lg"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-4"><fieldset disabled={isSubmitting} className="space-y-4"><ShiftTemplatePicker onApply={template=>{const value=templateAssignment(template);setBulkShiftType(value.shift_type);setBulkStartTime(value.start_time);setBulkEndTime(value.end_time);setBulkNote(value.note);}}/>
         {/* Target Selection */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Đối tượng áp dụng</label>
@@ -82,8 +87,8 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
               type="button"
               onClick={() => setBulkTarget('ALL')}
               className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${bulkTarget === 'ALL'
-                ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-600'
-                : 'bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-purple-300'
+                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-600'
+                : 'bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-blue-300'
                 }`}
             >
               Tất cả nhân sự ({employees.filter(e => e.status !== 'INACTIVE').length})
@@ -98,17 +103,18 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
                 }
               }}
               className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${bulkTarget === 'DEPARTMENT'
-                ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-600'
-                : 'bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-purple-300'
+                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-600'
+                : 'bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-blue-300'
                 }`}
             >
               Theo phòng ban
             </button>
 
             <select
+              aria-label="Đối tượng áp dụng"
               value={bulkTarget !== 'ALL' && bulkTarget !== 'DEPARTMENT' ? bulkTarget : ''}
               onChange={e => setBulkTarget(e.target.value)}
-              className="py-2 px-3 rounded-xl text-xs font-semibold border transition-all bg-slate-50 dark:bg-[#0f1224] text-slate-900 dark:text-slate-200 border-slate-200 dark:border-[#272d5a] focus:outline-none focus:border-purple-500 cursor-pointer"
+              className="py-2 px-3 rounded-xl text-xs font-semibold border transition-all bg-slate-50 dark:bg-[#0f1224] text-slate-900 dark:text-slate-200 border-slate-200 dark:border-[#272d5a] focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="" className="bg-white dark:bg-[#13162b]">Chọn từng NV...</option>
               {employees.filter(e => e.status !== 'INACTIVE').map(e => (
@@ -124,7 +130,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
               <select
                 value={bulkDepartment}
                 onChange={e => setBulkDepartment(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
               >
                 {departmentList.length === 0 ? (
                   <option value="" disabled className="bg-white dark:bg-[#13162b]">Chưa có phòng ban nào</option>
@@ -145,6 +151,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Ca làm việc</label>
             <select
+              aria-label="Ca làm việc"
               value={bulkShiftType}
               onChange={e => {
                 const val = e.target.value as WorkShift['shift_type'];
@@ -166,7 +173,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
                   setBulkEndTime('00:00');
                 }
               }}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
             >
               <option value="OFFICE_HOURS" className="bg-white dark:bg-[#13162b]">Ca Hành Chính</option>
               <option value="MORNING" className="bg-white dark:bg-[#13162b]">Ca Sáng</option>
@@ -176,7 +183,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
             </select>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/40 space-y-3">
+          <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 space-y-3">
             <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
               Khung giờ làm việc:
             </span>
@@ -222,21 +229,21 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
               <button
                 type="button"
                 onClick={() => setBulkDays([0, 1, 2, 3, 4])}
-                className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-[#0f1224] text-purple-600 dark:text-purple-400 hover:bg-slate-200 dark:hover:bg-[#1a1e3a] cursor-pointer"
+                className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-[#0f1224] text-blue-600 dark:text-blue-400 hover:bg-slate-200 dark:hover:bg-[#1a1e3a] cursor-pointer"
               >
                 T2 - T6
               </button>
               <button
                 type="button"
                 onClick={() => setBulkDays([0, 1, 2, 3, 4, 5])}
-                className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-[#0f1224] text-purple-600 dark:text-purple-400 hover:bg-slate-200 dark:hover:bg-[#1a1e3a] cursor-pointer"
+                className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-[#0f1224] text-blue-600 dark:text-blue-400 hover:bg-slate-200 dark:hover:bg-[#1a1e3a] cursor-pointer"
               >
                 T2 - T7
               </button>
               <button
                 type="button"
                 onClick={() => setBulkDays([0, 1, 2, 3, 4, 5, 6])}
-                className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-[#0f1224] text-purple-600 dark:text-purple-400 hover:bg-slate-200 dark:hover:bg-[#1a1e3a] cursor-pointer"
+                className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-[#0f1224] text-blue-600 dark:text-blue-400 hover:bg-slate-200 dark:hover:bg-[#1a1e3a] cursor-pointer"
               >
                 Cả tuần
               </button>
@@ -258,8 +265,8 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
                     }
                   }}
                   className={`py-2 text-center rounded-xl text-xs font-bold border transition-all cursor-pointer ${isSelected
-                    ? 'bg-purple-600 text-white border-purple-500 shadow-xs shadow-purple-500/20'
-                    : 'bg-slate-50 dark:bg-[#0f1224] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-purple-300'
+                    ? 'bg-blue-600 text-white border-blue-500 shadow-xs shadow-blue-500/20'
+                    : 'bg-slate-50 dark:bg-[#0f1224] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-blue-300'
                     }`}
                 >
                   {dName}
@@ -276,11 +283,12 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
             placeholder="Ví dụ: Phân ca chuẩn tháng 10, Ca trực tuần..."
             value={bulkNote}
             onChange={e => setBulkNote(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+            className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
           />
         </div>
 
-        <div className="pt-4 flex justify-end gap-2 border-t border-slate-200 dark:border-[#21264b]">
+        {error&&<div className="sf-feedback error" role="alert">{error}</div>}
+          <div className="pt-4 flex justify-end gap-2 border-t border-slate-200 dark:border-[#21264b]">
           <button
             type="button"
             onClick={onClose}
@@ -294,14 +302,14 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
             className={`px-5 py-2 rounded-xl text-xs font-semibold text-white shadow-sm flex items-center gap-1.5 transition-all ${
               isTimeInvalid
                 ? 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60'
-                : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20 cursor-pointer'
+                : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-500/20 cursor-pointer'
             }`}
           >
             <Sparkles className="w-4 h-4" />
             <span>Áp dụng phân ca ngay</span>
           </button>
         </div>
-      </form>
+      </fieldset></form>
     </Modal>
   );
 };

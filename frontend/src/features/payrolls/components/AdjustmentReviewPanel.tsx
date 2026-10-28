@@ -1,91 +1,67 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link, useSearchParams, useLocation } from 'react-router-dom';
+import { Check, X, Clock, FileSearch, Lock, RotateCcw, ArrowUpRight, Info } from 'lucide-react';
 import { apiFetch } from '../../../api/client';
 import { useToast } from '../../../context/ToastContext';
-
+import { Modal } from '../../../components/common/Modal';
 export interface AttendanceAdjustment {
-  id: string; employee_id: string; employee_name: string; date: string;
-  kind: 'OVERTIME' | 'LATE_EARLY' | 'ABSENCE'; hours: number; amount: number;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'VOID'; note: string | null;
-  reviewed_by: string | null; reviewed_at: string | null; updated_at: string; can_review: boolean; locked?: boolean;
+    id: string;
+    employee_id: string;
+    employee_name: string;
+    date: string;
+    kind: 'OVERTIME' | 'LATE_EARLY' | 'ABSENCE';
+    hours: number;
+    amount: number;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'VOID';
+    note: string | null;
+    reviewed_by: string | null;
+    reviewed_at: string | null;
+    updated_at: string;
+    can_review: boolean;
+    locked?: boolean;
 }
-const labels = { OVERTIME: 'Tăng ca', LATE_EARLY: 'Phạt trễ / sớm', ABSENCE: 'Phạt vắng ca' };
+export const adjustmentLabels = { OVERTIME: 'Tăng ca', LATE_EARLY: 'Phạt trễ / sớm', ABSENCE: 'Phạt vắng ca' };
 const statuses = { PENDING: 'Chờ duyệt', APPROVED: 'Đã duyệt', REJECTED: 'Không duyệt', VOID: 'Không còn phát sinh' };
-const money = (value: number) => `${value.toLocaleString('vi-VN')} ₫`;
-
-export function AdjustmentReviewPanel({ period, employeeId }: { period: string; employeeId?: string }) {
-  const queryClient = useQueryClient();
-  const { showToast } = useToast();
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const query = useQuery({
-    queryKey: ['attendanceAdjustments', period, employeeId || 'ALL'],
-    queryFn: async (): Promise<AttendanceAdjustment[]> => {
-      const params = new URLSearchParams({ period });
-      if (employeeId) params.set('employeeId', employeeId);
-      const res = await apiFetch(`/api/payroll/adjustments?${params}`);
-      if (!res.success) throw new Error(res.message || 'Không tải được các khoản OT/phạt');
-      return res.data;
-    },
-  });
-  const review = useMutation({
-    mutationFn: async ({ item, status }: { item: AttendanceAdjustment; status: 'APPROVED' | 'REJECTED' }) => {
-      const res = await apiFetch(`/api/payroll/adjustments/${item.id}`, { method: 'PATCH', body: JSON.stringify({ status, note: notes[item.id] ?? item.note ?? '', updated_at: item.updated_at }) });
-      if (!res.success) throw new Error(res.message || 'Không lưu được quyết định');
-    },
-    onSuccess: () => {
-      showToast('Đã lưu quyết định. Tính lại lương sau khi hoàn tất duyệt.', 'success');
-      for (const key of ['attendanceAdjustments', 'attendanceSummaries', 'payroll']) queryClient.invalidateQueries({ queryKey: [key] });
-    },
-    onError: (err: Error) => {
-      showToast(err.message, 'error');
-      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
-    },
-  });
-  const groups = new Map<string, AttendanceAdjustment[]>();
-  for (const item of query.data || []) groups.set(item.employee_id, [...(groups.get(item.employee_id) || []), item]);
-  const activeItems = (query.data || []).filter(i => i.status !== 'VOID');
-  const overtimeItems = activeItems.filter(i => i.kind === 'OVERTIME');
-  const penaltyItems = activeItems.filter(i => i.kind !== 'OVERTIME');
-  return <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#13162b] p-4 space-y-4 text-slate-800 dark:text-slate-100">
-    <div>
-      <h2 className="font-bold">Duyệt OT và các khoản phạt · {period}</h2>
-      <p className="text-xs text-slate-500 mt-1">Mở từng nhân viên để duyệt từng khoản theo ngày. Chỉ khoản đã duyệt được tính vào lương. Phạt vắng theo tỷ lệ cấu hình (mặc định 25% tiền công ca); nghỉ có phép chọn Không duyệt và ghi chú.</p>
-    </div>
-    {query.isSuccess && <div className="grid sm:grid-cols-3 gap-3 text-sm">
-      <div className="rounded-lg bg-slate-50 dark:bg-slate-800 p-3">OT đề xuất: <strong>{overtimeItems.reduce((n,i) => n+i.hours,0)}h</strong><div className="text-xs text-emerald-600">Đã duyệt {overtimeItems.filter(i => i.status === 'APPROVED').reduce((n,i) => n+i.hours,0)}h</div></div>
-      <div className="rounded-lg bg-slate-50 dark:bg-slate-800 p-3">Phạt đề xuất: <strong>{money(penaltyItems.reduce((n,i) => n+i.amount,0))}</strong><div className="text-xs text-rose-600">Đã duyệt {money(penaltyItems.filter(i => i.status === 'APPROVED').reduce((n,i) => n+i.amount,0))}</div></div>
-      <div className="rounded-lg bg-slate-50 dark:bg-slate-800 p-3">Chờ duyệt: <strong>{activeItems.filter(i => i.status === 'PENDING').length} khoản</strong></div>
-    </div>}
-    {query.isPending && <p role="status">Đang tải các khoản…</p>}
-    {query.isError && <div role="alert">{query.error.message} <button type="button" onClick={() => query.refetch()}>Thử lại</button></div>}
-    {query.isSuccess && !groups.size && <p className="text-sm text-slate-500">Chưa có khoản OT/phạt trong kỳ. Dùng Tính lương để cập nhật các ngày công.</p>}
-    {[...groups].map(([id, items]) => {
-      const active = items.filter(i => i.status !== 'VOID');
-      const approved = active.filter(i => i.status === 'APPROVED');
-      const pending = active.filter(i => i.status === 'PENDING');
-      return <div key={id} className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-        <button type="button" aria-expanded={!!expanded[id]} onClick={() => setExpanded(p => ({ ...p, [id]: !p[id] }))} className="w-full p-3 text-left flex flex-wrap justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800">
-          <span className="font-semibold">{items[0].employee_name} <span className="text-xs text-slate-500">{id}</span></span>
-          <span className="text-xs">{pending.length} khoản chờ · OT: {active.filter(i => i.kind === 'OVERTIME').reduce((n,i) => n+i.hours,0)}h (duyệt {approved.filter(i => i.kind === 'OVERTIME').reduce((n,i) => n+i.hours,0)}h) · Phạt duyệt: {money(approved.filter(i => i.kind !== 'OVERTIME').reduce((n,i) => n+i.amount,0))} · Chờ: {money(pending.reduce((n,i) => n+i.amount,0))} {expanded[id] ? '▴' : '▾'}</span>
-        </button>
-        {expanded[id] && <div className="overflow-x-auto"><table className="w-full text-sm text-left min-w-[700px]">
-          <thead className="bg-slate-50 dark:bg-slate-800"><tr>{['Ngày / khoản', 'Khối lượng', 'Số tiền', 'Trạng thái', 'Ghi chú / quyết định'].map(h => <th key={h} className="p-3">{h}</th>)}</tr></thead>
-          <tbody>{items.map(item => <tr key={item.id} className="border-t border-slate-100 dark:border-slate-700">
-            <td className="p-3">{item.date}<div className="font-semibold">{labels[item.kind]}</div></td>
-            <td className="p-3">{item.kind === 'ABSENCE' ? `1 ca (${item.hours}h)` : `${item.hours}h`}</td>
-            <td className="p-3 font-mono">{money(item.amount)}</td>
-            <td className="p-3"><span className={item.status === 'PENDING' ? 'text-amber-600' : item.status === 'APPROVED' ? 'text-emerald-600' : 'text-slate-500'}>{statuses[item.status]}</span>
-              {item.reviewed_at && <div className="text-xs text-slate-500">{new Date(item.reviewed_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</div>}</td>
-            <td className="p-3">{item.can_review && item.status !== 'VOID' ? <div className="space-y-2">
-              <textarea aria-label={`Ghi chú ${labels[item.kind]} ngày ${item.date}`} maxLength={2000} rows={2} value={notes[item.id] ?? item.note ?? ''} onChange={e => setNotes(p => ({ ...p, [item.id]: e.target.value }))} className="w-full min-w-48 rounded border border-slate-300 dark:border-slate-600 bg-transparent p-2" placeholder="Ghi chú (ví dụ: nghỉ có phép)" />
-              <div className="flex gap-2">
-                <button type="button" disabled={review.isPending} onClick={() => review.mutate({ item, status: 'APPROVED' })} className="rounded bg-emerald-700 text-white px-3 py-1 disabled:opacity-50">Duyệt khoản này</button>
-                <button type="button" disabled={review.isPending} onClick={() => review.mutate({ item, status: 'REJECTED' })} className="rounded border border-slate-300 dark:border-slate-600 px-3 py-1 disabled:opacity-50">Không duyệt</button>
-              </div></div> : <span>{item.note || '—'}{item.locked && <span className="block text-xs text-slate-500">Ngày công / kỳ lương đã khóa</span>}</span>}</td>
-          </tr>)}</tbody>
-        </table></div>}
-      </div>;
-    })}
-  </section>;
+const money = (n: number) => `${Number(n).toLocaleString('vi-VN')} ₫`;
+export function filterAdjustments(items: AttendanceAdjustment[], status: string, kind: string, search: string) { const q = search.trim().toLocaleLowerCase('vi-VN'); return items.filter(i => (status === 'ALL' || i.status === status) && (kind === 'ALL' || i.kind === kind) && (!q || `${i.employee_name} ${i.employee_id} ${i.date}`.toLocaleLowerCase('vi-VN').includes(q))); }
+export function canReviewAdjustment(item: AttendanceAdjustment) { return item.can_review && !item.locked && item.status !== 'VOID'; }
+export function AdjustmentReviewPanel({ period, employeeId }: {
+    period: string;
+    employeeId?: string;
+}) {
+    const location = useLocation();
+    const client = useQueryClient();
+    const { showToast } = useToast();
+    const [params, setParams] = useSearchParams();
+    const status = params.get('reviewStatus') || 'PENDING', kind = params.get('reviewKind') || 'ALL', search = params.get('reviewSearch') || '';
+    const setFilter = (name: string, value: string) => setParams(previous => { const next = new URLSearchParams(previous); if (value)
+        next.set(name, value);
+    else
+        next.delete(name); return next; }, { replace: true });
+    const [selected, setSelected] = useState<AttendanceAdjustment | null>(null);
+    const [note, setNote] = useState('');
+    const [decision, setDecision] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
+    const [dirty, setDirty] = useState(false);
+    const query = useQuery({ queryKey: ['attendanceAdjustments', period, employeeId || 'ALL'], queryFn: async (): Promise<AttendanceAdjustment[]> => { const p = new URLSearchParams({ period }); if (employeeId)
+            p.set('employeeId', employeeId); const res = await apiFetch(`/api/payroll/adjustments?${p}`); if (!res.success)
+            throw new Error(res.message || 'Không tải được OT và các khoản phạt'); return res.data; } });
+    const review = useMutation({ mutationFn: async () => { if (!selected || !canReviewAdjustment(selected))
+            throw new Error('Khoản này không còn được phép xét duyệt. Vui lòng tải lại.'); const res = await apiFetch(`/api/payroll/adjustments/${encodeURIComponent(selected.id)}`, { method: 'PATCH', body: JSON.stringify({ status: decision, note, updated_at: selected.updated_at }) }); if (!res.success)
+            throw new Error(res.message || 'Không lưu được quyết định'); }, onSuccess: () => { showToast('Đã lưu quyết định xét duyệt.', 'success'); setSelected(null); setDirty(true); for (const key of ['attendanceAdjustments', 'attendanceSummaries', 'payroll'])
+            client.invalidateQueries({ queryKey: [key] }); }, onError: () => { client.invalidateQueries({ queryKey: ['attendanceAdjustments'] }); } });
+    const items = query.data || [];
+    const active = items.filter(i => i.status !== 'VOID');
+    const pending = active.filter(i => i.status === 'PENDING');
+    const visible = filterAdjustments(items, status, kind, search).sort((a, b) => b.date.localeCompare(a.date) || a.employee_name.localeCompare(b.employee_name));
+    const open = (item: AttendanceAdjustment) => { review.reset(); setSelected(item); setNote(item.note || ''); setDecision('APPROVED'); };
+    return <section className="space-y-4" aria-label="Xét duyệt OT và khoản phạt"><div className="flex flex-wrap justify-between gap-3"><div><h2 className="text-lg font-semibold">Xét duyệt OT & khoản phạt</h2><p className="sf-secondary">Kỳ {period} · Xem căn cứ và quyết định riêng từng khoản theo ngày.</p></div><button className="sf-button" onClick={() => query.refetch()} disabled={query.isFetching}><RotateCcw size={16}/>Tải lại</button></div>
+ <div className="sf-summary"><span><strong>{pending.length}</strong> khoản chờ duyệt</span><span>OT chờ: <strong>{pending.filter(i => i.kind === 'OVERTIME').reduce((n, i) => n + i.hours, 0)} giờ</strong></span><span>Phạt chờ: <strong>{money(pending.filter(i => i.kind !== 'OVERTIME').reduce((n, i) => n + i.amount, 0))}</strong></span><span>Đã duyệt: <strong>{active.filter(i => i.status === 'APPROVED').length} khoản</strong></span></div>
+ {dirty && <div className="sf-feedback warning" role="status"><Info size={18}/><span>Quyết định đã lưu. Dùng <strong>Tính lương</strong> để cập nhật phiếu lương sau khi hoàn tất xét duyệt.</span></div>}
+ <div className="sf-toolbar"><label className="sf-field sf-search">Tìm khoản phát sinh<input className="sf-input" value={search} onChange={e => setFilter('reviewSearch', e.target.value)} placeholder="Tên nhân viên, mã hoặc ngày…"/></label><label className="sf-field">Loại khoản<select className="sf-input" value={kind} onChange={e => setFilter('reviewKind', e.target.value)}><option value="ALL">Tất cả loại khoản</option>{Object.entries(adjustmentLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label className="sf-field">Trạng thái<select className="sf-input" value={status} onChange={e => setFilter('reviewStatus', e.target.value)}><option value="ALL">Tất cả trạng thái</option>{Object.entries(statuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></div>
+ {query.isPending ? <div className="sf-empty" role="status">Đang tải các khoản phát sinh…</div> : query.isError ? <div className="sf-feedback error" role="alert"><span>{query.error.message} <button className="underline" onClick={() => query.refetch()}>Thử lại</button></span></div> : <div className="sf-panel"><table className="sf-table sf-responsive"><thead><tr><th>Nhân viên / ngày</th><th>Khoản phát sinh</th><th>Khối lượng / số tiền</th><th>Trạng thái</th><th>Xem xét</th></tr></thead><tbody>{visible.map(item => <tr key={item.id}><td><strong>{item.employee_name}</strong><div className="sf-secondary">{item.employee_id} · {item.date}</div></td><td data-label="Loại khoản">{adjustmentLabels[item.kind]}<div className="sf-secondary line-clamp-2">{item.note || 'Chưa có ghi chú'}</div></td><td data-label="Khối lượng"><span>{item.kind === 'ABSENCE' ? `1 ca (${item.hours} giờ)` : `${item.hours} giờ`}</span><div className={`sf-money font-semibold mt-1 ${item.kind === 'OVERTIME' ? 'text-emerald-700' : 'text-rose-700'}`}>{money(item.amount)}</div></td><td data-label="Trạng thái"><span className={`sf-badge ${item.status === 'PENDING' ? 'warning' : item.status === 'APPROVED' ? 'success' : ''}`}><Clock size={13}/>{statuses[item.status]}</span>{item.locked && <div className="sf-secondary flex items-center gap-1"><Lock size={12}/>Ngày công / kỳ lương đã khóa</div>}{item.reviewed_at && <div className="sf-secondary">{new Date(item.reviewed_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</div>}</td><td><button className="sf-button" onClick={() => open(item)}><FileSearch size={15}/>{canReviewAdjustment(item) ? 'Xem & xét duyệt' : 'Xem chi tiết'}</button></td></tr>)}</tbody></table>{!visible.length && <div className="sf-empty"><Check size={28}/><p className="font-semibold">{!items.length ? 'Chưa có khoản phát sinh trong kỳ' : 'Không có khoản phù hợp'}</p><p className="sf-secondary">{!items.length ? 'Dùng Tính lương để cập nhật các ngày công.' : 'Thử thay đổi loại khoản, trạng thái hoặc từ khóa.'}</p>{items.length > 0 && <button className="sf-button mt-4" onClick={() => setFilter('reviewStatus', 'ALL')}>Xem mọi trạng thái</button>}</div>}</div>}
+ <p className="sf-secondary">Chỉ các khoản đã duyệt được tính vào lương. Phạt vắng theo chính sách hiện có; nghỉ có phép chọn “Không duyệt” và ghi chú.</p>
+ <Modal isOpen={!!selected} onClose={() => { if (!review.isPending)
+        setSelected(null); }} title={selected ? adjustmentLabels[selected.kind] : 'Chi tiết khoản phát sinh'} subtitle={selected ? `${selected.employee_name} · ${selected.employee_id} · ${selected.date}` : undefined} maxWidth="2xl">{selected && <form onSubmit={e => { e.preventDefault(); review.mutate(); }}><div className="sf-review-grid"><div className="sf-review-context"><h3 className="font-semibold mb-4">Căn cứ khoản phát sinh</h3><dl className="space-y-3"><div className="flex justify-between gap-3"><dt>Ngày làm việc</dt><dd>{selected.date}</dd></div><div className="flex justify-between gap-3"><dt>Khối lượng</dt><dd>{selected.hours} giờ</dd></div><div className="flex justify-between gap-3"><dt>Số tiền đề xuất</dt><dd className="sf-money font-semibold">{money(selected.amount)}</dd></div><div className="flex justify-between gap-3"><dt>Trạng thái</dt><dd>{statuses[selected.status]}</dd></div></dl><Link className="sf-button mt-5 w-full" to={location.pathname.startsWith('/app/employee') ? `/app/employee/attendance?date=${selected.date}` : `/app/manager/employees/${encodeURIComponent(selected.employee_id)}?tab=attendance&date=${selected.date}`}><ArrowUpRight size={16}/>Đối chiếu chấm công</Link><p className="sf-secondary mt-3">Mở nhật ký quét, cặp vào/ra và kết quả tính công của đúng ngày.</p></div><div className="space-y-4"><h3 className="font-semibold">Quyết định xét duyệt</h3>{canReviewAdjustment(selected) ? <><fieldset disabled={review.isPending} className="space-y-3"><legend className="sr-only">Chọn quyết định</legend><label className="sf-button w-full justify-start"><input type="radio" name="decision" checked={decision === 'APPROVED'} onChange={() => setDecision('APPROVED')}/><Check size={16}/>Duyệt khoản này</label><label className="sf-button w-full justify-start"><input type="radio" name="decision" checked={decision === 'REJECTED'} onChange={() => setDecision('REJECTED')}/><X size={16}/>Không duyệt</label></fieldset><label className="sf-field">Ghi chú xét duyệt<textarea className="sf-input" rows={4} maxLength={2000} value={note} disabled={review.isPending} onChange={e => setNote(e.target.value)} placeholder="Nêu căn cứ hoặc lý do (ví dụ: nghỉ có phép)…"/></label></> : <div className="sf-feedback"><Lock size={18}/><span>{selected.locked ? 'Ngày công hoặc kỳ lương đã khóa.' : selected.status === 'VOID' ? 'Khoản này không còn phát sinh.' : 'Bạn không có quyền xét duyệt khoản này.'}<p className="mt-2">{selected.note || 'Không có ghi chú.'}</p></span></div>}{selected.reviewed_by && <p className="sf-secondary">Người xét duyệt: {selected.reviewed_by}</p>}</div></div>{review.isError && <div className="sf-feedback error mt-4" role="alert">{review.error.message} Ghi chú của bạn vẫn được giữ; đóng và mở lại khoản để lấy dữ liệu mới trước khi thử lại.</div>}<div className="sf-footer"><button type="button" className="sf-button" disabled={review.isPending} onClick={() => setSelected(null)}>Đóng</button>{canReviewAdjustment(selected) && <button type="submit" className="sf-button primary" disabled={review.isPending}>{review.isPending ? 'Đang lưu quyết định…' : decision === 'APPROVED' ? 'Xác nhận duyệt' : 'Xác nhận không duyệt'}</button>}</div></form>}</Modal>
+ </section>;
 }

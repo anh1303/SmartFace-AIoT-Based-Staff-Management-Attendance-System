@@ -5,7 +5,7 @@ import * as service from './employee.service.js';
 
 
 export const list = async (req: Request, res: Response) => {
-  successResponse(res, await service.list(req.query));
+  successResponse(res, await service.list(req.query, req.user));
 };
 
 export const create = async (req: Request, res: Response) => {
@@ -33,5 +33,5 @@ export const getById = async (req: Request, res: Response) => {
 
 export const resetPassword = async (req: Request, res: Response) => {
   const id = req.params.id as string;
-  successResponse(res, await service.resetPassword(id, req.user?.id), 'Mật khẩu đã được đặt lại thành công');
+  successResponse(res, await service.resetPassword(id, req.user?.id, req.user?.role), 'Mật khẩu đã được đặt lại thành công');
 };

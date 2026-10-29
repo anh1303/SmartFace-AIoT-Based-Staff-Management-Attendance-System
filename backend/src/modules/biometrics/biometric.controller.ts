@@ -27,7 +27,7 @@ export const enrollImages = async (req: Request, res: Response) => {
 
 export const deactivate = async (req: Request, res: Response) => {
   const employeeId = req.params.employeeId as string;
-  await service.deactivate(employeeId);
+  await service.deactivate(employeeId, req.user);
   successResponse(res, null, 'Biometric profile deactivated');
 };
 

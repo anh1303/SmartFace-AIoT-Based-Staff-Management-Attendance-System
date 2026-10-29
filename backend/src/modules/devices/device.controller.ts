@@ -31,19 +31,19 @@ export const getById = async (req: Request, res: Response) => {
 };
 
 export const create = async (req: Request, res: Response) => {
-  const device = await service.create(createDeviceSchema.parse(req.body), req.user?.id);
+  const device = await service.create(createDeviceSchema.parse(req.body), req.user?.id, req.user?.role);
   eventBus.publish('device:created', device);
   successResponse(res, device, 'Device created', 201);
 };
 
 export const update = async (req: Request, res: Response) => {
-  const device = await service.update(String(req.params.id), updateDeviceSchema.parse(req.body), req.user?.id);
+  const device = await service.update(String(req.params.id), updateDeviceSchema.parse(req.body), req.user?.id, req.user?.role);
   eventBus.publish('device:updated', device);
   successResponse(res, device, 'Device updated');
 };
 
 export const remove = async (req: Request, res: Response) => {
-  await service.remove(String(req.params.id), req.user?.id);
+  await service.remove(String(req.params.id), req.user?.id, req.user?.role);
   eventBus.publish('device:deleted', { id: req.params.id });
   successResponse(res, null, 'Device deleted');
 };
@@ -53,7 +53,7 @@ export const setMode = async (req: Request, res: Response) => {
   if (!mode || !['CHECK_IN', 'CHECK_OUT'].includes(mode)) {
     return res.status(400).json({ success: false, message: 'Invalid mode: must be CHECK_IN or CHECK_OUT' });
   }
-  const result = await service.setDeviceAttendanceMode(String(req.params.id), mode);
+  const result = await service.setDeviceAttendanceMode(String(req.params.id), mode, req.user?.role);
   eventBus.publish('device:mode-updated', { deviceId: req.params.id, mode, confirmed: result.confirmed });
   if (result.confirmed) {
     successResponse(res, result, `Pi đã xác nhận ${mode}`);

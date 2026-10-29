@@ -4,7 +4,7 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, formatVNDateISO } from '../../common/utils.js'
 import { logAction } from '../audit-logs/index.js'
-import { isEmployeeManager, assertCanAccessEmployeeDetail } from '../../common/permission.helper.js'
+import { assertCanManageEmployee, getEmployeeScope } from '../../common/permission.helper.js'
 import { findEmployeeByIdOrCode, findEmployeeByUserId } from '../employees/index.js'
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
@@ -117,7 +117,7 @@ export async function list(
   query: Record<string, unknown>,
   requesterUser?: { id?: string; role?: string }
 ) {
-  const where: Record<string, unknown> = {}
+  const where: Record<string, unknown> = { employees: await getEmployeeScope(requesterUser) }
 
   if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
     const emp = await findEmployeeByUserId(requesterUser.id)
@@ -219,6 +219,7 @@ export async function assignOrUpdate(data: {
 
   const shiftRecord = await prisma.$transaction(async tx => {
     await assertEditableDay(tx, data.date, emp.id)
+    await assertCanManageEmployee({ id: actorUserId, role: actorRole }, emp.id, tx)
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`shift-type:${standardConfig.code}`}))`
 
     const shiftNameMatches: string[] = [standardConfig.name]
@@ -328,33 +329,7 @@ export async function assignOrUpdateWithPermissionCheck(
   },
   actorUser?: { id?: string; role?: string }
 ) {
-  if (actorUser?.role !== 'ADMIN') {
-    await assertCanAccessEmployeeDetail(actorUser, data.employee_id)
-    const targetEmp = await prisma.employee.findFirst({
-      where: buildIdOrCodeWhere(data.employee_id),
-      include: {
-        department: true,
-        position: true,
-        users: {
-          select: {
-            id: true,
-            roles: { select: { role_name: true } },
-          },
-        },
-      },
-    })
-    if (!targetEmp) throw AppError.notFound('Không tìm thấy nhân viên')
-
-    if (targetEmp.user_id === actorUser?.id) {
-      throw AppError.forbidden(
-        'Không ai được tự phân ca hoặc sửa ca làm việc của chính mình. Vui lòng liên hệ Quản trị viên (Admin) phê duyệt!'
-      )
-    }
-
-    if (actorUser?.role === 'MANAGER' && isEmployeeManager(targetEmp)) {
-      throw AppError.forbidden('Quản lý không có quyền phân ca cho quản lý khác!')
-    }
-  }
+  await assertCanManageEmployee(actorUser, data.employee_id)
 
   return assignOrUpdate(data, actorUser?.id, actorUser?.role)
 }

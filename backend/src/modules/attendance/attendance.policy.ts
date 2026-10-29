@@ -1,7 +1,11 @@
 import { annotatePairCredits } from './attendance.details.js'
 import { createHash } from 'node:crypto'
 /** Company policy v2026-10-19. Pure calculations; no database, network or rounding per pair. */
-export const ATTENDANCE_POLICY_VERSION = '2026-10-26-v5'
+export const ATTENDANCE_POLICY_VERSION = '2026-10-29-v6'
+export const TWO_THIRDS_EFFECTIVE_DATE = '2026-10-29'
+export function attendancePolicyVersion(workDate: string): string {
+  return workDate >= TWO_THIRDS_EFFECTIVE_DATE ? ATTENDANCE_POLICY_VERSION : '2026-10-26-v5'
+}
 export const MAX_PAIR_MS = 24 * 60 * 60 * 1000
 export const OT_THRESHOLD_SECONDS = 30 * 60
 export const OT_REVIEW_SECONDS = 4 * 60 * 60
@@ -141,36 +145,36 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
   const last = pairs.at(-1)?.end ?? null
   const actualFirst = pairs[0]?.start ?? null
   const actualLast = pairs.at(-1)?.end ?? null
-  const meetsHalfShift = Boolean(shift && !off && scheduledShiftSeconds > 0 && actualWorkedSecondsInShift >= scheduledShiftSeconds / 2)
-  const underHalfShift = Boolean(shift && !off && pairs.length > 0 && !meetsHalfShift)
+  const twoThirds = workDate >= TWO_THIRDS_EFFECTIVE_DATE
+  const requiredNumerator = twoThirds ? 2 : 1
+  const requiredDenominator = twoThirds ? 3 : 2
+  const meetsMinimumShift = Boolean(shift && !off && scheduledShiftSeconds > 0 && actualWorkedSecondsInShift * requiredDenominator >= scheduledShiftSeconds * requiredNumerator)
+  const underMinimumShift = Boolean(shift && !off && pairs.length > 0 && !meetsMinimumShift)
 
   let regularSeconds = 0
   let overtimeSeconds = 0
   let lateSeconds = 0
   let earlySeconds = 0
 
-  if (meetsHalfShift) {
+  if (meetsMinimumShift) {
     // Lựa chọn B: Tổng giờ làm việc trong ngày = Giờ kết thúc ca - Giờ bắt đầu ca
     regularSeconds = scheduledShiftSeconds
     overtimeSeconds = rawOvertimeSeconds
     lateSeconds = actualFirst ? Math.min(scheduledShiftSeconds, Math.max(0, (+actualFirst - +start) / 1000)) : 0
     earlySeconds = actualLast ? Math.min(scheduledShiftSeconds, Math.max(0, (+end - +actualLast) / 1000)) : 0
   }
-  // Nếu !meetsHalfShift (chưa được 1 nửa thời gian ca hoặc không đi làm):
-  // regularSeconds = 0 -> workingHours = 0
-  // overtimeSeconds = 0 -> overtimeCandidateHours = 0
-  // lateSeconds = 0, earlySeconds = 0 -> lateEarlyHours = 0
+  // Below the dated eligibility threshold, retain evidence but grant no automatic wages or penalties.
 
   const lateEarlySeconds = lateSeconds + earlySeconds
   const invalid = ignored.some(l => l.reason === 'INVALID_PAIR' || l.reason === 'INTERRUPTED_PAIR')
   const flagged = source.some(l => l.status && l.status !== 'VALID')
   const orphanOut = !pairs.length && ignored.some(l => l.reason === 'UNPAIRED_CHECK_OUT')
   const noValidPair = sourceEvents.length > 0 && pairs.length === 0
-  const review = Boolean(noValidPair || open || invalid || flagged || orphanOut || underHalfShift || (!shift && (pairs.length || ignored.length)) || overtimeSeconds > OT_REVIEW_SECONDS)
+  const review = Boolean(noValidPair || open || invalid || flagged || orphanOut || underMinimumShift || (!shift && (pairs.length || ignored.length)) || overtimeSeconds > OT_REVIEW_SECONDS)
   const absenceCandidate = Boolean(shift && !off && scheduledShiftSeconds > 0 && +now >= +end && sourceEvents.length === 0 && !open && !ignored.length)
   let status = off ? 'OFF' : !shift ? 'NO_SHIFT' : !pairs.length && !open && +now < +end ? 'SCHEDULED' : absenceCandidate ? 'ABSENT' : 'PRESENT'
-  if (!off && shift && (open || invalid || underHalfShift)) status = 'INCOMPLETE'
-  else if (!off && shift && first && meetsHalfShift) {
+  if (!off && shift && (open || invalid || underMinimumShift)) status = 'INCOMPLETE'
+  else if (!off && shift && first && meetsMinimumShift) {
     if (lateSeconds > 900 && earlySeconds > 0) status = 'LATE_AND_EARLY'
     else if (lateSeconds > 900) status = 'LATE'
     else if (earlySeconds > 0) status = 'EARLY_LEAVE'
@@ -186,7 +190,7 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
       invalid ? 'INVALID_PAIR' : '',
       flagged ? 'FLAGGED_EVENT' : '',
       orphanOut ? 'UNPAIRED_CHECK_OUT' : '',
-      underHalfShift ? 'UNDER_HALF_SHIFT' : '',
+      underMinimumShift ? twoThirds ? 'UNDER_MINIMUM_SHIFT' : 'UNDER_HALF_SHIFT' : '',
       !shift && (pairs.length || ignored.length) ? 'NO_SHIFT' : '',
       overtimeSeconds > OT_REVIEW_SECONDS ? 'OT_OVER_4H' : '',
     ].filter(Boolean).join(',') || null,
@@ -196,19 +200,23 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
         logs: source.map(l => [String(l.id), l.type, new Date(l.event_time).toISOString(), l.status]),
         start: start.toISOString(), end: end.toISOString(), off: Boolean(off), assigned: Boolean(shift),
       })).digest('hex'),
-      policy: ATTENDANCE_POLICY_VERSION,
+      policy: attendancePolicyVersion(workDate),
       pairs: annotatePairCredits(pairs.map(p => ({ ...p, start: p.start.toISOString(), end: p.end.toISOString() })), {
         start: start.toISOString(), end: end.toISOString(), scheduledSeconds: scheduledShiftSeconds,
-        workingHours: roundHours(regularSeconds), candidateHours: candidate, off: Boolean(off),
+        workingHours: roundHours(regularSeconds), candidateHours: candidate, off: Boolean(off), requiredNumerator, requiredDenominator,
       }),
-      details_version: 2,
+      details_version: 3,
       ignored,
       off: Boolean(off),
       scheduledStart: start.toISOString(),
       scheduledEnd: end.toISOString(),
       actualWorkedSecondsInShift,
       scheduledShiftSeconds,
-      meetsHalfShift,
+      meetsMinimumShift,
+      minimumShiftNumerator: requiredNumerator,
+      minimumShiftDenominator: requiredDenominator,
+      // Legacy consumers can still read old half-shift evidence.
+      ...(!twoThirds ? { meetsHalfShift: meetsMinimumShift } : {}),
       absenceCandidate,
       overviewPairIds: overviewPairs.map(p => [p.inId, p.outId]),
       // Internal gaps are evidence only; they do not add late/early penalties.

@@ -1,3 +1,4 @@
+import { getEmployeeScope, assertCanManageEmployee } from '../employees/employee.permission.js';
 import { workDateSchema } from '../../common/date.schema.js';
 import { assertDeviceWebhook } from '../../common/device-auth.js';
 import { Request, Response } from 'express';
@@ -30,8 +31,8 @@ export const list = async (req: Request, res: Response) => {
   successResponse(res, await service.list(query, req.user));
 };
 
-export const statistics = async (_req: Request, res: Response) => {
-  successResponse(res, await service.statistics());
+export const statistics = async (req: Request, res: Response) => {
+  successResponse(res, await service.statistics(req.user));
 };
 
 export const checkIn = async (req: Request, res: Response) => {
@@ -54,10 +55,14 @@ export const getDailySummaries = async (req: Request, res: Response) => {
 
 export const aggregate = async (req: Request, res: Response) => {
   const body = aggregateAttendanceSchema.parse(req.body);
+  if (body.employeeId) await assertCanManageEmployee(req.user, body.employeeId);
+  const scope = await getEmployeeScope(req.user, 'manage');
   const result = await service.aggregateDailyAttendance(
     body.month,
     body.year,
-    body.employeeId
+    body.employeeId,
+    undefined,
+    scope
   );
   successResponse(res, result, 'Aggregated attendance successfully', 201);
 };
@@ -68,8 +73,8 @@ export const adjust = async (req: Request, res: Response) => {
   successResponse(res, result, 'Attendance adjusted');
 };
 
-export const getLocks = async (_req: Request, res: Response) => {
-  successResponse(res, await service.getLocks());
+export const getLocks = async (req: Request, res: Response) => {
+  successResponse(res, await service.getLocks(req.user));
 };
 
 export const lock = async (req: Request, res: Response) => {
@@ -77,7 +82,7 @@ export const lock = async (req: Request, res: Response) => {
   if (!dateStr) {
     return res.status(400).json({ success: false, message: 'Date is required' });
   }
-  const result = await service.toggleLock(dateStr, true, req.user?.id);
+  const result = await service.toggleLock(dateStr, true, req.user?.id, req.user?.role);
   successResponse(res, result, 'Đã khóa chốt dữ liệu chấm công thành công');
 };
 
@@ -86,6 +91,6 @@ export const unlock = async (req: Request, res: Response) => {
   if (!dateStr) {
     return res.status(400).json({ success: false, message: 'Date is required' });
   }
-  const result = await service.toggleLock(dateStr, false, req.user?.id);
+  const result = await service.toggleLock(dateStr, false, req.user?.id, req.user?.role);
   successResponse(res, result, 'Đã mở khóa dữ liệu chấm công thành công');
 };

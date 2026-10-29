@@ -114,7 +114,7 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
       process.env.NODE_ENV='production'
       await aggregate(emp,date)
       expect(await rows(emp)).toHaveLength(0)
-      await expect(attendance.toggleLock(date,true,admin.id)).rejects.toThrow(/chưa kết thúc/)
+      await expect(attendance.toggleLock(date,true,admin.id,'ADMIN')).rejects.toThrow(/chưa kết thúc/)
       vi.setSystemTime(new Date('2025-07-31T08:00:00+07:00'))
       await aggregate(emp,date)
       const [absence]=await rows(emp);expect(absence.status).toBe('PENDING');expect(Number(absence.amount)).toBe(200000)

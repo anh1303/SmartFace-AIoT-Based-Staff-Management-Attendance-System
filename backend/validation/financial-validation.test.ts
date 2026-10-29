@@ -6,7 +6,7 @@ import { updatePayrollSchema, generatePayrollSchema } from '../src/modules/payro
 const base = { hourly_rate:100000,total_working_hours:9,total_overtime:2,total_late_early:1,allowance:1500000,overtime_rate:100000,late_early_penalty:50000 }
 describe('Financial/date input boundaries', () => {
   it('retains the agreed OT and penalty formula without OT in ordinary hours', () => expect(calculateNetSalary(base)).toBe(2550000))
-  it('supports a legacy multiplier snapshot without repricing it', () => expect(calculateNetSalary({...base,overtime_rate:1.5})).toBe(2650000))
+  it('supports a legacy multiplier snapshot without repricing it', () => expect(calculateNetSalary({...base,overtime_rate:1.5,overtime_rate_kind:'HOURLY_MULTIPLIER'})).toBe(2650000))
   it('accepts explicit zero wages, hours and allowance', () => expect(calculateNetSalary({...base,total_working_hours:0,total_overtime:0,total_late_early:0,allowance:0})).toBe(0))
   it.each([NaN,Infinity,-1])('rejects invalid financial input %s', amount => expect(() => calculateNetSalary({...base,hourly_rate:amount})).toThrow())
   it('rejects monetary overflow before DB writes', () => expect(() => calculateNetSalary({...base,hourly_rate:1e15})).toThrow(/giới hạn/))

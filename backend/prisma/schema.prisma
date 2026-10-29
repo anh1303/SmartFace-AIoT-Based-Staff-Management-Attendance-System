@@ -33,6 +33,11 @@ enum PositionLevel {
   EMPLOYEE
 }
 
+enum RateKind {
+  FIXED_PER_HOUR
+  HOURLY_MULTIPLIER
+}
+
 model Department {
   id              Int        @id @default(autoincrement())
   department_code String     @unique @db.VarChar(50)
@@ -108,7 +113,9 @@ model PayrollRecord {
   net_salary          Decimal  @default(0) @db.Decimal(15, 2)
   status              String   @default("PENDING") @db.VarChar(20)
   overtime_rate       Decimal? @db.Decimal(15, 4)
+  overtime_rate_kind  RateKind?
   late_penalty_rate   Decimal? @db.Decimal(15, 4)
+  late_penalty_rate_kind RateKind?
   calculation_details Json?
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updated_at          DateTime @default(now()) @updatedAt @db.Timestamptz(6)
@@ -260,8 +267,10 @@ model Device {
 
 model BonusPenalty {
   id                 Int      @id @default(autoincrement())
-  overtime_rate      Decimal  @default(1.5) @db.Decimal(10, 2)
-  late_early_penalty Decimal  @default(0) @db.Decimal(15, 2)
+  overtime_rate      Decimal  @default(100000) @db.Decimal(10, 2)
+  overtime_rate_kind RateKind @default(FIXED_PER_HOUR)
+  late_early_penalty Decimal  @default(50000) @db.Decimal(15, 2)
+  late_early_penalty_kind RateKind @default(FIXED_PER_HOUR)
   absence_penalty_rate Decimal @default(0.25) @db.Decimal(5, 4)
   description        String?  @db.VarChar(255)
   created_at         DateTime @default(now()) @db.Timestamptz(6)

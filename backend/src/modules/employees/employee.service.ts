@@ -13,7 +13,7 @@ import {
   deleteAuthUser,
 } from '../auth/index.js'
 import { employeeInclude } from './employee.model.js'
-import { assertCanAccessEmployeeDetail } from './employee.permission.js'
+import { assertCanAccessEmployeeDetail, assertCanManageEmployee, getEmployeeScope, isEmployeeManager, type EmployeeActor } from './employee.permission.js'
 
 export interface RawEmployeeDb {
   id: string
@@ -85,7 +85,8 @@ export function formatEmployee(emp: RawEmployeeDb) {
   }
 }
 
-export async function list(query: Record<string, unknown>) {
+export async function list(query: Record<string, unknown>, actor?: EmployeeActor) {
+  const scope = await getEmployeeScope(actor)
   const page = Math.max(1, Number(query.page) || 1)
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 20))
   const search = typeof query.search === 'string' ? query.search : ''
@@ -96,6 +97,7 @@ export async function list(query: Record<string, unknown>) {
       : undefined
 
   const where = {
+    AND: [scope],
     ...(search
       ? {
         OR: [
@@ -153,7 +155,7 @@ export async function create(data: {
   avatar?: string | null
   avatar_url?: string | null
   fingerprint_enrolled?: boolean | null
-}, actorUserId?: string) {
+}, actorUserId?: string, actorRole?: string) {
   let deptId = data.departmentId ?? data.department_id
   let posId = data.positionId ?? data.position_id
 
@@ -236,7 +238,7 @@ export async function create(data: {
 
   // 5. Tìm vai trò EMPLOYEE mặc định cho nhân viên mới qua auth module
   const fallbackRole = await getDefaultRole()
-  if (!fallbackRole) {
+  if (!fallbackRole || fallbackRole.role_name.toUpperCase() !== 'EMPLOYEE') {
     throw new AppError(500, 'Không tìm thấy vai trò (roles) trong hệ thống để gán cho người dùng mới')
   }
 
@@ -244,6 +246,11 @@ export async function create(data: {
 
   // 6. Thực hiện tạo User và Employee đồng thời trong transaction
   const { created, user } = await prisma.$transaction(async (tx) => {
+    if (actorRole?.toUpperCase() === 'MANAGER') {
+      await getEmployeeScope({ id: actorUserId, role: actorRole }, 'manage', tx)
+      const self = await tx.employee.findFirst({ where: { user_id: actorUserId } })
+      if (!self?.departmentId || self.departmentId !== deptId) throw AppError.forbidden('Employee department changed; refresh before creating staff')
+    }
     // 6.1 Tạo tài khoản đăng nhập User mới qua auth module API
     const newUser = await createAuthUser(
       {
@@ -343,8 +350,10 @@ export async function update(
     fingerprint_enrolled?: boolean
   },
   actorUserId?: string,
+  tx?: Prisma.TransactionClient,
 ) {
-  const existing = await prisma.employee.findFirst({
+  const client = tx ?? prisma
+  const existing = await client.employee.findFirst({
     where: buildIdOrCodeWhere(idOrCode),
     include: employeeInclude,
   })
@@ -354,14 +363,14 @@ export async function update(
   let posId = data.positionId ?? data.position_id
 
   if (deptId === undefined && data.department) {
-    const dept = await prisma.department.findFirst({
+    const dept = await client.department.findFirst({
       where: { name: { equals: data.department.trim(), mode: 'insensitive' } },
     })
     if (dept) {
       deptId = dept.id
     } else {
       // Nếu frontend truyền tên chức vụ vào trường department
-      const foundPos = await prisma.position.findFirst({
+      const foundPos = await client.position.findFirst({
         where: { name: { equals: data.department.trim(), mode: 'insensitive' } },
       })
       if (foundPos) {
@@ -381,7 +390,7 @@ export async function update(
       if (!isNaN(parsedId)) {
         posId = parsedId
       } else {
-        const found = await prisma.position.findFirst({
+        const found = await client.position.findFirst({
           where: {
             name: { equals: data.position.trim(), mode: 'insensitive' },
             ...(deptId ? { departmentId: deptId } : {}),
@@ -396,13 +405,13 @@ export async function update(
   }
 
   if (deptId === undefined && posId) {
-    const p = await prisma.position.findUnique({ where: { id: posId } })
+    const p = await client.position.findUnique({ where: { id: posId } })
     if (p) deptId = p.departmentId
   }
 
   const rateVal = data.hourly_rate
 
-  const updated = await prisma.employee.update({
+  const updated = await client.employee.update({
     where: { id: existing.id },
     data: {
       ...(data.full_name !== undefined ? { full_name: data.full_name } : {}),
@@ -514,7 +523,8 @@ export async function remove(idOrCode: string, actorUserId?: string) {
 // Alias terminate để đảm bảo tương thích
 export const terminate = remove
 
-export async function resetPassword(idOrCode: string, actorUserId?: string) {
+export async function resetPassword(idOrCode: string, actorUserId?: string, actorRole?: string) {
+  await assertCanManageEmployee({ id: actorUserId, role: actorRole }, idOrCode)
   const existing = await prisma.employee.findFirst({
     where: buildIdOrCodeWhere(idOrCode),
     include: employeeInclude,
@@ -540,7 +550,7 @@ export async function resetPassword(idOrCode: string, actorUserId?: string) {
   } else {
     // Nếu nhân viên chưa có User thì tạo mới qua auth module
     const fallbackRole = await getDefaultRole()
-    if (!fallbackRole) {
+    if (!fallbackRole || fallbackRole.role_name.toUpperCase() !== 'EMPLOYEE') {
       throw new AppError(500, 'Không tìm thấy vai trò (roles) trong hệ thống')
     }
 
@@ -601,11 +611,41 @@ export async function resetPassword(idOrCode: string, actorUserId?: string) {
   }
 }
 
+async function scopeEmployeeChanges(body: any, actor?: EmployeeActor) {
+  if (actor?.role?.toUpperCase() === 'ADMIN') return body;
+  if (actor?.role?.toUpperCase() !== 'MANAGER' || !actor.id) throw AppError.forbidden('Employee management denied');
+  const self = await prisma.employee.findFirst({ where: { user_id: actor.id } });
+  if (!self?.departmentId) throw AppError.forbidden('A department is required to manage employees');
+  for (const key of ['departmentId', 'department_id']) {
+    if (body[key] !== undefined && body[key] !== self.departmentId) throw AppError.forbidden('Cannot move employees outside your department');
+  }
+  if (body.department) {
+    const department = await prisma.department.findFirst({ where: { name: { equals: String(body.department).trim(), mode: 'insensitive' } } });
+    if (department?.id !== self.departmentId) throw AppError.forbidden('Cannot manage another department');
+  }
+  let positionId = body.positionId ?? body.position_id;
+  if (positionId === undefined && body.position != null && body.position !== '') {
+    const candidate = Number(body.position);
+    if (Number.isInteger(candidate) && candidate > 0) positionId = candidate;
+    else {
+      const position = await prisma.position.findFirst({ where: { departmentId: self.departmentId, name: { equals: String(body.position).trim(), mode: 'insensitive' } } });
+      if (!position || isEmployeeManager({ position })) throw AppError.forbidden('Invalid staff position');
+      positionId = position.id;
+    }
+  }
+  if (positionId != null) {
+    const position = await prisma.position.findUnique({ where: { id: positionId } });
+    if (!position || position.departmentId !== self.departmentId || isEmployeeManager({ position })) throw AppError.forbidden('Invalid staff position');
+  }
+  return { ...body, departmentId: self.departmentId, ...(positionId !== undefined ? { positionId } : {}) };
+}
+
 export async function createWithManagerCheck(
   body: any,
   actorUserId?: string,
   actorRole?: string
 ) {
+  body = await scopeEmployeeChanges(body, { id: actorUserId, role: actorRole });
   if (actorRole === 'MANAGER') {
     const pos = typeof body.position === 'string' ? body.position.trim() : '';
     const dept = (body.department || '').trim();
@@ -632,7 +672,7 @@ export async function createWithManagerCheck(
     departmentId: body.departmentId || body.department_id,
     positionId: body.positionId || body.position_id,
   };
-  return create(empData, actorUserId);
+  return create(empData, actorUserId, actorRole);
 }
 
 export async function updateWithManagerCheck(
@@ -640,11 +680,8 @@ export async function updateWithManagerCheck(
   updates: any,
   actorUser?: { id?: string; role?: string }
 ) {
-  await assertCanAccessEmployeeDetail(
-    actorUser,
-    id,
-    'Quản lý không có quyền chỉnh sửa thông tin của quản lý khác'
-  );
+  await assertCanManageEmployee(actorUser, id);
+  updates = await scopeEmployeeChanges(updates, actorUser);
 
   if (actorUser?.role === 'MANAGER') {
     const pos = typeof updates.position === 'string' ? updates.position.trim() : '';
@@ -664,7 +701,10 @@ export async function updateWithManagerCheck(
     }
   }
 
-  return update(id, updates, actorUser?.id);
+  return prisma.$transaction(async tx => {
+    await assertCanManageEmployee(actorUser, id, tx);
+    return update(id, updates, actorUser?.id, tx);
+  });
 }
 
 export async function getByIdWithManagerCheck(

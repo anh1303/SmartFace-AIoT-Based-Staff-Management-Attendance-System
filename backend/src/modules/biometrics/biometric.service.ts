@@ -2,7 +2,7 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { logAction } from '../audit-logs/index.js'
 import { env } from '../../config/env.js'
-import { findEmployeeByIdOrCode, isEmployeeManager } from '../employees/index.js'
+import { findEmployeeByIdOrCode, assertCanManageEmployee, type EmployeeActor } from '../employees/index.js'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -36,7 +36,8 @@ export async function getByEmployee(idOrCode: string) {
   return { employeeId, sampleCount: embeddings.length, samples: embeddings }
 }
 
-export async function deactivate(idOrCode: string) {
+export async function deactivate(idOrCode: string, actor?: EmployeeActor) {
+  await assertCanManageEmployee(actor, idOrCode)
   const employeeId = await resolveEmployeeId(idOrCode)
   const count = await prisma.face_embeddings.count({
     where: { employee_id: employeeId, is_active: true },
@@ -150,19 +151,7 @@ export async function enrollImagesWithPermissionCheck(
   imagesBase64: string[],
   actorUser?: { id?: string; role?: string }
 ) {
-  const targetEmp = await findEmployeeByIdOrCode(employeeId)
-  if (!targetEmp) throw AppError.notFound('Không tìm thấy nhân viên')
-
-  if (actorUser?.role !== 'ADMIN') {
-    if (targetEmp.user_id === actorUser?.id) {
-      throw AppError.forbidden(
-        'Không ai được tự đăng ký hoặc sửa dữ liệu khuôn mặt của chính mình. Vui lòng liên hệ Quản trị viên (Admin) phê duyệt!'
-      );
-    }
-    if (actorUser?.role === 'MANAGER' && isEmployeeManager(targetEmp)) {
-      throw AppError.forbidden('Quản lý không có quyền đăng ký sinh trắc học cho quản lý khác!');
-    }
-  }
+  await assertCanManageEmployee(actorUser, employeeId)
 
   return enrollImages(employeeId, imagesBase64, actorUser?.id);
 }
@@ -171,19 +160,7 @@ export async function removeAllWithPermissionCheck(
   employeeId: string,
   actorUser?: { id?: string; role?: string }
 ) {
-  const targetEmp = await findEmployeeByIdOrCode(employeeId)
-  if (!targetEmp) throw AppError.notFound('Không tìm thấy nhân viên')
-
-  if (actorUser?.role !== 'ADMIN') {
-    if (targetEmp.user_id === actorUser?.id) {
-      throw AppError.forbidden(
-        'Không ai được tự xóa dữ liệu khuôn mặt của chính mình. Vui lòng liên hệ Quản trị viên (Admin) phê duyệt!'
-      );
-    }
-    if (actorUser?.role === 'MANAGER' && isEmployeeManager(targetEmp)) {
-      throw AppError.forbidden('Quản lý không có quyền xóa dữ liệu sinh trắc học của quản lý khác!');
-    }
-  }
+  await assertCanManageEmployee(actorUser, employeeId)
 
   return removeAll(employeeId, actorUser?.id);
 }

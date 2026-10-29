@@ -1,6 +1,9 @@
+import { prisma } from '../../config/database.js'
+import { buildIdOrCodeWhere } from '../../common/utils.js'
+import { isEmployeeManager } from '../employees/employee.permission.js'
 import type { Server } from 'socket.io'
 import { eventBus } from '../../common/event-bus.js'
-import { socketAuthMiddleware } from '../../sockets/socket.auth.js'
+import { socketAuthMiddleware, refreshSocketScope } from '../../sockets/socket.auth.js'
 
 let io: Server | undefined
 
@@ -10,16 +13,7 @@ export const initializeAttendanceGateway = (server: Server) => {
   nsp.use(socketAuthMiddleware)
   nsp.on('connection', (socket) => {
     const user = socket.data.user
-    if (user?.role) {
-      socket.join(user.role)
-    }
-    if (user?.id) {
-      socket.join(`user:${user.id}`)
-    }
-    const empId = user?.employeeId || user?.employee_id
-    if (empId) {
-      socket.join(`employee:${empId}`)
-    }
+    const empId = user?.employeeId
     socket.emit('connected', {
       namespace: '/attendance',
       user: user ? { id: user.id, role: user.role, employeeId: empId } : undefined,
@@ -31,22 +25,32 @@ export const initializeAttendanceGateway = (server: Server) => {
  * @internal INTERNAL USE ONLY - Do not call from controllers or services.
  * Services must publish domain events via eventBus instead.
  */
-export const emitAttendanceEvent = (event: string, payload: unknown, room?: string) => {
+export const emitAttendanceEvent = async (event: string, payload: unknown, room?: string) => {
   if (!io) return
   const nsp = io.of('/attendance')
-  if (room) {
-    nsp.to(room).emit(event, payload)
-    return
+  try {
+    // Refresh before delivery so department transfers and role changes revoke old subscriptions.
+    await Promise.all([...nsp.sockets.values()].map(async socket => {
+      try { await refreshSocketScope(socket) } catch { socket.disconnect(true) }
+    }))
+    const p = payload as any
+    const empId = p?.employee_uuid || p?.employee_id || p?.employeeId || p?.employees?.id || p?.employees?.employee_code
+    const userId = p?.employee_user_id || p?.user_id || p?.userId || p?.employees?.user_id
+    const employee = empId || userId ? await prisma.employee.findFirst({
+      where: empId ? buildIdOrCodeWhere(String(empId)) : { user_id: String(userId) },
+      include: { position: true, department: true, users: { include: { roles: true } } },
+    }) : null
+    let recipients = nsp.to('ADMIN')
+    if (employee) {
+      if (employee.departmentId && !isEmployeeManager(employee)) recipients = recipients.to(`department:${employee.departmentId}`)
+      recipients = recipients.to(`employee:${employee.id}`)
+      if (employee.user_id) recipients = recipients.to(`user:${employee.user_id}`)
+    }
+    // Explicit rooms cannot broaden the scope of an event.
+    recipients.emit(event, payload)
+  } catch (error) {
+    console.error('[Attendance Gateway] Unable to authorize event recipients', error)
   }
-
-  // Use a union of rooms so a manager receiving their own event gets one copy.
-  const p = payload as any
-  const empId = p?.employee_id || p?.employeeId || p?.employee_uuid || p?.employees?.id || p?.employees?.employee_code
-  const userId = p?.employee_user_id || p?.user_id || p?.userId || p?.employees?.user_id
-  let recipients = nsp.to('ADMIN').to('MANAGER')
-  if (empId) recipients = recipients.to(`employee:${empId}`)
-  if (userId) recipients = recipients.to(`user:${userId}`)
-  recipients.emit(event, payload)
 }
 
 // Tự động lắng nghe Domain Events từ EventBus và broadcast tới Socket.IO clients

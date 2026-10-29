@@ -47,7 +47,9 @@ export async function get(id: string) {
 export async function create(
   data: { name: string; location: string; ip?: string | null; status?: string },
   actorUserId?: string,
+  actorRole?: string,
 ) {
+  if (actorRole?.toUpperCase() !== 'ADMIN') throw AppError.forbidden('Only Admin can manage shared devices')
   const device = await prisma.device.create({
     data: {
       name: data.name,
@@ -77,7 +79,9 @@ export async function update(
   id: string,
   data: { name?: string; location?: string; ip?: string | null; status?: string },
   actorUserId?: string,
+  actorRole?: string,
 ) {
+  if (actorRole?.toUpperCase() !== 'ADMIN') throw AppError.forbidden('Only Admin can manage shared devices')
   const existing = await get(id)
   const updated = await prisma.device.update({
     where: { id },
@@ -111,7 +115,8 @@ export async function update(
   return formatDevice(updated)
 }
 
-export async function remove(id: string, actorUserId?: string): Promise<void> {
+export async function remove(id: string, actorUserId?: string, actorRole?: string): Promise<void> {
+  if (actorRole?.toUpperCase() !== 'ADMIN') throw AppError.forbidden('Only Admin can manage shared devices')
   const existing = await get(id)
   await prisma.device.delete({ where: { id } })
 
@@ -254,7 +259,8 @@ export async function getDeviceAttendanceMode(deviceId: string) {
   return { deviceId, mode: cached.mode || 'CHECK_IN', confirmed: cached.confirmed }
 }
 
-export async function setDeviceAttendanceMode(deviceId: string, mode: 'CHECK_IN' | 'CHECK_OUT') {
+export async function setDeviceAttendanceMode(deviceId: string, mode: 'CHECK_IN' | 'CHECK_OUT', actorRole?: string) {
+  if (actorRole?.toUpperCase() !== 'ADMIN') throw AppError.forbidden('Only Admin can control shared devices')
   let ackTimeout: NodeJS.Timeout
   const ackPromise = new Promise<boolean>((resolve) => {
     pendingModeAcks.set(deviceId, {

@@ -19,5 +19,5 @@ attendanceRouter.get('/summaries', asyncHandler(controller.getDailySummaries));
 attendanceRouter.post('/aggregate', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.aggregate));
 attendanceRouter.patch('/adjust', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.adjust));
 attendanceRouter.get('/locks', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.getLocks));
-attendanceRouter.post('/locks/lock', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.lock));
-attendanceRouter.post('/locks/unlock', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.unlock));
+attendanceRouter.post('/locks/lock', authorize('ADMIN'), asyncHandler(controller.lock));
+attendanceRouter.post('/locks/unlock', authorize('ADMIN'), asyncHandler(controller.unlock));

@@ -1,8 +1,14 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'
 import { io as connect, Socket } from 'socket.io-client'
 import jwt from 'jsonwebtoken'
+const records = vi.hoisted(() => ({ users: new Map<string, any>(), employees: new Map<string, any>() }))
+vi.mock('../src/config/database.js', () => ({ prisma: {
+  user: { findUnique: async ({ where }: any) => records.users.get(where.id) || null },
+  employee: { findFirst: async ({ where }: any) => [...records.employees.values()].find(e =>
+    where.user_id ? e.user_id === where.user_id : where.employee_code ? e.employee_code === where.employee_code : e.id === where.id) || null },
+} }))
 // Local socket listeners are opt-in so normal unit runs remain sandbox friendly.
 const suite = process.env.RUN_SOCKET_TESTS === '1' ? describe : describe.skip
 suite('Namespace authentication and broadcast isolation', () => {
@@ -10,6 +16,10 @@ suite('Namespace authentication and broadcast isolation', () => {
   const clients: Socket[] = []
   const secret = 'isolated-socket-test-key-at-least-32-characters'
   beforeAll(async () => {
+    for (const id of ['admin-user', 'test-user', 'mine', 'other', 'manager-a', 'manager-b']) {
+      records.users.set(id, { id, is_active: true, roles: { role_name: id === 'admin-user' ? 'ADMIN' : id.startsWith('manager-') ? 'MANAGER' : 'EMPLOYEE' } })
+      records.employees.set(id, { id: `employee-${id}`, employee_code: `employee-${id}`, user_id: id, departmentId: id === 'manager-b' ? 2 : 1 })
+    }
     process.env.JWT_SECRET = secret
     const { initializeAttendanceGateway, emitAttendanceEvent } = await import('../src/modules/attendance/attendance.gateway.js')
     const { initializeDeviceGateway, emitDeviceEvent } = await import('../src/modules/devices/device.gateway.js')
@@ -37,7 +47,7 @@ suite('Namespace authentication and broadcast isolation', () => {
     await Promise.all([admin,employee].map(s => new Promise<void>(resolve => s.once('connect',resolve))))
     const adminEvents: unknown[] = [], employeeEvents: unknown[] = []
     admin.on('policy-check',v => adminEvents.push(v));employee.on('policy-check',v => employeeEvents.push(v))
-    if (namespace === '/attendance') emitAttendance('policy-check',{ok:true,employee_user_id:'admin-user'})
+    if (namespace === '/attendance') await emitAttendance('policy-check',{ok:true,employee_user_id:'admin-user'})
     else emitDevice('policy-check',{ok:true})
     await new Promise(resolve => setTimeout(resolve,50))
     expect(adminEvents).toHaveLength(1);expect(employeeEvents).toHaveLength(0)
@@ -47,9 +57,32 @@ suite('Namespace authentication and broadcast isolation', () => {
     await Promise.all([mine,other].map(s => new Promise<void>(resolve => s.once('connect',resolve))))
     const received: unknown[] = [], leaked: unknown[] = []
     mine.on('personal-check',v => received.push(v));other.on('personal-check',v => leaked.push(v))
-    emitAttendance('personal-check',{employee_user_id:'mine'})
+    await emitAttendance('personal-check',{employee_user_id:'mine'})
     await new Promise(resolve => setTimeout(resolve,50))
     expect(received).toHaveLength(1);expect(leaked).toHaveLength(0)
+  })
+
+  it('isolates department events, revokes old rooms after a move, and keeps unknown alerts Admin-only', async () => {
+    const a = socket('/attendance', 'MANAGER', false, 'manager-a'), b = socket('/attendance', 'MANAGER', false, 'manager-b')
+    await Promise.all([a,b].map(s => new Promise<void>(resolve => s.once('connect',resolve))))
+    const eventsA: unknown[] = [], eventsB: unknown[] = []
+    a.on('department-check', value => eventsA.push(value)); b.on('department-check', value => eventsB.push(value))
+    await emitAttendance('department-check', { employee_user_id: 'mine' })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(eventsA).toHaveLength(1); expect(eventsB).toHaveLength(0)
+    records.employees.get('manager-a').departmentId = 2
+    await emitAttendance('department-check', { employee_user_id: 'mine' })
+    await emitAttendance('department-check', { unknown: true })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(eventsA).toHaveLength(1); expect(eventsB).toHaveLength(0)
+  })
+  it('does not send shared device events to managers', async () => {
+    const manager = socket('/devices', 'MANAGER', false, 'manager-a')
+    await new Promise<void>(resolve => manager.once('connect',resolve))
+    const received: unknown[] = []; manager.on('shared-device-check', value => received.push(value))
+    await emitDevice('shared-device-check', { mode: 'CHECK_OUT' })
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(received).toHaveLength(0)
   })
 
 })

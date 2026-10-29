@@ -4,9 +4,9 @@ import { observeRecognition } from './recognition-confirmation.js'
 import { Prisma } from '@prisma/client'
 import { createHash } from 'node:crypto'
 import { setImmediate as yieldToRequests } from 'node:timers/promises'
-import { attendanceWorkDate, calculateDay, prepareAttendance, vnDay, ATTENDANCE_POLICY_VERSION, MAX_PAIR_MS, roundHours } from './attendance.policy.js'
+import { attendanceWorkDate, calculateDay, prepareAttendance, vnDay, MAX_PAIR_MS, roundHours } from './attendance.policy.js'
 import { prisma } from '../../config/database.js'
-import { assertCanAccessEmployeeDetail } from '../../common/permission.helper.js'
+import { assertCanManageEmployee, getEmployeeScope, type EmployeeActor } from '../../common/permission.helper.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, formatVNDateISO, formatVNTime } from '../../common/utils.js'
 import { attendanceInclude } from './attendance.model.js'
@@ -185,7 +185,7 @@ export async function list(
   query: Record<string, unknown>,
   requesterUser?: { id?: string; role?: string }
 ) {
-  const where: Record<string, unknown> = {}
+  const where: Record<string, unknown> = { employees: await getEmployeeScope(requesterUser) }
 
   if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
     const emp = await prisma.employee.findFirst({
@@ -261,7 +261,7 @@ export async function getDailySummaries(
   query: Record<string, unknown>,
   requesterUser?: { id?: string; role?: string }
 ) {
-  const where: Record<string, unknown> = {}
+  const where: Record<string, unknown> = { employees: await getEmployeeScope(requesterUser) }
 
   let empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
     ? query.employeeId
@@ -366,15 +366,11 @@ export async function adjustAttendance(
   })
   if (!emp) throw AppError.notFound('Employee not found')
   if (!data.reason?.trim()) throw AppError.badRequest('Cần lý do điều chỉnh/duyệt OT')
-  if (actorRole !== 'ADMIN') {
-    await assertCanAccessEmployeeDetail({ id: actorUserId, role: actorRole }, emp.id)
-    if (emp.user_id === actorUserId) throw AppError.forbidden('Không được tự duyệt công/OT của chính mình')
-    const { isEmployeeManager } = await import('../../common/permission.helper.js')
-    if (actorRole === 'MANAGER' && isEmployeeManager(emp)) throw AppError.forbidden('Không được điều chỉnh công của quản lý khác')
-  }
+  await assertCanManageEmployee({ id: actorUserId, role: actorRole }, emp.id)
   await aggregateDailyAttendance(Number(data.date.slice(5, 7)), Number(data.date.slice(0, 4)), emp.id, data.date)
   const result = await prisma.$transaction(async tx => {
     await assertEditableDay(tx, data.date, emp.id)
+    await assertCanManageEmployee({ id: actorUserId, role: actorRole }, emp.id, tx)
     const key = { employee_id: emp.id, work_date: new Date(`${data.date}T00:00:00Z`) }
     const existing = await tx.daily_attendance_summary.findUnique({ where: { employee_id_work_date: key } })
     if (!existing) throw AppError.badRequest('Chưa có dữ liệu ngày công để điều chỉnh')
@@ -454,6 +450,7 @@ async function recordAttendance(
       : buildIdOrCodeWhere(employeeId),
   })
   if (!employee) throw AppError.notFound('Employee not found')
+  if (requester && requester.role?.toUpperCase() !== 'EMPLOYEE') await assertCanManageEmployee(requester, employee.id)
   if (employee.status !== 'ACTIVE') throw AppError.forbidden('Nhân viên không ở trạng thái ACTIVE')
   const eventTime = new Date(capture.capturedAt ?? Date.now())
   if (!Number.isFinite(+eventTime)) throw AppError.badRequest('Thời điểm ghi nhận không hợp lệ')
@@ -463,6 +460,7 @@ async function recordAttendance(
     // Lock adjacent periods in chronological order for cross-midnight/month pairs.
     const periods = [-1, 0, 1].map(offset => { const d = new Date(eventTime); d.setUTCMonth(d.getUTCMonth() + offset, 1); return vnDay(d).slice(0, 7) }).sort()
     for (const period of periods) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${period}`}))`
+    if (requester && requester.role?.toUpperCase() !== 'EMPLOYEE') await assertCanManageEmployee(requester, employee.id, tx)
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${employee.id}))`
     if (eventKey) {
       const existing = await tx.attendance_logs.findUnique({ where: { event_key: eventKey }, include: attendanceInclude })
@@ -579,7 +577,7 @@ export async function checkOut(
     : (isLegacy ? secondArg : undefined)
   const requesterUser = isObject
     ? (typeof secondArg === 'object' ? secondArg : thirdArg)
-    : (isLegacy ? thirdArg : (typeof secondArg === 'object' ? secondArg : undefined))
+    : (typeof secondArg === 'object' ? secondArg : thirdArg)
   const capture: CaptureOptions = (isObject ? (typeof secondArg === 'object' && !('id' in secondArg || 'role' in secondArg) ? (secondArg as CaptureOptions) : fourthArg) : fourthArg) || {}
 
   if (!targetEmployeeId && requesterUser?.role !== 'EMPLOYEE') throw AppError.badRequest('employeeId is required')
@@ -592,14 +590,15 @@ export async function checkOut(
   return recordAttendance('CHECK_OUT', targetEmployeeId || '', deviceInfo, requesterUser, mergedCapture)
 }
 
-export async function statistics() {
+export async function statistics(actor?: EmployeeActor) {
+  const scope = await getEmployeeScope(actor)
   const start = startOfToday()
   const [checkedInToday, totalActiveEmployees] = await Promise.all([
     prisma.attendance_logs.groupBy({
       by: ['employee_id'],
-      where: { type: 'CHECK_IN', event_time: { gte: start } },
+      where: { employees: scope, type: 'CHECK_IN', event_time: { gte: start } },
     }),
-    prisma.employee.count({ where: { status: 'ACTIVE' } }),
+    prisma.employee.count({ where: { AND: [scope, { status: 'ACTIVE' }] } }),
   ])
 
   const checkedIn = checkedInToday.length
@@ -612,7 +611,7 @@ export async function statistics() {
   }
 }
 
-export async function getLocks() {
+export async function getLocks(actor?: EmployeeActor) {
   const locks = await prisma.attendance_locks.findMany({
     orderBy: { work_date: 'desc' },
   })
@@ -620,11 +619,12 @@ export async function getLocks() {
     date: formatVNDateISO(l.work_date),
     is_locked: l.is_locked,
     locked_at: l.locked_at,
-    locked_by: l.locked_by,
+    locked_by: actor?.role?.toUpperCase() === 'ADMIN' ? l.locked_by : undefined,
   }))
 }
 
-export async function toggleLock(dateStr: string, is_locked: boolean, actorUserId?: string) {
+export async function toggleLock(dateStr: string, is_locked: boolean, actorUserId?: string, actorRole?: string) {
+  if (actorRole?.toUpperCase() !== 'ADMIN') throw AppError.forbidden('Only Admin can lock or unlock global attendance dates')
   const work_date = new Date(`${dateStr}T00:00:00.000Z`)
   if (is_locked) await aggregateDailyAttendance(Number(dateStr.slice(5,7)), Number(dateStr.slice(0,4)), undefined, dateStr)
   const lock = await prisma.$transaction(async tx => {
@@ -637,8 +637,8 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
     if (is_locked && await tx.attendanceAdjustment.count({ where: { work_date, status: 'PENDING' } })) throw AppError.conflict('Còn khoản OT/phạt chờ duyệt trước khi khóa ngày')
     if (is_locked && await tx.daily_attendance_summary.count({ where: { work_date, OR: [{ requires_review: true }, { overtime_status: 'PENDING' }, { policy_version: null }] } })) throw AppError.conflict('Cần rà soát công và duyệt OT trước khi khóa ngày')
     const lock = await tx.attendance_locks.upsert({ where: { work_date },
-      update: { is_locked, locked_at: new Date(), locked_by: actorUserId || 'MANAGER' },
-      create: { work_date, is_locked, locked_by: actorUserId || 'MANAGER' } })
+      update: { is_locked, locked_at: new Date(), locked_by: actorUserId || 'ADMIN' },
+      create: { work_date, is_locked, locked_by: actorUserId || 'ADMIN' } })
     await tx.auditLog.create({ data: { userId: actorUserId, action: is_locked ? 'LOCK_ATTENDANCE_DATE' : 'UNLOCK_ATTENDANCE_DATE',
       target_table: 'attendance_locks', record_id: dateStr, new_values: { date: dateStr, is_locked } } })
     return lock
@@ -657,7 +657,7 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
  * sang bảng daily_attendance_summary cho một tháng cụ thể (month: 1-12, year: e.g. 2026).
  * Đảm bảo luồng tính lương thông suốt: Sắp lịch -> Quẹt thẻ Checkin/out -> Tổng hợp ngày -> Tính lương cuối tháng.
  */
-export async function aggregateDailyAttendance(month: number, year: number, employeeId?: string, onlyDate?: string) {
+export async function aggregateDailyAttendance(month: number, year: number, employeeId?: string, onlyDate?: string, employeeScope: Prisma.EmployeeWhereInput = {}) {
   if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2000 || year > 2100) throw AppError.badRequest('Tháng/năm không hợp lệ')
   return prisma.$transaction(async tx => {
     if (typeof (tx as any).$executeRaw === 'function') {
@@ -667,9 +667,9 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
     const end = onlyDate ? new Date(+start + MAX_PAIR_MS) : new Date(Date.UTC(year, month, 1))
     const first = `${year}-${String(month).padStart(2, '0')}-01`
     const today = vnDay(new Date())
-    const employees = await tx.employee.findMany({ where: employeeId ? buildIdOrCodeWhere(employeeId) : {
+    const employees = await tx.employee.findMany({ where: { AND: [employeeScope, employeeId ? buildIdOrCodeWhere(employeeId) : {
       OR: [{ status: 'ACTIVE' }, { attendance_logs: { some: { event_time: { gte: new Date(+start - MAX_PAIR_MS), lt: new Date(+end + MAX_PAIR_MS) } } } }],
-    } })
+    }] } })
     const ids = employees.map(e => e.id)
     if (!ids.length) return { month, year, totalSummaries: 0, details: [] }
     const [shifts, logs, summaries, locks, closedPayroll, adjustmentRows] = await Promise.all([
@@ -716,7 +716,7 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
           const previous = summaries.find(s => s.employee_id === emp.id && vnDay(s.work_date) === date)
           if (lockedDates.has(date) || closedEmployees.has(emp.id)) return previous
           const previousDetails = previous?.calculation_details as Record<string, unknown> | null
-          const changed = previousDetails?.fingerprint !== calculation.details.fingerprint || previous?.overtime_seconds !== calculation.overtimeSeconds || previousDetails?.policy !== ATTENDANCE_POLICY_VERSION
+          const changed = previousDetails?.fingerprint !== calculation.details.fingerprint || previous?.overtime_seconds !== calculation.overtimeSeconds || previousDetails?.policy !== calculation.details.policy
           const invalidatedReview = Boolean(previous?.manual_adjustment && changed)
           const approved = previous?.overtime_status === 'APPROVED' && !changed
           const manual = previous?.manual_adjustment && !changed
@@ -733,13 +733,13 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
             manual_adjustment: Boolean(manual), attendance_status: calculation.status,
             requires_review: manual ? previous!.requires_review : calculation.requiresReview || invalidatedReview,
             review_reason: manual ? previous!.review_reason : calculation.reviewReason || (invalidatedReview ? 'SOURCE_CHANGED_AFTER_REVIEW' : null),
-            calculation_details: calculation.details, policy_version: ATTENDANCE_POLICY_VERSION,
+            calculation_details: calculation.details, policy_version: calculation.details.policy,
           }
           if (changed && previous?.manual_adjustment) invalidations.push({ action: 'INVALIDATE_ATTENDANCE_REVIEW',
             target_table: 'daily_attendance_summary', record_id: String(previous.id),
             old_values: { overtime: Number(previous.overtime), late_early: Number(previous.late_early), reason: previous.overtime_reason },
             new_values: { reason: 'SOURCE_CHANGED', overtime: 0 } })
-          if (changed || previousDetails?.details_version !== calculation.details.details_version || previous?.policy_version !== ATTENDANCE_POLICY_VERSION || previous?.attendance_status !== data.attendance_status || previous?.shift_id !== data.shift_id) {
+          if (changed || previousDetails?.details_version !== calculation.details.details_version || previous?.policy_version !== calculation.details.policy || previous?.attendance_status !== data.attendance_status || previous?.shift_id !== data.shift_id) {
             pendingWrites.push({ employee_id: emp.id, work_date: date, ...data, updated_at: new Date().toISOString() })
           }
           return data

@@ -8,6 +8,6 @@ export const positionRouter = Router();
 positionRouter.use(authenticate);
 
 positionRouter.get('/', asyncHandler(controller.listPositions));
-positionRouter.post('/', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.createPosition));
-positionRouter.put('/:id', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.updatePosition));
+positionRouter.post('/', authorize('ADMIN'), asyncHandler(controller.createPosition));
+positionRouter.put('/:id', authorize('ADMIN'), asyncHandler(controller.updatePosition));
 positionRouter.delete('/:id', authorize('ADMIN'), asyncHandler(controller.deletePosition));

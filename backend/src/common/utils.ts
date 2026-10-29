@@ -1,5 +1,7 @@
-import { AppError } from './AppError.js';
 import { prisma } from '../config/database.js';
+import { computePayrollBreakdown, type SalaryCalculationInput } from './payroll-rates.js';
+export { computePayrollBreakdown } from './payroll-rates.js';
+export type { SalaryCalculationInput, PayrollBreakdown, RateKind } from './payroll-rates.js';
 
 const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
 
@@ -129,45 +131,11 @@ export async function generateUniqueEmployeeCode(): Promise<string> {
   }
 }
 
-export interface SalaryCalculationInput {
-  hourly_rate: number;
-  total_working_hours: number;
-  total_overtime: number;
-  total_late_early: number;
-  allowance: number;
-  overtime_rate: number;
-  late_early_penalty: number;
-  total_absence_penalty?: number;
-}
-
 /**
  * Pure Function để tính lương thực lĩnh (net_salary) dùng chung thống nhất toàn hệ thống.
  */
 export function calculateNetSalary(params: SalaryCalculationInput): number {
-  if (!Object.values(params).every(v => v === undefined || Number.isFinite(v) && v >= 0)) throw AppError.badRequest('Dữ liệu tính lương phải hữu hạn và không âm');
-  const {
-    hourly_rate,
-    total_working_hours,
-    total_overtime,
-    total_late_early,
-    allowance,
-    overtime_rate,
-    late_early_penalty,
-  } = params;
-
-  const overtimePay = overtime_rate <= 10
-    ? total_overtime * hourly_rate * overtime_rate
-    : total_overtime * overtime_rate;
-
-  const latePenaltyDeduction = late_early_penalty <= 10
-    ? total_late_early * hourly_rate * late_early_penalty
-    : total_late_early * late_early_penalty;
-
-  const baseSalaryTotal = hourly_rate * total_working_hours;
-
-  const net = Math.max(0, Math.round(baseSalaryTotal + overtimePay - latePenaltyDeduction - (params.total_absence_penalty ?? 0) + allowance));
-  if (!Number.isFinite(net) || net >= 1e13) throw AppError.badRequest('Số tiền vượt giới hạn lưu trữ phiếu lương');
-  return net;
+  return computePayrollBreakdown(params).net_salary;
 }
 
 /**

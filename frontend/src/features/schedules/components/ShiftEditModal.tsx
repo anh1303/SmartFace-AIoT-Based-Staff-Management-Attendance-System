@@ -3,6 +3,7 @@ import React from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { WorkShift } from '../../../types';
 import { ShiftTimeInput } from './ShiftTimeInput';
+import { calculateShiftWorkingHours } from '../../../utils/timeUtils';
 
 export interface EditingShiftTarget {
   employeeId: string;
@@ -43,7 +44,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
   isSubmitting=false,
   error,
 }) => {
-  const isTimeInvalid = shiftType === 'OTHER' && startTime >= endTime;
+  const isTimeInvalid = shiftType === 'OTHER' && (!startTime || !endTime || startTime === endTime);
 
   return (
     <Modal
@@ -122,7 +123,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
             </div>
             {isTimeInvalid && (startTime !== '00:00' || endTime !== '00:00') && (
               <p className="text-[11px] text-rose-500 dark:text-rose-400 font-medium">
-                ⚠️ Giờ bắt đầu phải nhỏ hơn giờ kết thúc.
+                ⚠️ Giờ bắt đầu và kết thúc phải khác nhau.
               </p>
             )}
           </div>
@@ -139,6 +140,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
           </div>
 
           {error&&<div className="sf-feedback error" role="alert">{error}</div>}
+          {shiftType === 'OTHER' && !isTimeInvalid && startTime > endTime && <p className="text-xs text-blue-700">Ca qua đêm: kết thúc lúc {endTime} ngày hôm sau, thời lượng {calculateShiftWorkingHours({ start_time: startTime, end_time: endTime })} giờ. Ngày công là ngày bắt đầu ca.</p>}
           <div className="pt-4 flex justify-end items-center gap-2 border-t border-slate-200 dark:border-[#21264b]">
             <button
               type="button"

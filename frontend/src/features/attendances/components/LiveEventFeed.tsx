@@ -67,6 +67,7 @@ export const LiveEventFeed: React.FC<LiveEventFeedProps> = ({
             const isCheckOut = evt.type === 'CHECK_OUT';
             const isUnknown = evt.type === 'UNKNOWN';
             const isSpoof = evt.type === 'SPOOF_BLOCKED';
+            const isFlagged = evt.type === 'FLAGGED';
 
             let badgeBg = 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20';
             let icon = <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
@@ -80,6 +81,10 @@ export const LiveEventFeed: React.FC<LiveEventFeedProps> = ({
               badgeBg = 'bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-500/20';
               icon = <AlertTriangle className="w-4 h-4 text-yellow-500" />;
               title = 'NGƯỜI LẠ CHƯA ĐĂNG KÝ';
+            } else if (isFlagged) {
+              badgeBg = 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/20';
+              icon = <ShieldAlert className="w-4 h-4 text-red-500" />;
+              title = 'TỪ CHỐI ĐIỂM DANH';
             } else if (isSpoof) {
               badgeBg = 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/20';
               icon = <ShieldAlert className="w-4 h-4 text-red-500" />;
@@ -96,7 +101,7 @@ export const LiveEventFeed: React.FC<LiveEventFeedProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
-                      {evt.employeeName || (isUnknown ? 'Chưa xác định' : 'Cảnh báo giả mạo')}
+                      {evt.employeeName || (isFlagged ? 'Điểm danh bị gắn cờ' : isUnknown ? 'Chưa xác định' : 'Cảnh báo giả mạo')}
                     </p>
                     <span className="text-[10px] font-mono text-slate-400 flex-shrink-0">{evt.time}</span>
                   </div>

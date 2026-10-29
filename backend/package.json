@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "vitest run",
+    "test:policy-db": "node validation/tools/run-policy-tests.mjs",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:seed:shifts": "tsx prisma/seed-shifts.ts",

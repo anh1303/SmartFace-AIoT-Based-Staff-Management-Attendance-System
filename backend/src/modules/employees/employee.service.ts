@@ -13,6 +13,8 @@ import {
   deleteAuthUser,
 } from '../auth/index.js'
 import { employeeInclude } from './employee.model.js'
+import { recordHourlyRateChange } from './employee.wage.js'
+import { vnDay } from '../attendance/attendance.policy.js'
 import { assertCanAccessEmployeeDetail, assertCanManageEmployee, getEmployeeScope, isEmployeeManager, type EmployeeActor } from './employee.permission.js'
 
 export interface RawEmployeeDb {
@@ -351,8 +353,11 @@ export async function update(
   },
   actorUserId?: string,
   tx?: Prisma.TransactionClient,
-) {
+): Promise<ReturnType<typeof formatEmployee>> {
+  if (!tx && data.hourly_rate !== undefined) return prisma.$transaction(client => update(idOrCode, data, actorUserId, client))
   const client = tx ?? prisma
+  const ratePeriod = vnDay(new Date()).slice(0, 7)
+  if (tx && data.hourly_rate !== undefined) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${ratePeriod}`}))`
   const existing = await client.employee.findFirst({
     where: buildIdOrCodeWhere(idOrCode),
     include: employeeInclude,
@@ -424,6 +429,7 @@ export async function update(
         ? { avatar_url: data.avatar_url ?? data.avatar }
         : {}),
       ...(rateVal !== undefined ? { hourly_rate: rateVal } : {}),
+      ...(rateVal !== undefined && rateVal !== Number(existing.hourly_rate ?? 0) ? { hourly_rate_history: recordHourlyRateChange(existing, rateVal, ratePeriod) } : {}),
       ...(data.fingerprint_enrolled !== undefined ? { fingerprint_enrolled: data.fingerprint_enrolled } : {}),
     },
     include: employeeInclude,

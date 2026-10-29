@@ -5,7 +5,7 @@ import { ATTENDANCE_QUERY_KEY } from './useAttendance';
 
 export interface LiveAttendanceEvent {
   id: string;
-  type: 'CHECK_IN' | 'CHECK_OUT' | 'UNKNOWN' | 'SPOOF_BLOCKED';
+  type: 'CHECK_IN' | 'CHECK_OUT' | 'UNKNOWN' | 'SPOOF_BLOCKED' | 'FLAGGED';
   employeeCode?: string;
   employeeName?: string;
   avatarUrl?: string | null;
@@ -135,6 +135,16 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
     socket.on('attendance-summary-updated', () => {
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
       queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
+    });
+
+    socket.on('attendance-flagged', (data: any) => {
+      const id = `flagged-${data?.device_id || ''}-${data?.event_id || data?.timestamp || Date.now()}`;
+      if (seenEventIdsRef.current.has(id)) return;
+      seenEventIdsRef.current.add(id);
+      const timestamp = data?.timestamp || new Date().toISOString();
+      showToast?.('Điểm danh bị gắn cờ và từ chối.', 'warning');
+      queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
+      setLiveEvents(prev => [{ id, type: 'FLAGGED', employeeCode: data?.employee_id, deviceId: data?.device_id, time: new Date(timestamp).toLocaleTimeString('vi-VN'), timestamp, message: 'Điểm danh bị gắn cờ và từ chối' }, ...prev.slice(0, 9)]);
     });
 
     // Cảnh báo người lạ (không tìm thấy trong CSDL)

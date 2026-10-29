@@ -136,6 +136,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
               }}
               className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-500"
             />
+            <p className="mt-1 text-xs text-slate-500">Mức mới áp dụng cho toàn bộ tháng thay đổi. Các tháng trước giữ mức lương đã lưu; phiếu đã chốt không tự đổi.</p>
           </div>
 
           <div>

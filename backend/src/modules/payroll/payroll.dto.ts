@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { workDateSchema } from '../../common/date.schema.js'
 import { PAYROLL_STATUS } from '../../common/constants.js'
 import { RATE_KINDS } from '../../common/payroll-rates.js'
 
@@ -65,3 +66,12 @@ export const reviewAdjustmentSchema = z.object({
   note: z.string().trim().max(2000).optional(),
   updated_at: z.string().datetime(),
 })
+
+export const earlySettlementSchema = z.object({
+  employeeId: z.string().min(1, 'Mã nhân viên là bắt buộc'),
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Kỳ lương phải có dạng YYYY-MM'),
+  cutoffDate: workDateSchema,
+  reason: z.string().trim().min(1, 'Lý do quyết toán sớm là bắt buộc').max(2000),
+})
+
+export type EarlySettlementDto = z.infer<typeof earlySettlementSchema>

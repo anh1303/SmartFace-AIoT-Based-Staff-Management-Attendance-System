@@ -51,3 +51,5 @@ yarn-error.log*
 !validation/
 !validation/*.test.ts
 !validation/*.test.tsx
+!validation/**/*.test.ts
+!validation/**/*.test.tsx

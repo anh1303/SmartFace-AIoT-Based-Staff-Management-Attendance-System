@@ -18,7 +18,9 @@ import {
   PolicyFormData,
   PayrollFinalizeModal,
   PayrollUnlockModal,
+  EarlySettlementModal,
 } from '@/features/payrolls';
+import { earlySettlementPayrollApi } from '../../api/payrollApi';
 
 const payrollLogger = logger.child('ManagerPayroll');
 
@@ -115,6 +117,7 @@ export const ManagerPayroll: React.FC = () => {
   // Modal State for Editing a Payroll line item
   const [editingItem, setEditingItem] = useState<EditingPayrollItem | null>(null);
   const [isSavingItem, setIsSavingItem] = useState(false);
+  const [earlySettlementRecord, setEarlySettlementRecord] = useState<PayrollRecord | null>(null);
 
   // Dynamic periods generated from payroll records
   const availablePeriods = Array.from(
@@ -278,6 +281,24 @@ export const ManagerPayroll: React.FC = () => {
     setConfirmFinalizeOpen(false);
   };
 
+  const handleEarlySettlementConfirm = async (cutoffDate: string, reason: string) => {
+    if (!earlySettlementRecord) return;
+    try {
+      await earlySettlementPayrollApi({
+        employeeId: earlySettlementRecord.employee_id,
+        period: selectedPeriod,
+        cutoffDate,
+        reason,
+      });
+      showToast(`Đã quyết toán sớm bảng lương cho nhân viên ${earlySettlementRecord.employee_name || earlySettlementRecord.employee_id}!`, 'success');
+      setEarlySettlementRecord(null);
+      await generatePayroll(selectedPeriod);
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi quyết toán sớm', 'error');
+      throw err;
+    }
+  };
+
   const handleUnlockConfirm = () => {
     if (role !== 'admin') {
       showToast('Chỉ Quản trị viên (Admin) mới có quyền mở khóa bảng lương!', 'error');
@@ -417,6 +438,7 @@ export const ManagerPayroll: React.FC = () => {
         positionOptions={positionOptions}
         isFinalized={isFinalized}
         onOpenEdit={handleOpenEdit}
+        onOpenEarlySettlement={(record) => setEarlySettlementRecord(record)}
       />
 
       </div>
@@ -458,6 +480,21 @@ export const ManagerPayroll: React.FC = () => {
         policyData={policyData}
         onChangePolicyData={setPolicyData}
         onSavePolicy={handleSavePolicy}
+      />
+
+      {/* Modal: Early Settlement for offboarding employee */}
+      <EarlySettlementModal
+        isOpen={Boolean(earlySettlementRecord)}
+        onClose={() => setEarlySettlementRecord(null)}
+        selectedPeriod={selectedPeriod}
+        record={earlySettlementRecord}
+        employeeName={
+          employees.find((e) => e.employee_id === earlySettlementRecord?.employee_id)?.full_name ||
+          earlySettlementRecord?.employee_name ||
+          earlySettlementRecord?.employee_id ||
+          ''
+        }
+        onConfirm={handleEarlySettlementConfirm}
       />
     </div>
   );

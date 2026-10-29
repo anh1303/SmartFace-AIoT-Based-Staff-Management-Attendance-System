@@ -22,7 +22,7 @@ function recalculate(p: string) { for (const e of demoEmployees) {
     const approved = adjustments.filter(a => a.employee_id === e.employee_id && a.date.startsWith(p) && a.status === 'APPROVED');
     const ot = approved.filter(a => a.kind === 'OVERTIME').reduce((n, a) => n + a.hours, 0);
     const late = approved.filter(a => a.kind === 'LATE_EARLY').reduce((n, a) => n + a.hours, 0);
-    const absence = approved.filter(a => a.kind === 'ABSENCE').reduce((n, a) => n + a.amount, 0);
+    const absence = approved.filter(a => a.kind === 'ABSENCE').reduce((n, a) => n + (a.amount ?? 0), 0);
     const id = `${e.employee_id}-${p}`;
     const old = payroll.find(s => s.payroll_id === id);
     const allowance = old?.allowance ?? 300000;
@@ -150,7 +150,7 @@ export async function demoRequest<T>(endpoint: string, options: RequestInit = {}
         else if (parts[5] === 'unlock') {
             if (!isAdmin())
                 return fail('Chỉ Admin được mở khóa');
-            payroll.filter(s => s.period === p).forEach(s => s.status = 'PENDING');
+            payroll.filter(s => s.period === p && !(s.calculation_details as any)?.early_settlement?.is_early_settlement).forEach(s => s.status = 'PENDING');
         }
         return ok(payroll.filter(s => s.period === p && scoped(s.employee_id)));
     }

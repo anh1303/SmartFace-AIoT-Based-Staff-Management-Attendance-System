@@ -178,8 +178,8 @@ export const ManagerSchedule: React.FC = () => {
     if (modalShiftType === 'OTHER') {
       const s = modalStartTime?.trim();
       const endT = modalEndTime?.trim();
-      if (!s || !endT || (s === '00:00' && endT === '00:00') || s >= endT) {
-        showToast('Giờ bắt đầu phải nhỏ hơn giờ kết thúc (không được để 00:00 - 00:00)!', 'error');
+      if (!s || !endT || s === endT) {
+        showToast('Giờ bắt đầu và kết thúc phải khác nhau. Giờ kết thúc sớm hơn thuộc ngày hôm sau.', 'error');
         return;
       }
     }
@@ -217,8 +217,8 @@ export const ManagerSchedule: React.FC = () => {
     if (bulkShiftType === 'OTHER') {
       const s = bulkStartTime?.trim();
       const endT = bulkEndTime?.trim();
-      if (!s || !endT || (s === '00:00' && endT === '00:00') || s >= endT) {
-        showToast('Giờ bắt đầu phải nhỏ hơn giờ kết thúc (không được để 00:00 - 00:00)!', 'error');
+      if (!s || !endT || s === endT) {
+        showToast('Giờ bắt đầu và kết thúc phải khác nhau. Giờ kết thúc sớm hơn thuộc ngày hôm sau.', 'error');
         return;
       }
     }

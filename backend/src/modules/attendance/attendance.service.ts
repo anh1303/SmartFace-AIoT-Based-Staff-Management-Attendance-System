@@ -2,8 +2,10 @@ import { projectAttendanceDetails } from './attendance.details.js'
 import { syncDayAdjustments, flushAdjustmentBatch } from './attendance.adjustments.js'
 import { observeRecognition } from './recognition-confirmation.js'
 import { Prisma } from '@prisma/client'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { setImmediate as yieldToRequests } from 'node:timers/promises'
+import { type DevSimulateFaceScanInput, devSimulateFaceScanSchema } from './attendance.dto.js'
+import { monthlyHourlyRate } from '../employees/employee.wage.js'
 import { attendanceWorkDate, calculateDay, prepareAttendance, vnDay, MAX_PAIR_MS, roundHours } from './attendance.policy.js'
 import { prisma } from '../../config/database.js'
 import { assertCanManageEmployee, getEmployeeScope, type EmployeeActor } from '../../common/permission.helper.js'
@@ -391,7 +393,10 @@ export async function adjustAttendance(
       },
     })
     const adjustmentPolicy = await tx.bonusPenalty.findFirst({ orderBy: { id: 'desc' } })
-    await syncDayAdjustments(tx, updated, Number(emp.hourly_rate || 0), Number(adjustmentPolicy?.absence_penalty_rate ?? 0.25))
+    const wageSnapshot = await tx.payrollRecord.findFirst({ where: { employeeId: emp.id, payroll_period: data.date.slice(0, 7) } })
+    const wageProfile = await tx.employee.findFirst({ where: { id: emp.id } })
+    if (!wageProfile) throw AppError.notFound('Employee not found')
+    await syncDayAdjustments(tx, updated, monthlyHourlyRate(wageProfile, data.date.slice(0, 7), wageSnapshot?.hourly_rate), Number(adjustmentPolicy?.absence_penalty_rate ?? 0.25))
     await tx.auditLog.create({
       data: {
         userId: actorUserId,
@@ -435,6 +440,9 @@ type CaptureOptions = {
   livenessScore?: number
   deviceId?: string
   verified?: boolean
+  isDevSimulation?: boolean
+  reason?: string
+  method?: AttendanceMethod
 }
 
 async function recordAttendance(
@@ -450,7 +458,14 @@ async function recordAttendance(
       : buildIdOrCodeWhere(employeeId),
   })
   if (!employee) throw AppError.notFound('Employee not found')
-  if (requester && requester.role?.toUpperCase() !== 'EMPLOYEE') await assertCanManageEmployee(requester, employee.id)
+  if (requester?.role?.toUpperCase() === 'MANAGER') {
+    if (employee.user_id && requester.id && employee.user_id === requester.id) {
+      throw AppError.forbidden('Quản lý không được tự thực hiện điểm danh thủ công cho chính mình')
+    }
+    await assertCanManageEmployee(requester, employee.id)
+  } else if (requester && requester.role?.toUpperCase() !== 'EMPLOYEE') {
+    await assertCanManageEmployee(requester, employee.id)
+  }
   if (employee.status !== 'ACTIVE') throw AppError.forbidden('Nhân viên không ở trạng thái ACTIVE')
   const eventTime = new Date(capture.capturedAt ?? Date.now())
   if (!Number.isFinite(+eventTime)) throw AppError.badRequest('Thời điểm ghi nhận không hợp lệ')
@@ -460,8 +475,17 @@ async function recordAttendance(
     // Lock adjacent periods in chronological order for cross-midnight/month pairs.
     const periods = [-1, 0, 1].map(offset => { const d = new Date(eventTime); d.setUTCMonth(d.getUTCMonth() + offset, 1); return vnDay(d).slice(0, 7) }).sort()
     for (const period of periods) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${period}`}))`
-    if (requester && requester.role?.toUpperCase() !== 'EMPLOYEE') await assertCanManageEmployee(requester, employee.id, tx)
+    if (requester?.role?.toUpperCase() === 'MANAGER') {
+      if (employee.user_id && requester.id && employee.user_id === requester.id) {
+        throw AppError.forbidden('Quản lý không được tự thực hiện điểm danh thủ công cho chính mình')
+      }
+      await assertCanManageEmployee(requester, employee.id, tx)
+    } else if (requester && requester.role?.toUpperCase() !== 'EMPLOYEE') {
+      await assertCanManageEmployee(requester, employee.id, tx)
+    }
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${employee.id}))`
+    const currentEmployee = await tx.employee.findFirst({ where: { id: employee.id } })
+    if (!currentEmployee || currentEmployee.status !== 'ACTIVE') throw AppError.forbidden('Nhân viên không ở trạng thái ACTIVE')
     if (eventKey) {
       const existing = await tx.attendance_logs.findUnique({ where: { event_key: eventKey }, include: attendanceInclude })
       if (existing) {
@@ -479,6 +503,9 @@ async function recordAttendance(
     const date = type === 'CHECK_OUT' && previous?.type === 'CHECK_IN' && +eventTime - +previous.event_time <= MAX_PAIR_MS
       ? attendanceWorkDate(previous.event_time, schedule) : attendanceWorkDate(eventTime, schedule)
     const closedPeriod = await tx.payrollRecord.findFirst({ where: { employeeId: employee.id, payroll_period: date.slice(0, 7), status: { in: ['FINALIZED', 'CONFIRMED', 'PAID'] } } })
+    const recordedMethod = capture.verified
+      ? 'FACE'
+      : (capture.method && capture.method !== 'FACE' ? capture.method : 'MANUAL')
     const created = await tx.attendance_logs.create({
       data: {
         employee_id: employee.id,
@@ -486,7 +513,7 @@ async function recordAttendance(
         event_time: eventTime,
         work_date: new Date(`${date}T00:00:00Z`),
         event_key: eventKey,
-        method: capture.verified ? 'FACE' : 'MANUAL',
+        method: recordedMethod,
         device_info: device || 'Web',
         verification_score: capture.verificationScore,
         liveness_score: capture.livenessScore,
@@ -494,6 +521,44 @@ async function recordAttendance(
       },
       include: attendanceInclude,
     })
+    if (!capture.verified) {
+      await tx.auditLog.create({
+        data: {
+          userId: requester?.id ?? null,
+          action: `MANUAL_ATTENDANCE_${type}`,
+          target_table: 'attendance_logs',
+          record_id: String(created.id),
+          new_values: {
+            employee_id: employee.id,
+            type,
+            work_date: date,
+            reason: capture.reason || (device?.startsWith('device:') ? 'Legacy direct MQTT check-in' : 'Chấm công thủ công qua Web/API'),
+            device_info: device || 'Web',
+            method: recordedMethod,
+          },
+        },
+      })
+    } else if (capture.isDevSimulation) {
+      await tx.auditLog.create({
+        data: {
+          userId: requester?.id ?? null,
+          action: 'DEV_SIMULATE_FACE_SCAN',
+          target_table: 'attendance_logs',
+          record_id: String(created.id),
+          new_values: {
+            employee_id: employee.id,
+            type,
+            work_date: date,
+            reason: 'Developer Face Simulation (Dev Mode / Test)',
+            device_info: device || 'DEV_SIMULATOR',
+            method: 'FACE',
+            verification_score: capture.verificationScore,
+            liveness_score: capture.livenessScore,
+            is_simulation: true,
+          },
+        },
+      })
+    }
     const previousDay = previous && +eventTime - +previous.event_time <= MAX_PAIR_MS ? attendanceWorkDate(previous.event_time, schedule) : null
     const affected = [...new Set([date, vnDay(eventTime), ...(previousDay ? [previousDay] : [])])]
     for (const day of affected) {
@@ -540,17 +605,21 @@ export async function checkIn(
     event_id?: string
     eventId?: string
     verification_score?: number | null
+    reason?: string
   },
   requesterUser?: { id?: string; role?: string },
   capture: CaptureOptions = {}
 ) {
   const id = data.employeeId || data.employee_id
   if (!id && requesterUser?.role !== 'EMPLOYEE') throw AppError.badRequest('employeeId is required')
+  const verified = Boolean(capture.verified || capture.isDevSimulation)
   const mergedCapture: CaptureOptions = {
     ...capture,
     eventId: capture.eventId || data.eventId || data.event_id,
     verificationScore: capture.verificationScore ?? (data.verification_score !== undefined && data.verification_score !== null ? Number(data.verification_score) : undefined),
-    verified: capture.verified ?? (data.method === 'FACE'),
+    verified,
+    reason: capture.reason || data.reason,
+    method: capture.method || data.method,
   }
   return recordAttendance('CHECK_IN', id || '', data.device_info, requesterUser, mergedCapture)
 }
@@ -564,6 +633,7 @@ export async function checkOut(
     event_id?: string
     eventId?: string
     verification_score?: number | null
+    reason?: string
   },
   secondArg?: string | { id?: string; role?: string },
   thirdArg?: { id?: string; role?: string },
@@ -581,13 +651,57 @@ export async function checkOut(
   const capture: CaptureOptions = (isObject ? (typeof secondArg === 'object' && !('id' in secondArg || 'role' in secondArg) ? (secondArg as CaptureOptions) : fourthArg) : fourthArg) || {}
 
   if (!targetEmployeeId && requesterUser?.role !== 'EMPLOYEE') throw AppError.badRequest('employeeId is required')
+  const verified = Boolean(capture.verified || capture.isDevSimulation)
   const mergedCapture: CaptureOptions = {
     ...capture,
     eventId: capture.eventId || (isObject ? (targetOrData.eventId || targetOrData.event_id) : undefined),
     verificationScore: capture.verificationScore ?? (isObject && targetOrData.verification_score !== undefined && targetOrData.verification_score !== null ? Number(targetOrData.verification_score) : undefined),
-    verified: capture.verified ?? (isObject && targetOrData.method === 'FACE'),
+    verified,
+    reason: capture.reason || (isObject ? targetOrData.reason : undefined),
+    method: capture.method || (isObject ? targetOrData.method : undefined),
   }
   return recordAttendance('CHECK_OUT', targetEmployeeId || '', deviceInfo, requesterUser, mergedCapture)
+}
+
+export async function devSimulateFaceScan(
+  input: DevSimulateFaceScanInput,
+  requesterUser?: { id?: string; role?: string }
+) {
+  if (!['development', 'test'].includes(process.env.NODE_ENV || '')) {
+    throw AppError.forbidden('Tính năng giả lập chỉ khả dụng trong môi trường thử nghiệm/phát triển (Dev/Test)')
+  }
+  const data = devSimulateFaceScanSchema.parse(input)
+  const employee = await prisma.employee.findFirst({
+    where: buildIdOrCodeWhere(data.employeeId),
+  })
+  if (!employee) throw AppError.notFound('Không tìm thấy nhân viên')
+  if (requesterUser?.role?.toUpperCase() === 'MANAGER') {
+    if (employee.user_id && requesterUser.id && employee.user_id === requesterUser.id) {
+      throw AppError.forbidden('Quản lý không được tự thực hiện giả lập quét mặt cho chính mình')
+    }
+    await assertCanManageEmployee(requesterUser, employee.id)
+  } else if (requesterUser && requesterUser.role?.toUpperCase() !== 'EMPLOYEE') {
+    await assertCanManageEmployee(requesterUser, employee.id)
+  }
+
+  const capture: CaptureOptions = {
+    eventId: randomUUID(),
+    capturedAt: Date.now(),
+    deviceId: data.device_id || 'DEV_SIMULATOR',
+    verified: true,
+    isDevSimulation: true,
+    livenessScore: data.antispoof_score ?? 0.95,
+    verificationScore: data.verification_score ?? 0.92,
+  }
+
+  if (data.mode === 'CHECK_OUT') {
+    return checkOut(employee.id, `device:${capture.deviceId}`, requesterUser, capture)
+  } else {
+    return checkIn({
+      employeeId: employee.id,
+      device_info: `device:${capture.deviceId}`,
+    }, requesterUser, capture)
+  }
 }
 
 export async function statistics(actor?: EmployeeActor) {
@@ -672,7 +786,7 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
     }] } })
     const ids = employees.map(e => e.id)
     if (!ids.length) return { month, year, totalSummaries: 0, details: [] }
-    const [shifts, logs, summaries, locks, closedPayroll, adjustmentRows] = await Promise.all([
+    const [shifts, logs, summaries, locks, periodPayroll, adjustmentRows] = await Promise.all([
       tx.employee_shifts.findMany({ where: { employee_id: { in: ids }, work_date: { gte: new Date(+start - MAX_PAIR_MS), lt: new Date(+end + MAX_PAIR_MS) } }, include: { work_shifts: true } }),
       tx.attendance_logs.findMany({ where: { employee_id: { in: ids }, event_time: {
         gte: new Date(+new Date(`${onlyDate || first}T00:00:00+07:00`) - MAX_PAIR_MS),
@@ -680,12 +794,12 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
       } }, orderBy: [{ event_time: 'asc' }, { id: 'asc' }] }),
       tx.daily_attendance_summary.findMany({ where: { employee_id: { in: ids }, work_date: { gte: start, lt: end } } }),
       tx.attendance_locks.findMany({ where: { work_date: { gte: start, lt: end }, is_locked: true } }),
-      tx.payrollRecord.findMany({ where: { employeeId: { in: ids }, payroll_period: first.slice(0, 7), status: { in: ['FINALIZED', 'CONFIRMED', 'PAID'] } }, select: { employeeId: true } }),
+      tx.payrollRecord.findMany({ where: { employeeId: { in: ids }, payroll_period: first.slice(0, 7) }, select: { employeeId: true, status: true, hourly_rate: true } }),
       tx.attendanceAdjustment.findMany({ where: { employee_id: { in: ids }, work_date: { gte: start, lt: end } } }),
     ])
     const adjustmentBatch = { existing: new Map(adjustmentRows.map(r => [`${r.employee_id}:${r.work_date.toISOString().slice(0,10)}:${r.kind}`, r])), writes: [] as Prisma.AttendanceAdjustmentCreateManyInput[], audits: [] as Prisma.AuditLogCreateManyInput[] }
     const lockedDates = new Set(locks.map(l => vnDay(l.work_date)))
-    const closedEmployees = new Set(closedPayroll.map(p => p.employeeId))
+    const closedEmployees = new Set(periodPayroll.filter(p => ['FINALIZED', 'CONFIRMED', 'PAID'].includes(p.status)).map(p => p.employeeId))
     const pendingWrites: Array<Record<string, unknown>> = []
     const invalidations: Prisma.AuditLogCreateManyInput[] = []
     const details: Array<Record<string, unknown>> = []
@@ -745,7 +859,7 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
           return data
         })()
         if (summary && !lockedDates.has(date) && !closedEmployees.has(emp.id)) {
-          await syncDayAdjustments(tx, { ...summary, employee_id: emp.id, work_date: workDate }, Number(emp.hourly_rate || 0), Number(adjustmentPolicy?.absence_penalty_rate ?? 0.25), adjustmentBatch)
+          await syncDayAdjustments(tx, { ...summary, employee_id: emp.id, work_date: workDate }, monthlyHourlyRate(emp, first.slice(0, 7), periodPayroll.find(p => p.employeeId === emp.id)?.hourly_rate), Number(adjustmentPolicy?.absence_penalty_rate ?? 0.25), adjustmentBatch)
         }
         if (summary) details.push({ employee_code: emp.employee_code, employee_name: emp.full_name, date,
           total_working_hours: Number(summary.total_working_hours), overtime: Number(summary.overtime), overtime_status: summary.overtime_status,
@@ -964,11 +1078,39 @@ export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) 
       }, undefined, { eventId: data.event_id, capturedAt, deviceId: device_id, verified: true, verificationScore: match.similarity, livenessScore: antispoof_score })
     }
 
+    if (attendanceRecord.status === 'FLAGGED') {
+      emitAttendanceEvent('attendance-flagged', {
+        device_id,
+        event_id: data.event_id,
+        employee_id: match.emp_id,
+        reason: 'CLOSED_PERIOD_OR_FINALIZED',
+        timestamp: new Date().toISOString(),
+      })
+      return {
+        success: false,
+        door_open: false,
+        matched: true,
+        event_id: data.event_id,
+        mode: normalizedMode,
+        employee: {
+          id: match.emp_id,
+          employee_code: match.employee_code,
+          full_name: match.full_name,
+          avatar_url: match.avatar_url,
+        },
+        similarity: Number(match.similarity.toFixed(4)),
+        attendance: attendanceRecord,
+        code: 403,
+        message: 'Kỳ công đã chốt hoặc nhân viên đã quyết toán nghỉ việc; điểm danh bị gắn cờ và từ chối mở cửa',
+      }
+    }
+
     // Emit Realtime Socket.IO Event for live web monitor
     if (!attendanceRecord.duplicate) emitAttendanceEvent(isCheckOut ? 'checked-out' : 'checked-in', attendanceRecord)
 
     return {
       success: true,
+      door_open: true,
       matched: true,
       event_id: data.event_id,
       mode: normalizedMode,
@@ -986,6 +1128,7 @@ export async function handleThingsBoardWebhook(data: ThingsBoardWebhookPayload) 
     // Return structured response for 409 (already checked in / out today)
     return {
       success: false,
+      door_open: false,
       matched: true,
       event_id: data.event_id,
       mode: normalizedMode,

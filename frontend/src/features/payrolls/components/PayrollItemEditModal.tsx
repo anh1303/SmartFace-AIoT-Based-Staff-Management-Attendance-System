@@ -15,6 +15,7 @@ export interface EditingPayrollItem {
   allowance: number;
   reason: string;
   hours_resolution?: 'confirm' | 'reset';
+  resolve_rate_snapshot?: boolean;
 }
 
 export function buildPayrollItemUpdates(item: EditingPayrollItem): PayrollItemUpdates {
@@ -24,6 +25,7 @@ export function buildPayrollItemUpdates(item: EditingPayrollItem): PayrollItemUp
   const updates: PayrollItemUpdates = { reason, updated_at: record.updated_at };
   if (item.allowance !== Number(record.allowance ?? 0)) updates.allowance = item.allowance;
   if (item.hourly_rate !== Number(record.hourly_rate)) updates.hourly_rate = item.hourly_rate;
+  if (item.resolve_rate_snapshot) updates.resolve_rate_snapshot = true;
   if (item.hours_resolution === 'reset') {
     updates.reset_working_hours = true;
   } else if (item.hours_resolution === 'confirm') {

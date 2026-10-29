@@ -4,6 +4,7 @@ import { Sparkles } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
 import { WorkShift, Employee, DepartmentItem } from '../../../types';
 import { ShiftTimeInput } from './ShiftTimeInput';
+import { calculateShiftWorkingHours } from '../../../utils/timeUtils';
 
 interface BulkShiftModalProps {
   isOpen: boolean;
@@ -68,7 +69,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
     });
     return Array.from(deptSet);
   }, [departments, employees]);
-  const isTimeInvalid = bulkShiftType === 'OTHER' && bulkStartTime >= bulkEndTime;
+  const isTimeInvalid = bulkShiftType === 'OTHER' && (!bulkStartTime || !bulkEndTime || bulkStartTime === bulkEndTime);
 
   return (
     <Modal
@@ -215,7 +216,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
             </div>
             {isTimeInvalid && (bulkStartTime !== '00:00' || bulkEndTime !== '00:00') && (
               <p className="text-[11px] text-rose-500 dark:text-rose-400 font-medium">
-                ⚠️ Giờ bắt đầu phải nhỏ hơn giờ kết thúc.
+                ⚠️ Giờ bắt đầu và kết thúc phải khác nhau.
               </p>
             )}
           </div>
@@ -288,6 +289,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
         </div>
 
         {error&&<div className="sf-feedback error" role="alert">{error}</div>}
+        {bulkShiftType === 'OTHER' && !isTimeInvalid && bulkStartTime > bulkEndTime && <p className="text-xs text-blue-700">Ca qua đêm: kết thúc lúc {bulkEndTime} ngày hôm sau, thời lượng {calculateShiftWorkingHours({ start_time: bulkStartTime, end_time: bulkEndTime })} giờ. Mỗi ngày được chọn là ngày bắt đầu ca.</p>}
           <div className="pt-4 flex justify-end gap-2 border-t border-slate-200 dark:border-[#21264b]">
           <button
             type="button"

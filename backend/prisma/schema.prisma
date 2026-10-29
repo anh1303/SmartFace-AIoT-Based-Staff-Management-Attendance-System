@@ -79,6 +79,7 @@ model Employee {
   email                    String?                    @unique @db.VarChar(100)
   avatar_url               String?                    @db.Text
   hourly_rate              Decimal?                   @default(0) @db.Decimal(15, 2)
+  hourly_rate_history      Json                       @default("[]")
   status                   String                     @default("ACTIVE") @db.VarChar(20)
   fingerprint_enrolled     Boolean                    @default(false)
   createdAt                DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)

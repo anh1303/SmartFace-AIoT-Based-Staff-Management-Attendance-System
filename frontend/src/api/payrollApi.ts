@@ -3,7 +3,12 @@ import { PayrollRecord, BonusPenaltyPolicy } from '../types';
 
 export type PayrollItemUpdates = Partial<Pick<PayrollRecord,
   'hourly_rate' | 'total_working_hours' | 'total_overtime' | 'total_late_early' | 'allowance' | 'status' | 'reason' | 'updated_at'
->> & { working_hours?: number; reconcile_working_hours?: boolean; reset_working_hours?: boolean };
+>> & {
+  working_hours?: number;
+  reconcile_working_hours?: boolean;
+  reset_working_hours?: boolean;
+  resolve_rate_snapshot?: boolean;
+};
 
 export async function fetchPayrollApi(): Promise<PayrollRecord[]> {
   const res = await apiFetch('/api/payroll');
@@ -50,6 +55,7 @@ export async function updatePayrollItemApi(
       updated_at: updates.updated_at,
       reconcile_working_hours: updates.reconcile_working_hours,
       reset_working_hours: updates.reset_working_hours,
+      resolve_rate_snapshot: updates.resolve_rate_snapshot,
     }),
   });
   if (res.success && res.data) {
@@ -65,6 +71,22 @@ export async function finalizePayrollPeriodApi(period: string) {
   return res.data;
 }
 
+export async function earlySettlementPayrollApi(payload: {
+  employeeId: string;
+  period: string;
+  cutoffDate: string;
+  reason: string;
+}) {
+  const res = await apiFetch('/api/payroll/early-settlement', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!res.success) {
+    throw new Error(res.message || 'Lỗi quyết toán sớm');
+  }
+  return res.data;
+}
+
 export async function unlockPayrollPeriodApi(period: string): Promise<PayrollRecord[]> {
   const res = await apiFetch(`/api/payroll/period/${period}/unlock`, {
     method: 'POST',
@@ -73,6 +95,21 @@ export async function unlockPayrollPeriodApi(period: string): Promise<PayrollRec
     return res.data;
   }
   throw new Error(res.message || 'Lỗi mở khoá bảng lương');
+}
+
+export interface EarlySettlementPreview {
+  blocked: boolean;
+  conflict_dates: string[];
+  worked_hours_after_cutoff: number;
+  approved_adjustments_after_cutoff: number;
+  shift_dates_after_cutoff: string[];
+  adjustments_to_remove: { date: string; kind: string; status: string; hours: number; amount: number }[];
+}
+
+export async function previewEarlySettlementApi(payload: { employeeId: string; period: string; cutoffDate: string; reason: string }): Promise<EarlySettlementPreview> {
+  const res = await apiFetch('/api/payroll/early-settlement/preview', { method: 'POST', body: JSON.stringify(payload) });
+  if (!res.success || !res.data) throw new Error(res.message || 'Không thể xem trước quyết toán');
+  return res.data;
 }
 
 export async function updateBonusPenaltyApi(data: Partial<Omit<BonusPenaltyPolicy, 'id'>>): Promise<BonusPenaltyPolicy> {

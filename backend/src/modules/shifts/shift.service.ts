@@ -204,13 +204,14 @@ export async function assignOrUpdate(data: {
     startTimeDate = parseTimeStringToDate(standardConfig.start_time, '08:00')
     endTimeDate = parseTimeStringToDate(standardConfig.end_time, '17:00')
   } else {
-    // Ca khác (OTHER): Bắt buộc người dùng phải thiết lập giờ bắt đầu nhỏ hơn giờ kết thúc (không được để 00:00 - 00:00)
+    // An earlier end clock belongs to the next day; equal clocks are ambiguous.
     const rawStart = data.start_time?.trim() || ''
     const rawEnd = data.end_time?.trim() || ''
-    if (!rawStart || !rawEnd || (rawStart === '00:00' && rawEnd === '00:00') || rawStart >= rawEnd) {
+    const clockPattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+    if (!clockPattern.test(rawStart) || !clockPattern.test(rawEnd) || rawStart === rawEnd) {
       throw new AppError(
         400,
-        'Giờ bắt đầu ca làm việc phải nhỏ hơn giờ kết thúc (không được để mặc định 00:00 - 00:00)!'
+        'Giờ ca phải có dạng HH:mm hợp lệ và giờ bắt đầu khác giờ kết thúc; giờ kết thúc sớm hơn được tính sang ngày hôm sau.'
       )
     }
     startTimeDate = parseTimeStringToDate(rawStart, '00:00')

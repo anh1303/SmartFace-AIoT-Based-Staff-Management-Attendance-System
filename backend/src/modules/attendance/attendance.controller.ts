@@ -9,6 +9,7 @@ import {
   adjustAttendanceSchema,
   checkOutSchema,
   aggregateAttendanceSchema,
+  devSimulateFaceScanSchema,
 } from './attendance.dto.js';
 
 export const tbWebhook = async (req: Request, res: Response) => {
@@ -37,15 +38,21 @@ export const statistics = async (req: Request, res: Response) => {
 
 export const checkIn = async (req: Request, res: Response) => {
   const body = checkInSchema.parse(req.body);
-  const result = await service.checkIn(body, req.user, { eventId: body.event_id });
+  const result = await service.checkIn(body, req.user, { eventId: body.event_id, reason: body.reason });
   successResponse(res, result, 'Check-in recorded', 201);
 };
 
 export const checkOut = async (req: Request, res: Response) => {
   const body = checkOutSchema.parse(req.body);
   const targetEmployeeId = body.employeeId || (body as any).employee_id;
-  const result = await service.checkOut(targetEmployeeId, body.device_info, req.user, { eventId: body.event_id });
+  const result = await service.checkOut(targetEmployeeId, body.device_info, req.user, { eventId: body.event_id, reason: body.reason });
   successResponse(res, result, 'Check-out recorded', 201);
+};
+
+export const devSimulateFace = async (req: Request, res: Response) => {
+  const body = devSimulateFaceScanSchema.parse(req.body);
+  const result = await service.devSimulateFaceScan(body, req.user);
+  successResponse(res, result, 'Đã giả lập quét mặt thành công (Dev Mode)', 201);
 };
 
 export const getDailySummaries = async (req: Request, res: Response) => {

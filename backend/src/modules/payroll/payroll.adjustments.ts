@@ -6,6 +6,8 @@ import { assertCanAccessEmployeeDetail, assertCannotModifyOtherManager, assertCa
 import { aggregateDailyAttendance, assertEditableDay } from '../attendance/attendance.service.js'
 import { emitAttendanceEvent } from '../attendance/attendance.gateway.js'
 import { getEmployeeScope, assertCanManageEmployee } from '../employees/employee.permission.js'
+import { monthlyHourlyRate } from '../employees/employee.wage.js'
+import { payrollOverrides } from './payroll.overrides.js'
 
 type Actor = { id?: string; role?: string }
 const bounds = (period: string) => {
@@ -26,13 +28,15 @@ export async function listAdjustments(period: string, employeeId: string | undef
   const [rows, policy, payroll, locks] = await Promise.all([
     prisma.attendanceAdjustment.findMany({ where, include: { employee: { include: { position: true, users: { include: { roles: true } } } } }, orderBy: [{ work_date: 'asc' }, { kind: 'asc' }] }),
     prisma.bonusPenalty.findFirst({ orderBy: { id: 'desc' } }),
-    prisma.payrollRecord.findMany({ where: { payroll_period: period, employee: employeeScope }, select: { employeeId: true, hourly_rate: true, overtime_rate: true, overtime_rate_kind: true, late_penalty_rate: true, late_penalty_rate_kind: true, status: true } }),
+    prisma.payrollRecord.findMany({ where: { payroll_period: period, employee: employeeScope }, select: { employeeId: true, hourly_rate: true, total_working_hours: true, calculation_details: true, overtime_rate: true, overtime_rate_kind: true, late_penalty_rate: true, late_penalty_rate_kind: true, status: true } }),
     prisma.attendance_locks.findMany({ where: { work_date: { gte: start, lt: end }, is_locked: true }, select: { work_date: true } }),
   ])
   return rows.filter(row => actor.role !== 'MANAGER' || row.employee.user_id === actor.id || !isEmployeeManager(row.employee)).map(row => {
     const snapshot = payroll.find(p => p.employeeId === row.employee_id)
     const locked = Boolean(snapshot && ['FINALIZED', 'CONFIRMED', 'PAID'].includes(snapshot.status) || locks.some(l => +l.work_date === +row.work_date))
-    const hourlyRate = Number(snapshot?.hourly_rate ?? row.employee.hourly_rate ?? 0)
+    const hourlyRate = snapshot && (['FINALIZED', 'CONFIRMED', 'PAID'].includes(snapshot.status) || payrollOverrides(snapshot).fields.hourly_rate)
+      ? Number(snapshot.hourly_rate)
+      : monthlyHourlyRate(row.employee, period, snapshot?.hourly_rate)
     const rateValue = row.kind === 'OVERTIME' ? snapshot ? snapshot.overtime_rate : policy?.overtime_rate ?? 100000 : snapshot ? snapshot.late_penalty_rate : policy?.late_early_penalty ?? 50000
     const rateKind = row.kind === 'OVERTIME' ? snapshot ? snapshot.overtime_rate_kind : policy?.overtime_rate_kind ?? 'FIXED_PER_HOUR' : snapshot ? snapshot.late_penalty_rate_kind : policy?.late_early_penalty_kind ?? 'FIXED_PER_HOUR'
     const amount = row.kind === 'ABSENCE' ? Number(row.amount) : rateValue == null || !rateKind ? null : Math.round(Number(row.hours) * Number(rateValue) * (rateKind === 'HOURLY_MULTIPLIER' ? hourlyRate : 1))

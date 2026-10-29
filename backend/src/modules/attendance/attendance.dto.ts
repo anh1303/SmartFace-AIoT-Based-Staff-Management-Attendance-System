@@ -7,12 +7,11 @@ export const checkInSchema = z.object({
   device_info: z.string().optional(),
   event_id: z.string().uuid().optional(),
   method: z.enum([
-    ATTENDANCE_METHOD.FACE,
-    ATTENDANCE_METHOD.FINGERPRINT,
     ATTENDANCE_METHOD.MANUAL,
+    ATTENDANCE_METHOD.FINGERPRINT,
     ATTENDANCE_METHOD.CARD,
-  ]).optional(),
-  verification_score: z.number().min(0).max(1).optional(),
+  ]).optional().default(ATTENDANCE_METHOD.MANUAL),
+  reason: z.string().trim().max(1000).optional(),
 })
 
 export const adjustAttendanceSchema = z.object({
@@ -28,12 +27,11 @@ export const checkOutSchema = z.object({
   device_info: z.string().optional(),
   event_id: z.string().uuid().optional(),
   method: z.enum([
-    ATTENDANCE_METHOD.FACE,
-    ATTENDANCE_METHOD.FINGERPRINT,
     ATTENDANCE_METHOD.MANUAL,
+    ATTENDANCE_METHOD.FINGERPRINT,
     ATTENDANCE_METHOD.CARD,
-  ]).optional(),
-  verification_score: z.number().min(0).max(1).optional(),
+  ]).optional().default(ATTENDANCE_METHOD.MANUAL),
+  reason: z.string().trim().max(1000).optional(),
 })
 
 export const aggregateAttendanceSchema = z.object({
@@ -42,8 +40,18 @@ export const aggregateAttendanceSchema = z.object({
   employeeId: z.string().optional(),
 })
 
+export const devSimulateFaceScanSchema = z.object({
+  employeeId: z.string().min(1),
+  mode: z.enum(['CHECK_IN', 'CHECK_OUT']).default('CHECK_IN'),
+  device_id: z.string().optional().default('DEV_SIMULATOR'),
+  antispoof_score: z.number().min(0).max(1).optional().default(0.95),
+  verification_score: z.number().min(0).max(1).optional().default(0.92),
+})
+
 export type CheckInDto = z.infer<typeof checkInSchema>
 export type AdjustAttendanceDto = z.infer<typeof adjustAttendanceSchema>
 export type CheckOutDto = z.infer<typeof checkOutSchema>
 export type AggregateAttendanceDto = z.infer<typeof aggregateAttendanceSchema>
+export type DevSimulateFaceScanInput = z.input<typeof devSimulateFaceScanSchema>
+export type DevSimulateFaceScanDto = z.infer<typeof devSimulateFaceScanSchema>
 

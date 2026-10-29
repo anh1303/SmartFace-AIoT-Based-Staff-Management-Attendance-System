@@ -8,6 +8,7 @@ import {
   updateBonusPenaltySchema,
   generatePayrollSchema,
   updatePayrollSchema,
+  earlySettlementSchema,
 } from './payroll.dto.js';
 
 export const getBonusPenalty = async (_req: Request, res: Response) => {
@@ -48,9 +49,23 @@ export const finalizePeriod = async (req: Request, res: Response) => {
   successResponse(res, await service.finalizePeriod(period, req.user?.id, req.user?.role), 'Payroll period finalized');
 };
 
+export const finalizeEarlySettlement = async (req: Request, res: Response) => {
+  const body = earlySettlementSchema.parse(req.body);
+  successResponse(
+    res,
+    await service.finalizeEarlySettlement(body, req.user?.id, req.user?.role),
+    'Đã quyết toán sớm bảng lương nhân viên thành công'
+  );
+};
+
 export const unlockPeriod = async (req: Request, res: Response) => {
   const period = req.params.period as string;
   successResponse(res, await service.unlockPeriod(period, req.user?.id), 'Payroll period unlocked');
+};
+
+export const previewEarlySettlement = async (req: Request, res: Response) => {
+  const body = earlySettlementSchema.parse(req.body);
+  successResponse(res, await service.previewEarlySettlement(body, req.user?.id, req.user?.role));
 };
 
 export const listAdjustments = async (req: Request, res: Response) => {

@@ -12,7 +12,12 @@ export function roundHours(seconds: number): number {
   const remainder = duration - whole * 3600
   return whole + (remainder >= 1800 ? 0.5 : 0)
 }
-export const vnDay = (value: Date | string): string => new Date(value).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
+// Reuse ICU timezone data instead of constructing a formatter on every scan/day.
+const vnDayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
+export const vnDay = (value: Date | string): string => {
+  const date = new Date(value)
+  return Number.isNaN(+date) ? 'Invalid Date' : vnDayFormatter.format(date)
+}
 
 export interface PolicyLog {
   id: string | bigint | number
@@ -25,7 +30,7 @@ export interface PolicyLog {
 }
 export interface PolicyPair { inId: string; outId: string; start: Date; end: Date; workDate: string }
 
-export function pairAttendance(logs: PolicyLog[], assignments: DatedPolicyShift[] = []) {
+export function pairAttendance(logs: PolicyLog[], assignments: DatedPolicyShift[] = [], workDate = createWorkDateResolver(assignments)) {
   const ordered = logs.map((l, i) => ({ ...l, index: i }))
     .sort((a, b) => new Date(a.event_time).getTime() - new Date(b.event_time).getTime() ||
       (BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : a.index - b.index))
@@ -34,26 +39,26 @@ export function pairAttendance(logs: PolicyLog[], assignments: DatedPolicyShift[
   let pending: (typeof ordered)[number] | undefined
   for (const log of ordered) {
     if (log.status && log.status !== 'VALID') {
-      if (pending) ignored.push({ id: String(pending.id), date: attendanceWorkDate(pending.event_time, assignments), reason: 'INTERRUPTED_PAIR' })
+      if (pending) ignored.push({ id: String(pending.id), date: workDate(pending.event_time), reason: 'INTERRUPTED_PAIR' })
       pending = undefined
       continue
     }
     if (log.type === 'CHECK_IN') {
-      if (pending) ignored.push({ id: String(pending.id), date: attendanceWorkDate(pending.event_time, assignments), reason: 'REPLACED_CHECK_IN' })
+      if (pending) ignored.push({ id: String(pending.id), date: workDate(pending.event_time), reason: 'REPLACED_CHECK_IN' })
       pending = log
     } else if (log.type === 'CHECK_OUT' || log.type === 'TAN_CA') {
-      if (!pending) { ignored.push({ id: String(log.id), date: attendanceWorkDate(log.event_time, assignments), reason: 'UNPAIRED_CHECK_OUT' }); continue }
+      if (!pending) { ignored.push({ id: String(log.id), date: workDate(log.event_time), reason: 'UNPAIRED_CHECK_OUT' }); continue }
       const start = new Date(pending.event_time), end = new Date(log.event_time)
       const duration = end.getTime() - start.getTime()
       if (duration > 0 && duration <= MAX_PAIR_MS) {
-        pairs.push({ inId: String(pending.id), outId: String(log.id), start, end, workDate: attendanceWorkDate(start, assignments) })
+        pairs.push({ inId: String(pending.id), outId: String(log.id), start, end, workDate: workDate(start) })
       } else {
         ignored.push({ id: String(pending.id), date: vnDay(start), reason: 'INVALID_PAIR' },
           { id: String(log.id), date: vnDay(end), reason: 'INVALID_PAIR' })
       }
       pending = undefined
     } else {
-      if (pending) ignored.push({ id: String(pending.id), date: attendanceWorkDate(pending.event_time, assignments), reason: 'INTERRUPTED_PAIR' })
+      if (pending) ignored.push({ id: String(pending.id), date: workDate(pending.event_time), reason: 'INTERRUPTED_PAIR' })
       pending = undefined
     }
   }
@@ -77,25 +82,46 @@ export function shiftBounds(workDate: string, shift: PolicyShift | null) {
   return { start, end, off, isZeroDuration }
 }
 
-/** A re-entry after midnight still belongs to the assigned overnight shift. */
-export function attendanceWorkDate(time: Date | string, assignments: DatedPolicyShift[]) {
-  const at = +new Date(time)
-  const candidates = assignments.map(s => ({ date: vnDay(s.work_date), ...shiftBounds(vnDay(s.work_date), s) }))
-    .filter(s => !s.off && !s.isZeroDuration && at >= +s.start - 3600000 && at < +s.end)
-    .sort((a,b) => Number(+a.start > at) - Number(+b.start > at) || +b.start - +a.start)
-  return candidates[0]?.date || vnDay(time)
+/** Snapshot-scoped resolver: no identity data or mutable schedules cached globally. */
+function createWorkDateResolver(assignments: DatedPolicyShift[]) {
+  const windows = assignments.map(shift => {
+    const date = vnDay(shift.work_date)
+    return { date, ...shiftBounds(date, shift) }
+  })
+  const days = new Map<number, string>()
+  return (time: Date | string) => {
+    const at = +new Date(time)
+    if (days.has(at)) return days.get(at)!
+    const candidates = windows.filter(s => !s.off && !s.isZeroDuration && at >= +s.start - 3600000 && at < +s.end)
+      .sort((a,b) => Number(+a.start > at) - Number(+b.start > at) || +b.start - +a.start)
+    const date = candidates[0]?.date || vnDay(time)
+    days.set(at, date)
+    return date
+  }
 }
 
-export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyShift | null, now = new Date(), assignments: DatedPolicyShift[] = []) {
+/** A re-entry after midnight still belongs to the assigned overnight shift. */
+export function attendanceWorkDate(time: Date | string, assignments: DatedPolicyShift[]) {
+  return createWorkDateResolver(assignments)(time)
+}
+
+/** Prepare once per employee/input snapshot, then reuse for every day in a month. */
+export function prepareAttendance(logs: PolicyLog[], assignments: DatedPolicyShift[]) {
+  const workDate = createWorkDateResolver(assignments)
+  return { pairing: pairAttendance(logs, assignments, workDate), workDate }
+}
+
+export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyShift | null, now = new Date(), assignments: DatedPolicyShift[] = [], prepared?: ReturnType<typeof prepareAttendance>) {
   const schedule = assignments.length ? assignments : shift ? [{ ...shift, work_date: workDate }] : []
-  const result = pairAttendance(logs, schedule)
+  const context = prepared ?? prepareAttendance(logs, schedule)
+  const result = context.pairing
   const pairs = result.pairs.filter(p => p.workDate === workDate)
   const ownedIds = new Set(pairs.flatMap(p => [p.inId, p.outId]))
   const foreignIds = new Set(result.pairs.filter(p => p.workDate !== workDate).flatMap(p => [p.inId, p.outId]))
-  const source = logs.filter(l => ownedIds.has(String(l.id)) || attendanceWorkDate(l.event_time, schedule) === workDate && !foreignIds.has(String(l.id)))
+  const source = logs.filter(l => ownedIds.has(String(l.id)) || context.workDate(l.event_time) === workDate && !foreignIds.has(String(l.id)))
   const sourceEvents = source.map(l => ({ id: String(l.id), type: l.type, time: new Date(l.event_time).toISOString(), status: l.status || 'VALID', method: l.method, device_info: l.device_info, verification_score: l.verification_score }))
   const ignored = result.ignored.filter(p => p.date === workDate)
-  const open = result.pending && attendanceWorkDate(result.pending.event_time, schedule) === workDate
+  const open = result.pending && context.workDate(result.pending.event_time) === workDate
   const { start, end, off, isZeroDuration } = shiftBounds(workDate, shift)
 
   const scheduledShiftSeconds = shift && !off && !isZeroDuration ? Math.max(0, (+end - +start) / 1000) : 0

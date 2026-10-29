@@ -3,7 +3,8 @@ import { syncDayAdjustments, flushAdjustmentBatch } from './attendance.adjustmen
 import { observeRecognition } from './recognition-confirmation.js'
 import { Prisma } from '@prisma/client'
 import { createHash } from 'node:crypto'
-import { calculateDay, pairAttendance, attendanceWorkDate, vnDay, ATTENDANCE_POLICY_VERSION, MAX_PAIR_MS, roundHours } from './attendance.policy.js'
+import { setImmediate as yieldToRequests } from 'node:timers/promises'
+import { attendanceWorkDate, calculateDay, prepareAttendance, vnDay, ATTENDANCE_POLICY_VERSION, MAX_PAIR_MS, roundHours } from './attendance.policy.js'
 import { prisma } from '../../config/database.js'
 import { assertCanAccessEmployeeDetail } from '../../common/permission.helper.js'
 import { AppError } from '../../common/AppError.js'
@@ -689,20 +690,27 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
     const invalidations: Prisma.AuditLogCreateManyInput[] = []
     const details: Array<Record<string, unknown>> = []
     const adjustmentPolicy = await tx.bonusPenalty.findFirst({ orderBy: { id: 'desc' } })
+    let lastYield = performance.now()
     for (const emp of employees) {
       const empLogs = logs.filter(l => l.employee_id === emp.id)
       const empShifts = shifts.filter(s => s.employee_id === emp.id).map(s => ({ ...s, start_time: s.start_time ?? s.work_shifts.start_time, end_time: s.end_time ?? s.work_shifts.end_time }))
-      const pairing = pairAttendance(empLogs, empShifts)
+      const prepared = prepareAttendance(empLogs, empShifts)
+      const pairing = prepared.pairing
       const pairedOuts = new Set(pairing.pairs.map(p => p.outId))
       const dates = new Set([
         ...shifts.filter(s => s.employee_id === emp.id).map(s => vnDay(s.work_date)),
-        ...empLogs.filter(l => !pairedOuts.has(String(l.id))).map(l => attendanceWorkDate(l.event_time, empShifts)),
+        ...empLogs.filter(l => !pairedOuts.has(String(l.id))).map(l => prepared.workDate(l.event_time)),
         ...summaries.filter(s => s.employee_id === emp.id).map(s => vnDay(s.work_date)),
       ])
       for (const date of [...dates].sort()) {
+        // Promise microtasks alone do not let HTTP handlers/timers run during CPU work.
+        if (performance.now() - lastYield >= 10) {
+          await yieldToRequests()
+          lastYield = performance.now()
+        }
         if (date.slice(0, 7) !== first.slice(0, 7) || date > today || (onlyDate && date !== onlyDate)) continue
         const assigned = empShifts.find(s => vnDay(s.work_date) === date)
-        const calculation = calculateDay(date, empLogs, assigned || null, new Date(), empShifts)
+        const calculation = calculateDay(date, empLogs, assigned || null, new Date(), empShifts, prepared)
         const workDate = new Date(`${date}T00:00:00Z`)
         const summary = (() => {
           const previous = summaries.find(s => s.employee_id === emp.id && vnDay(s.work_date) === date)

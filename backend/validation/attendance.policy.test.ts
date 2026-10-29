@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculateDay, pairAttendance, roundHours } from '../src/modules/attendance/attendance.policy.js'
+import { calculateDay, pairAttendance, prepareAttendance, roundHours } from '../src/modules/attendance/attendance.policy.js'
 const day = '2026-10-02'
 const shift = { start_time: '08:00', end_time: '17:30', shift_type: 'OFFICE_HOURS' }
 const log = (id: number, type: string, time: string, date = day) => ({ id, type, event_time: `${date}T${time}+07:00`, status: 'VALID' })
@@ -133,6 +133,24 @@ describe('Absence and overnight ownership', () => {
     const r = calculateDay('2026-09-30', logs, night, new Date('2026-10-01T08:00:00+07:00'), assignments)
     expect(r.workingHours).toBe(8);expect(r.overtimeCandidateHours).toBe(1)
     expect(calculateDay('2026-10-01',logs,null,new Date('2026-10-01T08:00:00+07:00'),assignments).details.events).toHaveLength(0)
+  })
+  it('reuses a prepared monthly calculation without changing any daily result', () => {
+    const night = { start_time:'22:00',end_time:'06:00',shift_type:'NIGHT' }
+    const assignments = [{...night,work_date:'2026-09-30'},{...shift,work_date:'2026-10-01'}]
+    const logs = [
+      log(1,'CHECK_IN','22:00:00','2026-09-30'),
+      log(2,'CHECK_OUT','01:00:00','2026-10-01'),
+      {...log(3,'CHECK_IN','01:30:00','2026-10-01'),status:'FLAGGED'},
+      log(4,'CHECK_OUT','07:00:00','2026-10-01'),
+      log(5,'CHECK_OUT','18:00:00','2026-10-01'),
+    ]
+    const now = new Date('2026-10-02T12:00:00+07:00')
+    const prepared = prepareAttendance(logs,assignments)
+    for (const date of ['2026-09-30','2026-10-01','2026-10-02']) {
+      const assigned = assignments.find(s => s.work_date === date) || null
+      expect(calculateDay(date,logs,assigned,now,assignments,prepared))
+        .toEqual(calculateDay(date,logs,assigned,now,assignments))
+    }
   })
   it('keeps an active overnight shift ahead of the next shift pre-entry window', () => {
     const night={start_time:'22:00',end_time:'06:00',shift_type:'NIGHT'}

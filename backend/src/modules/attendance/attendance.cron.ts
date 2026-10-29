@@ -16,20 +16,24 @@ let cronInterval: NodeJS.Timeout | null = null
 export async function runAttendanceAggregationJob() {
   if (running) return
   running = true
+  let activePeriod = ''
   try {
     const todayStr = getTodayVNString() // YYYY-MM-DD
     const [yearStr, monthStr] = todayStr.split('-')
     const year = parseInt(yearStr, 10)
     const month = parseInt(monthStr, 10)
 
-    cronLogger.info(`Đang tự động tổng hợp dữ liệu chấm công tháng ${month}/${year}...`)
     const previous = new Date(Date.UTC(year, month - 2, 1))
-    await aggregateDailyAttendance(previous.getUTCMonth() + 1, previous.getUTCFullYear())
-    const result = await aggregateDailyAttendance(month, year)
+    for (const [targetMonth, targetYear] of [[previous.getUTCMonth() + 1, previous.getUTCFullYear()], [month, year]]) {
+      activePeriod = `${targetYear}-${String(targetMonth).padStart(2, '0')}`
+      const started = performance.now()
+      cronLogger.info(`Bắt đầu tổng hợp chấm công kỳ ${activePeriod}`)
+      const result = await aggregateDailyAttendance(targetMonth, targetYear)
+      cronLogger.info(`Đã tổng hợp kỳ ${activePeriod}: ${result.totalSummaries} ngày công trong ${Math.round(performance.now() - started)} ms`)
+    }
     emitAttendanceEvent('attendance-summary-updated', { period: todayStr.slice(0, 7) })
-    cronLogger.info(`Đã tổng hợp thành công ${result.totalSummaries} bản ghi chấm công ngày tháng ${month}/${year}`)
   } catch (error) {
-    cronLogger.error('Lỗi khi tự động tổng hợp dữ liệu chấm công:', error)
+    cronLogger.error(`Lỗi khi tự động tổng hợp dữ liệu chấm công kỳ ${activePeriod}:`, error)
   } finally { running = false }
 }
 

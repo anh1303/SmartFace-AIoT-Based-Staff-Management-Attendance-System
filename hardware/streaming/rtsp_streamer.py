@@ -49,7 +49,6 @@ class RTSPStreamer:
             "-b:v", "800k",
             "-f", "rtsp",
             "-rtsp_transport", "tcp",
-            "-stimeout", "5000000",
             self.rtsp_url
         ]
         try:

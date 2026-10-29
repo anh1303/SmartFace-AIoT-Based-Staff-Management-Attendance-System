@@ -15,7 +15,7 @@ export function AttendanceLogFilterSelect({ value, onChange }: { value: Attendan
   </label>;
 }
 const reasons: Record<string, string> = { REPLACED_CHECK_IN: 'Lượt vào bị thay bởi lượt vào sau', UNPAIRED_CHECK_OUT: 'Lượt ra chưa có cặp vào', INVALID_PAIR: 'Cặp không hợp lệ', INTERRUPTED_PAIR: 'Cặp bị gián đoạn' };
-const creditReasons: Record<string, string> = { OFF:'Ngày OFF, không tự ghi công', NO_SHIFT:'Chưa phân ca', UNDER_HALF_SHIFT:'Chưa đạt nửa ca', HALF_SHIFT_NOT_YET_REACHED:'Chưa đạt nửa ca tại lượt này', FULL_SHIFT_ALREADY_CREDITED:'Công cả ca đã ghi ở checkout trước' };
+const creditReasons: Record<string, string> = { UNDER_TWO_THIRDS_SHIFT:'Chưa đạt ngưỡng 2/3 ca', TWO_THIRDS_SHIFT_NOT_YET_REACHED:'Chưa đạt ngưỡng 2/3 ca tại lượt này', OFF:'Ngày OFF, không tự ghi công', NO_SHIFT:'Chưa phân ca', UNDER_HALF_SHIFT:'Chưa đạt nửa ca', HALF_SHIFT_NOT_YET_REACHED:'Chưa đạt nửa ca tại lượt này', FULL_SHIFT_ALREADY_CREDITED:'Công cả ca đã ghi ở checkout trước' };
 export function AttendanceDayDetails({ item, filter, showFilter = true }: { item: AttendancePairItem; filter?: AttendanceLogFilter; showFilter?: boolean }) {
   const [localFilter, setLocalFilter] = useState<AttendanceLogFilter>('ALL');
   const mode = filter ?? localFilter;
@@ -24,7 +24,7 @@ export function AttendanceDayDetails({ item, filter, showFilter = true }: { item
   const events = mode === 'ALL' ? item.rawEvents : item.rawEvents.filter(ev => visibleIds.has(ev.id));
   return <div className="space-y-4 text-slate-800 dark:text-slate-100 text-sm">
     {showFilter && <AttendanceLogFilterSelect value={localFilter} onChange={setLocalFilter} />}
-    <p className="text-xs text-slate-500">Công ngày đã ghi: {item.workingHours}h. Theo rule nửa ca, công cả ca được ghi một lần tại checkout đầu tiên đạt ngưỡng; OT đề xuất cần duyệt riêng.</p>
+    <p className="text-xs text-slate-500">Công ngày đã ghi: {item.workingHours}h. Công cả ca được ghi một lần tại checkout đầu tiên đạt ngưỡng ghi công của ngày; OT đề xuất cần duyệt riêng.</p>
     {item.needsReview && <p className="text-amber-600">Cần xác minh: {item.reviewReason || 'Dữ liệu chấm công chưa đầy đủ'}</p>}
     {item.hasPairData === false && <p role="status" className="text-amber-600">Chưa có kết quả ghép cặp từ bản tổng hợp. Các lượt bên dưới vẫn được giữ; cần tải lại hoặc tính lại công.</p>}
     <div>

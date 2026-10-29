@@ -15,6 +15,7 @@ import { EmployeeProvider, useEmployeeContext } from './EmployeeContext';
 import { ShiftProvider, useShiftContext } from './ShiftContext';
 import { AttendanceProvider, useAttendanceContext } from './AttendanceContext';
 import { PayrollProvider, usePayrollContext } from './PayrollContext';
+import type { PayrollItemUpdates } from '../api/payrollApi';
 import { NotificationProvider, useNotifications } from '../features/notifications';
 
 
@@ -44,14 +45,16 @@ export interface AppContextType {
 
   // Payroll
   payroll: PayrollRecord[];
+  isLoadingPayroll?: boolean;
+  payrollError?: Error | null;
   bonusPenalty: BonusPenaltyPolicy | null;
   selectedPeriod: string;
   setSelectedPeriod: (period: string) => void;
   generatePayroll: (period: string) => Promise<void>;
-  updatePayrollItem: (id: string, updates: Partial<PayrollRecord>) => Promise<unknown>;
+  updatePayrollItem: (id: string, updates: PayrollItemUpdates) => Promise<unknown>;
   finalizePayrollPeriod: (period: string) => void;
   unlockPayrollPeriod: (period: string) => void;
-  updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; description?: string }) => Promise<void>;
+  updateBonusPenalty: (data: Partial<Omit<BonusPenaltyPolicy, 'id'>>) => Promise<void>;
 
   // Toasts
   toasts: ToastMessage[];
@@ -100,6 +103,8 @@ const AppConsumerBridge: React.FC<{ children: React.ReactNode }> = ({ children }
 
     // Payroll
     payroll: payrollCtx.payroll,
+    isLoadingPayroll: payrollCtx.isLoadingPayroll,
+    payrollError: payrollCtx.payrollError,
     bonusPenalty: payrollCtx.bonusPenalty,
     selectedPeriod: payrollCtx.selectedPeriod,
     setSelectedPeriod: payrollCtx.setSelectedPeriod,
@@ -135,6 +140,8 @@ const AppConsumerBridge: React.FC<{ children: React.ReactNode }> = ({ children }
     attendanceCtx.attendance,
     attendanceCtx.addAttendanceRecord,
     payrollCtx.payroll,
+    payrollCtx.isLoadingPayroll,
+    payrollCtx.payrollError,
     payrollCtx.bonusPenalty,
     payrollCtx.selectedPeriod,
     payrollCtx.setSelectedPeriod,

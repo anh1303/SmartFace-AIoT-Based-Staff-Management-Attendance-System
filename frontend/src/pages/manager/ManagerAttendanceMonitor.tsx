@@ -54,7 +54,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     departmentFilter,
   });
 
-  const { devices, isError: isDevicesError } = useDevices();
+  const { devices, isError: isDevicesError } = useDevices(role === 'admin');
   const { isDateLocked, toggleLock } = useAttendanceLocks();
   // useAttendanceSummaries lấy đúng khoảng ngày đang xem [startDate, endDate]
   const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap, adjustAttendance } = useAttendanceSummaries(startDate, endDate);
@@ -121,7 +121,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   };
 
   const handleToggleLock = () => {
-    if (!startDate) return;
+    if (role !== 'admin' || !startDate) return;
     toggleLock(startDate, !isCurrentDateLocked);
     if (startDate !== endDate) {
       toggleLock(endDate, !isCurrentDateLocked);
@@ -192,17 +192,17 @@ export const ManagerAttendanceMonitor: React.FC = () => {
         onExportCSV={handleExportCSV}
       />
 
-      <DeviceStatusCards devices={devices} isError={isDevicesError} />
+      {role === 'admin' && <DeviceStatusCards devices={devices} isError={isDevicesError} />}
 
       {/* AIoT Realtime Gate Camera & Live Events Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <div className="lg:col-span-2">
+      <div className={role === 'admin' ? 'grid grid-cols-1 lg:grid-cols-3 gap-6 items-start' : ''}>
+        {role === 'admin' && <div className="lg:col-span-2">
           <WebRTCPlayer
             deviceId="PI4_FRONT_GATE"
             deviceName="Cổng Kiểm Soát — Raspberry Pi 4 Edge AI"
             showToast={showToast}
           />
-        </div>
+        </div>}
         <div className="lg:col-span-1 h-full min-h-[360px]">
           <LiveEventFeed
             events={liveEvents}

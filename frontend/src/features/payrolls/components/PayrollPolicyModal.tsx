@@ -1,9 +1,12 @@
 import React from 'react';
 import { Modal } from '../../../components/common/Modal';
+import type { RateKind } from '../../../types/payroll.types';
 
 export interface PolicyFormData {
   overtime_rate: number;
+  overtime_rate_kind: RateKind;
   late_early_penalty: number;
+  late_early_penalty_kind: RateKind;
   absence_penalty_rate: number;
   description: string;
 }
@@ -40,10 +43,11 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
         </div>
         <div>
           <label className="block text-xs text-slate-700 dark:text-slate-400 font-medium mb-1">
-            Mức thưởng OT (Hệ số x hoặc ₫/h)
+            Mức thưởng OT
           </label>
           <input
             type="number"
+            min={0}
             step="any"
             value={policyData.overtime_rate}
             onChange={(e) =>
@@ -53,21 +57,18 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
               }))
             }
             className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
-            placeholder="Ví dụ: 1.5 (gấp 1.5x) hoặc 100000 (100.000 ₫/h)"
             required
           />
-          <p className="text-[11px] text-slate-500 mt-1">
-            Nhập ≤ 10 nếu là hệ số nhân lương giờ (VD: 1.5x), nhập &gt; 10 nếu là số tiền ₫/h (VD:
-            100000 ₫/h).
-          </p>
+          <label className="sf-field mt-2">Đơn vị thưởng OT<select className="sf-input" value={policyData.overtime_rate_kind} onChange={e => onChangePolicyData(p => ({ ...p, overtime_rate_kind: e.target.value as RateKind }))}><option value="FIXED_PER_HOUR">Số tiền cố định (₫/h)</option><option value="HOURLY_MULTIPLIER">Hệ số nhân lương giờ (x)</option></select></label>
         </div>
 
         <div>
           <label className="block text-xs text-slate-700 dark:text-slate-400 font-medium mb-1">
-            Mức phạt đi trễ / về sớm (Hệ số x hoặc ₫/h)
+            Mức phạt đi trễ / về sớm
           </label>
           <input
             type="number"
+            min={0}
             step="any"
             value={policyData.late_early_penalty}
             onChange={(e) =>
@@ -80,9 +81,7 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
             placeholder="Ví dụ: 50000 (50.000 ₫/h)"
             required
           />
-          <p className="text-[11px] text-slate-500 mt-1">
-            Nhập ≤ 10 nếu là hệ số khấu trừ lương giờ, nhập &gt; 10 nếu là số tiền phạt ₫/h.
-          </p>
+          <label className="sf-field mt-2">Đơn vị phạt trễ / sớm<select className="sf-input" value={policyData.late_early_penalty_kind} onChange={e => onChangePolicyData(p => ({ ...p, late_early_penalty_kind: e.target.value as RateKind }))}><option value="FIXED_PER_HOUR">Số tiền cố định (₫/h)</option><option value="HOURLY_MULTIPLIER">Hệ số nhân lương giờ (x)</option></select></label>
         </div>
 
         <div>

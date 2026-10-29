@@ -8,6 +8,7 @@ import {
   finalizePayrollPeriodApi,
   unlockPayrollPeriodApi,
   updateBonusPenaltyApi,
+  PayrollItemUpdates,
 } from '../api/payrollApi';
 import { PayrollRecord, BonusPenaltyPolicy } from '../types';
 import { useToast } from '../context/ToastContext';
@@ -52,7 +53,7 @@ export function usePayroll() {
   });
 
   const updatePayrollItemMutation = useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<PayrollRecord> & { working_hours?: number; reason?: string } }) =>
+    mutationFn: ({ id, updates }: { id: string; updates: PayrollItemUpdates }) =>
       updatePayrollItemApi(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
@@ -88,7 +89,7 @@ export function usePayroll() {
   });
 
   const updateBonusPenaltyMutation = useMutation({
-    mutationFn: (data: { overtime_rate?: number; late_early_penalty?: number; absence_penalty_rate?: number; description?: string }) => updateBonusPenaltyApi(data),
+    mutationFn: (data: Partial<Omit<BonusPenaltyPolicy, 'id'>>) => updateBonusPenaltyApi(data),
     onSuccess: () => {
       showToast('Cập nhật chính sách thưởng/phạt vào CSDL thành công', 'success');
       queryClient.invalidateQueries({ queryKey: BONUS_PENALTY_QUERY_KEY });
@@ -106,11 +107,12 @@ export function usePayroll() {
     selectedPeriod,
     setSelectedPeriod,
     isLoadingPayroll: payrollQuery.isLoading,
+    payrollError: payrollQuery.error,
     generatePayroll: (period: string) => generatePayrollMutation.mutateAsync(period),
-    updatePayrollItem: (id: string, updates: Partial<PayrollRecord> & { working_hours?: number; reason?: string }) =>
+    updatePayrollItem: (id: string, updates: PayrollItemUpdates) =>
       updatePayrollItemMutation.mutateAsync({ id, updates }),
     finalizePayrollPeriod: (period: string) => finalizePayrollPeriodMutation.mutate(period),
     unlockPayrollPeriod: (period: string) => unlockPayrollPeriodMutation.mutate(period),
-    updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; absence_penalty_rate?: number; description?: string }) => updateBonusPenaltyMutation.mutateAsync(data),
+    updateBonusPenalty: (data: Partial<Omit<BonusPenaltyPolicy, 'id'>>) => updateBonusPenaltyMutation.mutateAsync(data),
   };
 }

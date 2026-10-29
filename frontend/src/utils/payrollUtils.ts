@@ -1,17 +1,14 @@
-/**
- * Utility functions for payroll calculations and rate formatting.
- * Consolidates the standard business logic across Manager and Employee modules:
- * - When rate <= 10, it is treated as a multiplier of hourlyRate: amount = hours * rate * hourlyRate
- * - When rate > 10, it is treated as a fixed monetary rate per hour: amount = hours * rate
- */
+import type { RateKind } from '../types/payroll.types';
 
-export function calcPayrollAmount(hours: number, rate: number, hourlyRate: number): number {
+/** The fourth argument is the saved unit; omitted units mean fixed currency per hour. */
+export function calcPayrollAmount(hours: number, rate: number, hourlyRate: number, kind: RateKind = 'FIXED_PER_HOUR'): number {
   if (!hours || hours <= 0 || !rate || rate <= 0) return 0;
-  return rate <= 10 ? hours * rate * hourlyRate : hours * rate;
+  return kind === 'HOURLY_MULTIPLIER' ? hours * rate * hourlyRate : hours * rate;
 }
 
-export function formatPayrollRateLabel(rate: number, hourlyRate?: number): string {
-  if (rate <= 10) {
+/** The third argument is the saved unit; hourlyRate only expands multiplier labels. */
+export function formatPayrollRateLabel(rate: number, hourlyRate?: number, kind: RateKind = 'FIXED_PER_HOUR'): string {
+  if (kind === 'HOURLY_MULTIPLIER') {
     return hourlyRate
       ? `${rate}x lương giờ (${(rate * hourlyRate).toLocaleString('vi-VN')} ₫/h)`
       : `${rate}x`;

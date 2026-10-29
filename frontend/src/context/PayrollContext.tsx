@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { usePayroll } from '../hooks/usePayroll';
+import type { PayrollItemUpdates } from '../api/payrollApi';
 import { PayrollRecord, BonusPenaltyPolicy } from '../types';
 
 export interface PayrollContextType {
@@ -8,11 +9,12 @@ export interface PayrollContextType {
   selectedPeriod: string;
   setSelectedPeriod: (period: string) => void;
   isLoadingPayroll?: boolean;
+  payrollError?: Error | null;
   generatePayroll: (period: string) => Promise<PayrollRecord[] | void>;
-  updatePayrollItem: (id: string, updates: Partial<PayrollRecord> & { working_hours?: number; reason?: string }) => Promise<PayrollRecord | void>;
+  updatePayrollItem: (id: string, updates: PayrollItemUpdates) => Promise<PayrollRecord | void>;
   finalizePayrollPeriod: (period: string) => void;
   unlockPayrollPeriod: (period: string) => void;
-  updateBonusPenalty: (data: { overtime_rate?: number; late_early_penalty?: number; absence_penalty_rate?: number; description?: string }) => Promise<BonusPenaltyPolicy | void>;
+  updateBonusPenalty: (data: Partial<Omit<BonusPenaltyPolicy, 'id'>>) => Promise<BonusPenaltyPolicy | void>;
 }
 
 const PayrollContext = createContext<PayrollContextType | undefined>(undefined);
@@ -26,6 +28,7 @@ export const PayrollProvider: React.FC<{ children: React.ReactNode }> = ({ child
     selectedPeriod: payrollHook.selectedPeriod,
     setSelectedPeriod: payrollHook.setSelectedPeriod,
     isLoadingPayroll: payrollHook.isLoadingPayroll,
+    payrollError: payrollHook.payrollError,
     generatePayroll: async (period: string) => {
       return await payrollHook.generatePayroll(period);
     },
@@ -41,6 +44,7 @@ export const PayrollProvider: React.FC<{ children: React.ReactNode }> = ({ child
     payrollHook.selectedPeriod,
     payrollHook.setSelectedPeriod,
     payrollHook.isLoadingPayroll,
+    payrollHook.payrollError,
     payrollHook.generatePayroll,
     payrollHook.updatePayrollItem,
     payrollHook.finalizePayrollPeriod,

@@ -15,6 +15,11 @@ function Status({ status }: {
     status: DeviceStatus;
 }) { const Icon = status === 'ONLINE' ? Wifi : status === 'MAINTENANCE' ? Wrench : WifiOff; return <span className={`sf-badge ${status === 'ONLINE' ? 'success' : status === 'MAINTENANCE' ? 'warning' : ''}`}><Icon size={14}/>{labels[status]}</span>; }
 export const ManagerDevices: React.FC = () => {
+    const { role } = useAuth();
+    return role === 'admin' ? <DeviceManagement/> : <p className="sf-feedback warning">Chỉ Admin được quản lý và điều khiển thiết bị dùng chung.</p>;
+};
+
+const DeviceManagement: React.FC = () => {
     const { id } = useParams();
     const [params, setParams] = useSearchParams();
     const navigate = useNavigate();

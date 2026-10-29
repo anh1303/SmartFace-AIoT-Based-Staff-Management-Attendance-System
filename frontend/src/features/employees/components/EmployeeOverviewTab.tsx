@@ -19,7 +19,7 @@ interface EmployeeOverviewTabProps {
   standardHours: number;
   overtimeHours: number;
   lateEarlyHours: number;
-  currentNetSalary: number;
+  currentNetSalary: number | null;
   workDays: number;
   onOpenEditModal: () => void;
 }
@@ -283,9 +283,9 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
             <div>
               <div className="flex items-baseline gap-1">
                 <span className="text-xl sm:text-2xl font-black font-mono text-blue-600 dark:text-blue-400">
-                  {currentNetSalary.toLocaleString('vi-VN')}
+                  {currentNetSalary === null ? 'Chưa tính lương kỳ này' : currentNetSalary.toLocaleString('vi-VN')}
                 </span>
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">đ</span>
+                {currentNetSalary !== null && <span className="text-xs font-medium text-slate-500 dark:text-slate-400">đ</span>}
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                 Bao gồm lương cứng + OT + phụ cấp

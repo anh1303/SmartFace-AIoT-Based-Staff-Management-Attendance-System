@@ -1,6 +1,6 @@
 {
-  "version": "2026-10-26-v5",
-  "updated": "26/10/2026",
+  "version": "2026-10-29-v6",
+  "updated": "29/10/2026",
   "timezone": "Asia/Ho_Chi_Minh",
   "sections": [
     {
@@ -114,11 +114,15 @@
     },
     {
       "id": "dieu-3",
-      "title": "3. Công thường và điều kiện nửa ca",
+      "title": "3. Công thường và điều kiện 2/3 ca",
       "blocks": [
         {
           "type": "paragraph",
-          "text": "Cần phân biệt thời gian thực tế bạn có mặt trong ca với số giờ công được trả. Điều kiện nửa ca được xét trên tổng thời gian thực tế của các khoảng vào–ra hợp lệ trong cùng ca."
+          "text": "Ngưỡng 2/3 có hiệu lực theo ngày ca từ 29/10/2026. Ngày ca trước đó giữ ngưỡng 1/2; phiếu đã chốt không tự thay đổi."
+        },
+        {
+          "type": "paragraph",
+          "text": "Cần phân biệt thời gian thực tế bạn có mặt trong ca với số giờ công được trả. Điều kiện 2/3 ca được xét trên tổng thời gian thực tế của các khoảng vào–ra hợp lệ trong cùng ca."
         },
         {
           "type": "table",
@@ -128,22 +132,22 @@
               "Cách xử lý"
             ],
             [
-              "Từ một nửa độ dài ca trở lên",
+              "Từ hai phần ba độ dài ca trở lên",
               "Được ghi công cả ca theo quy tắc làm tròn. Sau đó mới xét đề xuất tăng ca và phạt trễ/sớm."
             ],
             [
-              "Dưới một nửa độ dài ca",
+              "Dưới hai phần ba độ dài ca",
               "Không tự ghi công thường, tăng ca hoặc giờ phạt trễ/sớm. Cần xác minh; không tự coi là vắng hoàn toàn."
             ]
           ]
         },
         {
           "type": "paragraph",
-          "text": "Ví dụ ca hành chính 08:00–17:30 dài 9,5 giờ, ngưỡng nửa ca là 4 giờ 45 phút. Làm thực tế từ 08:00–12:00 và 13:00–17:30 được 8,5 giờ, đủ điều kiện nhận 9,5 giờ công. Khoảng ra ngoài giữa ca không bị tính thành khoản phạt riêng."
+          "text": "Ca hành chính 08:00–17:00 dài 9 giờ, ngưỡng 2/3 là 6 giờ thực tế. Đúng 6 giờ nhận 9 giờ công; thiếu một giây chưa đạt. Khoảng ra ngoài giữa ca không bị tính thành khoản phạt riêng."
         },
         {
           "type": "paragraph",
-          "text": "Một khoảng làm việc 09:00–16:30 có 7,5 giờ thực tế nên vẫn đủ điều kiện nhận 9,5 giờ công. Giờ đi trễ và về sớm được xem xét thành khoản riêng; chỉ khấu trừ khi đã được duyệt."
+          "text": "Trong ca 08:00–17:00, làm 09:00–16:00 có 7 giờ thực tế nên nhận 9 giờ công. Trễ/sớm chỉ bị khấu trừ khi khoản phạt đã được duyệt."
         },
         {
           "type": "heading",
@@ -154,7 +158,7 @@
           "items": [
             "Ngày nghỉ vẫn lưu đủ các lượt vào/ra nhưng không tự tính công, tăng ca hoặc phạt vắng. Người có quyền có thể đề xuất tăng ca thủ công kèm lý do.",
             "Ngày chưa phân ca không tự được trả công hoặc phát sinh khoản phạt vắng. Quản lý cần kiểm tra, phân ca hoặc điều chỉnh có lý do.",
-            "Có lượt quét nhưng thiếu, không hợp lệ hoặc dưới nửa ca thì phải xác minh. Không tự chuyển thành một ngày vắng hoàn toàn."
+            "Có lượt quét nhưng thiếu, không hợp lệ hoặc dưới 2/3 ca thì phải xác minh. Không tự chuyển thành một ngày vắng hoàn toàn."
           ]
         }
       ]
@@ -233,7 +237,7 @@
       "blocks": [
         {
           "type": "paragraph",
-          "text": "Tăng ca chỉ được tự đề xuất khi nhân viên có ca làm, có khoảng vào–ra hợp lệ, thực tế trong ca đạt ít nhất nửa ca và thời gian thực sự làm sau khi ca kết thúc trên 30 phút."
+          "text": "Tăng ca chỉ được tự đề xuất khi nhân viên có ca làm, có khoảng vào–ra hợp lệ, thực tế trong ca đạt ít nhất 2/3 ca và thời gian thực sự làm sau khi ca kết thúc trên 30 phút."
         },
         {
           "type": "list",
@@ -297,14 +301,14 @@
         },
         {
           "type": "paragraph",
-          "text": "Khi ngày làm việc đã đạt điều kiện nửa ca, giờ trễ được tính từ giờ bắt đầu ca đến lượt vào đầu tiên trong các cặp hợp lệ; giờ về sớm được tính từ lượt ra cuối cùng có ghép cặp đến giờ kết thúc ca. Cộng hai phần này rồi áp dụng quy tắc làm tròn."
+          "text": "Khi ngày làm việc đã đạt điều kiện 2/3 ca, giờ trễ được tính từ giờ bắt đầu ca đến lượt vào đầu tiên trong các cặp hợp lệ; giờ về sớm được tính từ lượt ra cuối cùng có ghép cặp đến giờ kết thúc ca. Cộng hai phần này rồi áp dụng quy tắc làm tròn."
         },
         {
           "type": "list",
           "items": [
             "Đến sau giờ bắt đầu ca trên 15 phút được hiển thị là đi trễ. Nhãn đi trễ không đồng nghĩa đã có tiền phạt.",
             "Trễ 20 phút có nhãn đi trễ nhưng giờ phạt sau làm tròn là 0. Trễ 30 phút đề xuất 0,5 giờ.",
-            "Trễ 20 phút và về sớm 20 phút đề xuất tổng 0,5 giờ. Các ví dụ chỉ áp dụng khi đã đạt nửa ca.",
+            "Trễ 20 phút và về sớm 20 phút đề xuất tổng 0,5 giờ. Các ví dụ chỉ áp dụng khi đã đạt 2/3 ca.",
             "Khoảng ra ngoài rồi quay lại giữa ca không bị tính thành khoản phạt. Khoản trễ/sớm chỉ khấu trừ khi được duyệt."
           ]
         },
@@ -326,7 +330,7 @@
         },
         {
           "type": "paragraph",
-          "text": "Nghỉ có phép được xem xét bằng quyết định không duyệt khoản phạt và có thể ghi chú lý do. Có lượt quét thiếu, không hợp lệ hoặc làm dưới nửa ca thì cần xác minh, không tự áp phạt vắng."
+          "text": "Nghỉ có phép được xem xét bằng quyết định không duyệt khoản phạt và có thể ghi chú lý do. Có lượt quét thiếu, không hợp lệ hoặc làm dưới 2/3 ca thì cần xác minh, không tự áp phạt vắng."
         }
       ]
     },
@@ -419,6 +423,10 @@
         {
           "type": "paragraph",
           "text": "Cách tính nêu trên chưa bao gồm thuế thu nhập, bảo hiểm hoặc các khoản khấu trừ khác ngoài phạm vi chính sách này. Phiếu đã chốt không đồng nghĩa tiền đã được chuyển."
+        },
+        {
+          "type": "paragraph",
+          "text": "Đơn giá ghi rõ tiền/giờ hoặc hệ số nhân lương giờ trên snapshot phiếu. Sửa phụ cấp không đóng băng công thường. Công chỉnh tay có nguồn thay đổi cần đối chiếu trước khi chốt. Giao diện dùng kết quả backend; chưa có phiếu đúng kỳ thì hiển thị chưa có kết quả."
         }
       ]
     },
@@ -449,7 +457,7 @@
         },
         {
           "type": "paragraph",
-          "text": "Quản lý cần được gắn phòng ban để xem và duyệt sổ khoản tăng ca/phạt của nhân viên phụ trách. Phiếu và khoản cần xử lý của chính quản lý được chuyển cho quản trị viên."
+          "text": "Quản lý chỉ xem mình và nhân viên thường cùng phòng; chỉ quản lý nhân viên thường cùng phòng. Chưa có phòng ban thì không có quyền quản lý. Chỉ Admin khóa/mở ngày toàn hệ thống, thay đổi danh mục chung và điều khiển thiết bị dùng chung."
         },
         {
           "type": "paragraph",
@@ -473,7 +481,7 @@
           "type": "list",
           "items": [
             "Có lượt vào chưa có lượt ra, lượt ra lẻ, thời gian ghép vượt 24 giờ hoặc không tạo được thời lượng hợp lệ.",
-            "Có lượt ghi nhận bất thường, chưa phân ca, thời gian thực tế dưới nửa ca hoặc tăng ca thực tế trên 4 giờ.",
+            "Có lượt ghi nhận bất thường, chưa phân ca, thời gian thực tế dưới 2/3 ca hoặc tăng ca thực tế trên 4 giờ.",
             "Ca làm hoặc lượt chấm công thay đổi sau khi đã xét duyệt.",
             "Chưa đủ căn cứ để xác định chính sách đã áp dụng cho dữ liệu cũ."
           ]

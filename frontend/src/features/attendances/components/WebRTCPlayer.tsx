@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { apiFetch } from '../../../api/client';
+import { useAuth } from '../../../context/AuthContext';
 
 interface WebRTCPlayerProps {
   streamUrl?: string; // e.g. http://10.52.138.36:8889/pi4_cam/whep
@@ -19,7 +20,12 @@ interface WebRTCPlayerProps {
   showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
-export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
+export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = (props) => {
+  const { role } = useAuth();
+  return role === 'admin' ? <AdminWebRTCPlayer {...props}/> : null;
+};
+
+const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   streamUrl = (import.meta.env.VITE_MEDIAMTX_WHEP_URL || `http://${typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '192.168.1.170'}:8889/pi4_cam/whep`),
   deviceId = 'PI4_FRONT_GATE',
   deviceName = 'Cổng Chính — Raspberry Pi 4 Edge',

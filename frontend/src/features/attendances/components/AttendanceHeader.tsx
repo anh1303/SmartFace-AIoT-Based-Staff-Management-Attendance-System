@@ -27,14 +27,14 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
   const isAdmin = role === 'admin';
   const isSameDay = startDate === endDate;
 
-  const canClickLock = !startDate ? false : isCurrentDateLocked ? isAdmin : true;
+  const canClickLock = isAdmin && Boolean(startDate);
 
   return (
     <PageHeaderBanner
-      title="Giám Sát Chấm Công Toàn Doanh Nghiệp"
+      title={isAdmin ? 'Giám sát chấm công toàn doanh nghiệp' : 'Giám sát chấm công phòng ban'}
       actions={
         <>
-          <button
+          {isAdmin && <button
             type="button"
             onClick={() => {
               if (canClickLock) {
@@ -78,7 +78,7 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
                 </span>
               </>
             )}
-          </button>
+          </button>}
 
           <button
             type="button"

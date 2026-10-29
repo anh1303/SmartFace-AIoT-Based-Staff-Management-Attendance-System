@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionUtils';
 import { PayrollRecord } from '../../types';
 import { logger } from '../../utils/logger';
+import { buildPayrollItemUpdates } from '../../features/payrolls/components/PayrollItemEditModal';
 import { useDepartmentPositions } from '@/features/employees';
 import {
   PayrollHeader,
@@ -28,6 +29,8 @@ export const ManagerPayroll: React.FC = () => {
   const selectView=(value:string)=>setViewParams(p=>{p.set('payrollTab',value);return p;});
   const {
     payroll,
+    isLoadingPayroll,
+    payrollError,
     bonusPenalty,
     selectedPeriod,
     setSelectedPeriod,
@@ -75,7 +78,9 @@ export const ManagerPayroll: React.FC = () => {
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [policyData, setPolicyData] = useState<PolicyFormData>({
     overtime_rate: 100000,
+    overtime_rate_kind: 'FIXED_PER_HOUR',
     late_early_penalty: 50000,
+    late_early_penalty_kind: 'FIXED_PER_HOUR',
     absence_penalty_rate: 0.25,
     description: '',
   });
@@ -87,7 +92,9 @@ export const ManagerPayroll: React.FC = () => {
     }
     setPolicyData({
       overtime_rate: bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000,
+      overtime_rate_kind: bonusPenalty?.overtime_rate_kind ?? 'FIXED_PER_HOUR',
       late_early_penalty: bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000,
+      late_early_penalty_kind: bonusPenalty?.late_early_penalty_kind ?? 'FIXED_PER_HOUR',
       absence_penalty_rate: bonusPenalty?.absence_penalty_rate ?? 0.25,
       description: bonusPenalty?.description || '',
     });
@@ -148,7 +155,7 @@ export const ManagerPayroll: React.FC = () => {
         if (emp && isAnotherManager(emp, currentUser)) {
           return false;
         }
-      }
+      } else return false;
     }
     return true;
   });
@@ -220,7 +227,7 @@ export const ManagerPayroll: React.FC = () => {
       total_overtime: record.total_overtime ?? 0,
       total_late_early: record.total_late_early ?? 0,
       allowance: record.allowance ?? 0,
-      reason: record.reason || '',
+      reason: '',
     });
   };
 
@@ -254,14 +261,7 @@ export const ManagerPayroll: React.FC = () => {
 
     try {
       setIsSavingItem(true);
-      await updatePayrollItem(editingItem.record.payroll_id, {
-        hourly_rate: editingItem.hourly_rate,
-        working_hours: editingItem.working_hours,
-        total_overtime: editingItem.total_overtime,
-        total_late_early: editingItem.total_late_early,
-        allowance: editingItem.allowance,
-        reason: editingItem.reason,
-      });
+      await updatePayrollItem(editingItem.record.payroll_id, buildPayrollItemUpdates(editingItem));
 
       showToast(`Đã lưu thay đổi bảng lương cho ${editingItem.empName}!`, 'success');
       setEditingItem(null);
@@ -362,6 +362,8 @@ export const ManagerPayroll: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {payrollError && <p className="sf-feedback error" role="alert">Không thể tải bảng lương: {payrollError.message}</p>}
+      {isLoadingPayroll && <p role="status">Đang tải bảng lương…</p>}
       {/* Bento Top Header */}
       <PayrollHeader
         selectedPeriod={selectedPeriod}

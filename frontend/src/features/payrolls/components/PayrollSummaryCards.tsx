@@ -2,6 +2,7 @@ import React from 'react';
 import { Sparkles, AlertCircle, Lock, Unlock } from 'lucide-react';
 import { BonusPenaltyPolicy, PayrollRecord } from '../../../types';
 import { useAuth } from '../../../context/AuthContext';
+import { formatPayrollRateLabel } from '../../../utils/payrollUtils';
 
 interface PayrollSummaryCardsProps {
   bonusPenalty: BonusPenaltyPolicy | null;
@@ -51,30 +52,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
           </div>
         </div>
         <div className="pt-2 text-xl sm:text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">
-          {bonusPenalty?.overtime_rate ? (
-            Number(bonusPenalty.overtime_rate) <= 10 ? (
-              <span>
-                {bonusPenalty.overtime_rate}x{' '}
-                <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                  lương giờ
-                </span>
-              </span>
-            ) : (
-              <span>
-                {Number(bonusPenalty.overtime_rate).toLocaleString('vi-VN')}{' '}
-                <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                  ₫/h
-                </span>
-              </span>
-            )
-          ) : (
-            <span>
-              1.5x{' '}
-              <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                lương giờ
-              </span>
-            </span>
-          )}
+          {bonusPenalty ? formatPayrollRateLabel(Number(bonusPenalty.overtime_rate), undefined, bonusPenalty.overtime_rate_kind) : 'Chưa có cấu hình'}
         </div>
       </div>
 
@@ -106,30 +84,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
           </div>
         </div>
         <div className="pt-2 text-xl sm:text-2xl font-bold font-mono text-rose-600 dark:text-rose-400">
-          {bonusPenalty?.late_early_penalty ? (
-            Number(bonusPenalty.late_early_penalty) <= 10 ? (
-              <span>
-                {bonusPenalty.late_early_penalty}x{' '}
-                <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                  lương giờ
-                </span>
-              </span>
-            ) : (
-              <span>
-                {Number(bonusPenalty.late_early_penalty).toLocaleString('vi-VN')}{' '}
-                <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                  ₫/h
-                </span>
-              </span>
-            )
-          ) : (
-            <span>
-              50.000{' '}
-              <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                ₫/h
-              </span>
-            </span>
-          )}
+          {bonusPenalty ? formatPayrollRateLabel(Number(bonusPenalty.late_early_penalty), undefined, bonusPenalty.late_early_penalty_kind) : 'Chưa có cấu hình'}
         </div>
       </div>
 

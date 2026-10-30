@@ -431,30 +431,35 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
               </span>
             </div>
 
-            {/* Slider track kiểu Ubuntu GNOME */}
+            {/* Slider track kiểu Ubuntu GNOME với thanh ngang và núm tròn nổi bật */}
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={toggleMute}
                 title={settings.isMuted ? 'Bật âm thanh' : 'Tắt tiếng (Mute)'}
-                className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-[#252c5c] text-slate-600 dark:text-slate-300 cursor-pointer transition-colors"
+                className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-[#252c5c] text-slate-600 dark:text-slate-300 cursor-pointer transition-colors shrink-0"
               >
                 {renderVolumeIcon('w-4 h-4')}
               </button>
 
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={settings.isMuted ? 0 : settings.volume}
-                onChange={(e) => setVolume(Number(e.target.value))}
-                disabled={!settings.bluetooth.connected}
-                className={`w-full h-2 rounded-lg appearance-none bg-slate-200 dark:bg-[#252b52] accent-purple-600 cursor-pointer transition-all ${
-                  !settings.bluetooth.connected ? 'opacity-40 cursor-not-allowed' : ''
-                }`}
-              />
+              <div className="relative flex-1 flex items-center">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={settings.isMuted ? 0 : settings.volume}
+                  onChange={(e) => setVolume(Number(e.target.value))}
+                  disabled={!settings.bluetooth.connected}
+                  style={{
+                    background: `linear-gradient(to right, #a855f7 ${settings.isMuted ? 0 : settings.volume}%, rgba(148, 163, 184, 0.28) ${settings.isMuted ? 0 : settings.volume}%)`,
+                  }}
+                  className={`w-full sf-slider appearance-none cursor-pointer transition-all ${
+                    !settings.bluetooth.connected ? 'opacity-40 cursor-not-allowed' : ''
+                  }`}
+                />
+              </div>
 
-              <Volume2 className="w-4 h-4 text-slate-400" />
+              <Volume2 className="w-4 h-4 text-slate-400 shrink-0" />
             </div>
 
             {/* Thông báo nếu loa Bluetooth ngắt kết nối */}

@@ -214,25 +214,60 @@ def get_bluetooth_info() -> Dict[str, Any]:
 
 def scan_bluetooth_devices() -> List[Dict[str, Any]]:
     """
-    Quét danh sách các thiết bị loa Bluetooth thực tế (đã paired hoặc đang phát hiện).
+    Quét chủ động tìm các thiết bị Bluetooth xung quanh (tai nghe, loa) và liệt kê kết quả.
     """
     devices: List[Dict[str, Any]] = []
+
+    # 1. Kích hoạt dò quét sóng (Active Discovery) trong 3.5 - 4 giây để tìm thiết bị mới
+    try:
+        subprocess.run(["bluetoothctl", "--timeout", "4", "scan", "on"], capture_output=True, text=True, timeout=6)
+    except Exception:
+        try:
+            # Fallback cho bản bluetoothctl không có cờ --timeout
+            p = subprocess.Popen(["bluetoothctl", "scan", "on"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(3.5)
+            p.terminate()
+            p.wait(timeout=1)
+        except Exception:
+            pass
+
+    # 2. Lấy danh sách các thiết bị đã phát hiện được trong bộ đệm bluetoothctl
     try:
         res = subprocess.run(["bluetoothctl", "devices"], capture_output=True, text=True, timeout=3)
         if res.returncode == 0:
+            seen_addrs = set()
             for line in res.stdout.splitlines():
                 line = line.strip()
                 if line.startswith("Device"):
                     parts = line.split(maxsplit=2)
                     if len(parts) >= 3:
-                        devices.append({
-                            "name": parts[2],
-                            "address": parts[1],
-                            "connected": False,
-                            "paired": True,
-                        })
+                        addr, name = parts[1], parts[2].strip()
+                        # Lọc trùng và bỏ qua các thiết bị vô danh (chỉ hiện MAC)
+                        if addr not in seen_addrs and name and name != addr:
+                            seen_addrs.add(addr)
+                            devices.append({
+                                "name": name,
+                                "address": addr,
+                                "connected": False,
+                                "paired": False,
+                            })
     except Exception:
         pass
+
+    # 3. Kiểm tra thiết bị nào đã paired trước đó
+    try:
+        res_paired = subprocess.run(["bluetoothctl", "paired-devices"], capture_output=True, text=True, timeout=3)
+        if res_paired.returncode == 0:
+            paired_addrs = {
+                l.split()[1] for l in res_paired.stdout.splitlines()
+                if l.strip().startswith("Device") and len(l.split()) >= 2
+            }
+            for d in devices:
+                if d["address"] in paired_addrs:
+                    d["paired"] = True
+    except Exception:
+        pass
+
     return devices
 
 

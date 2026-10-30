@@ -349,12 +349,33 @@ function defaultDeviceSettings(deviceId: string): DeviceSettingsState {
 
 export function recordDeviceSettingsNotify(
   deviceId: string,
-  patch: Partial<DeviceSettingsState>,
+  patch: Partial<DeviceSettingsState> & Record<string, any>,
 ): DeviceSettingsState {
   const current = deviceSettingsStore.get(deviceId) || defaultDeviceSettings(deviceId)
+  const normalized: Partial<DeviceSettingsState> = {}
+
+  if (patch.volume !== undefined && !Number.isNaN(Number(patch.volume))) {
+    normalized.volume = Number(patch.volume)
+  }
+  if (patch.isMuted !== undefined) {
+    normalized.isMuted = Boolean(patch.isMuted)
+  } else if (patch.is_muted !== undefined) {
+    normalized.isMuted = Boolean(patch.is_muted)
+  }
+  if (patch.showFps !== undefined) {
+    normalized.showFps = Boolean(patch.showFps)
+  } else if (patch.show_fps !== undefined) {
+    normalized.showFps = Boolean(patch.show_fps)
+  }
+  if (patch.streamEnabled !== undefined) {
+    normalized.streamEnabled = Boolean(patch.streamEnabled)
+  } else if (patch.stream_enabled !== undefined) {
+    normalized.streamEnabled = Boolean(patch.stream_enabled)
+  }
+
   const updated: DeviceSettingsState = {
     ...current,
-    ...patch,
+    ...normalized,
     wifi: patch.wifi ? { ...current.wifi, ...patch.wifi } : current.wifi,
     bluetooth: patch.bluetooth ? { ...current.bluetooth, ...patch.bluetooth } : current.bluetooth,
     lastUpdated: new Date().toISOString(),
@@ -364,6 +385,7 @@ export function recordDeviceSettingsNotify(
 }
 
 export async function getDeviceSettings(deviceId: string): Promise<DeviceSettingsState> {
+  const isFirstInit = !deviceSettingsStore.has(deviceId)
   let state = deviceSettingsStore.get(deviceId)
   if (!state) {
     state = defaultDeviceSettings(deviceId)
@@ -405,14 +427,17 @@ export async function getDeviceSettings(deviceId: string): Promise<DeviceSetting
           }
         }
 
-        const vol = getVal('volume')
-        if (vol !== undefined && !Number.isNaN(Number(vol))) state.volume = Number(vol)
-        const muted = getVal('is_muted')
-        if (muted !== undefined) state.isMuted = muted === true || muted === 'true'
-        const fps = getVal('show_fps')
-        if (fps !== undefined) state.showFps = fps === true || fps === 'true'
-        const stream = getVal('stream_enabled')
-        if (stream !== undefined) state.streamEnabled = stream === true || stream === 'true'
+        // Chỉ khởi tạo các cờ điều khiển từ telemetry lần đầu tiên để tránh telemetry trễ ghi đè nút vừa bấm
+        if (isFirstInit) {
+          const vol = getVal('volume')
+          if (vol !== undefined && !Number.isNaN(Number(vol))) state.volume = Number(vol)
+          const muted = getVal('is_muted')
+          if (muted !== undefined) state.isMuted = muted === true || muted === 'true'
+          const fps = getVal('show_fps')
+          if (fps !== undefined) state.showFps = fps === true || fps === 'true'
+          const stream = getVal('stream_enabled')
+          if (stream !== undefined) state.streamEnabled = stream === true || stream === 'true'
+        }
 
         state.lastUpdated = new Date().toISOString()
         deviceSettingsStore.set(deviceId, state)
@@ -429,7 +454,8 @@ export async function updateDeviceSettings(
   deviceId: string,
   patch: Partial<DeviceSettingsState>,
 ): Promise<DeviceSettingsState> {
-  const current = await getDeviceSettings(deviceId)
+  // Lấy trực tiếp state hiện hành trong store (tránh gọi getDeviceSettings kéo telemetry cũ về ghi đè nút kia)
+  const current = deviceSettingsStore.get(deviceId) || (await getDeviceSettings(deviceId))
   const updated: DeviceSettingsState = {
     ...current,
     ...patch,
@@ -439,17 +465,19 @@ export async function updateDeviceSettings(
   }
   deviceSettingsStore.set(deviceId, updated)
 
-  // Đồng bộ sang ThingsBoard nếu có cấu hình
+  // Đồng bộ sang ThingsBoard nếu có cấu hình (chỉ gửi các trường thực sự thay đổi trong patch)
   if (process.env.TB_HOST && process.env.NODE_ENV !== 'test') {
     try {
       const target = await resolveTbDevice(deviceId)
-      await tbRequest(`/api/plugins/telemetry/DEVICE/${target.id.id}/SHARED_SCOPE`, {
-        volume: updated.volume,
-        is_muted: updated.isMuted,
-        show_fps: updated.showFps,
-        stream_enabled: updated.streamEnabled,
+      const tbPayload: Record<string, any> = {
         settings_updated_at: Date.now(),
-      })
+      }
+      if (patch.volume !== undefined) tbPayload.volume = updated.volume
+      if (patch.isMuted !== undefined) tbPayload.is_muted = updated.isMuted
+      if (patch.showFps !== undefined) tbPayload.show_fps = updated.showFps
+      if (patch.streamEnabled !== undefined) tbPayload.stream_enabled = updated.streamEnabled
+
+      await tbRequest(`/api/plugins/telemetry/DEVICE/${target.id.id}/SHARED_SCOPE`, tbPayload)
     } catch (tbErr) {
       console.warn(`[Device Service] TB sync settings warning:`, tbErr)
     }

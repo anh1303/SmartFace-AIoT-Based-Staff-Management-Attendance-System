@@ -56,9 +56,8 @@ tests/
 # ==============================================================================
 # 4. MÔI TRƯỜNG PHÁT TRIỂN & HỆ ĐIỀU HÀNH (IDE & OS)
 # ==============================================================================
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
+**/.vscode/*
+!**/.vscode/extensions.json
 .idea/
 .DS_Store
 .DS_Store?
@@ -138,3 +137,10 @@ md/
 /face_auth/tests/test_pad_shadow_policy.py
 /face_auth/tests/test_pad_domain_optimization.py
 /docs/experiments/2026-10-22-pad-final/
+
+# Local presentation deliverables; keep sources on disk, outside version control.
+/docs/presentation*/
+
+# Notebook/editor and development-server caches.
+.ipynb_checkpoints/
+.vite-cache/

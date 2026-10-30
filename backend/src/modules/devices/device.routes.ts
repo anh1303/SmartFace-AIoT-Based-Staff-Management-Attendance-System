@@ -3,12 +3,15 @@ import { authenticate } from '../../middlewares/auth.middleware.js';
 import { authorize } from '../../middlewares/rbac.middleware.js';
 import { asyncHandler } from '../../middlewares/asyncHandler.js';
 import * as controller from './device.controller.js';
+import { authenticateFaceExtraction, faceExtractionLimiter, extractDeviceFace } from './face-extraction.js';
 
 export const deviceRouter = Router();
 
 // Webhook / Callback từ Raspberry Pi hoặc ThingsBoard khi chế độ đổi từ phần cứng (không cần JWT)
 deviceRouter.post('/:id/mode-notify', asyncHandler(controller.modeNotify));
 deviceRouter.post('/:id/settings-notify', asyncHandler(controller.settingsNotify));
+
+deviceRouter.post('/:id/face-embedding', asyncHandler(authenticateFaceExtraction), faceExtractionLimiter, asyncHandler(extractDeviceFace));
 
 deviceRouter.use(authenticate);
 

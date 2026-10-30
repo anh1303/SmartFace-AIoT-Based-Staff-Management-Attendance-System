@@ -3,6 +3,8 @@
 > Hướng dẫn cấu hình hiện tại: [RUN_ON_PI.md](RUN_ON_PI.md), gồm bộ cài
 > `setup_pi.sh`, `configure.py`, `check_connection.py` và ThingsBoard cổng 8081.
 
+> Thử nghiệm chuyển ArcFace lên server: [SERVER_ARCFACE_OFFLOAD.md](../docs/architecture/SERVER_ARCFACE_OFFLOAD.md). Mặc định vẫn nhận diện cục bộ.
+
 Thư mục `hardware/` (trước đây là `pi_edge/`) này là bản đóng gói độc lập, siêu nhẹ (chỉ gồm runtime và model triển khai, không kèm dữ liệu huấn luyện).
 * **Đầy đủ cấu trúc Pipeline AIoT:**
   1. `detection/`   : Bộ dò khuôn mặt (SCRFD ONNX hoặc YuNet INT8 ONNX).

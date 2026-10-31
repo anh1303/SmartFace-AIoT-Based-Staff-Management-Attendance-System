@@ -159,12 +159,12 @@ export interface RawAttendanceLogDb {
   } | null
 }
 
-export function formatAttendanceRecord(log: RawAttendanceLogDb) {
+export function formatAttendanceRecord(log: RawAttendanceLogDb, shifts = log.employees?.employee_shifts) {
   const eventDate = new Date(log.event_time)
   const punctuality = determinePunctuality(
     log.type,
     eventDate,
-    log.employees?.employee_shifts,
+    shifts,
   )
 
   return {
@@ -185,6 +185,29 @@ export function formatAttendanceRecord(log: RawAttendanceLogDb) {
     punctuality,
     raw_status: log.status,
   }
+}
+
+async function formatAttendanceRecords(logs: RawAttendanceLogDb[]) {
+  if (!logs.length) return []
+  const dates = logs.map(log => formatVNDateISO(log.event_time)).sort()
+  const shifts = await prisma.employee_shifts.findMany({
+    where: {
+      employee_id: { in: [...new Set(logs.map(log => log.employee_id))] },
+      work_date: { gte: new Date(`${dates[0]}T00:00:00Z`), lte: new Date(`${dates[dates.length - 1]}T00:00:00Z`) },
+    },
+    include: { work_shifts: true },
+  })
+  const shiftsByEmployee = new Map<string, typeof shifts>()
+  for (const shift of shifts) {
+    const employeeShifts = shiftsByEmployee.get(shift.employee_id) || []
+    employeeShifts.push(shift)
+    shiftsByEmployee.set(shift.employee_id, employeeShifts)
+  }
+  return logs.map(log => formatAttendanceRecord(log, shiftsByEmployee.get(log.employee_id)?.map(shift => ({
+    ...shift,
+    start_time: shift.start_time ?? shift.work_shifts.start_time,
+    end_time: shift.end_time ?? shift.work_shifts.end_time,
+  }))))
 }
 
 export async function list(
@@ -260,7 +283,7 @@ export async function list(
     take: limit,
   })
 
-  return logs.map(formatAttendanceRecord)
+  return formatAttendanceRecords(logs)
 }
 
 export async function getDailySummaries(
@@ -591,7 +614,8 @@ async function recordAttendance(
     updatedSummaries.push(...calculated.details)
   }
 
-  const result = { ...formatAttendanceRecord(created), duplicate, summaries: updatedSummaries, work_date: vnDay(created.work_date || created.event_time) }
+  const [formatted] = await formatAttendanceRecords([created])
+  const result = { ...formatted, duplicate, summaries: updatedSummaries, work_date: vnDay(created.work_date || created.event_time) }
   emitAttendanceEvent('attendance-summary-updated', { employee_id: employee.employee_code, employee_user_id: employee.user_id, dates: affected })
   if (!duplicate) eventBus.publish(type === 'CHECK_IN' ? 'attendance:checked-in' : 'attendance:checked-out', {
     employeeId: employee.id,

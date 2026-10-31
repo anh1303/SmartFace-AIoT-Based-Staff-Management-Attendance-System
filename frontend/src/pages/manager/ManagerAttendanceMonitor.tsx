@@ -88,9 +88,9 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     end_time: string;
     inTime: string;
     outTime: string;
-    initialOTSec: number;
+    initialOTSec: number | null;
     currentOTSec: number;
-    initialLateEarlySec: number;
+    initialLateEarlySec: number | null;
     currentLateEarlySec: number;
     date: string;
     isOffDay?: boolean;

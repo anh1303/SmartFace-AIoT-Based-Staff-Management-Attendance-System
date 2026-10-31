@@ -11,6 +11,8 @@ export interface BackendAttendanceSummaryItem {
   total_working_hours: number;
   raw_work_seconds: number;
   late_early: number;
+  late_early_seconds?: number | null;
+  overtime_seconds?: number | null;
   overtime: number;
   approved_overtime_hours: number;
   proposed_overtime_hours: number;

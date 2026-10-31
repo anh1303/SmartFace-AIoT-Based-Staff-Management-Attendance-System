@@ -87,4 +87,34 @@ describe('Attendance details and per-item review', () => {
     expect(rows[0].validIntervals).toHaveLength(0);expect(rows[0].workingHours).toBe(0);
   });
 
+  it('keeps rule-calculated seconds separate from manually adjusted values', async () => {
+    let rows: AttendancePairItem[]=[];
+    function Probe() {
+      rows=useAttendancePairs([{employee_id:'NV1',full_name:'Test',department:'QA',position:'Tester'} as Employee],
+        [{employee_id:'NV1',date:'2026-10-26',start_time:'08:00',end_time:'18:00',shift_type:'OFFICE_HOURS'} as WorkShift], [],
+        '2026-10-26','2026-10-26','','ALL',{'NV1_2026-10-26':7200},{'NV1_2026-10-26':1800},'ALL','ALL',{'NV1_2026-10-26':{employee_id:'NV1',date:'2026-10-26',late_early:0.5,overtime:2,late_early_seconds:900,overtime_seconds:2700}});
+      return null;
+    }
+    await mount(<Probe/>);
+    expect(rows[0].initialLateEarlySec).toBe(900); expect(rows[0].currentLateEarlySec).toBe(1800);
+    expect(rows[0].initialOTSec).toBe(2700); expect(rows[0].currentOTSec).toBe(7200);
+  });
+
+  it('shows an unpaired valid check-in in the overview without inventing a checkout or work hours', async () => {
+    let rows: AttendancePairItem[]=[];
+    function Probe() {
+      rows=useAttendancePairs([{employee_id:'NV1',full_name:'Test',department:'QA',position:'Tester'} as Employee],
+        [{employee_id:'NV1',date:'2026-10-31',start_time:'08:00',end_time:'18:00',shift_type:'OFFICE_HOURS'} as WorkShift],
+        [{id:'100',attendance_id:'ATT-100',employee_id:'NV1',timestamp:'2026-10-31T07:50:05+07:00',type:'CHECK_IN',status:'VALID',method:'FACE',device_id:'PI',verification_score:0.94,punctuality:'ON_TIME'}],
+        '2026-10-31','2026-10-31','','ALL',{}, {},'ALL','ALL',{'NV1_2026-10-31':{employee_id:'NV1',date:'2026-10-31',first_check_in:null,last_check_out:null,total_working_hours:0,requires_review:true,calculation_details:{events:[{id:'100',type:'CHECK_IN',time:'2026-10-31T07:50:05+07:00',status:'VALID',method:'FACE'}],pairs:[]}}});
+      return null;
+    }
+    await mount(<Probe/>);
+    expect(rows[0].events[0].time).toBe('07:50:05');
+    expect(rows[0].events[0].status).toBe('ON_TIME');
+    expect(rows[0].events[1].time).toBe('--:--:--');
+    expect(rows[0].workingHours).toBe(0);
+    expect(rows[0].needsReview).toBe(true);
+  });
+
 });

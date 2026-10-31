@@ -23,7 +23,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
   const isAdmin = role === 'admin';
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
       {/* Card 1: Hệ số thưởng tăng ca */}
       <div className="p-4 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors flex flex-col justify-between group relative shadow-xs">
         <div className="flex items-center justify-between">
@@ -51,7 +51,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
             <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
           </div>
         </div>
-        <div className="pt-2 text-xl sm:text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">
+        <div className="pt-2 text-xl sm:text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
           {bonusPenalty ? formatPayrollRateLabel(Number(bonusPenalty.overtime_rate)) : 'Chưa có cấu hình'}
         </div>
         {bonusPenalty?.effective_period && <p className="sf-secondary">Áp dụng từ {bonusPenalty.effective_period}</p>}
@@ -87,9 +87,35 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
         <div className="pt-2 text-xl sm:text-2xl font-bold font-mono text-rose-600 dark:text-rose-400">
           {bonusPenalty ? formatPayrollRateLabel(Number(bonusPenalty.late_early_penalty)) : 'Chưa có cấu hình'}
         </div>
+        {bonusPenalty?.effective_period && <p className="sf-secondary">Áp dụng từ {bonusPenalty.effective_period}</p>}
       </div>
 
-      {/* Card 3: Trạng thái kỳ lương */}
+      <div className="p-4 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors flex flex-col justify-between shadow-xs">
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
+            Hệ số phạt nghỉ làm không lý do
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isAdmin ? (
+              <button type="button" onClick={onOpenPolicyModal} className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium cursor-pointer">
+                Thay đổi
+              </button>
+            ) : (
+              <span title="Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số này" className="text-[10px] text-slate-400 dark:text-slate-500 font-medium flex items-center gap-0.5">
+                <Lock className="w-3 h-3 text-slate-400" />
+                <span>Admin</span>
+              </span>
+            )}
+            <AlertCircle className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400" />
+          </div>
+        </div>
+        <div className="pt-2 text-xl sm:text-2xl font-bold font-mono text-rose-600 dark:text-rose-400">
+          {bonusPenalty?.absence_penalty_rate != null ? formatPayrollRateLabel(Number(bonusPenalty.absence_penalty_rate)) : 'Chưa có cấu hình'}
+        </div>
+        {bonusPenalty?.effective_period && <p className="sf-secondary">Áp dụng từ {bonusPenalty.effective_period}</p>}
+      </div>
+
+      {/* Card 4: Trạng thái kỳ lương */}
       <div className="p-4 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors flex flex-col justify-between shadow-xs">
         <div className="flex items-center justify-between">
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">

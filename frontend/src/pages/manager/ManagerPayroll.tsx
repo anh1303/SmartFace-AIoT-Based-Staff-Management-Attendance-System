@@ -1,6 +1,4 @@
-import { AdjustmentReviewPanel } from '../../features/payrolls/components/AdjustmentReviewPanel';
 import React, { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionUtils';
@@ -22,14 +20,15 @@ import {
   EarlySettlementModal,
 } from '@/features/payrolls';
 import { earlySettlementPayrollApi, fetchBonusPenaltyApi } from '../../api/payrollApi';
+import { useAttendanceSummaries } from '../../features/attendances/hooks/useAttendanceSummaries';
+import { payrollAttendanceTotals } from '../../features/payrolls/payrollAttendance';
+import { useShiftContext } from '../../context/ShiftContext';
+import { formatVNDateISO } from '../../utils/dateUtils';
 
 const payrollLogger = logger.child('ManagerPayroll');
 
 export const ManagerPayroll: React.FC = () => {
   const { role, currentUser } = useAuth();
-  const [viewParams,setViewParams]=useSearchParams();
-  const view=viewParams.get('payrollTab')||'records';
-  const selectView=(value:string)=>setViewParams(p=>{p.set('payrollTab',value);return p;});
   const {
     payroll,
     isLoadingPayroll,
@@ -47,6 +46,15 @@ export const ManagerPayroll: React.FC = () => {
   } = useApp();
 
   const isManager = role === 'manager';
+  const shifts = useShiftContext();
+  const monthEnd = new Date(Date.UTC(Number(selectedPeriod.slice(0, 4)), Number(selectedPeriod.slice(5, 7)), 0)).getUTCDate();
+  const attendanceSummary = useAttendanceSummaries(`${selectedPeriod}-01`, `${selectedPeriod}-${String(monthEnd).padStart(2, '0')}`);
+  const attendanceTotals = useMemo(() => payrollAttendanceTotals(attendanceSummary.summaries, shifts.workShifts), [attendanceSummary.summaries, shifts.workShifts]);
+  const unprocessedEmployeeIds = useMemo(() => {
+    const today = formatVNDateISO(new Date());
+    const summarized = new Set(attendanceSummary.summaries.flatMap(s => [`${s.employee_id}_${s.date}`, `${s.employee_uuid}_${s.date}`]));
+    return new Set(shifts.workShifts.filter(s => s.date.startsWith(selectedPeriod) && s.date < today && s.shift_type !== 'OFF' && !summarized.has(`${s.employee_id}_${s.date}`)).map(s => s.employee_id));
+  }, [attendanceSummary.summaries, shifts.workShifts, selectedPeriod]);
   const managerDept = currentUser?.department;
 
   const [confirmFinalizeOpen, setConfirmFinalizeOpen] = useState(false);
@@ -409,13 +417,9 @@ export const ManagerPayroll: React.FC = () => {
         onOpenPolicyModal={handleOpenPolicyModal}
       />
 
-      <div role="tablist" aria-label="Nội dung bảng lương" className="sf-tabs" onKeyDown={e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const next=e.key==='Home'?'records':e.key==='End'?'reviews':view==='reviews'?'records':'reviews';selectView(next);document.getElementById(next==='reviews'?'payroll-reviews-tab':'payroll-records-tab')?.focus();}}}>
-        <button role="tab" tabIndex={view!=='reviews'?0:-1} id="payroll-records-tab" aria-controls="payroll-records-panel" aria-selected={view!=='reviews'} className="sf-tab" onClick={()=>selectView('records')}>Phiếu lương & phụ cấp</button>
-        <button role="tab" tabIndex={view==='reviews'?0:-1} id="payroll-reviews-tab" aria-controls="payroll-reviews-panel" aria-selected={view==='reviews'} className="sf-tab" onClick={()=>selectView('reviews')}>Xét duyệt OT & khoản phạt</button>
-      </div>
-      {view==='reviews' && <div role="tabpanel" id="payroll-reviews-panel" aria-labelledby="payroll-reviews-tab"><AdjustmentReviewPanel period={selectedPeriod} /></div>}
-      <div hidden={view==='reviews'} role="tabpanel" id="payroll-records-panel" aria-labelledby="payroll-records-tab">
-      <p className="text-sm text-slate-500 mb-4">Mở chi tiết để đối soát phiếu lương. Phụ cấp được sửa cùng phiếu đang chờ duyệt; OT và phạt được quyết định riêng theo ngày.</p>
+      <div>
+      {attendanceSummary.isError && <p className="sf-feedback error mb-4" role="alert">Không tải được dữ liệu chấm công để tính số ca nghỉ. <button type="button" className="underline" onClick={() => attendanceSummary.refetch()}>Thử lại</button></p>}
+      {shifts.isError && <p className="sf-feedback error mb-4" role="alert">Không tải được lịch ca để tính số ca nghỉ. <button type="button" className="underline" onClick={shifts.refetchShifts}>Thử lại</button></p>}
 
       {/* Bento Table with Search & Position Filter */}
       <PayrollTable
@@ -441,6 +445,9 @@ export const ManagerPayroll: React.FC = () => {
         isFinalized={isFinalized}
         onOpenEdit={handleOpenEdit}
         onOpenEarlySettlement={(record) => setEarlySettlementRecord(record)}
+        attendanceTotals={attendanceTotals}
+        unprocessedEmployeeIds={unprocessedEmployeeIds}
+        attendanceUnavailable={attendanceSummary.isLoading || attendanceSummary.isError || shifts.isLoading || shifts.isError}
       />
 
       </div>
@@ -451,6 +458,7 @@ export const ManagerPayroll: React.FC = () => {
         onClose={() => setEditingItem(null)}
         onChangeEditingItem={setEditingItem}
         onConfirmSave={handleConfirmEditSave}
+        absenceLabel={attendanceSummary.isLoading || attendanceSummary.isError || shifts.isLoading || shifts.isError ? '—' : editingItem && unprocessedEmployeeIds.has(editingItem.record.employee_id) ? 'Chưa tổng hợp' : `${editingItem ? attendanceTotals.get(editingItem.record.employee_id) ?? 0 : 0} ca`}
         otRate={otRate}
         lateRate={lateRate}
         selectedPeriod={selectedPeriod}

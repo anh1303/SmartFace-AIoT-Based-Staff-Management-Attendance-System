@@ -17,7 +17,7 @@ export const Sidebar: React.FC<{
         { label: 'Không gian làm việc', items: [['Tổng quan hệ thống', 'dashboard', LayoutDashboard]] },
         { label: 'Nhân sự', items: [['Nhân viên', 'employees', Users], ['Sinh trắc học', 'biometrics', Fingerprint]] },
         { label: 'Vận hành', items: [['Lịch làm việc', 'schedule', CalendarDays], ['Theo dõi chấm công', 'attendance', Clock], ['Thiết bị', 'devices', Server]] },
-        { label: 'Tài chính', items: [['Bảng lương & xét duyệt', 'payroll', Banknote], ['Báo cáo & thống kê', 'reports', BarChart3]] }
+        { label: 'Tài chính', items: [['Bảng lương', 'payroll', Banknote], ['Báo cáo & thống kê', 'reports', BarChart3]] }
     ] : [{ label: 'Công việc', items: [['Bàn làm việc', 'dashboard', LayoutDashboard], ['Lịch làm việc', 'schedule', CalendarDays], ['Lịch sử chấm công', 'attendance', Clock]] }, { label: 'Cá nhân', items: [['Hồ sơ & sinh trắc', 'profile', User], ['Lương tạm tính', 'salary-estimate', Banknote], ['Lịch sử phiếu lương', 'salary-history', FileText]] }];
     const base = role === 'admin' || role === 'manager' ? '/app/manager/' : '/app/employee/';
     return <>{isOpen && <div className="sf-nav-backdrop lg:hidden" onClick={onClose}/>}

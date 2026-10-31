@@ -1,4 +1,3 @@
-import {ShiftTemplateManager} from './ShiftTemplates';
 import React from 'react';
 import {
   Copy,
@@ -40,6 +39,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
 }) => {
   return (
     <PageHeaderBanner
+      className="[&>div:first-child>div:last-child]:ml-auto"
       title="Sắp Xếp & Phân Bổ Ca Làm Việc"
       titleExtra={
         <div className="flex items-center gap-2 flex-wrap">
@@ -94,7 +94,6 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
       }
       actions={
         <fieldset disabled={busy} className="flex items-center gap-2.5 flex-wrap">
-          <ShiftTemplateManager/>
           {/* Copy from previous week */}
           <button
             type="button"

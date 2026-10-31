@@ -75,14 +75,12 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Thay đổi quy định Thưởng / Phạt"
-      subtitle="Thiết lập hệ số tăng ca (OT), phạt trễ/sớm và phạt vắng theo lương giờ (Quyền hạn: Admin)"
     >
       <form onSubmit={e => { if (blocked) { e.preventDefault(); return; } onSavePolicy(e); }} className="space-y-4">
         <label className="sf-field">Áp dụng từ kỳ lương
           <input className="sf-input" type="month" min={nextPayrollPolicyPeriod()} required value={policyData.effective_period}
             onChange={e => void loadPeriod(e.target.value)}/>
         </label>
-        <p className="text-xs text-slate-500">Lưu thành phiên bản mới từ tháng đã chọn. Các kỳ trước giữ chính sách đã áp dụng; mỗi tháng chỉ có một phiên bản.</p>
         {loading && <p role="status" className="text-sm text-slate-600 dark:text-slate-300">Đang tải chính sách của kỳ đã chọn…</p>}
         {error && <div role="alert" className="text-sm text-rose-700 dark:text-rose-300"><p>{error}</p><button type="button" className="underline" onClick={() => void loadPeriod(policyData.effective_period)}>Thử lại</button></div>}
         {proposal && <div role="status" className="rounded-lg border border-amber-300 p-3 text-sm text-amber-900 dark:text-amber-200">
@@ -91,14 +89,10 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
           {proposal.description && <p className="mt-1 break-words">Ghi chú: {proposal.description}</p>}
           <div className="mt-2 flex flex-wrap gap-3"><button type="button" className="underline" onClick={() => choosePolicy(true)}>Dùng chính sách kỳ mới</button><button type="button" className="underline" onClick={() => choosePolicy(false)}>Giữ giá trị đang nhập</button></div>
         </div>}
-        <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-xl border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-300">
-          💡 Công thức tính thống nhất: <strong>Số tiền = Số giờ × Hệ số × Lương theo giờ</strong>
-        </div>
-
         <fieldset disabled={blocked} className="space-y-4 disabled:opacity-60">
         <div>
           <label className="block text-xs text-slate-700 dark:text-slate-400 font-medium mb-1">
-            Hệ số thưởng làm thêm giờ (OT)
+            Hệ số thưởng làm thêm giờ
           </label>
           <input
             type="number"
@@ -144,7 +138,7 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
 
         <div>
           <label className="block text-xs text-slate-700 dark:text-slate-400 font-medium mb-1">
-            Hệ số phạt nghỉ làm không lý do (Vắng ca)
+            Hệ số phạt nghỉ làm không lý do
           </label>
           <input
             type="number"

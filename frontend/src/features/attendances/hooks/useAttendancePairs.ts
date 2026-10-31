@@ -55,10 +55,10 @@ export interface AttendancePairItem {
   hasCheckedOut: boolean;
   isOffDay: boolean;
   isUnassigned: boolean;
-  initialLateEarlySec: number;
+  initialLateEarlySec: number | null;
   currentLateEarlySec: number;
   lateEarlyStr: string;
-  initialOTSec: number;
+  initialOTSec: number | null;
   currentOTSec: number;
   overtimeStr: string;
   date: string;
@@ -238,7 +238,7 @@ export function useAttendancePairs(
             ? customLateEarlyMap[fallbackKey]
             : Math.round((Number(summary?.late_early) || 0) * 3600));
       const lateEarlyStr = formatSecondsToHHMMSS(currentLateEarlySec);
-      const initialLateEarlySec = currentLateEarlySec;
+      const initialLateEarlySec = summary?.late_early_seconds != null ? Number(summary.late_early_seconds) : null;
 
       // Giờ tăng ca (OT) đã duyệt và đề xuất
       const approvedOtHours = summary?.approved_overtime_hours ?? (Number(summary?.overtime) || 0);
@@ -252,7 +252,7 @@ export function useAttendancePairs(
             ? customOvertimeMap[fallbackKey]
             : Math.round(approvedOtHours * 3600));
       const overtimeStr = formatSecondsToHHMMSS(currentOTSec);
-      const initialOTSec = currentOTSec;
+      const initialOTSec = summary?.overtime_seconds != null ? Number(summary.overtime_seconds) : null;
 
       // Cờ rà soát và phiên bản chính sách
       const needsReview = summary?.requires_review ?? summary?.needs_review ?? false;
@@ -332,10 +332,14 @@ export function useAttendancePairs(
         inId: p.inId, outId: p.outId, counted: p.counted, regularSeconds: p.regular_seconds, overtimeSeconds: p.overtime_seconds,
         creditedRegularSeconds: p.credited_regular_seconds, creditReason: p.credit_reason,
       }));
-      // The server owns overview boundaries. A loose OUT must never become an IN.
-      const checkInLog = summary?.first_check_in ? empLogs.find(l => l.type === 'CHECK_IN' && +new Date(l.timestamp) === +new Date(summary.first_check_in)) : undefined;
+      // Show a pending valid check-in without treating it as a completed work interval.
+      const ignoredIds = new Set((summary?.calculation_details?.ignored || []).map((event: any) => event.id));
+      const pendingCheckIn = !summary?.first_check_in && policyPairs.length === 0
+        ? empLogs.find(l => l.type === 'CHECK_IN' && l.status === 'VALID' && !ignoredIds.has(l.id || l.attendance_id))
+        : undefined;
+      const checkInLog = summary?.first_check_in ? empLogs.find(l => l.type === 'CHECK_IN' && +new Date(l.timestamp) === +new Date(summary.first_check_in)) : pendingCheckIn;
       const checkOutLog = summary?.last_check_out ? empLogs.find(l => (l.type === 'CHECK_OUT' || l.type === 'TAN_CA') && +new Date(l.timestamp) === +new Date(summary.last_check_out)) : undefined;
-      const checkInTime = summary?.first_check_in ? formatVNTime(summary.first_check_in) : '--:--:--';
+      const checkInTime = summary?.first_check_in ? formatVNTime(summary.first_check_in) : pendingCheckIn ? formatVNTime(pendingCheckIn.timestamp) : '--:--:--';
       const checkOutTime = summary?.last_check_out ? formatVNTime(summary.last_check_out) : '--:--:--';
       const hasCheckedIn = checkInTime !== '--:--:--';
       const hasCheckedOut = checkOutTime !== '--:--:--';

@@ -12,9 +12,9 @@ export interface EditingItemState {
   end_time: string;
   inTime: string;
   outTime: string;
-  initialOTSec: number;
+  initialOTSec: number | null;
   currentOTSec: number;
-  initialLateEarlySec: number;
+  initialLateEarlySec: number | null;
   currentLateEarlySec: number;
   date: string;
   isOffDay?: boolean;
@@ -39,13 +39,13 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
   editingItem,
   onSave,
 }) => {
-  const [inputLEHours, setInputLEHours] = useState<number>(0);
-  const [inputLEMinutes, setInputLEMinutes] = useState<number>(0);
-  const [inputLESeconds, setInputLESeconds] = useState<number>(0);
+  const [inputLEHours, setInputLEHours] = useState<number | ''>(0);
+  const [inputLEMinutes, setInputLEMinutes] = useState<number | ''>(0);
+  const [inputLESeconds, setInputLESeconds] = useState<number | ''>(0);
 
-  const [inputOTHours, setInputOTHours] = useState<number>(0);
-  const [inputOTMinutes, setInputOTMinutes] = useState<number>(0);
-  const [inputOTSeconds, setInputOTSeconds] = useState<number>(0);
+  const [inputOTHours, setInputOTHours] = useState<number | ''>(0);
+  const [inputOTMinutes, setInputOTMinutes] = useState<number | ''>(0);
+  const [inputOTSeconds, setInputOTSeconds] = useState<number | ''>(0);
 
   const [reason, setReason] = useState<string>('');
   const [modalError, setModalError] = useState<string | null>(null);
@@ -91,7 +91,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
       return false;
     }
 
-    if (totalLE > editingItem.initialLateEarlySec && editingItem.initialLateEarlySec > 0) {
+    if (editingItem.initialLateEarlySec != null && totalLE > editingItem.initialLateEarlySec && editingItem.initialLateEarlySec > 0) {
       setModalError(`Thời gian đi trễ/về sớm không được vượt quá thời gian trễ/sớm thực tế (${formatSecondsToHHMMSS(editingItem.initialLateEarlySec)})`);
       return false;
     }
@@ -107,13 +107,13 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
     return true;
   };
 
-  const handleLEChange = (h: number, m: number, s: number) => {
+  const handleLEChange = (h: number | '', m: number | '', s: number | '') => {
     setInputLEHours(h);
     setInputLEMinutes(m);
     setInputLESeconds(s);
   };
 
-  const handleOTChange = (h: number, m: number, s: number) => {
+  const handleOTChange = (h: number | '', m: number | '', s: number | '') => {
     setInputOTHours(h);
     setInputOTMinutes(m);
     setInputOTSeconds(s);
@@ -123,7 +123,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
     const totalInputLESec = (inputLEHours || 0) * 3600 + (inputLEMinutes || 0) * 60 + (inputLESeconds || 0);
     const totalInputOTSec = (inputOTHours || 0) * 3600 + (inputOTMinutes || 0) * 60 + (inputOTSeconds || 0);
 
-    if (!validateInputs(inputLEHours, inputLEMinutes, inputLESeconds, inputOTHours, inputOTMinutes, inputOTSeconds, reason)) {
+    if (!validateInputs(inputLEHours || 0, inputLEMinutes || 0, inputLESeconds || 0, inputOTHours || 0, inputOTMinutes || 0, inputOTSeconds || 0, reason)) {
       return;
     }
 
@@ -159,10 +159,9 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white font-heading">
               Điều Chỉnh Thời Gian Chấm Công
-              <span className="block text-xs font-normal text-slate-500 mt-1">Lưu đề xuất; duyệt từng khoản trong mục OT và phạt ở bảng lương.</span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Nhân viên: <span className="text-slate-900 dark:text-white font-semibold">{editingItem.employee.full_name}</span> ({editingItem.employee.employee_id})
+              {editingItem.employee.full_name} · {editingItem.employee.employee_id}
             </p>
           </div>
           <button
@@ -176,18 +175,11 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
         </div>
 
         <div className="p-6 space-y-5 text-xs max-h-[75vh] overflow-y-auto">
-          {/* Shift info summary */}
-          <div className="bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] rounded-xl p-4 grid grid-cols-2 gap-3 text-slate-700 dark:text-slate-300">
-            <div>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Ca làm việc</p>
-              <p className="font-semibold text-slate-900 dark:text-white mt-0.5">{editingItem.shiftName}</p>
-              <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400">{editingItem.shiftTimeRange}</p>
-            </div>
-            <div>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Thời gian điểm danh</p>
-              <p className="text-[10px] font-mono mt-0.5">Vào ca: <span className="text-slate-900 dark:text-white font-semibold">{editingItem.inTime}</span></p>
-              <p className="text-[10px] font-mono">Tan ca: <span className="text-slate-900 dark:text-white font-semibold">{editingItem.outTime}</span></p>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label className="sf-field">Ngày làm việc<input className="sf-input font-semibold" value={editingItem.date.split('-').reverse().join('/')} readOnly /></label>
+            <label className="sf-field">Ca làm việc<input className="sf-input font-semibold" value={editingItem.shiftName} readOnly /></label>
+            <label className="sf-field">Giờ làm việc<input className="sf-input font-semibold" value={editingItem.shiftTimeRange} readOnly /></label>
+            <label className="sf-field">Vào ca – Tan ca<input className="sf-input font-semibold" value={`${editingItem.inTime} – ${editingItem.outTime}`} readOnly /></label>
           </div>
 
           {editingItem.isOffDay && (
@@ -212,7 +204,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                   Thời gian Đi trễ / Về sớm
                 </label>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                  Thực tế: <span className="font-mono text-rose-600 dark:text-rose-400 font-semibold">{formatSecondsToHHMMSS(editingItem.initialLateEarlySec)}</span>
+                  Thực tế: <span className="font-mono text-rose-600 dark:text-rose-400 font-semibold">{editingItem.initialLateEarlySec == null ? '—' : formatSecondsToHHMMSS(editingItem.initialLateEarlySec)}</span>
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3">
@@ -224,7 +216,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                     max={23}
                     value={inputLEHours}
                     disabled={isSubmitting}
-                    onChange={(e) => handleLEChange(parseInt(e.target.value, 10) || 0, inputLEMinutes, inputLESeconds)}
+                    onChange={(e) => handleLEChange(e.target.value === '' ? '' : Number(e.target.value), inputLEMinutes, inputLESeconds)}
                     className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                   />
                 </div>
@@ -236,7 +228,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                     max={59}
                     value={inputLEMinutes}
                     disabled={isSubmitting}
-                    onChange={(e) => handleLEChange(inputLEHours, parseInt(e.target.value, 10) || 0, inputLESeconds)}
+                    onChange={(e) => handleLEChange(inputLEHours, e.target.value === '' ? '' : Number(e.target.value), inputLESeconds)}
                     className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                   />
                 </div>
@@ -248,7 +240,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                     max={59}
                     value={inputLESeconds}
                     disabled={isSubmitting}
-                    onChange={(e) => handleLEChange(inputLEHours, inputLEMinutes, parseInt(e.target.value, 10) || 0)}
+                    onChange={(e) => handleLEChange(inputLEHours, inputLEMinutes, e.target.value === '' ? '' : Number(e.target.value))}
                     className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                   />
                 </div>
@@ -264,7 +256,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                 Thời gian Tăng ca (OT)
               </label>
               <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                Thực tế: <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{formatSecondsToHHMMSS(editingItem.initialOTSec)}</span>
+                Thực tế: <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{editingItem.initialOTSec == null ? '—' : formatSecondsToHHMMSS(editingItem.initialOTSec)}</span>
               </span>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -276,7 +268,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                   max={744}
                   value={inputOTHours}
                   disabled={isSubmitting}
-                  onChange={(e) => handleOTChange(parseInt(e.target.value, 10) || 0, inputOTMinutes, inputOTSeconds)}
+                  onChange={(e) => handleOTChange(e.target.value === '' ? '' : Number(e.target.value), inputOTMinutes, inputOTSeconds)}
                   className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                 />
               </div>
@@ -288,7 +280,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                   max={59}
                   value={inputOTMinutes}
                   disabled={isSubmitting}
-                  onChange={(e) => handleOTChange(inputOTHours, parseInt(e.target.value, 10) || 0, inputOTSeconds)}
+                  onChange={(e) => handleOTChange(inputOTHours, e.target.value === '' ? '' : Number(e.target.value), inputOTSeconds)}
                   className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                 />
               </div>
@@ -300,7 +292,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                   max={59}
                   value={inputOTSeconds}
                   disabled={isSubmitting}
-                  onChange={(e) => handleOTChange(inputOTHours, inputOTMinutes, parseInt(e.target.value, 10) || 0)}
+                  onChange={(e) => handleOTChange(inputOTHours, inputOTMinutes, e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
                 />
               </div>
@@ -326,9 +318,6 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
             />
           </div>
 
-          <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-[11px] flex items-center gap-2">
-            <span>💡 <strong>Quy tắc làm tròn:</strong> 0 – 29 phút quy về 0 giờ (+0h), 30 – 59 phút quy về 0.5 giờ (+30p).</span>
-          </div>
         </div>
 
         <div className="p-6 border-t border-slate-100 dark:border-[#21264b] flex justify-end gap-3">

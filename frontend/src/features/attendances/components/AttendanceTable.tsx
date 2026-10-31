@@ -306,7 +306,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                       title={item.isOffDay ? 'Điều chỉnh hoặc phê duyệt OT ngày nghỉ (OFF)' : 'Chỉnh sửa giờ trễ/sớm và tăng ca'}
                     >
                       <Edit className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
-                      <span>Sửa</span>
+                      <span>Xét duyệt</span>
                     </button>
                   </td>
                 </tr>

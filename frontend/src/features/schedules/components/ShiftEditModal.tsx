@@ -1,4 +1,3 @@
-import {ShiftTemplatePicker,templateAssignment} from './ShiftTemplates';
 import React from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { WorkShift } from '../../../types';
@@ -55,7 +54,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
       maxWidth="md"
     >
       {editingShift && (
-        <form onSubmit={onSubmit} className="space-y-4"><fieldset disabled={isSubmitting} className="space-y-4"><ShiftTemplatePicker onApply={template=>{const value=templateAssignment(template);setShiftType(value.shift_type);setStartTime(value.start_time);setEndTime(value.end_time);setNote(value.note);}}/>
+        <form onSubmit={onSubmit} className="space-y-4"><fieldset disabled={isSubmitting} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Ca làm việc</label>
             <select

@@ -1,10 +1,10 @@
+import { assertIsolatedNeonTestDatabase } from '../../src/__tests__/helpers/cloud-test-db.mjs'
 import { randomUUID } from 'node:crypto'
 import { beforeAll, beforeEach, afterAll, describe, it, expect, vi } from 'vitest'
+import { ensureTestPayrollPolicy } from '../payroll/policy-fixture.js'
 // This suite must never connect to the workspace/live database. Both URLs are mandatory.
 const enabled = process.env.RUN_POLICY_DB_TESTS === '1'
-if (enabled && ![process.env.DATABASE_URL, process.env.DIRECT_URL].every(url => url && /^postgresql:\/\/[^@]+@127\.0\.0\.1:55439\/policy_check$/.test(url))) {
-  throw new Error('Refusing integration test: both URLs must point to the isolated policy_check database')
-}
+if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.env.DIRECT_URL)
 const suite = enabled ? describe : describe.skip
 suite('PostgreSQL policy integration (isolated database only)', () => {
   let db: any, service: any, payroll: any, adjustments: any, emp: any, admin: any
@@ -16,7 +16,7 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
     service = await import('../../src/modules/attendance/attendance.service.js')
     payroll = await import('../../src/modules/payroll/payroll.service.js')
     adjustments = await import('../../src/modules/payroll/payroll.adjustments.js')
-    await payroll.updateBonusPenalty({overtime_rate:100000,overtime_rate_kind:'FIXED_PER_HOUR',late_early_penalty:50000,late_early_penalty_kind:'FIXED_PER_HOUR'})
+    await ensureTestPayrollPolicy(db)
     const role = await db.roles.upsert({ where: { role_name: 'ADMIN' }, create: { role_name: 'ADMIN' }, update: {} })
     admin = await db.user.create({ data: { username: `policy-${randomUUID().slice(0,8)}`, passwordHash: 'test-only', role_id: role.id } })
     emp = await db.employee.create({ data: { employee_code: `TEST-${randomUUID().slice(0,8)}`, full_name: 'Policy Test', hourly_rate: 100000 } })
@@ -25,6 +25,16 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
   })
   beforeEach(() => vi.setSystemTime(new Date(`${date}T22:00:00+07:00`)))
   afterAll(async () => { vi.useRealTimers(); if (db) await db.$disconnect() })
+  it('aggregates a scheduled inactive employee with no scans into an absence', async () => {
+    const inactive = await db.employee.create({ data: { employee_code: `INACTIVE-${randomUUID().slice(0,8)}`, full_name: 'Inactive Scheduled', hourly_rate: 100000, status: 'INACTIVE' } })
+    const shift = await db.work_shifts.create({ data: { shift_name: `Inactive-${randomUUID().slice(0,8)}`, start_time: new Date('1970-01-01T08:00:00Z'), end_time: new Date('1970-01-01T17:00:00Z') } })
+    await db.employee_shifts.create({ data: { employee_id: inactive.id, shift_id: shift.id, work_date: new Date(`${date}T00:00:00Z`), shift_type: 'OFFICE_HOURS', start_time: shift.start_time, end_time: shift.end_time } })
+    await service.aggregateDailyAttendance(10, 2026, undefined, undefined, { id: inactive.id })
+    const summary = await db.daily_attendance_summary.findUnique({ where: { employee_id_work_date: { employee_id: inactive.id, work_date: new Date(`${date}T00:00:00Z`) } } })
+    const absence = await db.attendanceAdjustment.findFirst({ where: { employee_id: inactive.id, kind: 'ABSENCE' } })
+    expect(summary?.attendance_status).toBe('ABSENT')
+    expect(absence?.status).toBe('PENDING')
+  })
   it('deduplicates concurrent transport retries but keeps distinct INs', async () => {
     const capture = { eventId:'same-event-1234',capturedAt:at('08:00:00'),deviceId:`TEST_PI_${emp.id}` }
     const results = await Promise.all([service.checkIn({employeeId:emp.id},undefined,capture),service.checkIn({employeeId:emp.id},undefined,capture)])
@@ -49,11 +59,11 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
   it('generates zero-safe wages, snapshots rates and blocks stale finalize', async () => {
     const generated = await payroll.generate(period,emp.id,admin.id,{id:admin.id,role:'ADMIN'})
     expect(generated[0].total_working_hours).toBe(9.5);expect(generated[0].total_overtime).toBe(2.5)
-    expect(generated[0].net_salary).toBe(2650000)
-    await payroll.updateBonusPenalty({overtime_rate:200000,overtime_rate_kind:'FIXED_PER_HOUR',late_early_penalty:80000,late_early_penalty_kind:'FIXED_PER_HOUR'},admin.id)
+    expect(generated[0].net_salary).toBe(2800000)
+    await payroll.updateBonusPenalty({overtime_rate: 2.5, late_early_penalty: 2.0, absence_penalty_rate: 2.0},admin.id)
     await payroll.generate(period,emp.id,admin.id,{id:admin.id,role:'ADMIN'})
     const current = await db.payrollRecord.findFirst({where:{employeeId:emp.id}})
-    expect(Number(current.overtime_rate)).toBe(100000)
+    expect(Number(current.overtime_rate)).toBe(2.0)
     await service.adjustAttendance({employeeId:emp.id,date,late_early:1,overtime:1,reason:'Duyệt lại 1 giờ'},admin.id,'ADMIN')
     const ot = await db.attendanceAdjustment.findFirst({where:{employee_id:emp.id,kind:'OVERTIME'}})
     await adjustments.reviewAdjustment(String(ot.id),{status:'APPROVED',note:'Duyệt lại',updated_at:ot.updated_at.toISOString()},{id:admin.id,role:'ADMIN'})

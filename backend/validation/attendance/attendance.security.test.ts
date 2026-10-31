@@ -21,6 +21,7 @@ vi.mock('../../src/modules/attendance/index.js', () => ({
 vi.mock('../../src/config/database.js', () => {
   const db: any = {
     $executeRaw: vi.fn(async () => 1),
+    attendanceAggregationState: { findUnique: vi.fn(async () => null) },
     $queryRaw: vi.fn(async () => [{
       emp_id: state.employee?.id || '11111111-1111-4111-8111-111111111111',
       employee_code: state.employee?.employee_code || 'NV-001',
@@ -94,11 +95,9 @@ vi.mock('../../src/config/database.js', () => {
     bonusPenalty: {
       findFirst: vi.fn(async () => ({
         id: 1,
-        overtime_rate: 100000,
-        late_early_penalty: 50000,
-        absence_penalty_rate: 0.25,
-        overtime_rate_kind: 'FIXED_PER_HOUR',
-        late_early_penalty_kind: 'FIXED_PER_HOUR',
+        overtime_rate: 2.0,
+        late_early_penalty: 1.5,
+        absence_penalty_rate: 2.0,
       })),
     },
     daily_attendance_summary: {
@@ -378,10 +377,8 @@ describe('Attendance Security & Period Finalization Test Suite', () => {
       total_absence_penalty: 0,
       allowance: 1500000,
       net_salary: 2300000,
-      overtime_rate: 100000,
-      late_penalty_rate: 50000,
-      overtime_rate_kind: 'FIXED_PER_HOUR',
-      late_penalty_rate_kind: 'FIXED_PER_HOUR',
+      overtime_rate: 2.0,
+      late_penalty_rate: 1.5,
       status: 'PENDING',
       updated_at: new Date('2026-10-15T09:00:00Z'),
       calculation_details: {

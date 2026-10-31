@@ -1,7 +1,9 @@
+import { assertIsolatedNeonTestDatabase } from '../../src/__tests__/helpers/cloud-test-db.mjs'
 import { randomUUID } from 'node:crypto'
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest'
+import { ensureTestPayrollPolicy } from './policy-fixture.js'
 const enabled = process.env.RUN_POLICY_DB_TESTS === '1'
-if (enabled && ![process.env.DATABASE_URL,process.env.DIRECT_URL].every(url => url && /^postgresql:\/\/[^@]+@127\.0\.0\.1:55439\/policy_check$/.test(url))) throw new Error('Isolated policy_check URLs required')
+if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.env.DIRECT_URL)
 const suite = enabled ? describe : describe.skip
 suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
   let db: any, attendance: any, payroll: any, adjustments: any, admin: any, ws: any
@@ -24,14 +26,14 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
     const role = await db.roles.upsert({where:{role_name:'ADMIN'},create:{role_name:'ADMIN'},update:{}})
     admin = await db.user.create({data:{username:`ledger-${randomUUID().slice(0,8)}`,passwordHash:'test-only',role_id:role.id}})
     ws = await db.work_shifts.create({data:{shift_name:'Ledger Test',start_time:new Date('1970-01-01T08:00:00Z'),end_time:new Date('1970-01-01T16:00:00Z')}})
-    await payroll.updateBonusPenalty({overtime_rate:100000,late_early_penalty:50000,absence_penalty_rate:0.25},admin.id)
+    await ensureTestPayrollPolicy(db)
   })
   afterAll(async () => {vi.useRealTimers();if(db) await db.$disconnect()})
-  it('proposes 25% shift wages, stores leave notes and only deducts approved absence', async () => {
+  it('proposes 2x shift wages, stores leave notes and only deducts approved absence', async () => {
     const date='2025-01-03', emp=await fixture(date)
     await aggregate(emp,date)
     let [item]=await rows(emp)
-    expect(item.kind).toBe('ABSENCE');expect(item.status).toBe('PENDING');expect(Number(item.amount)).toBe(200000)
+    expect(item.kind).toBe('ABSENCE');expect(item.status).toBe('PENDING');expect(Number(item.amount)).toBe(1600000)
     let [pay]=await payroll.generate('2025-01',emp.id,admin.id,actor())
     expect(pay.total_absence_penalty).toBe(0)
     await expect(payroll.finalizePeriod('2025-01',admin.id,'ADMIN')).rejects.toThrow(/chờ duyệt/)
@@ -40,8 +42,10 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
     ;[item]=await rows(emp);expect(item.status).toBe('REJECTED');expect(item.note).toBe('Nghỉ có phép')
     await review(item,'APPROVED','Xác minh lại: nghỉ không phép')
     await expect(payroll.finalizePeriod('2025-01',admin.id,'ADMIN')).rejects.toThrow(/thay đổi/)
-    ;[pay]=await payroll.generate('2025-01',emp.id,admin.id,actor());expect(pay.total_absence_penalty).toBe(200000);expect(pay.net_salary).toBe(1300000)
+    ;[pay]=await payroll.generate('2025-01',emp.id,admin.id,actor());expect(pay.total_absence_penalty).toBe(1600000);expect(pay.net_salary).toBe(0)
     await payroll.finalizePeriod('2025-01',admin.id,'ADMIN')
+    const finalized = await db.payrollRecord.findUnique({ where: { employeeId_payroll_period: { employeeId: emp.id, payroll_period: '2025-01' } } })
+    expect(finalized.calculation_details.applied_policy_snapshot).toMatchObject({ applied_overtime_rate: 2, applied_late_penalty_rate: 1.5, policy: { absence_penalty_rate: 2 }, approved_absences: [{ amount: 1600000, hours: 8 }] })
     ;[item]=await rows(emp);await expect(review(item,'REJECTED','Đã chốt')).rejects.toThrow(/chốt|khóa/)
   })
   it('reviews OT and late penalties independently by day, with stale-write protection', async () => {
@@ -55,7 +59,7 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
     expect(pay.total_overtime).toBe(1);expect(pay.total_late_early).toBe(0)
     await review(late,'REJECTED','Được phép vào muộn')
     await expect(review(late,'APPROVED')).rejects.toThrow(/thay đổi/)
-    ;[pay]=await payroll.generate('2025-02',emp.id,admin.id,actor());expect(pay.net_salary).toBe(2400000)
+    ;[pay]=await payroll.generate('2025-02',emp.id,admin.id,actor());expect(pay.net_salary).toBe(2500000)
     await payroll.updateItem(pay.id,{allowance:0,reason:'Điều chỉnh phụ cấp'},actor())
     const freshLate=(await rows(emp)).find((r:any)=>r.kind==='LATE_EARLY')
     await review(freshLate,'APPROVED','Đã xác minh')
@@ -117,7 +121,7 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
       await expect(attendance.toggleLock(date,true,admin.id,'ADMIN')).rejects.toThrow(/chưa kết thúc/)
       vi.setSystemTime(new Date('2025-07-31T08:00:00+07:00'))
       await aggregate(emp,date)
-      const [absence]=await rows(emp);expect(absence.status).toBe('PENDING');expect(Number(absence.amount)).toBe(200000)
+      const [absence]=await rows(emp);expect(absence.status).toBe('PENDING');expect(Number(absence.amount)).toBe(1600000)
     } finally {process.env.NODE_ENV=original;vi.setSystemTime(new Date('2026-10-20T20:00:00+07:00'))}
   })
   it('limits managers to their department and blocks self/peer approval', async () => {

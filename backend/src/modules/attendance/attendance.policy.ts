@@ -173,7 +173,7 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
   const review = Boolean(noValidPair || open || invalid || flagged || orphanOut || underMinimumShift || (!shift && (pairs.length || ignored.length)) || overtimeSeconds > OT_REVIEW_SECONDS)
   const absenceCandidate = Boolean(shift && !off && scheduledShiftSeconds > 0 && +now >= +end && sourceEvents.length === 0 && !open && !ignored.length)
   let status = off ? 'OFF' : !shift ? 'NO_SHIFT' : !pairs.length && !open && +now < +end ? 'SCHEDULED' : absenceCandidate ? 'ABSENT' : 'PRESENT'
-  if (!off && shift && (open || invalid || underMinimumShift)) status = 'INCOMPLETE'
+  if (!off && shift && (open || invalid || orphanOut || underMinimumShift)) status = 'INCOMPLETE'
   else if (!off && shift && first && meetsMinimumShift) {
     if (lateSeconds > 900 && earlySeconds > 0) status = 'LATE_AND_EARLY'
     else if (lateSeconds > 900) status = 'LATE'

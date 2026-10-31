@@ -16,6 +16,12 @@ import { unlockPeriod } from '../../src/modules/payroll/payroll.service.js'
 const row = (id: bigint, early: boolean, status = 'FINALIZED') => ({ id, employeeId: `employee${id}`, payroll_period: '2026-10', hourly_rate: 100000, total_working_hours: 0, total_overtime: 0, total_late_early: 0, allowance: 0, net_salary: 0, status, employee: { hourly_rate: 100000 }, calculation_details: early ? { early_settlement: { is_early_settlement: true, cutoff_date: '2026-10-15' } } : {} })
 beforeEach(() => { vi.clearAllMocks(); state.rows = [row(1n, false), row(2n, true)] })
 describe('period unlock exclusions', () => {
+  it('keeps unresolved historical rows closed and does not unlock other rows on failure', async () => {
+    state.rows[0].calculation_details = { rate_snapshot_status: 'UNRESOLVED' }
+    state.rows.push(row(3n, false))
+    await expect(unlockPeriod('2026-10')).rejects.toThrow(/đối soát/)
+    expect(state.rows.map(r => r.status)).toEqual(['FINALIZED', 'FINALIZED', 'FINALIZED'])
+  })
   it('opens ordinary staff while preserving an early-settled record and its cutoff', async () => {
     await unlockPeriod('2026-10')
     expect(state.rows.map(r => r.status)).toEqual(['PENDING', 'FINALIZED'])

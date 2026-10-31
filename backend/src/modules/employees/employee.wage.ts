@@ -23,6 +23,15 @@ export function monthlyHourlyRate(employee: WageProfile, period: string, savedRa
   return effective?.rate ?? Number(employee.hourly_rate ?? 0)
 }
 
+/** A manually changed payroll rate is not a reliable historical profile snapshot. */
+export function sourceHourlyRate(employee: WageProfile, period: string, savedRate: unknown, rateWasOverridden: boolean): number {
+  if (!rateWasOverridden) return monthlyHourlyRate(employee, period, savedRate)
+  if (period < vnDate.format(new Date()).slice(0, 7) && !historyOf(employee).some(row => row.period <= period)) {
+    throw AppError.conflict('\u004b\u0068\u00f4\u006e\u0067 \u0063\u00f3 \u006c\u1ecb\u0063\u0068 \u0073\u1eed \u006c\u01b0\u01a1\u006e\u0067 \u0067\u0069\u1edd \u0063\u1ee7\u0061 \u006b\u1ef3 \u0063\u0169; \u006b\u0068\u00f4\u006e\u0067 \u0074\u0068\u1ec3 \u0074\u1ef1 \u006b\u0068\u00f4\u0069 \u0070\u0068\u1ee5\u0063')
+  }
+  return monthlyHourlyRate(employee, period)
+}
+
 export function recordHourlyRateChange(employee: WageProfile, rate: number, period: string): WageEntry[] {
   const history = historyOf(employee)
   if (!history.length) history.push({ period: BASELINE_PERIOD, rate: Number(employee.hourly_rate ?? 0) })

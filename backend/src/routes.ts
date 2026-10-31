@@ -7,6 +7,7 @@ import { deviceRouter } from './modules/devices/index.js';
 import { payrollRouter } from './modules/payroll/index.js';
 import { shiftRouter } from './modules/shifts/index.js';
 import { auditRouter } from './modules/audit-logs/index.js';
+import { notificationRouter } from './modules/attendance/attendance.notifications.js';
 
 export const apiRouter = Router();
 
@@ -21,3 +22,4 @@ apiRouter.use('/devices', deviceRouter);
 apiRouter.use('/payroll', payrollRouter);
 apiRouter.use('/shifts', shiftRouter);
 apiRouter.use('/audit-logs', auditRouter);
+apiRouter.use('/notifications', notificationRouter);

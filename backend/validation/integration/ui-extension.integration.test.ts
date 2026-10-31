@@ -1,10 +1,11 @@
+import { assertIsolatedNeonTestDatabase } from '../../src/__tests__/helpers/cloud-test-db.mjs'
 import {randomUUID} from 'node:crypto'
 import {beforeAll,afterAll,describe,it,expect} from 'vitest'
 import request from 'supertest'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 const enabled=process.env.RUN_POLICY_DB_TESTS==='1'
-if(enabled&&![process.env.DATABASE_URL,process.env.DIRECT_URL].every(url=>url&&/^postgresql:\/\/[^@]+@127\.0\.0\.1:55439\/policy_check$/.test(url)))throw new Error('Isolated policy_check URLs required')
+if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.env.DIRECT_URL)
 const suite=enabled?describe:describe.skip
 suite('UI extensions with real HTTP, cookies and isolated PostgreSQL',()=>{
  let db:any,app:any,admin:any,employeeUser:any,manager:any,employee:any

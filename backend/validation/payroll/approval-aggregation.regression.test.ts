@@ -1,0 +1,91 @@
+import { randomUUID } from 'node:crypto'
+import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest'
+import { assertIsolatedNeonTestDatabase } from '../../src/__tests__/helpers/cloud-test-db.mjs'
+
+if (process.env.RUN_POLICY_DB_TESTS === '1') assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.env.DIRECT_URL)
+const suite = process.env.RUN_POLICY_DB_TESTS === '1' ? describe : describe.skip
+suite('Payroll approval and aggregation regressions on isolated Neon', () => {
+  let db: any, attendance: any, payroll: any, adjustments: any, cron: any, shift: any, admin: any
+  const addEmployee = async (date: string) => {
+    const employee = await db.employee.create({ data: { employee_code: `REVIEW-${randomUUID()}`, full_name: 'Synthetic review fixture', hourly_rate: 100000 } })
+    await db.employee_shifts.create({ data: { employee_id: employee.id, shift_id: shift.id, work_date: new Date(`${date}T00:00:00Z`), shift_type: 'OFFICE_HOURS', start_time: shift.start_time, end_time: shift.end_time } })
+    return employee
+  }
+  const raw = (employee: any, date: string, type: string, time: string) => db.attendance_logs.create({ data: { employee_id: employee.id, type, event_time: new Date(`${date}T${time}+07:00`), status: 'VALID', method: 'MANUAL' } })
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-30T20:00:00+07:00'))
+    db = (await import('../../src/config/database.js')).prisma
+    attendance = await import('../../src/modules/attendance/attendance.service.js')
+    payroll = await import('../../src/modules/payroll/payroll.service.js')
+    adjustments = await import('../../src/modules/payroll/payroll.adjustments.js')
+    cron = await import('../../src/modules/attendance/attendance.cron.js')
+    const role = await db.roles.findUnique({ where: { role_name: 'ADMIN' } })
+    admin = await db.user.create({ data: { username: `review-${randomUUID()}`, passwordHash: 'test-only', role_id: role.id } })
+    shift = await db.work_shifts.create({ data: { shift_name: `Review ${randomUUID()}`, start_time: new Date('1970-01-01T08:00:00Z'), end_time: new Date('1970-01-01T16:00:00Z') } })
+    await db.bonusPenalty.create({ data: { effective_period: '2026-10', overtime_rate: 2, late_early_penalty: 1.5, absence_penalty_rate: 2 } })
+  })
+  afterAll(async () => { vi.useRealTimers(); if (db) await db.$disconnect() })
+  it('keeps a locked summary unchanged when a late scan arrives', async () => {
+    vi.setSystemTime(new Date('2026-10-30T18:00:00+07:00'))
+    const date = '2026-10-29', employee = await addEmployee(date)
+    const dept = await db.department.create({ data: { department_code: `ALERT-${randomUUID()}`, name: 'Alert test' } })
+    const staffRole = await db.roles.findUnique({ where: { role_name: 'EMPLOYEE' } })
+    const managerRole = await db.roles.findUnique({ where: { role_name: 'MANAGER' } })
+    const staff = await db.user.create({ data: { username: `staff-${randomUUID()}`, passwordHash: 'test', role_id: staffRole.id } })
+    const manager = await db.user.create({ data: { username: `manager-${randomUUID()}`, passwordHash: 'test', role_id: managerRole.id } })
+    await db.employee.update({ where: { id: employee.id }, data: { user_id: staff.id, departmentId: dept.id } })
+    await db.employee.create({ data: { employee_code: `M-${randomUUID()}`, full_name: 'Manager', user_id: manager.id, departmentId: dept.id } })
+    await raw(employee,date,'CHECK_IN','08:00:00'); await raw(employee,date,'CHECK_OUT','16:00:00')
+    await attendance.aggregateDailyAttendance(10,2026,employee.id,date)
+    await attendance.toggleLock(date,true,admin.id,'ADMIN')
+    const before = await db.daily_attendance_summary.findUnique({ where: { employee_id_work_date: { employee_id: employee.id, work_date: new Date(`${date}T00:00:00Z`) } } })
+    const capture = { eventId: randomUUID(), capturedAt: +new Date('2026-10-29T19:00:00+07:00') }
+    const lateScan = await attendance.checkIn({ employeeId: employee.id }, { id: admin.id, role: 'ADMIN' }, capture)
+    expect((await attendance.checkIn({ employeeId: employee.id }, { id: admin.id, role: 'ADMIN' }, capture)).duplicate).toBe(true)
+    const summary = await db.daily_attendance_summary.findUnique({ where: { employee_id_work_date: { employee_id: employee.id, work_date: new Date(`${date}T00:00:00Z`) } } })
+    expect(lateScan.status).toBe('FLAGGED')
+    expect(summary.requires_review).toBe(false)
+    expect(summary).toEqual(before)
+    expect(await db.systemNotification.count({ where: { user_id: admin.id, employee_id: employee.id, event_key: `locked-scan:${lateScan.id}` } })).toBe(1)
+    expect(await db.systemNotification.count({ where: { user_id: { in: [staff.id, manager.id] }, employee_id: employee.id, event_key: `locked-scan:${lateScan.id}` } })).toBe(2)
+    const { default: request } = await import('supertest')
+    const jwt = (await import('jsonwebtoken')).default
+    const { env } = await import('../../src/config/env.js')
+    const { app } = await import('../../src/app.js')
+    const token = (user: any, role: string) => jwt.sign({ id: user.id, username: user.username, role }, env.JWT_SECRET)
+    const list = async (user: any, role: string) => request(app).get('/api/notifications').set('Authorization', `Bearer ${token(user, role)}`)
+    expect((await list(manager, 'MANAGER')).body.data.some((n: any) => n.message.includes('Synthetic review fixture'))).toBe(true)
+    const other = await db.department.create({ data: { department_code: `OTHER-${randomUUID()}`, name: 'Other' } })
+    await db.employee.update({ where: { user_id: manager.id }, data: { departmentId: other.id } })
+    expect((await list(manager, 'MANAGER')).body.data).toHaveLength(0)
+    expect((await list(staff, 'EMPLOYEE')).body.data).toHaveLength(1)
+    const adminAlert = await db.systemNotification.findFirst({ where: { user_id: admin.id, event_key: `locked-scan:${lateScan.id}` } })
+    expect((await request(app).patch(`/api/notifications/${adminAlert.id}`).set('Authorization', `Bearer ${token(staff, 'EMPLOYEE')}`).send({ action: 'delete' })).status).toBe(404)
+    expect((await list(admin, 'ADMIN')).body.data.some((n: any) => n.id === `server_${adminAlert.id}`)).toBe(true)
+  })
+  it('rejects approval when the listed price is unknown', async () => {
+    const date = '2026-09-03', employee = await addEmployee(date)
+    await raw(employee,date,'CHECK_IN','08:00:00'); await raw(employee,date,'CHECK_OUT','17:00:00')
+    await attendance.aggregateDailyAttendance(9,2026,employee.id,date)
+    const listed = await adjustments.listAdjustments('2026-09',employee.id,{ id: admin.id, role: 'ADMIN' })
+    const item = listed.find((entry: any) => entry.kind === 'OVERTIME')
+    expect(item).toMatchObject({ amount: null, can_review: false })
+    await expect(adjustments.reviewAdjustment(item.id,{ status:'APPROVED',updated_at:item.updated_at },{ id:admin.id,role:'ADMIN' })).rejects.toThrow()
+    await expect(adjustments.reviewAdjustment(item.id,{ status:'REJECTED',updated_at:item.updated_at },{ id:admin.id,role:'ADMIN' })).resolves.toMatchObject({ status: 'REJECTED' })
+  })
+  it('continues current aggregation after a previous-month error', async () => {
+    await addEmployee('2026-09-04')
+    const current = await addEmployee('2026-10-28')
+    await cron.runAttendanceAggregationJob()
+    const summary = await db.daily_attendance_summary.findUnique({ where: { employee_id_work_date: { employee_id: current.id, work_date: new Date('2026-10-28T00:00:00Z') } } })
+    expect(summary).not.toBeNull()
+    expect((await db.attendanceAggregationState.findUnique({ where: { period: '2026-09' } })).failed).toBe(true)
+    expect((await db.attendanceAggregationState.findUnique({ where: { period: '2026-10' } })).failed).toBe(false)
+    expect(await db.systemNotification.count({ where: { user_id: admin.id, event_key: 'aggregation-failed:2026-09' } })).toBeGreaterThan(0)
+    await expect(attendance.toggleLock('2026-09-05', true, admin.id, 'ADMIN')).rejects.toThrow()
+    await db.bonusPenalty.create({ data: { effective_period: '2026-09', overtime_rate: 2, late_early_penalty: 1.5, absence_penalty_rate: 2 } })
+    await cron.runAttendanceAggregationJob()
+    expect((await db.attendanceAggregationState.findUnique({ where: { period: '2026-09' } })).failed).toBe(false)
+    await expect(attendance.toggleLock('2026-09-05', true, admin.id, 'ADMIN')).resolves.toMatchObject({ is_locked: true })
+  })
+})

@@ -1,15 +1,19 @@
 import { projectAttendanceDetails } from './attendance.details.js'
+import { ATTENDANCE_REASON_LABELS, displayAttendanceStatus } from './attendance.reasons.js'
+import { assertAggregationHealthy, notifyLockedScan } from './attendance.alerts.js'
 import { syncDayAdjustments, flushAdjustmentBatch } from './attendance.adjustments.js'
 import { observeRecognition } from './recognition-confirmation.js'
 import { Prisma } from '@prisma/client'
 import { createHash, randomUUID } from 'node:crypto'
 import { setImmediate as yieldToRequests } from 'node:timers/promises'
 import { type DevSimulateFaceScanInput, devSimulateFaceScanSchema } from './attendance.dto.js'
-import { monthlyHourlyRate } from '../employees/employee.wage.js'
+import { sourceHourlyRate } from '../employees/employee.wage.js'
+import { payrollOverrides } from '../payroll/payroll.overrides.js'
 import { attendanceWorkDate, calculateDay, prepareAttendance, vnDay, MAX_PAIR_MS, roundHours } from './attendance.policy.js'
 import { prisma } from '../../config/database.js'
 import { assertCanManageEmployee, getEmployeeScope, type EmployeeActor } from '../../common/permission.helper.js'
 import { AppError } from '../../common/AppError.js'
+import { policyForPeriod } from '../../common/payroll-policy.js'
 import { buildIdOrCodeWhere, formatVNDateISO, formatVNTime } from '../../common/utils.js'
 import { attendanceInclude } from './attendance.model.js'
 import { logAction } from '../audit-logs/audit.service.js'
@@ -332,7 +336,7 @@ export async function getDailySummaries(
     total_working_hours: s.total_working_hours ? Number(s.total_working_hours) : 0,
     late_early: s.late_early ? Number(s.late_early) : 0,
     overtime: s.overtime ? Number(s.overtime) : 0,
-    status: s.attendance_status,
+    status: displayAttendanceStatus(s.attendance_status, s.review_reason, s.calculation_details),
     first_check_in: s.first_check_in,
     last_check_out: s.last_check_out,
     overtime_candidate_hours: Number(s.overtime_candidate_hours),
@@ -340,6 +344,7 @@ export async function getDailySummaries(
     overtime_reason: s.overtime_reason,
     requires_review: s.requires_review,
     review_reason: s.review_reason,
+    reason_labels: ATTENDANCE_REASON_LABELS,
     policy_version: s.policy_version,
     calculation_details: projectAttendanceDetails(s.calculation_details, Number(s.total_working_hours), Number(s.overtime_candidate_hours)),
     regular_seconds: s.regular_seconds,
@@ -392,11 +397,11 @@ export async function adjustAttendance(
         review_reason: null,
       },
     })
-    const adjustmentPolicy = await tx.bonusPenalty.findFirst({ orderBy: { id: 'desc' } })
+    const adjustmentPolicy = await policyForPeriod(data.date.slice(0, 7), tx)
     const wageSnapshot = await tx.payrollRecord.findFirst({ where: { employeeId: emp.id, payroll_period: data.date.slice(0, 7) } })
     const wageProfile = await tx.employee.findFirst({ where: { id: emp.id } })
     if (!wageProfile) throw AppError.notFound('Employee not found')
-    await syncDayAdjustments(tx, updated, monthlyHourlyRate(wageProfile, data.date.slice(0, 7), wageSnapshot?.hourly_rate), Number(adjustmentPolicy?.absence_penalty_rate ?? 0.25))
+    await syncDayAdjustments(tx, updated, sourceHourlyRate(wageProfile, data.date.slice(0, 7), wageSnapshot?.hourly_rate, Boolean(payrollOverrides(wageSnapshot).fields.hourly_rate)), adjustmentPolicy?.absence_penalty_rate ?? null)
     await tx.auditLog.create({
       data: {
         userId: actorUserId,
@@ -490,7 +495,8 @@ async function recordAttendance(
       const existing = await tx.attendance_logs.findUnique({ where: { event_key: eventKey }, include: attendanceInclude })
       if (existing) {
         if (existing.employee_id !== employee.id || existing.type !== type) throw AppError.conflict('Event ID đã được dùng cho một lượt khác')
-        return { created: existing, affected: [...new Set([vnDay(existing.work_date || existing.event_time), vnDay(existing.event_time)])], duplicate: true }
+        const lock = existing.work_date && await tx.attendance_locks.findUnique({ where: { work_date: existing.work_date } })
+        return { created: existing, affected: lock?.is_locked ? [] : [...new Set([vnDay(existing.work_date || existing.event_time), vnDay(existing.event_time)])], duplicate: true }
       }
     }
     const previous = await tx.attendance_logs.findFirst({
@@ -503,6 +509,7 @@ async function recordAttendance(
     const date = type === 'CHECK_OUT' && previous?.type === 'CHECK_IN' && +eventTime - +previous.event_time <= MAX_PAIR_MS
       ? attendanceWorkDate(previous.event_time, schedule) : attendanceWorkDate(eventTime, schedule)
     const closedPeriod = await tx.payrollRecord.findFirst({ where: { employeeId: employee.id, payroll_period: date.slice(0, 7), status: { in: ['FINALIZED', 'CONFIRMED', 'PAID'] } } })
+    const lockedDay = await tx.attendance_locks.findUnique({ where: { work_date: new Date(`${date}T00:00:00Z`) } })
     const recordedMethod = capture.verified
       ? 'FACE'
       : (capture.method && capture.method !== 'FACE' ? capture.method : 'MANUAL')
@@ -517,10 +524,11 @@ async function recordAttendance(
         device_info: device || 'Web',
         verification_score: capture.verificationScore,
         liveness_score: capture.livenessScore,
-        status: flagged || closedPeriod ? 'FLAGGED' : 'VALID',
+        status: flagged || closedPeriod || lockedDay?.is_locked ? 'FLAGGED' : 'VALID',
       },
       include: attendanceInclude,
     })
+    if (lockedDay?.is_locked) await notifyLockedScan(tx, employee.id, created.id, type, eventTime, created.created_at)
     if (!capture.verified) {
       await tx.auditLog.create({
         data: {
@@ -560,11 +568,12 @@ async function recordAttendance(
       })
     }
     const previousDay = previous && +eventTime - +previous.event_time <= MAX_PAIR_MS ? attendanceWorkDate(previous.event_time, schedule) : null
-    const affected = [...new Set([date, vnDay(eventTime), ...(previousDay ? [previousDay] : [])])]
+    const affected = lockedDay?.is_locked ? [] : [...new Set([date, vnDay(eventTime), ...(previousDay ? [previousDay] : [])])]
     for (const day of affected) {
       const closed = await tx.payrollRecord.findFirst({ where: { employeeId: employee.id, payroll_period: day.slice(0, 7), status: { in: ['FINALIZED', 'CONFIRMED', 'PAID'] } } })
-      if (!closed) {
-        const work_date = new Date(`${day}T00:00:00Z`)
+      const work_date = new Date(`${day}T00:00:00Z`)
+      const dayLock = await tx.attendance_locks.findUnique({ where: { work_date } })
+      if (!closed && !dayLock?.is_locked) {
         const invalidated = { policy_version: null, requires_review: true, review_reason: 'SOURCE_CHANGED' }
         await tx.daily_attendance_summary.upsert({
           where: { employee_id_work_date: { employee_id: employee.id, work_date } },
@@ -745,6 +754,7 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${dateStr.slice(0, 7)}`}))`
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${dateStr}`}))`
     if (is_locked) {
+      await assertAggregationHealthy(tx, dateStr.slice(0, 7))
       const days = await tx.daily_attendance_summary.findMany({ where: { work_date }, select: { calculation_details: true } })
       if (days.some(d => { const details = d.calculation_details as Record<string, unknown> | null; return details && !details.off && +new Date(String(details.scheduledEnd)) > Date.now() })) throw AppError.conflict('Ca chưa kết thúc, bao gồm ca qua đêm; chưa thể khóa ngày')
     }
@@ -782,7 +792,7 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
     const first = `${year}-${String(month).padStart(2, '0')}-01`
     const today = vnDay(new Date())
     const employees = await tx.employee.findMany({ where: { AND: [employeeScope, employeeId ? buildIdOrCodeWhere(employeeId) : {
-      OR: [{ status: 'ACTIVE' }, { attendance_logs: { some: { event_time: { gte: new Date(+start - MAX_PAIR_MS), lt: new Date(+end + MAX_PAIR_MS) } } } }],
+      OR: [{ status: 'ACTIVE' }, { employee_shifts: { some: { work_date: { gte: start, lt: end } } } }, { attendance_logs: { some: { event_time: { gte: new Date(+start - MAX_PAIR_MS), lt: new Date(+end + MAX_PAIR_MS) } } } }],
     }] } })
     const ids = employees.map(e => e.id)
     if (!ids.length) return { month, year, totalSummaries: 0, details: [] }
@@ -794,7 +804,7 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
       } }, orderBy: [{ event_time: 'asc' }, { id: 'asc' }] }),
       tx.daily_attendance_summary.findMany({ where: { employee_id: { in: ids }, work_date: { gte: start, lt: end } } }),
       tx.attendance_locks.findMany({ where: { work_date: { gte: start, lt: end }, is_locked: true } }),
-      tx.payrollRecord.findMany({ where: { employeeId: { in: ids }, payroll_period: first.slice(0, 7) }, select: { employeeId: true, status: true, hourly_rate: true } }),
+      tx.payrollRecord.findMany({ where: { employeeId: { in: ids }, payroll_period: first.slice(0, 7) }, select: { employeeId: true, status: true, hourly_rate: true, total_working_hours: true, calculation_details: true } }),
       tx.attendanceAdjustment.findMany({ where: { employee_id: { in: ids }, work_date: { gte: start, lt: end } } }),
     ])
     const adjustmentBatch = { existing: new Map(adjustmentRows.map(r => [`${r.employee_id}:${r.work_date.toISOString().slice(0,10)}:${r.kind}`, r])), writes: [] as Prisma.AttendanceAdjustmentCreateManyInput[], audits: [] as Prisma.AuditLogCreateManyInput[] }
@@ -803,7 +813,7 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
     const pendingWrites: Array<Record<string, unknown>> = []
     const invalidations: Prisma.AuditLogCreateManyInput[] = []
     const details: Array<Record<string, unknown>> = []
-    const adjustmentPolicy = await tx.bonusPenalty.findFirst({ orderBy: { id: 'desc' } })
+    const adjustmentPolicy = await policyForPeriod(first.slice(0, 7), tx)
     let lastYield = performance.now()
     for (const emp of employees) {
       const empLogs = logs.filter(l => l.employee_id === emp.id)
@@ -859,7 +869,9 @@ export async function aggregateDailyAttendance(month: number, year: number, empl
           return data
         })()
         if (summary && !lockedDates.has(date) && !closedEmployees.has(emp.id)) {
-          await syncDayAdjustments(tx, { ...summary, employee_id: emp.id, work_date: workDate }, monthlyHourlyRate(emp, first.slice(0, 7), periodPayroll.find(p => p.employeeId === emp.id)?.hourly_rate), Number(adjustmentPolicy?.absence_penalty_rate ?? 0.25), adjustmentBatch)
+          const payroll = periodPayroll.find(p => p.employeeId === emp.id)
+          const oldRate = payrollOverrides(payroll ?? null).fields.hourly_rate
+          await syncDayAdjustments(tx, { ...summary, employee_id: emp.id, work_date: workDate }, sourceHourlyRate(emp, first.slice(0, 7), payroll?.hourly_rate, Boolean(oldRate)), adjustmentPolicy?.absence_penalty_rate ?? null, adjustmentBatch)
         }
         if (summary) details.push({ employee_code: emp.employee_code, employee_name: emp.full_name, date,
           total_working_hours: Number(summary.total_working_hours), overtime: Number(summary.overtime), overtime_status: summary.overtime_status,

@@ -4,7 +4,9 @@ import bcrypt from 'bcryptjs'
 const prisma = new PrismaClient()
 
 async function main() {
-
+  if (await prisma.bonusPenalty.findFirst({ where: { effective_period: { not: null } } })) {
+    throw new Error('Database đã có phiên bản chính sách bất biến. Chỉ seed trên database phát triển trống đã được chuẩn bị riêng; không xóa dữ liệu đang sử dụng.')
+  }
   // 1. Dọn dẹp sạch toàn bộ dữ liệu theo thứ tự quan hệ khóa ngoại
   console.log('🧹 Đang dọn dẹp sạch dữ liệu cũ...')
   await prisma.attendance_locks.deleteMany({})
@@ -454,12 +456,14 @@ async function main() {
   // 10. Bảng Bonus Penalty
   await prisma.bonusPenalty.create({
     data: {
-      overtime_rate: 100000,
-      late_early_penalty: 50000,
-      description: 'Quy định mức thưởng tăng ca 100.000 ₫/h và phạt đi trễ/về sớm 50.000 ₫/h năm 2026',
+      overtime_rate: 2.0,
+      late_early_penalty: 1.5,
+      absence_penalty_rate: 2.0,
+      effective_period: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).slice(0, 7),
+      description: 'Quy định hệ số thưởng tăng ca 2.0x, phạt đi trễ/về sớm 1.5x và phạt vắng không phép 2.0x theo lương giờ',
     },
   })
-  console.log('✅ 8. Bảng bonus_penalty (Mức thưởng OT: 100.000 ₫/h, Mức phạt: 50.000 ₫/h)')
+  console.log('✅ 8. Bảng bonus_penalty (Hệ số OT: 2.0x, Phạt trễ/sớm: 1.5x, Phạt vắng: 2.0x)')
 
   // 11. Bảng Audit Log khởi tạo hệ thống
   await prisma.auditLog.create({

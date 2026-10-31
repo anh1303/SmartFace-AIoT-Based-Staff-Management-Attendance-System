@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { Prisma, type AttendanceAdjustment } from '@prisma/client'
+import { AppError } from '../../common/AppError.js'
 
 export interface AdjustmentSource {
   employee_id: string
@@ -22,28 +23,34 @@ export interface AdjustmentBatch {
 }
 
 /** Called in the same transaction as day aggregation; closed dates are never passed. */
-export async function syncDayAdjustments(tx: Prisma.TransactionClient, day: AdjustmentSource, hourlyRate: number, absenceRate: number, batch?: AdjustmentBatch) {
+export async function syncDayAdjustments(tx: Prisma.TransactionClient, day: AdjustmentSource, hourlyRate: number, absenceRate: number | null, batch?: AdjustmentBatch) {
   const details = (day.calculation_details || {}) as Record<string, unknown>
   const absence = details.absenceCandidate === true
   const hours = Number(details.scheduledShiftSeconds || 0) / 3600
-  const absenceAmount = absence ? Math.round(hours * hourlyRate * absenceRate) : 0
   const items = [
     { kind: 'OVERTIME', hours: Number(day.overtime_status === 'APPROVED' ? day.overtime : day.overtime_candidate_hours), amount: 0 },
     { kind: 'LATE_EARLY', hours: Number(day.late_early), amount: 0 },
-    { kind: 'ABSENCE', hours: absence ? hours : 0, amount: absenceAmount },
+    { kind: 'ABSENCE', hours: absence ? hours : 0, amount: 0 },
   ]
   for (const item of items) {
     const key = { employee_id: day.employee_id, work_date: day.work_date, kind: item.kind }
     const previous = batch ? batch.existing.get(`${key.employee_id}:${key.work_date.toISOString().slice(0,10)}:${key.kind}`) : await tx.attendanceAdjustment.findUnique({ where: { employee_id_work_date_kind: key } })
+    const previousDetails = previous?.source_details as Record<string, unknown> | null
+    const savedRate = previousDetails?.absence_penalty_rate
+    const effectiveRate = savedRate != null ? Number(savedRate) : absenceRate
+    if (item.kind === 'ABSENCE' && absence) {
+      if (effectiveRate == null || !Number.isFinite(effectiveRate) || effectiveRate < 0) throw AppError.conflict('Chưa có chính sách phạt vắng được xác minh cho kỳ này')
+      item.amount = Math.round(hours * hourlyRate * effectiveRate)
+    }
     const active = item.kind === 'ABSENCE' ? absence : item.hours > 0
-    const fingerprint = createHash('sha256').update(JSON.stringify([details.fingerprint, details.policy, item, item.kind === 'ABSENCE' ? [hourlyRate, absenceRate] : null])).digest('hex')
+    const fingerprint = createHash('sha256').update(JSON.stringify([details.fingerprint, details.policy, item, item.kind === 'ABSENCE' ? [hourlyRate, effectiveRate] : null])).digest('hex')
     if (previous?.source_fingerprint === fingerprint) continue
     if (!previous && !active) continue
     // Migrate an existing explicit daily OT decision, never auto-approve a penalty.
     const legacyStatus = !previous && item.kind === 'OVERTIME' && ['APPROVED', 'REJECTED'].includes(day.overtime_status) ? day.overtime_status : 'PENDING'
     const data = { ...item, source_fingerprint: fingerprint,
       source_details: { attendance_fingerprint: details.fingerprint ?? null, policy: details.policy ?? null,
-        ...(item.kind === 'ABSENCE' ? { hourly_rate: hourlyRate, scheduled_hours: hours, absence_penalty_rate: absenceRate } : {}) },
+        ...(item.kind === 'ABSENCE' ? { hourly_rate: hourlyRate, scheduled_hours: hours, absence_penalty_rate: effectiveRate } : {}) },
       status: active ? legacyStatus : 'VOID',
       reviewed_by: legacyStatus !== 'PENDING' ? day.approved_by : null,
       reviewed_at: legacyStatus !== 'PENDING' ? day.approved_at : null,

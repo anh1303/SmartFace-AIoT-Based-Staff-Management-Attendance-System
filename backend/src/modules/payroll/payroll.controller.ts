@@ -11,8 +11,9 @@ import {
   earlySettlementSchema,
 } from './payroll.dto.js';
 
-export const getBonusPenalty = async (_req: Request, res: Response) => {
-  successResponse(res, await service.getBonusPenalty());
+export const getBonusPenalty = async (req: Request, res: Response) => {
+  const period = req.query.period === undefined ? undefined : z.string().parse(req.query.period);
+  successResponse(res, await service.getBonusPenalty(period));
 };
 
 export const updateBonusPenalty = async (req: Request, res: Response) => {

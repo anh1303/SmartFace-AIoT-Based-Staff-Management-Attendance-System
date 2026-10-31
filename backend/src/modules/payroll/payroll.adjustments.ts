@@ -8,6 +8,8 @@ import { emitAttendanceEvent } from '../attendance/attendance.gateway.js'
 import { getEmployeeScope, assertCanManageEmployee } from '../employees/employee.permission.js'
 import { monthlyHourlyRate } from '../employees/employee.wage.js'
 import { payrollOverrides } from './payroll.overrides.js'
+import { policyForPeriod, validMultiplier } from '../../common/payroll-policy.js'
+import { historicalAdjustmentAmount } from '../../common/payroll-history.js'
 
 type Actor = { id?: string; role?: string }
 const bounds = (period: string) => {
@@ -27,19 +29,24 @@ export async function listAdjustments(period: string, employeeId: string | undef
   where.AND = [{ employee: employeeScope }]
   const [rows, policy, payroll, locks] = await Promise.all([
     prisma.attendanceAdjustment.findMany({ where, include: { employee: { include: { position: true, users: { include: { roles: true } } } } }, orderBy: [{ work_date: 'asc' }, { kind: 'asc' }] }),
-    prisma.bonusPenalty.findFirst({ orderBy: { id: 'desc' } }),
-    prisma.payrollRecord.findMany({ where: { payroll_period: period, employee: employeeScope }, select: { employeeId: true, hourly_rate: true, total_working_hours: true, calculation_details: true, overtime_rate: true, overtime_rate_kind: true, late_penalty_rate: true, late_penalty_rate_kind: true, status: true } }),
+    policyForPeriod(period),
+    prisma.payrollRecord.findMany({ where: { payroll_period: period, employee: employeeScope }, select: { employeeId: true, hourly_rate: true, total_working_hours: true, calculation_details: true, overtime_rate: true, late_penalty_rate: true, status: true } }),
     prisma.attendance_locks.findMany({ where: { work_date: { gte: start, lt: end }, is_locked: true }, select: { work_date: true } }),
   ])
   return rows.filter(row => actor.role !== 'MANAGER' || row.employee.user_id === actor.id || !isEmployeeManager(row.employee)).map(row => {
     const snapshot = payroll.find(p => p.employeeId === row.employee_id)
     const locked = Boolean(snapshot && ['FINALIZED', 'CONFIRMED', 'PAID'].includes(snapshot.status) || locks.some(l => +l.work_date === +row.work_date))
-    const hourlyRate = snapshot && (['FINALIZED', 'CONFIRMED', 'PAID'].includes(snapshot.status) || payrollOverrides(snapshot).fields.hourly_rate)
+    const isFinalized = Boolean(snapshot && ['FINALIZED', 'CONFIRMED', 'PAID'].includes(snapshot.status))
+    const snapshotStatus = (snapshot?.calculation_details as Record<string, unknown> | null)?.rate_snapshot_status
+    const unresolved = ['UNRESOLVED', 'LEGACY_VERIFIED'].includes(String(snapshotStatus))
+    const hourlyRate = snapshot && (isFinalized || payrollOverrides(snapshot).fields.hourly_rate)
       ? Number(snapshot.hourly_rate)
       : monthlyHourlyRate(row.employee, period, snapshot?.hourly_rate)
-    const rateValue = row.kind === 'OVERTIME' ? snapshot ? snapshot.overtime_rate : policy?.overtime_rate ?? 100000 : snapshot ? snapshot.late_penalty_rate : policy?.late_early_penalty ?? 50000
-    const rateKind = row.kind === 'OVERTIME' ? snapshot ? snapshot.overtime_rate_kind : policy?.overtime_rate_kind ?? 'FIXED_PER_HOUR' : snapshot ? snapshot.late_penalty_rate_kind : policy?.late_early_penalty_kind ?? 'FIXED_PER_HOUR'
-    const amount = row.kind === 'ABSENCE' ? Number(row.amount) : rateValue == null || !rateKind ? null : Math.round(Number(row.hours) * Number(rateValue) * (rateKind === 'HOURLY_MULTIPLIER' ? hourlyRate : 1))
+    const rateValue = row.kind === 'OVERTIME'
+      ? (validMultiplier(snapshot?.overtime_rate) && !unresolved ? Number(snapshot!.overtime_rate) : (isFinalized || unresolved ? null : policy?.overtime_rate ?? null))
+      : (validMultiplier(snapshot?.late_penalty_rate) && !unresolved ? Number(snapshot!.late_penalty_rate) : (isFinalized || unresolved ? null : policy?.late_early_penalty ?? null))
+    const legacyAmount = snapshot ? historicalAdjustmentAmount(snapshot, row.kind, Number(row.hours), hourlyRate) : null
+    const amount = row.kind === 'ABSENCE' ? Number(row.amount) : legacyAmount != null ? Math.round(legacyAmount) : rateValue == null ? null : Math.round(Number(row.hours) * rateValue * hourlyRate)
     return { id: String(row.id), employee_id: row.employee.employee_code, employee_name: row.employee.full_name,
       date: row.work_date.toISOString().slice(0,10), kind: row.kind, hours: Number(row.hours),
       amount, amount_unavailable: amount == null,
@@ -68,6 +75,27 @@ export async function reviewAdjustment(id: string, data: { status: 'APPROVED' | 
     const fresh = await tx.attendanceAdjustment.findUniqueOrThrow({ where: { id: item.id } })
     if (fresh.updated_at.toISOString() !== data.updated_at) throw AppError.conflict('Khoản duyệt đã thay đổi; tải lại trước khi duyệt')
     if (fresh.status === 'VOID') throw AppError.conflict('Khoản này không còn phát sinh')
+    if (data.status === 'APPROVED') {
+      const [employee, snapshot, policy] = await Promise.all([
+        tx.employee.findUniqueOrThrow({ where: { id: item.employee_id } }),
+        tx.payrollRecord.findUnique({ where: { employeeId_payroll_period: { employeeId: item.employee_id, payroll_period: date.slice(0, 7) } } }),
+        policyForPeriod(date.slice(0, 7), tx),
+      ])
+      const snapshotStatus = (snapshot?.calculation_details as Record<string, unknown> | null)?.rate_snapshot_status
+      const unresolved = ['UNRESOLVED', 'LEGACY_VERIFIED'].includes(String(snapshotStatus))
+      const savedRate = snapshot && payrollOverrides(snapshot).fields.hourly_rate ? snapshot.hourly_rate : undefined
+      const hourlyRate = employee.hourly_rate == null && !snapshot ? NaN : monthlyHourlyRate(employee, date.slice(0, 7), savedRate ?? snapshot?.hourly_rate)
+      const multiplier = fresh.kind === 'OVERTIME' ? snapshot?.overtime_rate : snapshot?.late_penalty_rate
+      const policyRate = fresh.kind === 'OVERTIME' ? policy?.overtime_rate : policy?.late_early_penalty
+      const source = fresh.source_details as Record<string, unknown> | null
+      const absenceRate = source?.absence_penalty_rate
+      const absenceHourly = source?.hourly_rate
+      const absenceValid = fresh.amount != null && absenceHourly != null && Number.isFinite(Number(absenceHourly)) && Number(absenceHourly) >= 0 && validMultiplier(absenceRate)
+        && Math.round(Number(fresh.hours) * Number(absenceHourly) * Number(absenceRate)) === Number(fresh.amount)
+      if (unresolved || !Number.isFinite(hourlyRate) || hourlyRate < 0 || (fresh.kind !== 'ABSENCE' && !validMultiplier(multiplier ?? policyRate)) || (fresh.kind === 'ABSENCE' && !absenceValid)) {
+        throw AppError.conflict('Chưa xác định đầy đủ đơn giá và chính sách để duyệt khoản này')
+      }
+    }
     const note = data.note?.trim() || null
     const updated = await tx.attendanceAdjustment.update({ where: { id: item.id }, data: { status: data.status, note, reviewed_by: actor.id, reviewed_at: new Date() } })
     if (item.kind === 'OVERTIME') await tx.daily_attendance_summary.update({ where: { employee_id_work_date: { employee_id: item.employee_id, work_date: item.work_date } }, data: {

@@ -1,7 +1,7 @@
 import { prisma } from '../config/database.js';
-import { computePayrollBreakdown, type SalaryCalculationInput } from './payroll-rates.js';
-export { computePayrollBreakdown } from './payroll-rates.js';
-export type { SalaryCalculationInput, PayrollBreakdown, RateKind } from './payroll-rates.js';
+import { computePayrollBreakdown, type SalaryCalculationInput, type PayrollBreakdown } from './payroll-rates.js';
+export { computePayrollBreakdown };
+export type { SalaryCalculationInput, PayrollBreakdown };
 
 const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
 

@@ -1,8 +1,5 @@
 import { AppError } from './AppError.js';
 
-export const RATE_KINDS = ['FIXED_PER_HOUR', 'HOURLY_MULTIPLIER'] as const;
-export type RateKind = typeof RATE_KINDS[number];
-
 export interface SalaryCalculationInput {
   hourly_rate: number;
   total_working_hours: number;
@@ -11,8 +8,6 @@ export interface SalaryCalculationInput {
   allowance: number;
   overtime_rate: number;
   late_early_penalty: number;
-  overtime_rate_kind?: RateKind;
-  late_penalty_rate_kind?: RateKind;
   total_absence_penalty?: number;
 }
 
@@ -28,7 +23,6 @@ export interface PayrollBreakdown {
 export function computePayrollBreakdown(params: SalaryCalculationInput): PayrollBreakdown {
   const { hourly_rate, total_working_hours, total_overtime, total_late_early,
     allowance, overtime_rate, late_early_penalty,
-    overtime_rate_kind = 'FIXED_PER_HOUR', late_penalty_rate_kind = 'FIXED_PER_HOUR',
     total_absence_penalty = 0 } = params;
 
   if (![hourly_rate, total_working_hours, total_overtime, total_late_early,
@@ -36,13 +30,10 @@ export function computePayrollBreakdown(params: SalaryCalculationInput): Payroll
     .every(value => Number.isFinite(value) && value >= 0)) {
     throw AppError.badRequest('Dữ liệu tính lương phải hữu hạn và không âm');
   }
-  if (!RATE_KINDS.includes(overtime_rate_kind) || !RATE_KINDS.includes(late_penalty_rate_kind)) {
-    throw AppError.badRequest('Đơn vị đơn giá lương không hợp lệ');
-  }
 
   const base_salary = hourly_rate * total_working_hours;
-  const overtime_pay = total_overtime * overtime_rate * (overtime_rate_kind === 'HOURLY_MULTIPLIER' ? hourly_rate : 1);
-  const late_early_deduction = total_late_early * late_early_penalty * (late_penalty_rate_kind === 'HOURLY_MULTIPLIER' ? hourly_rate : 1);
+  const overtime_pay = total_overtime * overtime_rate * hourly_rate;
+  const late_early_deduction = total_late_early * late_early_penalty * hourly_rate;
   const net_salary = Math.max(0, Math.round(base_salary + overtime_pay - late_early_deduction - total_absence_penalty + allowance));
   if (![base_salary, overtime_pay, late_early_deduction, net_salary].every(Number.isFinite) || net_salary >= 1e13) {
     throw AppError.badRequest('Số tiền vượt giới hạn lưu trữ phiếu lương');

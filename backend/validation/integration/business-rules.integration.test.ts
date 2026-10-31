@@ -1,7 +1,9 @@
+import { assertIsolatedNeonTestDatabase } from '../../src/__tests__/helpers/cloud-test-db.mjs'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ensureTestPayrollPolicy } from '../payroll/policy-fixture.js'
 const enabled = process.env.RUN_POLICY_DB_TESTS === '1'
-if (enabled && ![process.env.DATABASE_URL, process.env.DIRECT_URL].every(url => url && /^postgresql:\/\/[^@]+@127\.0\.0\.1:55439\/policy_check$/.test(url))) throw new Error('Isolated policy_check URLs required')
+if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.env.DIRECT_URL)
 const suite = enabled ? describe : describe.skip
 
 suite('Business payroll rules in isolated PostgreSQL', () => {
@@ -10,6 +12,7 @@ suite('Business payroll rules in isolated PostgreSQL', () => {
   const employee = (name: string) => db.employee.create({ data: { employee_code: `BIZ-${prefix}-${name}`, full_name: name, hourly_rate: 50000 } })
   beforeAll(async () => {
     db = (await import('../../src/config/database.js')).prisma
+    await ensureTestPayrollPolicy(db)
     payroll = await import('../../src/modules/payroll/payroll.service.js')
     employees = await import('../../src/modules/employees/employee.service.js')
     attendance = await import('../../src/modules/attendance/attendance.service.js')

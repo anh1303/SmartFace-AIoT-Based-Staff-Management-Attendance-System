@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { calculateDay, pairAttendance, prepareAttendance, roundHours } from '../../src/modules/attendance/attendance.policy.js'
+import { displayAttendanceStatus } from '../../src/modules/attendance/attendance.reasons.js'
 const day = '2026-10-02'
 const shift = { start_time: '08:00', end_time: '17:30', shift_type: 'OFFICE_HOURS' }
 const log = (id: number, type: string, time: string, date = day) => ({ id, type, event_time: `${date}T${time}+07:00`, status: 'VALID' })
@@ -72,6 +73,11 @@ describe('Company policy boundaries', () => {
     const a = calc([log(1,'CHECK_IN','09:00:00')]); const b = calc([log(2,'CHECK_OUT','17:30:00')])
     expect(a.workingHours).toBe(0); expect(a.lateEarlyHours).toBe(0); expect(a.last).toBeNull(); expect(a.requiresReview).toBe(true)
     expect(b.first).toBeNull(); expect(b.workingHours).toBe(0); expect(b.requiresReview).toBe(true)
+    expect(a.status).toBe('INCOMPLETE'); expect(a.reviewReason).toContain('MISSING_CHECK_OUT')
+    expect(b.status).toBe('INCOMPLETE'); expect(b.reviewReason).toContain('UNPAIRED_CHECK_OUT')
+    expect(displayAttendanceStatus('PRESENT', 'NO_VALID_PAIR,UNPAIRED_CHECK_OUT')).toBe('INCOMPLETE')
+    expect(displayAttendanceStatus('PRESENT', null, { pairs: [], ignored: [{ reason: 'UNPAIRED_CHECK_OUT' }] })).toBe('INCOMPLETE')
+    expect(displayAttendanceStatus('PRESENT', 'UNPAIRED_CHECK_OUT')).toBe('PRESENT')
   })
   it('does not bridge flagged scans', () => {
     const r = calc([log(1,'CHECK_IN','08:00:00'), { ...log(2,'CHECK_IN','09:00:00'), status:'FLAGGED' }, log(3,'CHECK_OUT','17:30:00')])

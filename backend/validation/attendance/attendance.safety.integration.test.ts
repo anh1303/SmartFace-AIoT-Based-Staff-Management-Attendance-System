@@ -1,7 +1,9 @@
+import { assertIsolatedNeonTestDatabase } from '../../src/__tests__/helpers/cloud-test-db.mjs'
 import { randomUUID } from 'node:crypto'
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest'
+import { ensureTestPayrollPolicy } from '../payroll/policy-fixture.js'
 const enabled = process.env.RUN_POLICY_DB_TESTS === '1'
-if (enabled && ![process.env.DATABASE_URL,process.env.DIRECT_URL].every(url => url && /^postgresql:\/\/[^@]+@127\.0\.0\.1:55439\/policy_check$/.test(url))) throw new Error('Isolated policy_check URLs required')
+if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.env.DIRECT_URL)
 const suite = enabled ? describe : describe.skip
 suite('Financial and review safety in PostgreSQL', () => {
   let db: any, attendance: any, payroll: any, shifts: any, admin: any
@@ -11,6 +13,7 @@ suite('Financial and review safety in PostgreSQL', () => {
   beforeAll(async () => {
     vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-09-30T23:00:00+07:00'))
     db = (await import('../../src/config/database.js')).prisma
+    await ensureTestPayrollPolicy(db)
     attendance = await import('../../src/modules/attendance/attendance.service.js')
     payroll = await import('../../src/modules/payroll/payroll.service.js')
     shifts = await import('../../src/modules/shifts/shift.service.js')

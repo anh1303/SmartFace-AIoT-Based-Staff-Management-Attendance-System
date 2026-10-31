@@ -123,7 +123,7 @@ Các test tương đương dùng ảnh tổng hợp, chỉ chứng minh tương 
 Chạy lại từ root dự án:
 
 ```bash
-(cd backend && npm run build && npm test -- validation/face-extraction.test.ts validation/webhook-validation.test.ts validation/recognition-confirmation.test.ts)
+(cd backend && npm run build && npm test -- validation/devices/face-extraction.test.ts validation/devices/webhook-validation.test.ts validation/devices/recognition-confirmation.test.ts)
 PYTHONDONTWRITEBYTECODE=1 PAD_ADAPTIVE_ENABLED=false PAD_RUNTIME_CONFIG_PATH= python3 -m unittest discover -s hardware/validation -p 'test*recognition*.py' -v
 PYTHONDONTWRITEBYTECODE=1 PAD_ADAPTIVE_ENABLED=false PAD_RUNTIME_CONFIG_PATH= python3 -m unittest discover -s face_auth/tests -p test_remote_extraction.py -v
 PYTHONDONTWRITEBYTECODE=1 python3 hardware/validation/smoke_server_recognition.py

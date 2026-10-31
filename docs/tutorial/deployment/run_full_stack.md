@@ -29,13 +29,7 @@ bên trong là PBL6. Giữ volume nghiệp vụ đúng; dừng container Postgre
 khi dùng cùng volume với Compose mới. Không cho hai PostgreSQL mở cùng PGDATA.
 Không dùng `docker compose down -v` để đổi cấu hình.
 
-Nếu muốn một DB **test mới hoàn toàn**, tạo volume riêng rồi đặt tên đó trong
-`.env.compose`; đây không phải thao tác chuyển dữ liệu từ DB nghiệp vụ:
-
-```bash
-docker volume create pbl6_fresh_test_postgres
-# .env.compose: PBL6_POSTGRES_VOLUME=pbl6_fresh_test_postgres
-```
+Integration test database chạy bằng `npm run test:neon` trong `backend`; runner tự tạo và xóa database tạm trên endpoint Neon testing đã cấu hình.
 
 Backend container đọc secrets từ `backend/.env`; thay JWT/MQTT shared secret theo
 môi trường. Compose ghi đè các URL thành hostname nội bộ `postgres`, `face-auth`,

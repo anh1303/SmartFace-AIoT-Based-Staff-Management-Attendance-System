@@ -33,8 +33,8 @@ export function usePayroll() {
   });
 
   const bonusPenaltyQuery = useQuery({
-    queryKey: BONUS_PENALTY_QUERY_KEY,
-    queryFn: fetchBonusPenaltyApi,
+    queryKey: [...BONUS_PENALTY_QUERY_KEY, selectedPeriod],
+    queryFn: () => fetchBonusPenaltyApi(selectedPeriod),
     staleTime: 1000 * 60 * 10,
     retry: 1,
   });

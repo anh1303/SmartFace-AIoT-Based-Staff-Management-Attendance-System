@@ -30,8 +30,8 @@ export const EmployeeSalaryEstimate: React.FC = () => {
         <dl className="grid sm:grid-cols-2 gap-4 text-sm">
           <div><dt className="text-slate-500">Giờ công đã ghi</dt><dd>{record.total_working_hours ?? record.working_hours ?? 0} giờ</dd></div>
           <div><dt className="text-slate-500">Đơn giá giờ trên phiếu</dt><dd>{Number(record.hourly_rate).toLocaleString('vi-VN')} ₫/h</dd></div>
-          <div><dt className="text-slate-500">Đơn giá OT trên phiếu</dt><dd>{record.overtime_rate != null && record.overtime_rate_kind ? formatPayrollRateLabel(Number(record.overtime_rate), Number(record.hourly_rate), record.overtime_rate_kind) : 'Chưa có đơn giá xác định'}</dd></div>
-          <div><dt className="text-slate-500">Đơn giá phạt trên phiếu</dt><dd>{record.late_penalty_rate != null && record.late_penalty_rate_kind ? formatPayrollRateLabel(Number(record.late_penalty_rate), Number(record.hourly_rate), record.late_penalty_rate_kind) : 'Chưa có đơn giá xác định'}</dd></div>
+          <div><dt className="text-slate-500">Hệ số OT trên phiếu</dt><dd>{record.overtime_rate != null ? formatPayrollRateLabel(Number(record.overtime_rate), Number(record.hourly_rate)) : 'Chưa có hệ số xác định'}</dd></div>
+          <div><dt className="text-slate-500">Hệ số phạt trên phiếu</dt><dd>{record.late_penalty_rate != null ? formatPayrollRateLabel(Number(record.late_penalty_rate), Number(record.hourly_rate)) : 'Chưa có hệ số xác định'}</dd></div>
         </dl>
         <PayslipBreakdown record={record}/>
       </section>}

@@ -1,14 +1,7 @@
 import { apiFetch } from './client';
 import { PayrollRecord, BonusPenaltyPolicy } from '../types';
 
-export type PayrollItemUpdates = Partial<Pick<PayrollRecord,
-  'hourly_rate' | 'total_working_hours' | 'total_overtime' | 'total_late_early' | 'allowance' | 'status' | 'reason' | 'updated_at'
->> & {
-  working_hours?: number;
-  reconcile_working_hours?: boolean;
-  reset_working_hours?: boolean;
-  resolve_rate_snapshot?: boolean;
-};
+export type PayrollItemUpdates = { allowance: number; reason?: string; updated_at?: string };
 
 export async function fetchPayrollApi(): Promise<PayrollRecord[]> {
   const res = await apiFetch('/api/payroll');
@@ -18,8 +11,8 @@ export async function fetchPayrollApi(): Promise<PayrollRecord[]> {
   throw new Error(res.message || 'Không thể tải bảng lương');
 }
 
-export async function fetchBonusPenaltyApi(): Promise<BonusPenaltyPolicy | null> {
-  const res = await apiFetch('/api/payroll/bonus-penalty');
+export async function fetchBonusPenaltyApi(period?: string): Promise<BonusPenaltyPolicy | null> {
+  const res = await apiFetch(`/api/payroll/bonus-penalty${period ? `?period=${encodeURIComponent(period)}` : ''}`);
   if (res.success && res.data) {
     return res.data;
   }
@@ -41,22 +34,9 @@ export async function updatePayrollItemApi(
   id: string,
   updates: PayrollItemUpdates
 ): Promise<PayrollRecord> {
-  const workingHours = updates.working_hours ?? updates.total_working_hours;
   const res = await apiFetch(`/api/payroll/${id}`, {
     method: 'PUT',
-    body: JSON.stringify({
-      hourly_rate: updates.hourly_rate,
-      total_working_hours: workingHours,
-      total_overtime: updates.total_overtime,
-      total_late_early: updates.total_late_early,
-      allowance: updates.allowance,
-      status: updates.status,
-      reason: updates.reason,
-      updated_at: updates.updated_at,
-      reconcile_working_hours: updates.reconcile_working_hours,
-      reset_working_hours: updates.reset_working_hours,
-      resolve_rate_snapshot: updates.resolve_rate_snapshot,
-    }),
+    body: JSON.stringify({ allowance: updates.allowance, reason: updates.reason, updated_at: updates.updated_at }),
   });
   if (res.success && res.data) {
     return res.data;

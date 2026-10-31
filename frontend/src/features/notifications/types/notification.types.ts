@@ -22,7 +22,7 @@ export interface NotificationContextType {
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   addNotification: (params: { message: string; type?: NotificationType; title?: string }) => void;
   removeNotification: (id: string) => void;
-  clearAll: () => void;
+  clearAll: (localOnly?: boolean) => void;
   markAllAsRead: () => void;
   markAsRead: (id: string) => void;
 }

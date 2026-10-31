@@ -1,14 +1,14 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../../components/common/Modal';
-import type { RateKind } from '../../../types/payroll.types';
+import { nextPayrollPolicyPeriod } from '../../../utils/payrollUtils';
+import { fetchBonusPenaltyApi } from '../../../api/payrollApi';
 
 export interface PolicyFormData {
   overtime_rate: number;
-  overtime_rate_kind: RateKind;
   late_early_penalty: number;
-  late_early_penalty_kind: RateKind;
   absence_penalty_rate: number;
   description: string;
+  effective_period: string;
 }
 
 interface PayrollPolicyModalProps {
@@ -26,29 +26,85 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
   onChangePolicyData,
   onSavePolicy,
 }) => {
+  const baseline = useRef<PolicyFormData>(policyData);
+  const requestId = useRef(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [proposal, setProposal] = useState<PolicyFormData | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      baseline.current = policyData;
+      setLoading(false); setError(''); setProposal(null);
+    }
+    return () => { requestId.current += 1; };
+    // The starting baseline must not change when the user edits the form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  const loadPeriod = async (period: string) => {
+    const id = ++requestId.current;
+    const dirty = (['overtime_rate', 'late_early_penalty', 'absence_penalty_rate', 'description'] as const)
+      .some(key => policyData[key] !== baseline.current[key]);
+    onChangePolicyData(current => ({ ...current, effective_period: period }));
+    setProposal(null); setError('');
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) { setLoading(false); setError('Vui lòng chọn kỳ hiệu lực hợp lệ.'); return; }
+    setLoading(true);
+    try {
+      const policy = await fetchBonusPenaltyApi(period);
+      if (id !== requestId.current) return;
+      if (!policy || policy.absence_penalty_rate == null) throw new Error('Không có chính sách được xác minh cho kỳ này.');
+      const next: PolicyFormData = { effective_period: period, overtime_rate: Number(policy.overtime_rate), late_early_penalty: Number(policy.late_early_penalty), absence_penalty_rate: Number(policy.absence_penalty_rate), description: policy.description || '' };
+      if (![next.overtime_rate, next.late_early_penalty, next.absence_penalty_rate].every(rate => Number.isFinite(rate) && rate >= 0 && rate <= 50)) throw new Error('Hệ số không hợp lệ');
+      if (dirty) setProposal(next);
+      else { baseline.current = next; onChangePolicyData(next); }
+    } catch {
+      if (id === requestId.current) setError('Không tải được chính sách của kỳ đã chọn. Vui lòng thử lại.');
+    } finally { if (id === requestId.current) setLoading(false); }
+  };
+
+  const choosePolicy = (useNew: boolean) => {
+    if (!proposal) return;
+    baseline.current = proposal;
+    if (useNew) onChangePolicyData(proposal);
+    setProposal(null);
+  };
+  const blocked = loading || Boolean(error) || Boolean(proposal);
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Thay đổi quy định Thưởng / Phạt"
-      subtitle="Thiết lập hệ số tăng ca (OT) và định mức vi phạm đi trễ / về sớm (Quyền hạn: Admin)"
+      subtitle="Thiết lập hệ số tăng ca (OT), phạt trễ/sớm và phạt vắng theo lương giờ (Quyền hạn: Admin)"
     >
-      <form onSubmit={onSavePolicy} className="space-y-4">
-        <div>
-          <label className="block text-xs mb-1" htmlFor="absence-penalty-rate">Phạt vắng ca (% tiền công của ca)</label>
-          <input id="absence-penalty-rate" type="number" min="0" max="100" step="0.01" required value={Number((policyData.absence_penalty_rate * 100).toFixed(2))}
-            onChange={e => onChangePolicyData(p => ({ ...p, absence_penalty_rate: Number(e.target.value) / 100 }))}
-            className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2" />
-          <p className="text-xs text-slate-500 mt-1">Mặc định 25% × số giờ ca × lương giờ. Manager duyệt từng ngày trước khi trừ lương.</p>
+      <form onSubmit={e => { if (blocked) { e.preventDefault(); return; } onSavePolicy(e); }} className="space-y-4">
+        <label className="sf-field">Áp dụng từ kỳ lương
+          <input className="sf-input" type="month" min={nextPayrollPolicyPeriod()} required value={policyData.effective_period}
+            onChange={e => void loadPeriod(e.target.value)}/>
+        </label>
+        <p className="text-xs text-slate-500">Lưu thành phiên bản mới từ tháng đã chọn. Các kỳ trước giữ chính sách đã áp dụng; mỗi tháng chỉ có một phiên bản.</p>
+        {loading && <p role="status" className="text-sm text-slate-600 dark:text-slate-300">Đang tải chính sách của kỳ đã chọn…</p>}
+        {error && <div role="alert" className="text-sm text-rose-700 dark:text-rose-300"><p>{error}</p><button type="button" className="underline" onClick={() => void loadPeriod(policyData.effective_period)}>Thử lại</button></div>}
+        {proposal && <div role="status" className="rounded-lg border border-amber-300 p-3 text-sm text-amber-900 dark:text-amber-200">
+          <p>Bạn đã sửa giá trị. Dùng chính sách của kỳ mới hay giữ giá trị đang nhập?</p>
+          <p className="mt-1">Chính sách kỳ mới: OT {proposal.overtime_rate}× · Trễ/sớm {proposal.late_early_penalty}× · Vắng {proposal.absence_penalty_rate}×.</p>
+          {proposal.description && <p className="mt-1 break-words">Ghi chú: {proposal.description}</p>}
+          <div className="mt-2 flex flex-wrap gap-3"><button type="button" className="underline" onClick={() => choosePolicy(true)}>Dùng chính sách kỳ mới</button><button type="button" className="underline" onClick={() => choosePolicy(false)}>Giữ giá trị đang nhập</button></div>
+        </div>}
+        <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-xl border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-300">
+          💡 Công thức tính thống nhất: <strong>Số tiền = Số giờ × Hệ số × Lương theo giờ</strong>
         </div>
+
+        <fieldset disabled={blocked} className="space-y-4 disabled:opacity-60">
         <div>
           <label className="block text-xs text-slate-700 dark:text-slate-400 font-medium mb-1">
-            Mức thưởng OT
+            Hệ số thưởng làm thêm giờ (OT)
           </label>
           <input
             type="number"
             min={0}
-            step="any"
+            max={50}
+            step="0.0001"
             value={policyData.overtime_rate}
             onChange={(e) =>
               onChangePolicyData((p) => ({
@@ -57,19 +113,21 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
               }))
             }
             className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
+            placeholder="Ví dụ: 2.0 (200% lương giờ)"
             required
           />
-          <label className="sf-field mt-2">Đơn vị thưởng OT<select className="sf-input" value={policyData.overtime_rate_kind} onChange={e => onChangePolicyData(p => ({ ...p, overtime_rate_kind: e.target.value as RateKind }))}><option value="FIXED_PER_HOUR">Số tiền cố định (₫/h)</option><option value="HOURLY_MULTIPLIER">Hệ số nhân lương giờ (x)</option></select></label>
+          <p className="text-[11px] text-slate-500 mt-1">Mặc định: <strong>2.0x</strong> lương theo giờ.</p>
         </div>
 
         <div>
           <label className="block text-xs text-slate-700 dark:text-slate-400 font-medium mb-1">
-            Mức phạt đi trễ / về sớm
+            Hệ số phạt đi trễ / về sớm
           </label>
           <input
             type="number"
             min={0}
-            step="any"
+            max={50}
+            step="0.0001"
             value={policyData.late_early_penalty}
             onChange={(e) =>
               onChangePolicyData((p) => ({
@@ -78,10 +136,33 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
               }))
             }
             className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
-            placeholder="Ví dụ: 50000 (50.000 ₫/h)"
+            placeholder="Ví dụ: 1.5 (150% lương giờ)"
             required
           />
-          <label className="sf-field mt-2">Đơn vị phạt trễ / sớm<select className="sf-input" value={policyData.late_early_penalty_kind} onChange={e => onChangePolicyData(p => ({ ...p, late_early_penalty_kind: e.target.value as RateKind }))}><option value="FIXED_PER_HOUR">Số tiền cố định (₫/h)</option><option value="HOURLY_MULTIPLIER">Hệ số nhân lương giờ (x)</option></select></label>
+          <p className="text-[11px] text-slate-500 mt-1">Mặc định: <strong>1.5x</strong> lương theo giờ.</p>
+        </div>
+
+        <div>
+          <label className="block text-xs text-slate-700 dark:text-slate-400 font-medium mb-1">
+            Hệ số phạt nghỉ làm không lý do (Vắng ca)
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={50}
+            step="0.0001"
+            value={policyData.absence_penalty_rate}
+            onChange={(e) =>
+              onChangePolicyData((p) => ({
+                ...p,
+                absence_penalty_rate: parseFloat(e.target.value) || 0,
+              }))
+            }
+            className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
+            placeholder="Ví dụ: 2.0 (200% lương giờ ca vắng)"
+            required
+          />
+          <p className="text-[11px] text-slate-500 mt-1">Mặc định: <strong>2.0x</strong> lương giờ của ca vi phạm.</p>
         </div>
 
         <div>
@@ -102,6 +183,7 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
           />
         </div>
 
+        </fieldset>
         <div className="pt-2 flex justify-end gap-2">
           <button
             type="button"
@@ -112,9 +194,10 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
           </button>
           <button
             type="submit"
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 cursor-pointer"
+            disabled={blocked}
+            className="px-4 py-2 rounded-xl text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md shadow-blue-500/20 cursor-pointer"
           >
-            Lưu thay đổi quy định
+            Lưu quy định
           </button>
         </div>
       </form>

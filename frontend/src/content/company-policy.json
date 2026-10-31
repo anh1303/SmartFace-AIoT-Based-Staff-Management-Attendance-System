@@ -322,11 +322,11 @@
         },
         {
           "type": "paragraph",
-          "text": "Mức đề xuất mặc định bằng 25% tiền công của ca vắng, tính theo độ dài ca chính xác và lương giờ của nhân viên. Quản trị viên có thể điều chỉnh tỷ lệ theo chính sách áp dụng."
+          "text": "Mức đề xuất mặc định bằng 2 lần tiền công của ca vắng, tính theo độ dài ca chính xác và lương giờ của nhân viên. Hệ số thực tế theo chính sách có hiệu lực của kỳ lương."
         },
         {
           "type": "paragraph",
-          "text": "Ví dụ ca 8 giờ, lương 100.000₫/giờ: khoản phạt vắng đề xuất là 200.000₫. Khoản này vẫn phải được duyệt riêng; chưa duyệt hoặc không duyệt thì chưa khấu trừ."
+          "text": "Ví dụ ca 8 giờ, lương 100.000₫/giờ, hệ số mặc định 2 lần: khoản phạt vắng đề xuất là 1.600.000₫. Khoản này vẫn phải được duyệt riêng; chưa duyệt hoặc không duyệt thì chưa khấu trừ."
         },
         {
           "type": "paragraph",
@@ -351,15 +351,15 @@
             ],
             [
               "Tăng ca đã duyệt",
-              "100.000₫ cho mỗi giờ; không nhân thêm lương giờ thường."
+              "Mặc định 2 lần lương giờ cho mỗi giờ tăng ca được duyệt."
             ],
             [
               "Phạt trễ/sớm đã duyệt",
-              "50.000₫ cho mỗi giờ được duyệt."
+              "Mặc định 1,5 lần lương giờ cho mỗi giờ trễ/sớm được duyệt."
             ],
             [
               "Phạt vắng đã duyệt",
-              "Mặc định 25% tiền công ca vắng."
+              "Mặc định 2 lần tiền công ca vắng."
             ],
             [
               "Phụ cấp trên phiếu mới",
@@ -377,7 +377,7 @@
         },
         {
           "type": "paragraph",
-          "text": "Tiền lương bằng tiền công thường cộng tiền tăng ca đã duyệt, trừ phạt trễ/sớm và phạt vắng đã duyệt, rồi cộng phụ cấp. Kết quả được làm tròn đến đồng và không nhỏ hơn 0."
+          "text": "Tiền lương bằng tiền công thường cộng tiền tăng ca đã duyệt, trừ phạt trễ/sớm và phạt vắng đã duyệt, rồi cộng phụ cấp. Tiền OT và phạt trễ/sớm bằng số giờ được duyệt nhân lương giờ và hệ số áp dụng của kỳ. Kết quả được làm tròn đến đồng và không nhỏ hơn 0."
         },
         {
           "type": "paragraph",
@@ -395,12 +395,12 @@
               "900.000₫"
             ],
             [
-              "2 giờ tăng ca đã duyệt × 100.000₫",
-              "+200.000₫"
+              "2 giờ tăng ca đã duyệt × 100.000₫ × 2",
+              "+400.000₫"
             ],
             [
-              "1 giờ trễ/sớm đã duyệt × 50.000₫",
-              "−50.000₫"
+              "1 giờ trễ/sớm đã duyệt × 100.000₫ × 1,5",
+              "−150.000₫"
             ],
             [
               "Phụ cấp",
@@ -408,17 +408,17 @@
             ],
             [
               "Thành tiền",
-              "2.550.000₫"
+              "2.650.000₫"
             ]
           ]
         },
         {
           "type": "paragraph",
-          "text": "Nếu 2 giờ tăng ca còn chờ duyệt, chưa cộng 200.000₫ và kỳ chưa được chốt. Nếu có thêm khoản vắng ca 200.000₫ đã duyệt, khấu trừ riêng khoản này."
+          "text": "Ví dụ dùng hệ số mặc định; chính sách thực tế phụ thuộc kỳ lương. Nếu 2 giờ tăng ca còn chờ duyệt, chưa cộng 400.000₫ và kỳ chưa được chốt. Nếu có thêm một ca vắng 8 giờ đã duyệt với lương 100.000₫/giờ và hệ số 2, khấu trừ riêng 1.600.000₫."
         },
         {
           "type": "paragraph",
-          "text": "Phiếu lịch sử áp dụng đơn giá đã được lưu trên chính phiếu đó. Thay đổi chính sách mới không tự đổi đơn giá của phiếu cũ. Một số phiếu lịch sử có thể dùng hệ số lương thay cho mức tiền cố định."
+          "text": "Phiếu lịch sử áp dụng đơn giá đã được xác minh và lưu trên chính phiếu đó. Thay đổi chính sách mới không tự đổi đơn giá của phiếu cũ; phiếu chưa xác minh được đơn vị đơn giá cần đối soát trước khi xử lý tiếp."
         },
         {
           "type": "paragraph",
@@ -426,7 +426,7 @@
         },
         {
           "type": "paragraph",
-          "text": "Đơn giá ghi rõ tiền/giờ hoặc hệ số nhân lương giờ trên snapshot phiếu. Sửa phụ cấp không đóng băng công thường. Công chỉnh tay có nguồn thay đổi cần đối chiếu trước khi chốt. Giao diện dùng kết quả backend; chưa có phiếu đúng kỳ thì hiển thị chưa có kết quả."
+          "text": "Phiếu lương mới lưu hệ số áp dụng; phiếu lịch sử cần được đối soát đơn vị khi chưa xác minh. Sửa phụ cấp không đóng băng công thường. Công chỉnh tay có nguồn thay đổi cần đối chiếu trước khi chốt. Giao diện dùng kết quả backend; chưa có phiếu đúng kỳ thì hiển thị chưa có kết quả."
         }
       ]
     },

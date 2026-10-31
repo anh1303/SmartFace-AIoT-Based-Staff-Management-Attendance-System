@@ -98,7 +98,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
 
   const handleOpenEditModal = (item: AttendancePairItem) => {
     // Cho phép mở modal nếu nhân viên có chấm công, hoặc là ngày OFF (quản lý xử lý OT ngày OFF), hoặc đã có OT
-    if (!item.hasCheckedIn && !item.hasCheckedOut && !item.isOffDay && item.currentOTSec === 0) {
+    if (!item.hasCheckedIn && !item.hasCheckedOut && !item.rawEvents.length && !item.isOffDay && item.currentOTSec === 0) {
       showToast('Không có dữ liệu ca hoặc chấm công để điều chỉnh', 'warning');
       return;
     }

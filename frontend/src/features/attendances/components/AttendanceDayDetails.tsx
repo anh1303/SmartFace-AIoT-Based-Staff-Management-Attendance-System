@@ -14,18 +14,18 @@ export function AttendanceLogFilterSelect({ value, onChange }: { value: Attendan
     </select>
   </label>;
 }
-const reasons: Record<string, string> = { REPLACED_CHECK_IN: 'Lượt vào bị thay bởi lượt vào sau', UNPAIRED_CHECK_OUT: 'Lượt ra chưa có cặp vào', INVALID_PAIR: 'Cặp không hợp lệ', INTERRUPTED_PAIR: 'Cặp bị gián đoạn' };
-const creditReasons: Record<string, string> = { UNDER_TWO_THIRDS_SHIFT:'Chưa đạt ngưỡng 2/3 ca', TWO_THIRDS_SHIFT_NOT_YET_REACHED:'Chưa đạt ngưỡng 2/3 ca tại lượt này', OFF:'Ngày OFF, không tự ghi công', NO_SHIFT:'Chưa phân ca', UNDER_HALF_SHIFT:'Chưa đạt nửa ca', HALF_SHIFT_NOT_YET_REACHED:'Chưa đạt nửa ca tại lượt này', FULL_SHIFT_ALREADY_CREDITED:'Công cả ca đã ghi ở checkout trước' };
 export function AttendanceDayDetails({ item, filter, showFilter = true }: { item: AttendancePairItem; filter?: AttendanceLogFilter; showFilter?: boolean }) {
   const [localFilter, setLocalFilter] = useState<AttendanceLogFilter>('ALL');
   const mode = filter ?? localFilter;
   const intervals = mode === 'COUNTED' ? item.validIntervals.filter(p => p.counted) : item.validIntervals;
   const visibleIds = new Set(intervals.flatMap(p => [p.inId, p.outId]));
   const events = mode === 'ALL' ? item.rawEvents : item.rawEvents.filter(ev => visibleIds.has(ev.id));
+  const reason = (code: string) => item.reasonLabels?.[code] || 'Dữ liệu chấm công cần xác minh';
+  const reviewText = item.reviewReason?.split(',').filter(Boolean).map(reason).join('; ');
   return <div className="space-y-4 text-slate-800 dark:text-slate-100 text-sm">
     {showFilter && <AttendanceLogFilterSelect value={localFilter} onChange={setLocalFilter} />}
     <p className="text-xs text-slate-500">Công ngày đã ghi: {item.workingHours}h. Công cả ca được ghi một lần tại checkout đầu tiên đạt ngưỡng ghi công của ngày; OT đề xuất cần duyệt riêng.</p>
-    {item.needsReview && <p className="text-amber-600">Cần xác minh: {item.reviewReason || 'Dữ liệu chấm công chưa đầy đủ'}</p>}
+    {item.needsReview && <p className="text-amber-600">Cần xác minh: {reviewText || 'Dữ liệu chấm công chưa đầy đủ'}</p>}
     {item.hasPairData === false && <p role="status" className="text-amber-600">Chưa có kết quả ghép cặp từ bản tổng hợp. Các lượt bên dưới vẫn được giữ; cần tải lại hoặc tính lại công.</p>}
     <div>
       <h4 className="font-semibold mb-2">Các cặp vào → ra ({intervals.length})</h4>
@@ -42,13 +42,13 @@ export function AttendanceDayDetails({ item, filter, showFilter = true }: { item
           <td className="p-2 font-mono whitespace-nowrap">{ev.timestamp ? formatVNDateISO(ev.timestamp) : ''} {ev.time}</td>
           <td className="p-2"><AttendanceEventBadge type={ev.type}/></td>
           <td className="p-2">{ev.methodLabel} · {ev.device_id}</td>
-          <td className="p-2">{ev.rawStatus || '—'} · {matched ? 'Đã ghép cặp' : ev.pairingReason ? reasons[ev.pairingReason] || ev.pairingReason : item.hasPairData === false ? 'Chờ kết quả tổng hợp' : 'Chưa ghép cặp'}</td>
+          <td className="p-2">{ev.rawStatus || '—'} · {matched ? 'Đã ghép cặp' : ev.pairingReason ? reason(ev.pairingReason) : item.hasPairData === false ? 'Chờ kết quả tổng hợp' : 'Chưa ghép cặp'}</td>
           <td className="p-2">{pair ? <div className="space-y-1">
             <div className="font-mono">Thời lượng cặp: {pair.durationStr}</div>
             {typeof pair.creditedRegularSeconds === 'number' ? <>
               <div className="font-mono">{formatSecondsToHHMMSS(pair.regularSeconds || 0)} trong ca · {formatSecondsToHHMMSS(pair.overtimeSeconds || 0)} OT đề xuất</div>
               <div className="font-semibold">Công ghi nhận: +{formatSecondsToHHMMSS(pair.creditedRegularSeconds)}</div>
-              {pair.creditReason && creditReasons[pair.creditReason] && <div className="text-slate-500">{creditReasons[pair.creditReason]}</div>}
+              {pair.creditReason && <div className="text-slate-500">{reason(pair.creditReason)}</div>}
             </> : <div className="text-amber-600">Bản tổng hợp cũ chưa có chi tiết công tại checkout; công ngày đã ghi {item.workingHours}h.</div>}
           </div> : ev.type === 'CHECK_OUT' ? 'Chưa có cặp hợp lệ để ghi công' : '—'}</td>
         </tr>;

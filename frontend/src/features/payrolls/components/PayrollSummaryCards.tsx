@@ -24,11 +24,11 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-      {/* Card 1: Mức thưởng tăng ca */}
+      {/* Card 1: Hệ số thưởng tăng ca */}
       <div className="p-4 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors flex flex-col justify-between group relative shadow-xs">
         <div className="flex items-center justify-between">
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
-            Mức thưởng tăng ca
+            Hệ số thưởng OT
           </span>
           <div className="flex items-center gap-1.5">
             {isAdmin ? (
@@ -52,15 +52,16 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
           </div>
         </div>
         <div className="pt-2 text-xl sm:text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">
-          {bonusPenalty ? formatPayrollRateLabel(Number(bonusPenalty.overtime_rate), undefined, bonusPenalty.overtime_rate_kind) : 'Chưa có cấu hình'}
+          {bonusPenalty ? formatPayrollRateLabel(Number(bonusPenalty.overtime_rate)) : 'Chưa có cấu hình'}
         </div>
+        {bonusPenalty?.effective_period && <p className="sf-secondary">Áp dụng từ {bonusPenalty.effective_period}</p>}
       </div>
 
-      {/* Card 2: Mức phạt đi trễ / về sớm */}
+      {/* Card 2: Hệ số phạt đi trễ / về sớm */}
       <div className="p-4 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors flex flex-col justify-between group relative shadow-xs">
         <div className="flex items-center justify-between">
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">
-            Mức phạt đi trễ / về sớm
+            Hệ số phạt trễ / sớm
           </span>
           <div className="flex items-center gap-1.5">
             {isAdmin ? (
@@ -84,7 +85,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
           </div>
         </div>
         <div className="pt-2 text-xl sm:text-2xl font-bold font-mono text-rose-600 dark:text-rose-400">
-          {bonusPenalty ? formatPayrollRateLabel(Number(bonusPenalty.late_early_penalty), undefined, bonusPenalty.late_early_penalty_kind) : 'Chưa có cấu hình'}
+          {bonusPenalty ? formatPayrollRateLabel(Number(bonusPenalty.late_early_penalty)) : 'Chưa có cấu hình'}
         </div>
       </div>
 

@@ -25,7 +25,7 @@ const events = [
   {id:'2',type:'CHECK_OUT',time:'06:00:00',timestamp:'2026-10-01T06:00:00+07:00',rawStatus:'VALID'},
   {id:'3',type:'CHECK_OUT',time:'07:00:00',timestamp:'2026-10-01T07:00:00+07:00',rawStatus:'VALID',pairingReason:'UNPAIRED_CHECK_OUT'},
 ];
-const item = { workingHours:8,needsReview:false,rawEvents:events,validIntervals:[{inId:'1',outId:'2',counted:true,inTime:'22:00:00',outTime:'06:00:00',durationStr:'08:00:00',regularSeconds:28800,overtimeSeconds:0,creditedRegularSeconds:28800,creditReason:'HALF_SHIFT_REACHED'}] } as AttendancePairItem;
+const item = { workingHours:8,needsReview:false,rawEvents:events,reasonLabels:{OFF:'Ngày OFF, không tự ghi công'},validIntervals:[{inId:'1',outId:'2',counted:true,inTime:'22:00:00',outTime:'06:00:00',durationStr:'08:00:00',regularSeconds:28800,overtimeSeconds:0,creditedRegularSeconds:28800,creditReason:'HALF_SHIFT_REACHED'}] } as AttendancePairItem;
 describe('Attendance details and per-item review', () => {
   it('filters loose scans while retaining both ends of counted overnight pairs and checkout hours', async () => {
     await mount(<AttendanceDayDetails item={item}/>);

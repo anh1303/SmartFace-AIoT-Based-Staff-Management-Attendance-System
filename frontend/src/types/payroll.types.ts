@@ -1,5 +1,4 @@
 export type PayrollStatus = 'PENDING' | 'CONFIRMED' | 'FINALIZED' | 'PAID';
-export type RateKind = 'FIXED_PER_HOUR' | 'HOURLY_MULTIPLIER';
 
 export interface PayrollBreakdown {
   base_salary: number;
@@ -12,10 +11,9 @@ export interface PayrollBreakdown {
 
 export interface BonusPenaltyPolicy {
   id?: number;
+  effective_period?: string | null;
   overtime_rate: number;
-  overtime_rate_kind: RateKind;
   late_early_penalty: number;
-  late_early_penalty_kind: RateKind;
   absence_penalty_rate?: number;
   description?: string;
 }
@@ -39,9 +37,7 @@ export interface PayrollRecord {
   status: PayrollStatus;
   reason?: string;
   overtime_rate?: number | null;
-  overtime_rate_kind?: RateKind | null;
   late_penalty_rate?: number | null;
-  late_penalty_rate_kind?: RateKind | null;
   late_early_penalty?: number | null;
   breakdown?: PayrollBreakdown | null;
   needs_recalculation?: boolean;

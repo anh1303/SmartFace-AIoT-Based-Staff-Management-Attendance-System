@@ -164,6 +164,10 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
 
             const rowKey = `${employee.employee_id}-${item.date}-${shift.name}`;
             const isExpanded = Boolean(expandedRows[rowKey]);
+            const eventTypes = new Set(item.rawEvents.map(event => event.type));
+            const missingCode = item.validIntervals.length === 0 && eventTypes.size === 1
+              ? eventTypes.has('CHECK_IN') ? 'MISSING_CHECK_OUT' : eventTypes.has('CHECK_OUT') ? 'UNPAIRED_CHECK_OUT' : null
+              : null;
 
             return (
               <React.Fragment key={rowKey}>
@@ -193,6 +197,10 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                         <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate" title={employee.employee_id}>
                           {employee.employee_id}
                         </p>
+                        {missingCode && <p className="text-[10px] text-amber-700 dark:text-amber-400">{item.reasonLabels?.[missingCode] || 'Chấm công chưa đầy đủ'}</p>}
+                        {!missingCode && item.needsReview && item.reviewReason?.split(',').filter(code => code === 'MISSING_CHECK_OUT' || code === 'UNPAIRED_CHECK_OUT').map(code => (
+                          <p key={code} className="text-[10px] text-amber-700 dark:text-amber-400">{item.reasonLabels?.[code] || 'Chấm công chưa đầy đủ'}</p>
+                        ))}
                         {item.rawEvents && item.rawEvents.length > 0 && (
                           <button
                             type="button"

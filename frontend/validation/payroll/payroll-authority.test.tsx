@@ -74,12 +74,10 @@ describe('Payroll source of truth', () => {
     expect(html).not.toContain('720.000');
     expect(html).toContain('0 ₫');
   });
-  it('labels explicit fixed rates and zero without guessing multiplier units', () => {
-    const html = renderToStaticMarkup(<PayrollSummaryCards bonusPenalty={{ overtime_rate: 5, overtime_rate_kind: 'FIXED_PER_HOUR', late_early_penalty: 0, late_early_penalty_kind: 'FIXED_PER_HOUR' }} allPeriodRecords={[]} totalExpense={0} isFinalized={false} onOpenPolicyModal={() => {}} />);
-    expect(html).toContain('5 ₫/h');
-    expect(html).toContain('0 ₫/h');
-    expect(html).not.toContain('5x');
-    expect(html).not.toContain('50.000');
+  it('labels multiplier rates without guessing fixed units', () => {
+    const html = renderToStaticMarkup(<PayrollSummaryCards bonusPenalty={{ overtime_rate: 2.0, late_early_penalty: 1.5 }} allPeriodRecords={[]} totalExpense={0} isFinalized={false} onOpenPolicyModal={() => {}} />);
+    expect(html).toContain('2x');
+    expect(html).toContain('1.5x');
   });
   it('does not offer global attendance lock controls to managers', () => {
     const html = renderToStaticMarkup(<AttendanceHeader startDate="2026-10-29" endDate="2026-10-29" isCurrentDateLocked={false} onToggleLock={() => {}} onExportCSV={() => {}} />);

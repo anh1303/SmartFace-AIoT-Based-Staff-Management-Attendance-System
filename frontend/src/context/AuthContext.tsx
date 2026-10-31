@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Clear any prior user's cached queries and notifications before setting up new session
       queryClient.clear();
-      notifications?.clearAll();
+      notifications?.clearAll(true);
 
       const { session, targetRole } = await loginApi(identifier, password, rememberMe);
       setCurrentUser(session);
@@ -117,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryClient.clear();
 
     // 2. Wipe all notifications completely (no old notifications retained on logout)
-    notifications?.clearAll();
+    notifications?.clearAll(true);
     try {
       sessionStorage.removeItem('smartface_notifications_cache');
       localStorage.removeItem('smartface_notifications_cache');
@@ -146,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Reset notifications when switching roles in DEV
-    notifications?.clearAll();
+    notifications?.clearAll(true);
 
     if (newRole === 'admin') {
       setCurrentUser(DEFAULT_USERS.admin);

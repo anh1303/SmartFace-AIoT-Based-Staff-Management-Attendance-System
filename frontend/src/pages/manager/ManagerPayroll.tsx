@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionUtils';
 import { PayrollRecord } from '../../types';
 import { logger } from '../../utils/logger';
+import { nextPayrollPolicyPeriod } from '../../utils/payrollUtils';
 import { buildPayrollItemUpdates } from '../../features/payrolls/components/PayrollItemEditModal';
 import { useDepartmentPositions } from '@/features/employees';
 import {
@@ -20,7 +21,7 @@ import {
   PayrollUnlockModal,
   EarlySettlementModal,
 } from '@/features/payrolls';
-import { earlySettlementPayrollApi } from '../../api/payrollApi';
+import { earlySettlementPayrollApi, fetchBonusPenaltyApi } from '../../api/payrollApi';
 
 const payrollLogger = logger.child('ManagerPayroll');
 
@@ -79,28 +80,33 @@ export const ManagerPayroll: React.FC = () => {
   // Modal state for Bonus Penalty Policy
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [policyData, setPolicyData] = useState<PolicyFormData>({
-    overtime_rate: 100000,
-    overtime_rate_kind: 'FIXED_PER_HOUR',
-    late_early_penalty: 50000,
-    late_early_penalty_kind: 'FIXED_PER_HOUR',
-    absence_penalty_rate: 0.25,
+    overtime_rate: 2.0,
+    late_early_penalty: 1.5,
+    absence_penalty_rate: 2.0,
+    effective_period: nextPayrollPolicyPeriod(),
     description: '',
   });
 
-  const handleOpenPolicyModal = () => {
+  const handleOpenPolicyModal = async () => {
     if (role !== 'admin') {
       showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error');
       return;
     }
-    setPolicyData({
-      overtime_rate: bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000,
-      overtime_rate_kind: bonusPenalty?.overtime_rate_kind ?? 'FIXED_PER_HOUR',
-      late_early_penalty: bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000,
-      late_early_penalty_kind: bonusPenalty?.late_early_penalty_kind ?? 'FIXED_PER_HOUR',
-      absence_penalty_rate: bonusPenalty?.absence_penalty_rate ?? 0.25,
-      description: bonusPenalty?.description || '',
-    });
-    setIsPolicyModalOpen(true);
+    try {
+      const effectivePeriod = nextPayrollPolicyPeriod();
+      const base = await fetchBonusPenaltyApi(effectivePeriod);
+      if (!base) throw new Error('Chưa xác định chính sách cho kỳ hiệu lực');
+      setPolicyData({
+        overtime_rate: Number(base.overtime_rate),
+        late_early_penalty: Number(base.late_early_penalty),
+        absence_penalty_rate: Number(base.absence_penalty_rate),
+        description: base.description || '',
+        effective_period: effectivePeriod,
+      });
+      setIsPolicyModalOpen(true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không tải được chính sách', 'error');
+    }
   };
 
   const handleSavePolicy = async (e: React.FormEvent) => {
@@ -195,8 +201,8 @@ export const ManagerPayroll: React.FC = () => {
     return true;
   });
 
-  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000;
-  const lateRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
+  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 2;
+  const lateRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 1.5;
 
   const handleOpenEdit = (record: PayrollRecord) => {
     if (record.status !== 'PENDING') {
@@ -225,10 +231,6 @@ export const ManagerPayroll: React.FC = () => {
     setEditingItem({
       record,
       empName: emp?.full_name || record.employee_name || record.employee_id,
-      hourly_rate: record.hourly_rate ?? 0,
-      working_hours: record.total_working_hours ?? record.working_hours ?? 0,
-      total_overtime: record.total_overtime ?? 0,
-      total_late_early: record.total_late_early ?? 0,
       allowance: record.allowance ?? 0,
       reason: '',
     });

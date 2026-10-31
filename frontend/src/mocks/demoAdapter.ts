@@ -4,6 +4,7 @@ import type { Employee, WorkShift, AttendanceRecord, PayrollRecord } from '../ty
 import type { AttendanceAdjustment } from '../features/payrolls/components/AdjustmentReviewPanel';
 import type { Device, DeviceMode } from '../features/devices/deviceApi';
 import { calcPayrollAmount } from '../utils/payrollUtils';
+import { nextPayrollPolicyPeriod } from '../utils/payrollUtils';
 const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
 const period = today.slice(0, 7);
 const now = () => new Date().toISOString();
@@ -13,8 +14,17 @@ const dates = Array.from({ length: 7 }, (_, i) => { const d = new Date(`${today}
 let shifts: WorkShift[] = demoEmployees.flatMap(e => dates.map(date => ({ shift_id: `${e.employee_id}-${date}`, employee_id: e.employee_id, date, start_time: '08:00', end_time: '17:00', shift_type: 'OFFICE_HOURS', department: e.department, note: '' })));
 let attendance: AttendanceRecord[] = demoEmployees.flatMap((e, index) => dates.flatMap((date, i) => { if (i === 2 && index === 2)
     return []; return (['CHECK_IN', 'CHECK_OUT'] as const).map((type, j) => ({ attendance_id: `${e.employee_id}-${date}-${j}`, id: `${e.employee_id}-${date}-${j}`, employee_id: e.employee_id, employee_name: e.full_name, type, timestamp: stamp(date, j === 0 ? (index === 1 ? '08:30' : '08:00') : (index === 0 ? '18:00' : '17:00')), method: 'FACE' as const, device_id: 'demo-device-1', verification_score: .94, status: 'VALID' as const, punctuality: index === 1 && j === 0 ? 'LATE' as const : 'ON_TIME' as const })); })).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-let adjustments: AttendanceAdjustment[] = [['NV001', 'OVERTIME', 1, 100000, 'PENDING', 0], ['NV002', 'LATE_EARLY', .5, 25000, 'PENDING', 0], ['NV003', 'ABSENCE', 9, 112500, 'PENDING', 2], ['NV001', 'OVERTIME', 1, 100000, 'APPROVED', 1], ['NV002', 'LATE_EARLY', .5, 25000, 'REJECTED', 1]].map(([employee, kind, hours, amount, status, offset], i) => ({ id: `demo-adjustment-${i + 1}`, employee_id: String(employee), employee_name: demoEmployees.find(e => e.employee_id === employee)!.full_name, date: dates[Number(offset)], kind: kind as AttendanceAdjustment['kind'], hours: Number(hours), amount: Number(amount), status: status as AttendanceAdjustment['status'], note: i === 3 ? 'Đã đối chiếu nhật ký vào/ra' : null, reviewed_by: i >= 3 ? 'Quản trị minh họa' : null, reviewed_at: i >= 3 ? now() : null, updated_at: now(), can_review: true, locked: false }));
-let policy = { overtime_rate: 100000, late_early_penalty: 50000, absence_penalty_rate: .25, description: 'Chính sách minh họa' };
+let adjustments: AttendanceAdjustment[] = [['NV001', 'OVERTIME', 1, 100000, 'PENDING', 0], ['NV002', 'LATE_EARLY', .5, 37500, 'PENDING', 0], ['NV003', 'ABSENCE', 9, 900000, 'PENDING', 2], ['NV001', 'OVERTIME', 1, 100000, 'APPROVED', 1], ['NV002', 'LATE_EARLY', .5, 37500, 'REJECTED', 1]].map(([employee, kind, hours, amount, status, offset], i) => ({ id: `demo-adjustment-${i + 1}`, employee_id: String(employee), employee_name: demoEmployees.find(e => e.employee_id === employee)!.full_name, date: dates[Number(offset)], kind: kind as AttendanceAdjustment['kind'], hours: Number(hours), amount: Number(amount), status: status as AttendanceAdjustment['status'], note: i === 3 ? 'Đã đối chiếu nhật ký vào/ra' : null, reviewed_by: i >= 3 ? 'Quản trị minh họa' : null, reviewed_at: i >= 3 ? now() : null, updated_at: now(), can_review: true, locked: false }));
+let policy = { overtime_rate: 2, late_early_penalty: 1.5, absence_penalty_rate: 2, description: 'Chính sách minh họa', effective_period: '2000-01' };
+const policies = [policy];
+function refreshPayrollAmounts(row: PayrollRecord) {
+    const base_salary = (row.total_working_hours ?? 0) * row.hourly_rate;
+    const overtime_pay = calcPayrollAmount(row.total_overtime, row.overtime_rate ?? 2, row.hourly_rate);
+    const late_early_deduction = calcPayrollAmount(row.total_late_early, row.late_penalty_rate ?? 1.5, row.hourly_rate);
+    const absence_deduction = row.total_absence_penalty ?? 0;
+    row.net_salary = Math.max(0, Math.round(base_salary + overtime_pay - late_early_deduction - absence_deduction + row.allowance));
+    row.breakdown = { base_salary, overtime_pay, late_early_deduction, absence_deduction, allowance: row.allowance, net_salary: row.net_salary };
+}
 let payroll: PayrollRecord[] = [];
 function recalculate(p: string) { for (const e of demoEmployees) {
     const logs = attendance.filter(a => a.employee_id === e.employee_id && a.timestamp.startsWith(p));
@@ -25,10 +35,13 @@ function recalculate(p: string) { for (const e of demoEmployees) {
     const absence = approved.filter(a => a.kind === 'ABSENCE').reduce((n, a) => n + (a.amount ?? 0), 0);
     const id = `${e.employee_id}-${p}`;
     const old = payroll.find(s => s.payroll_id === id);
+    if (old && old.status !== 'PENDING') continue;
+    const periodPolicy = policies.filter(policy => policy.effective_period <= p).at(-1)!;
     const allowance = old?.allowance ?? 300000;
     const rate = old?.hourly_rate ?? 50000;
     const hours = old?.total_working_hours ?? workDays * 9;
-    const next: PayrollRecord = { ...old, payroll_id: id, employee_id: e.employee_id, employee_name: e.full_name, department: e.department, period: p, hourly_rate: rate, total_working_hours: hours, total_overtime: ot, total_late_early: late, total_absence_penalty: absence, allowance, net_salary: Math.max(0, hours * rate + ot * 100000 - late * 50000 - absence + allowance), status: old?.status ?? 'PENDING', overtime_rate: 100000, late_penalty_rate: 50000 };
+    const next: PayrollRecord = { ...old, payroll_id: id, employee_id: e.employee_id, employee_name: e.full_name, department: e.department, period: p, hourly_rate: rate, total_working_hours: hours, total_overtime: ot, total_late_early: late, total_absence_penalty: absence, allowance, net_salary: 0, status: old?.status ?? 'PENDING', overtime_rate: old?.overtime_rate ?? periodPolicy.overtime_rate, late_penalty_rate: old?.late_penalty_rate ?? periodPolicy.late_early_penalty };
+    refreshPayrollAmounts(next);
     payroll = payroll.filter(s => s.payroll_id !== id).concat(next);
 } }
 recalculate(period);
@@ -36,8 +49,9 @@ for (const monthOffset of [1, 2]) {
     const date = new Date(`${period}-01T12:00:00+07:00`);
     date.setMonth(date.getMonth() - monthOffset);
     const p = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).slice(0, 7);
-    payroll.push(...demoEmployees.map(e => ({ payroll_id: `${e.employee_id}-${p}`, employee_id: e.employee_id, employee_name: e.full_name, department: e.department, period: p, hourly_rate: 50000, total_working_hours: 180, total_overtime: 2, total_late_early: 0, total_absence_penalty: 0, allowance: 300000, net_salary: 9500000, status: 'PAID' as const, overtime_rate: 100000, late_penalty_rate: 50000 })));
+    payroll.push(...demoEmployees.map(e => ({ payroll_id: `${e.employee_id}-${p}`, employee_id: e.employee_id, employee_name: e.full_name, department: e.department, period: p, hourly_rate: 50000, total_working_hours: 180, total_overtime: 2, total_late_early: 0, total_absence_penalty: 0, allowance: 300000, net_salary: 9500000, status: 'PAID' as const, overtime_rate: 2, late_penalty_rate: 1.5 })));
 }
+payroll.forEach(refreshPayrollAmounts);
 let devices: Device[] = ['Pi Sảnh A', 'Pi Cổng B', 'Pi Tầng 2', 'Pi Kho'].map((name, i) => ({ id: `demo-device-${i + 1}`, name, location: ['Sảnh tầng 1', 'Cổng phụ', 'Tầng 2', 'Khu kho'][i], ip: null, status: i < 2 ? 'ONLINE' : i === 2 ? 'OFFLINE' : 'MAINTENANCE', lastSeen: i < 2 ? now() : stamp(dates[1], '17:30'), createdAt: stamp(`${period}-01`, '08:00') }));
 const modes = new Map<string, DeviceMode>();
 devices.forEach(d => modes.set(d.id, { deviceId: d.id, mode: 'CHECK_IN', confirmed: true, lastUpdated: now() }));
@@ -109,11 +123,21 @@ export async function demoRequest<T>(endpoint: string, options: RequestInit = {}
         return ok(shifts.filter(s => scoped(s.employee_id) && filterDate(s.date) && (!url.searchParams.get('employeeId') || s.employee_id === url.searchParams.get('employeeId'))).map(s => { const events = attendance.filter(a => a.employee_id === s.employee_id && a.timestamp.startsWith(s.date)); const first = events.find(a => a.type === 'CHECK_IN'); const last = events.find(a => a.type === 'CHECK_OUT'); const ot = adjustments.filter(a => a.employee_id === s.employee_id && a.date === s.date && a.kind === 'OVERTIME'); const pairs = first && last ? [{ inId: first.id, outId: last.id, start: first.timestamp, end: last.timestamp, counted: true, regular_seconds: 9 * 3600, overtime_seconds: s.employee_id === 'NV001' ? 3600 : 0, credited_regular_seconds: 9 * 3600, credit_reason: 'HALF_SHIFT_REACHED' }] : []; return { id: s.shift_id, employee_id: s.employee_id, employee_uuid: demoEmployees.find(e => e.employee_id === s.employee_id)?.id, date: s.date, regular_hours: pairs.length ? 9 : 0, total_working_hours: pairs.length ? 9 : 0, raw_work_seconds: pairs.length ? 9 * 3600 : 0, late_early: s.employee_id === 'NV002' ? .5 : 0, overtime: ot.filter(a => a.status === 'APPROVED').reduce((n, a) => n + a.hours, 0), approved_overtime_hours: ot.filter(a => a.status === 'APPROVED').reduce((n, a) => n + a.hours, 0), proposed_overtime_hours: ot.reduce((n, a) => n + a.hours, 0), pending_overtime_hours: ot.filter(a => a.status === 'PENDING').reduce((n, a) => n + a.hours, 0), status: pairs.length ? 'PRESENT' : 'ABSENT', first_check_in: first?.timestamp || null, last_check_out: last?.timestamp || null, needs_review: !pairs.length, review_reason: null, policy_version: 'demo', is_legacy_no_policy: false, calculation_details: { pairs, events: events.map(a => ({ id: a.id, type: a.type, time: a.timestamp, status: a.status, method: a.method, device_info: a.device_id })) }, raw_events: events.map(a => ({ id: a.id, time: a.timestamp, type: a.type, method: a.method, device_id: a.device_id, status: a.status })), pairs: [] }; }));
     }
     if (path === '/api/payroll/bonus-penalty') {
-        if (method === 'GET')
-            return ok(policy);
+        if (method === 'GET') {
+            const selected = url.searchParams.get('period') ?? period;
+            return ok(policies.filter(item => item.effective_period <= selected).at(-1) ?? null);
+        }
         if (!isAdmin())
             return fail('Chỉ Admin được sửa chính sách');
-        policy = { ...policy, ...body };
+        const effective_period = body.effective_period ?? nextPayrollPolicyPeriod();
+        if (effective_period < nextPayrollPolicyPeriod() || policies.some(policy => policy.effective_period === effective_period)) return fail('Kỳ hiệu lực không hợp lệ hoặc đã có chính sách');
+        const base = policies.filter(item => item.effective_period <= effective_period).at(-1);
+        if (!base) return fail('Chưa xác định chính sách cho kỳ hiệu lực');
+        const next = { ...base, ...body, effective_period };
+        if (![next.overtime_rate, next.late_early_penalty, next.absence_penalty_rate].every(value => Number.isFinite(value) && value >= 0 && value <= 50)) return fail('Hệ số phải từ 0 đến 50');
+        policies.push(next);
+        policies.sort((a, b) => a.effective_period.localeCompare(b.effective_period));
+        policy = policies.at(-1)!;
         return ok(policy);
     }
     if (path === '/api/payroll' && method === 'GET')
@@ -161,7 +185,7 @@ export async function demoRequest<T>(endpoint: string, options: RequestInit = {}
         if (p.status !== 'PENDING')
             return fail('Phiếu đã khóa');
         Object.assign(p, body);
-        p.net_salary = Math.max(0, Number(p.total_working_hours ?? 0) * p.hourly_rate + calcPayrollAmount(p.total_overtime, p.overtime_rate ?? 100000, p.hourly_rate) - calcPayrollAmount(p.total_late_early, p.late_penalty_rate ?? 50000, p.hourly_rate) - (p.total_absence_penalty || 0) + p.allowance);
+        refreshPayrollAmounts(p);
         return ok(p);
     }
     if (path === '/api/devices') {

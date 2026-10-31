@@ -71,6 +71,7 @@ export interface AttendancePairItem {
   pendingOtHours: number;
   needsReview: boolean;
   reviewReason: string | null;
+  reasonLabels?: Record<string, string>;
   policyVersion: string | null;
   isLegacyNoPolicy: boolean;
   overtimeStatus: string;
@@ -435,6 +436,7 @@ export function useAttendancePairs(
         pendingOtHours,
         needsReview,
         reviewReason,
+        reasonLabels: summary?.reason_labels,
         policyVersion,
         isLegacyNoPolicy,
         overtimeStatus: (summary as any)?.overtime_status || 'NONE',

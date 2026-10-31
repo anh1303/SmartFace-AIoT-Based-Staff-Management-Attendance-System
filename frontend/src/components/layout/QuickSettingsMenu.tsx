@@ -17,7 +17,12 @@ import {
   RefreshCw,
   Play,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Unlink,
+  Search,
+  X,
+  Filter,
+  Users
 } from 'lucide-react';
 import { useDeviceSettings, BluetoothDevice } from '../../features/attendances/hooks/useDeviceSettings';
 
@@ -51,22 +56,58 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
     toggleMute,
     toggleFps,
     toggleStream,
+    setMaxFaces,
     testAudio,
     reconnectBluetooth,
     connectBluetooth,
+    disconnectBluetooth,
     scanBluetooth,
   } = useDeviceSettings(deviceId);
 
   const [isOpen, setIsOpen] = useState(false);
   const [isTestingSound, setIsTestingSound] = useState(false);
   const [isReconnectingBt, setIsReconnectingBt] = useState(false);
+  const [isDisconnectingBt, setIsDisconnectingBt] = useState(false);
   const [reconnectToast, setReconnectToast] = useState<string | null>(null);
 
-  // Trạng thái chọn đổi thiết bị Loa Bluetooth
+  // Trạng thái chọn đổi thiết bị Loa Bluetooth & Bộ lọc
   const [isBtPickerOpen, setIsBtPickerOpen] = useState(false);
   const [scannedBtDevices, setScannedBtDevices] = useState<BluetoothDevice[]>([]);
   const [isScanningBt, setIsScanningBt] = useState(false);
   const [connectingBtAddr, setConnectingBtAddr] = useState<string | null>(null);
+  const [btSearchText, setBtSearchText] = useState('');
+  const [btFilterCategory, setBtFilterCategory] = useState<'all' | 'audio' | 'paired'>('all');
+
+  // Nhận diện thiết bị âm thanh
+  const isAudioDevice = (name: string) => {
+    const n = (name || '').toLowerCase();
+    const audioKeywords = [
+      'audio', 'speaker', 'headset', 'headphone', 'airpod', 'earbud',
+      'tws', 'sound', 'hoco', 'jbl', 'sony', 'marshall', 'havit', 'x7',
+      'loa', 'mic', 'b3.0', 'pro', 'buds', 'wireless'
+    ];
+    if (audioKeywords.some((kw) => n.includes(kw))) return true;
+    if (/^u-acg[0-9a-f]{4}$/i.test(n) || n.startsWith('[tv]') || n.startsWith('ble_')) {
+      return false;
+    }
+    return false;
+  };
+
+  // Ngắt kết nối thiết bị Bluetooth
+  const handleDisconnectBluetooth = async (deviceAddr?: string) => {
+    setIsDisconnectingBt(true);
+    setReconnectToast(null);
+    const success = await disconnectBluetooth(deviceAddr);
+    setIsDisconnectingBt(false);
+    if (success) {
+      setReconnectToast('Đã ngắt kết nối loa Bluetooth.');
+    } else {
+      setReconnectToast('Không thể ngắt kết nối thiết bị.');
+    }
+    setTimeout(() => {
+      setReconnectToast(null);
+    }, 3000);
+  };
 
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -193,20 +234,26 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
             : 'bg-slate-100 hover:bg-slate-200/90 border-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:border-[#272d5a] dark:text-purple-300'
         }`}
       >
-        {/* Biểu tượng Wi-Fi động theo mức sóng */}
-        {settings.wifi.connected ? (
+        {/* Biểu tượng Wi-Fi động theo mức sóng & trạng thái Online của Pi */}
+        {settings.online && settings.wifi.connected ? (
           renderWifiSignalIcon(settings.wifi.signalStrength, 'w-3.5 h-3.5')
         ) : (
           <WifiOff className="w-3.5 h-3.5 text-rose-500" />
         )}
 
-        {/* Biểu tượng Âm lượng */}
-        <span className="flex items-center gap-1 text-xs font-semibold">
-          {renderVolumeIcon('w-3.5 h-3.5')}
-          <span className="font-mono text-[11px] hidden sm:inline">
-            {settings.isMuted ? 'Mute' : `${settings.volume}%`}
+        {/* Biểu tượng Âm lượng hoặc nhãn Offline */}
+        {settings.online ? (
+          <span className="flex items-center gap-1 text-xs font-semibold">
+            {renderVolumeIcon('w-3.5 h-3.5')}
+            <span className="font-mono text-[11px] hidden sm:inline">
+              {settings.isMuted ? 'Mute' : `${settings.volume}%`}
+            </span>
           </span>
-        </span>
+        ) : (
+          <span className="font-mono text-[11px] font-bold text-rose-500 hidden sm:inline">
+            Offline
+          </span>
+        )}
 
         {/* Biểu tượng Cài đặt bánh răng */}
         <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
@@ -228,13 +275,22 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
                 </h4>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
-                {deviceId} • {settings.wifi.ip}
+                {settings.online
+                  ? `${deviceId}${settings.wifi.ip ? ` • ${settings.wifi.ip}` : ''}`
+                  : 'Chưa phát hiện thiết bị Pi hoạt động'}
               </p>
             </div>
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 shadow-xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Online
-            </span>
+            {settings.online ? (
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 shadow-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Online
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60 shadow-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                Offline
+              </span>
+            )}
           </div>
 
           {/* KHỐI 1: KẾT NỐI KHÔNG DÂY (Wi-Fi & Bluetooth Audio) */}
@@ -244,28 +300,34 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
               <div className="flex items-center gap-2.5 min-w-0">
                 <div
                   className={`p-2 rounded-lg ${
-                    settings.wifi.connected && settings.wifi.ssid
+                    settings.online && settings.wifi.connected && settings.wifi.ssid
                       ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
                   }`}
                 >
                   {renderWifiSignalIcon(
-                    settings.wifi.connected && settings.wifi.ssid ? settings.wifi.signalStrength : 0,
+                    settings.online && settings.wifi.connected && settings.wifi.ssid ? settings.wifi.signalStrength : 0,
                     'w-4 h-4'
                   )}
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">
-                    {settings.wifi.connected && settings.wifi.ssid ? settings.wifi.ssid : 'Chưa kết nối Wi-Fi'}
+                    {!settings.online
+                      ? 'Chưa kết nối Wi-Fi (Pi đang tắt)'
+                      : settings.wifi.connected && settings.wifi.ssid
+                      ? settings.wifi.ssid
+                      : 'Chưa kết nối Wi-Fi'}
                   </div>
                   <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                    {settings.wifi.connected && settings.wifi.ssid
-                      ? 'Đã kết nối • Tín hiệu tốt'
+                    {!settings.online
+                      ? 'Hãy chạy python edge_client.py trên Raspberry Pi'
+                      : settings.wifi.connected && settings.wifi.ssid
+                      ? `Đã kết nối • Tín hiệu ${settings.wifi.signalStrength}%`
                       : 'Chưa có tín hiệu mạng'}
                   </div>
                 </div>
               </div>
-              {settings.wifi.connected && settings.wifi.ip ? (
+              {settings.online && settings.wifi.connected && settings.wifi.ip ? (
                 <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-200/60 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 border border-slate-300/40 dark:border-slate-700/50 shrink-0">
                   {settings.wifi.ip}
                 </span>
@@ -319,6 +381,19 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
                     </button>
                   )}
 
+                  {settings.bluetooth.connected && (
+                    <button
+                      type="button"
+                      onClick={() => handleDisconnectBluetooth()}
+                      disabled={isDisconnectingBt || isUpdating}
+                      title="Ngắt kết nối loa Bluetooth hiện tại"
+                      className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40 transition-colors cursor-pointer"
+                    >
+                      <Unlink className="w-3 h-3" />
+                      <span>{isDisconnectingBt ? 'Đang ngắt...' : 'Ngắt kết nối'}</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={handleToggleBtPicker}
@@ -339,7 +414,7 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
                 <div className="pt-2 border-t border-slate-200/70 dark:border-[#222850] space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
                   <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
                     <span className="font-semibold uppercase tracking-wider text-[10px]">
-                      Loa Bluetooth khả dụng
+                      Danh sách thiết bị Bluetooth ({scannedBtDevices.length})
                     </span>
                     <button
                       type="button"
@@ -352,7 +427,68 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
                     </button>
                   </div>
 
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {/* Bộ lọc và Tìm kiếm thiết bị Bluetooth */}
+                  <div className="space-y-1.5">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={btSearchText}
+                        onChange={(e) => setBtSearchText(e.target.value)}
+                        placeholder="Lọc theo tên hoặc MAC..."
+                        className="w-full pl-8 pr-7 py-1 text-[11px] rounded-lg bg-white dark:bg-[#12162e] border border-slate-200 dark:border-[#252b54] text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                      />
+                      {btSearchText && (
+                        <button
+                          type="button"
+                          onClick={() => setBtSearchText('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filter Category Pills */}
+                    <div className="flex items-center gap-1 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setBtFilterCategory('all')}
+                        className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${
+                          btFilterCategory === 'all'
+                            ? 'bg-purple-600 text-white shadow-2xs'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        Tất cả ({scannedBtDevices.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBtFilterCategory('audio')}
+                        className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${
+                          btFilterCategory === 'audio'
+                            ? 'bg-purple-600 text-white shadow-2xs'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        Loa & Tai nghe ({scannedBtDevices.filter((d) => isAudioDevice(d.name)).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBtFilterCategory('paired')}
+                        className={`px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer ${
+                          btFilterCategory === 'paired'
+                            ? 'bg-purple-600 text-white shadow-2xs'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        Đã ghép đôi ({scannedBtDevices.filter((d) => Boolean(d.paired)).length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Danh sách thiết bị */}
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                     {isScanningBt && (!Array.isArray(scannedBtDevices) || scannedBtDevices.length === 0) ? (
                       <div className="text-center py-3 text-xs text-slate-400 flex items-center justify-center gap-2">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin text-purple-500" />
@@ -363,50 +499,91 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
                         Chưa tìm thấy loa nào. Bật nguồn loa và bấm Quét lại.
                       </div>
                     ) : (
-                      scannedBtDevices.map((dev) => {
-                        const isCurrent =
-                          Boolean(settings.bluetooth.connected &&
-                          settings.bluetooth.deviceName &&
-                          (settings.bluetooth.deviceName.toLowerCase().includes(dev.name.toLowerCase()) ||
-                            dev.name.toLowerCase().includes(settings.bluetooth.deviceName.toLowerCase())));
-                        const isConnecting = connectingBtAddr === dev.address;
+                      scannedBtDevices
+                        .filter((dev) => {
+                          if (btSearchText.trim()) {
+                            const q = btSearchText.toLowerCase().trim();
+                            const matchName = dev.name.toLowerCase().includes(q);
+                            const matchAddr = dev.address.toLowerCase().includes(q);
+                            if (!matchName && !matchAddr) return false;
+                          }
+                          if (btFilterCategory === 'audio') {
+                            return isAudioDevice(dev.name);
+                          }
+                          if (btFilterCategory === 'paired') {
+                            return Boolean(dev.paired);
+                          }
+                          return true;
+                        })
+                        .map((dev) => {
+                          const isCurrent =
+                            Boolean(settings.bluetooth.connected &&
+                            settings.bluetooth.deviceName &&
+                            (settings.bluetooth.deviceName.toLowerCase().includes(dev.name.toLowerCase()) ||
+                              dev.name.toLowerCase().includes(settings.bluetooth.deviceName.toLowerCase())));
+                          const isConnecting = connectingBtAddr === dev.address;
+                          const isAudio = isAudioDevice(dev.name);
 
-                        return (
-                          <div
-                            key={dev.address}
-                            className={`flex items-center justify-between p-2 rounded-lg border text-xs transition-colors ${
-                              isCurrent
-                                ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800/60'
-                                : 'bg-white dark:bg-[#12162e] border-slate-200 dark:border-[#222850] hover:bg-slate-100/70 dark:hover:bg-[#1a1f42]'
-                            }`}
-                          >
-                            <div className="min-w-0 pr-2">
-                              <div className="font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-1.5">
-                                <Headphones className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                <span className="truncate">{dev.name}</span>
+                          return (
+                            <div
+                              key={dev.address}
+                              className={`flex items-center justify-between p-2 rounded-lg border text-xs transition-colors ${
+                                isCurrent
+                                  ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800/60'
+                                  : 'bg-white dark:bg-[#12162e] border-slate-200 dark:border-[#222850] hover:bg-slate-100/70 dark:hover:bg-[#1a1f42]'
+                              }`}
+                            >
+                              <div className="min-w-0 pr-2">
+                                <div className="font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-1.5">
+                                  {isAudio ? (
+                                    <Headphones className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                                  ) : (
+                                    <Bluetooth className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  )}
+                                  <span className="truncate">{dev.name}</span>
+                                  <span
+                                    className={`text-[9px] px-1.5 py-0.2 rounded font-normal shrink-0 ${
+                                      isAudio
+                                        ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                                    }`}
+                                  >
+                                    {isAudio ? 'Loa/Tai nghe' : 'Thiết bị BLE'}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-mono pl-5 truncate">
+                                  {dev.address} {dev.paired ? '• Đã lưu' : ''}
+                                </div>
                               </div>
-                              <div className="text-[10px] text-slate-400 font-mono pl-5 truncate">
-                                {dev.address}
-                              </div>
+
+                              {isCurrent ? (
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/40 shrink-0">
+                                    Đang dùng
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDisconnectBluetooth(dev.address)}
+                                    disabled={isDisconnectingBt || isUpdating}
+                                    title="Ngắt kết nối thiết bị này"
+                                    className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                                  >
+                                    {isDisconnectingBt ? '...' : 'Ngắt'}
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectBtDevice(dev)}
+                                  disabled={isConnecting || isUpdating}
+                                  className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-700 text-white transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                                >
+                                  {isConnecting ? 'Đang nối...' : 'Kết nối'}
+                                </button>
+                              )}
                             </div>
-
-                            {isCurrent ? (
-                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/40 shrink-0">
-                                Đang dùng
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleSelectBtDevice(dev)}
-                                disabled={isConnecting || isUpdating}
-                                className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-700 text-white transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-                              >
-                                {isConnecting ? 'Đang nối...' : 'Kết nối'}
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })
+                          );
+                        })
                     )}
                   </div>
                 </div>
@@ -493,26 +670,31 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
               <button
                 type="button"
                 onClick={toggleStream}
-                className={`p-2.5 rounded-xl border flex flex-col gap-1.5 text-left transition-all duration-150 cursor-pointer ${
-                  settings.streamEnabled
-                    ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800/60 text-purple-950 dark:text-purple-100'
-                    : 'bg-slate-50 dark:bg-[#181c3b] border-slate-200 dark:border-[#252b54] text-slate-500 dark:text-slate-400 opacity-80'
+                disabled={!settings.online || isUpdating}
+                className={`p-2.5 rounded-xl border flex flex-col gap-1.5 text-left transition-all duration-150 ${
+                  !settings.online
+                    ? 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 opacity-50 cursor-not-allowed'
+                    : settings.streamEnabled
+                    ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-300 dark:border-purple-800/60 text-purple-950 dark:text-purple-100 cursor-pointer'
+                    : 'bg-slate-50 dark:bg-[#181c3b] border-slate-200 dark:border-[#252b54] text-slate-500 dark:text-slate-400 opacity-80 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  {settings.streamEnabled ? (
+                  {settings.online && settings.streamEnabled ? (
                     <Video className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                   ) : (
                     <VideoOff className="w-4 h-4 text-slate-400" />
                   )}
                   <span
                     className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
-                      settings.streamEnabled
+                      !settings.online
+                        ? 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                        : settings.streamEnabled
                         ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold'
                         : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
                     }`}
                   >
-                    {settings.streamEnabled ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
+                    {!settings.online ? 'OFFLINE' : settings.streamEnabled ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
                   </span>
                 </div>
                 <span className="text-xs font-semibold">Camera Kiosk</span>
@@ -522,28 +704,88 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
               <button
                 type="button"
                 onClick={toggleFps}
-                className={`p-2.5 rounded-xl border flex flex-col gap-1.5 text-left transition-all duration-150 cursor-pointer ${
-                  settings.showFps
-                    ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800/60 text-emerald-950 dark:text-emerald-100'
-                    : 'bg-slate-50 dark:bg-[#181c3b] border-slate-200 dark:border-[#252b54] text-slate-500 dark:text-slate-400 opacity-80'
+                disabled={!settings.online || isUpdating}
+                className={`p-2.5 rounded-xl border flex flex-col gap-1.5 text-left transition-all duration-150 ${
+                  !settings.online
+                    ? 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-400 opacity-50 cursor-not-allowed'
+                    : settings.showFps
+                    ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800/60 text-emerald-950 dark:text-emerald-100 cursor-pointer'
+                    : 'bg-slate-50 dark:bg-[#181c3b] border-slate-200 dark:border-[#252b54] text-slate-500 dark:text-slate-400 opacity-80 cursor-pointer'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <Gauge
-                    className={`w-4 h-4 ${settings.showFps ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}
+                    className={`w-4 h-4 ${
+                      settings.online && settings.showFps
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-slate-400'
+                    }`}
                   />
                   <span
                     className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
-                      settings.showFps
+                      !settings.online
+                        ? 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                        : settings.showFps
                         ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold'
                         : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
                     }`}
                   >
-                    {settings.showFps ? 'HIỂN THỊ' : 'ẨN'}
+                    {!settings.online
+                      ? 'OFFLINE'
+                      : settings.showFps
+                      ? settings.fps > 0
+                        ? `${settings.fps.toFixed(1)} FPS`
+                        : 'HIỂN THỊ'
+                      : 'ẨN'}
                   </span>
                 </div>
                 <span className="text-xs font-semibold">FPS Màn LCD</span>
               </button>
+            </div>
+
+            {/* Cài đặt Số khuôn mặt nhận diện tối đa (MAX_FACES_PER_FRAME) */}
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#181c3b] border border-slate-200/80 dark:border-[#252b54] space-y-2 mt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+                    <Users className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                      Số khuôn mặt nhận diện
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                      MAX_FACES_PER_FRAME
+                    </div>
+                  </div>
+                </div>
+                <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                  {settings.maxFaces || 3} người
+                </span>
+              </div>
+
+              <div className="grid grid-cols-5 gap-1.5">
+                {[1, 2, 3, 4, 5].map((num) => {
+                  const isActive = (settings.maxFaces || 3) === num;
+                  return (
+                    <button
+                      key={num}
+                      type="button"
+                      disabled={!settings.online || isUpdating}
+                      onClick={() => setMaxFaces(num)}
+                      className={`py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
+                        !settings.online
+                          ? 'bg-slate-100 dark:bg-slate-900 text-slate-400 border-slate-200 dark:border-slate-800 opacity-50 cursor-not-allowed'
+                          : isActive
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-white dark:bg-[#12162e] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#252b54] hover:border-indigo-400'
+                      }`}
+                    >
+                      {num} mặt
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

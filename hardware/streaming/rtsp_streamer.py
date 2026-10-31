@@ -33,6 +33,10 @@ class RTSPStreamer:
 
     def start_ffmpeg(self):
         self._close_process()
+        # Giới hạn framerate và cấu hình Keyframe ngắn (GOP=10 ~ 1.0-1.5s)
+        # để WebRTC (WHEP) bắt hình tức thì khi client kết nối, không phải chờ IDR keyframe
+        stream_fps = min(15, max(5, int(self.fps)))
+        gop_size = max(5, stream_fps)
         command = [
             "ffmpeg",
             "-y",
@@ -40,12 +44,15 @@ class RTSPStreamer:
             "-vcodec", "rawvideo",
             "-pix_fmt", "bgr24",
             "-s", f"{self.width}x{self.height}",
-            "-r", str(self.fps),
+            "-r", str(stream_fps),
             "-i", "-",
             "-c:v", "libx264",
             "-pix_fmt", "yuv420p",
             "-preset", "ultrafast",
             "-tune", "zerolatency",
+            "-g", str(gop_size),
+            "-keyint_min", str(max(2, gop_size // 2)),
+            "-sc_threshold", "0",
             "-b:v", "800k",
             "-f", "rtsp",
             "-rtsp_transport", "tcp",

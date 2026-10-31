@@ -4,7 +4,6 @@ import { Menu, Sun, Moon, ChevronRight } from 'lucide-react';
 import { FloatingNotificationBubble } from '../../features/notifications';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { QuickSettingsMenu } from './QuickSettingsMenu';
 
 const labels: Record<string, string> = {
   dashboard: 'Tổng quan',
@@ -75,7 +74,6 @@ export const Topbar: React.FC<{
         >
           {isDark ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <QuickSettingsMenu />
       </div>
     </header>
   );

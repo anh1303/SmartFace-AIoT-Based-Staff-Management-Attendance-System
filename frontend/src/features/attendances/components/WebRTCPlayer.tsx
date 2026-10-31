@@ -15,8 +15,8 @@ interface WebRTCPlayerProps {
   streamUrl?: string; // e.g. http://10.52.138.36:8889/pi4_cam/whep
   deviceId?: string;
   deviceName?: string;
-  currentMode?: 'CHECK_IN' | 'CHECK_OUT' | null;
-  onModeChange?: (newMode: 'CHECK_IN' | 'CHECK_OUT') => void;
+  currentMode?: 'CHECK_IN' | 'CHECK_OUT' | 'OFF' | null;
+  onModeChange?: (newMode: 'CHECK_IN' | 'CHECK_OUT' | 'OFF') => void;
   showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
@@ -35,12 +35,19 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const sessionUrlRef = useRef<string | null>(null);
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = useRef<number>(0);
+  const streamEnabledRef = useRef<boolean>(settings.streamEnabled);
+
+  useEffect(() => {
+    streamEnabledRef.current = settings.streamEnabled;
+  }, [settings.streamEnabled]);
 
   const [iceState, setIceState] = useState<RTCIceConnectionState>('new');
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  // Không mặc định Pi luôn là CHECK_IN; khởi tạo theo prop hoặc null (CHƯA XÁC NHẬN)
-  const [activeMode, setActiveMode] = useState<'CHECK_IN' | 'CHECK_OUT' | null>(currentMode || null);
+  // Không mặc định Pi luôn là CHECK_IN; khởi tạo theo prop hoặc null (TẮT / CHỜ CẢM BIẾN)
+  const [activeMode, setActiveMode] = useState<'CHECK_IN' | 'CHECK_OUT' | 'OFF' | null>(currentMode || null);
   const [isSwitchingMode, setIsSwitchingMode] = useState(false);
 
   const isLive = iceState === 'connected' || iceState === 'completed';
@@ -49,12 +56,12 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   const fetchDeviceRealMode = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/devices/${deviceId}/mode`);
-      if (res.success && res.data?.confirmed === true && res.data?.mode) {
-        setActiveMode(res.data.mode);
-        onModeChange?.(res.data.mode);
+      if (res.success && res.data?.mode) {
+        const m = res.data.mode === 'CHECK_IN' || res.data.mode === 'CHECK_OUT' ? res.data.mode : 'OFF';
+        setActiveMode(m);
+        onModeChange?.(m);
       } else {
-        // Chưa được Pi xác nhận
-        setActiveMode(null);
+        setActiveMode('OFF');
       }
     } catch {
       setActiveMode(null);
@@ -85,15 +92,12 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
     });
     socket.on('device-mode-changed', (data: any) => {
       if (data && (data.deviceId === deviceId || data.deviceId === 'PI4_FRONT_GATE')) {
-        if (data.confirmed === true && (data.mode === 'CHECK_IN' || data.mode === 'CHECK_OUT')) {
+        if (data.mode === 'CHECK_IN' || data.mode === 'CHECK_OUT') {
           setActiveMode(data.mode);
           onModeChange?.(data.mode);
-          showToast?.(
-            `Cổng đã xác nhận chế độ: ${data.mode === 'CHECK_IN' ? 'VÀO CA (Check-in)' : 'TAN CA (Check-out)'}`,
-            'info'
-          );
-        } else if (data.confirmed === false) {
-          setActiveMode(null);
+        } else if (data.mode === 'OFF' || data.confirmed === false) {
+          setActiveMode('OFF');
+          onModeChange?.('OFF');
         }
       }
     });
@@ -104,6 +108,12 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   }, [deviceId, fetchDeviceRealMode, onModeChange, showToast]);
 
   const stopConnection = useCallback(() => {
+    // 0. Hủy timer auto-retry
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+
     // 1. Hủy request in-flight nếu đang kết nối
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -135,6 +145,10 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   }, []);
 
   const startConnection = useCallback(async () => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     stopConnection();
     setIsConnecting(true);
     setErrorMsg(null);
@@ -172,6 +186,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       pc.oniceconnectionstatechange = () => {
         setIceState(pc.iceConnectionState);
         if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          retryCountRef.current = 0;
           setIsConnecting(false);
           setErrorMsg(null);
           if (connectionTimeoutRef.current) {
@@ -188,19 +203,26 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      // Thu thập ICE Candidate trước khi gửi offer SDP lên WHEP server
+      // Thu thập ICE Candidate nhanh (tối đa 300ms là đủ cho LAN/Host candidate)
       await new Promise<void>((resolve) => {
         if (pc.iceGatheringState === 'complete') {
           resolve();
         } else {
-          const checkIce = () => {
-            if (pc.iceGatheringState === 'complete') {
+          let resolved = false;
+          const done = () => {
+            if (!resolved) {
+              resolved = true;
               pc.removeEventListener('icegatheringstatechange', checkIce);
               resolve();
             }
           };
+          const checkIce = () => {
+            if (pc.iceGatheringState === 'complete') {
+              done();
+            }
+          };
           pc.addEventListener('icegatheringstatechange', checkIce);
-          setTimeout(resolve, 1500); // Tối đa 1.5s thu thập ICE
+          setTimeout(done, 300); // 300ms thay vì chờ 1500ms
         }
       });
 
@@ -239,6 +261,14 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       setErrorMsg(err.message || 'Không thể kết nối luồng WebRTC');
       setIsConnecting(false);
       setIceState('failed');
+
+      // Tự động thử lại nếu camera đang bật (cho phép Pi mở camera & đẩy RTSP tới MediaMTX)
+      if (streamEnabledRef.current && retryCountRef.current < 10) {
+        retryCountRef.current += 1;
+        retryTimerRef.current = setTimeout(() => {
+          startConnection();
+        }, 1200);
+      }
     }
   }, [streamUrl, stopConnection]);
 
@@ -262,21 +292,28 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
     }
   };
 
-  // Sửa mode API sang PATCH theo route backend; chỉ hiển thị thành công khi có confirmed=true từ ACK của Pi
-  const handleSwitchMode = async (mode: 'CHECK_IN' | 'CHECK_OUT') => {
-    if (isSwitchingMode || activeMode === mode) return;
+  // Nhấn vào nút đang bật sẽ tắt cả 2 nút ('OFF'); nhấn vào nút đang tắt sẽ bật chế độ đó
+  const handleSwitchMode = async (clickedMode: 'CHECK_IN' | 'CHECK_OUT') => {
+    if (isSwitchingMode) return;
+    const nextMode: 'CHECK_IN' | 'CHECK_OUT' | 'OFF' = activeMode === clickedMode ? 'OFF' : clickedMode;
     setIsSwitchingMode(true);
     try {
       const res = await apiFetch(`/api/devices/${deviceId}/mode`, {
         method: 'PATCH',
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify({ mode: nextMode }),
       });
-      if (res.success && res.data?.confirmed && res.data?.mode === mode) {
-        setActiveMode(mode);
-        onModeChange?.(mode);
-        showToast?.(`Đã đổi chế độ sang ${mode === 'CHECK_IN' ? 'Check-in (Vào ca)' : 'Check-out (Tan ca)'}`, 'success');
+      if (res.success && res.data?.confirmed && res.data?.mode === nextMode) {
+        setActiveMode(nextMode);
+        onModeChange?.(nextMode);
+        showToast?.(
+          nextMode === 'CHECK_IN'
+            ? 'Đã bật chế độ: Check-in (Vào ca)'
+            : nextMode === 'CHECK_OUT'
+            ? 'Đã bật chế độ: Check-out (Tan ca)'
+            : 'Đã tắt chế độ điểm danh (Chờ cảm biến siêu âm)',
+          'success'
+        );
       } else {
-        // Lệnh đã gửi nhưng Pi chưa xác nhận
         showToast?.(
           res.message || 'Lệnh đã gửi nhưng Raspberry Pi chưa phản hồi xác nhận (ACK). Vui lòng kiểm tra thiết bị.',
           'warning'
@@ -326,6 +363,11 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
           <span className="hidden sm:inline-block text-xs text-slate-300/80 font-mono">
             | {deviceName}
           </span>
+          {settings.online && settings.showFps && settings.streamEnabled && (
+            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[11px] font-bold">
+              {settings.fps > 0 ? `${settings.fps.toFixed(1)} FPS` : 'FPS ON'}
+            </span>
+          )}
         </div>
 
         {/* Remote Mode Switcher */}
@@ -461,7 +503,7 @@ export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
                 : 'bg-slate-700/40 text-slate-400 border border-slate-600/50'
             }`}
           >
-            {activeMode === 'CHECK_IN' ? 'CHECK-IN' : activeMode === 'CHECK_OUT' ? 'CHECK-OUT' : 'CHƯA XÁC NHẬN'}
+            {activeMode === 'CHECK_IN' ? 'CHECK-IN' : activeMode === 'CHECK_OUT' ? 'CHECK-OUT' : 'TẮT / CHỜ CẢM BIẾN'}
           </span>
         </div>
       </div>

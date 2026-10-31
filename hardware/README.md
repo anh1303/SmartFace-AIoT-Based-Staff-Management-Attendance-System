@@ -66,17 +66,87 @@ Mở file `.env` bằng lệnh `nano .env` và kiểm tra các thông số quan 
 
 ---
 
-## 4. Sơ đồ nối chân Màn hình TFT ST7789V SPI trên Raspberry Pi 4
-| Chân màn hình TFT | Chân Raspberry Pi 4 (Header 40-pin) |
-| :--- | :--- |
-| **VCC** | Chân 1 hoặc 17 (3.3V Power) |
-| **GND** | Chân 6, 9, 14, 20 hoặc 25 (Ground) |
-| **SCL / SCK** | Chân 23 (GPIO 11 - SPI0 SCLK) |
-| **SDA / MOSI** | Chân 19 (GPIO 10 - SPI0 MOSI) |
-| **RES / RST** | Chân 18 (GPIO 24 - Configurable qua `TFT_RESET_PIN`) |
-| **DC** | Chân 22 (GPIO 25 - Configurable qua `TFT_DC_PIN`) |
-| **CS / CE0** | Chân 24 (GPIO 8 - SPI0 CE0) |
-| **BLK / BL** | Nối 3.3V (Đèn nền sáng liên tục) |
+## 4. Sơ đồ nối chân phần cứng toàn bộ thiết bị trên Raspberry Pi 4
+
+### 4.1. Bảng sơ đồ trực quan Header 40-pin Raspberry Pi 4
+Dưới đây là sơ đồ gán chân vật lý thực tế trên bo mạch Raspberry Pi 4 cho toàn bộ các thiết bị ngoại vi (Màn hình LCD TFT ST7789V, Cảm biến Siêu âm #1 Check-in, Cảm biến Siêu âm #2 Check-out):
+
+```text
+                                Raspberry Pi 4 GPIO Header (40-Pin)
+                                     +--------------------+
+[TFT VCC]            3.3V Power  (01) | o  o | (02)  5V Power          [VCC Siêu âm #1]
+                     GPIO 2      (03) | o  o | (04)  5V Power          [VCC Siêu âm #2]
+                     GPIO 3      (05) | o  o | (06)  Ground            [GND Siêu âm #1]
+                     GPIO 4      (07) | o  o | (08)  GPIO 14 (TXD)
+                     Ground      (09) | o  o | (10)  GPIO 15 (RXD)
+[TRIG Siêu âm #2]    GPIO 17     (11) | o  o | (12)  GPIO 18
+[ECHO Siêu âm #1]    GPIO 27     (13) | o  o | (14)  Ground            [GND Siêu âm #2]
+[ECHO Siêu âm #2]    GPIO 22     (15) | o  o | (16)  GPIO 23           [TRIG Siêu âm #1]
+[TFT BLK Đèn nền]    3.3V Power  (17) | o  o | (18)  GPIO 24           [TFT RESET / RST]
+[TFT MOSI / SDA]     GPIO 10     (19) | o  o | (20)  Ground            [TFT GND]
+                     GPIO 9      (21) | o  o | (22)  GPIO 25           [TFT DC]
+[TFT SCLK / SCL]     GPIO 11     (23) | o  o | (24)  GPIO 8 (CE0)      [TFT CS]
+                     Ground      (25) | o  o | (26)  GPIO 7 (CE1)
+                     GPIO 0      (27) | o  o | (28)  GPIO 1
+                     GPIO 5      (29) | o  o | (30)  Ground
+                     GPIO 6      (31) | o  o | (32)  GPIO 12
+                     GPIO 13     (33) | o  o | (34)  Ground
+                     GPIO 19     (35) | o  o | (36)  GPIO 16
+                     GPIO 26     (37) | o  o | (38)  GPIO 20
+                     Ground      (39) | o  o | (40)  GPIO 21
+                                     +--------------------+
+```
+
+---
+
+### 4.2. Bảng tổng hợp chân cắm toàn bộ thiết bị (Master Pinout Table)
+
+| Thiết bị ngoại vi | Chân trên Module | Chân vật lý Pi 4 | Số hiệu BCM GPIO | Điện áp / Chức năng | Ghi chú & Cấu hình |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Màn hình LCD TFT (ST7789V SPI)** | **VCC** | **Chân 1** | — | 3.3V Power | Nguồn cấp cho màn hình |
+| | **GND** | **Chân 20** | — | Ground | Nối đất màn hình |
+| | **SCL / SCK** | **Chân 23** | **GPIO 11** | SPI0 SCLK | Xung nhịp đồng hồ SPI phần cứng |
+| | **SDA / MOSI** | **Chân 19** | **GPIO 10** | SPI0 MOSI | Dữ liệu hình ảnh từ Pi sang màn |
+| | **RES / RST** | **Chân 18** | **GPIO 24** | Output (Reset) | Khởi động lại phần cứng màn hình (`TFT_RESET_PIN=24`) |
+| | **DC** | **Chân 22** | **GPIO 25** | Output (Data/Cmd) | Phân biệt lệnh và dữ liệu hình ảnh (`TFT_DC_PIN=25`) |
+| | **CS** | **Chân 24** | **GPIO 8** | SPI0 CE0 | Chọn chip SPI (Chip Select 0) |
+| | **BLK / BL** | **Chân 17** | — | 3.3V Power | Cấp nguồn liên tục cho đèn nền LED màn hình |
+| **Cảm biến Siêu âm #1 (CHECK_IN — Vào ca)** | **VCC** | **Chân 2** | — | 5V Power | Nguồn nuôi HC-SR04 (hoặc 3.3V nếu dùng HC-SR04P) |
+| | **TRIG** | **Chân 16** | **GPIO 23** | Output (Trigger) | Cố định trong code: phát xung kích hoạt siêu âm 10µs |
+| | **ECHO** | **Chân 13** | **GPIO 27** | Input (Echo) | Cố định trong code: nhận xung phản xạ (qua cầu phân áp 3.3V) |
+| | **GND** | **Chân 6** | — | Ground | Nối đất chung |
+| **Cảm biến Siêu âm #2 (CHECK_OUT — Ra ca)** | **VCC** | **Chân 4** | — | 5V Power | Nguồn nuôi HC-SR04 (hoặc 3.3V nếu dùng HC-SR04P) |
+| | **TRIG** | **Chân 11** | **GPIO 17** | Output (Trigger) | Cố định trong code: phát xung kích hoạt siêu âm 10µs |
+| | **ECHO** | **Chân 15** | **GPIO 22** | Input (Echo) | Cố định trong code: nhận xung phản xạ (qua cầu phân áp 3.3V) |
+| | **GND** | **Chân 14** | — | Ground | Nối đất chung |
+| **Camera (Nhận diện)** | **Cáp Ribbon CSI** | **Cổng CSI** | — | Giao tiếp MIPI CSI-2 | Cắm cáp ribbon vào khe CAMERA trên Pi 4 |
+| | *hoặc USB* | **Cổng USB 3.0/2.0**| — | USB Video Class (UVC) | Cắm trực tiếp webcam vào cổng USB |
+| **Tai nghe / Loa (Phát âm thanh)** | **Bluetooth A2DP** | **Onboard Bluetooth**| — | Kết nối không dây BlueZ | Tự động ghép đôi và phát âm thanh qua PipeWire (`pw-play`) |
+| | *hoặc Loa 3.5mm* | **Cổng Jack 3.5mm** | — | Analog Stereo Audio | Cắm trực tiếp jack loa 3.5mm vào cổng audio trên bo mạch |
+
+---
+
+### 4.3. Lưu ý kỹ thuật khi đấu dây:
+
+1. **Cầu phân áp điện trở cho chân ECHO cảm biến HC-SR04 5V:**
+   - Chân GPIO của Raspberry Pi 4 chỉ chịu được tối đa điện áp **3.3V**.
+   - Nếu bạn dùng cảm biến **HC-SR04 (bản chạy 5V)**, chân ECHO phát ra xung 5V. Để bảo vệ an toàn cho Raspberry Pi, **bắt buộc** nối chân ECHO qua cầu phân áp:
+     ```text
+     Chân ECHO cảm biến -----> [ Điện trở R1 = 1kΩ ] ----+-----> Chân GPIO Pi 4 (GPIO 27 hoặc GPIO 22)
+                                                         |
+                                                [ Điện trở R2 = 2kΩ ]
+                                                         |
+                                                        GND (Đất chung)
+     ```
+   - *Nếu bạn dùng cảm biến **HC-SR04P** hoặc **RCWL-1601** (hỗ trợ cấp nguồn 3.3V)*: Có thể cắm trực tiếp chân ECHO vào GPIO Pi 4 mà không cần thêm điện trở.
+
+2. **Cơ chế lọc trễ chống rung 2 chiều (Debounce 0.5s):**
+   - Cả 2 cảm biến siêu âm hoạt động với chu kỳ đo 12.5Hz trong luồng ngầm.
+   - **Khi đưa tay vào ($\le 20\text{cm}$):** Phải giữ tay cố định liên tục ít nhất **$0.5\text{s}$** (`ULTRASONIC_DEBOUNCE_SECONDS=0.5`) thì chế độ tương ứng (`CHECK_IN` hoặc `CHECK_OUT`) mới kích hoạt.
+   - **Khi rút tay ra ($> 20\text{cm}$):** Phải rút tay ra hoàn toàn liên tục ít nhất **$0.5\text{s}$** thì chế độ mới chuyển về tắt (`OFF`).
+
+3. **Nối đất chung (Common Ground):**
+   - Tất cả các chân GND của màn hình TFT LCD và 2 cảm biến siêu âm phải được nối chung về hệ thống chân GND của Raspberry Pi 4 để đảm bảo điện thế tham chiếu đồng nhất.
 
 ---
 

@@ -26,6 +26,7 @@ deviceRouter.post('/:id/actions/scan-wifi', authorize('ADMIN', 'MANAGER'), async
 deviceRouter.post('/:id/actions/scan-bluetooth', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.scanBluetooth));
 deviceRouter.post('/:id/actions/bluetooth-reconnect', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.reconnectBluetooth));
 deviceRouter.post('/:id/actions/bluetooth-connect', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.connectBluetooth));
+deviceRouter.post('/:id/actions/bluetooth-disconnect', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.disconnectBluetooth));
 deviceRouter.post('/', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.create));
 deviceRouter.put('/:id', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.update));
 deviceRouter.delete('/:id', authorize('ADMIN'), asyncHandler(controller.remove));

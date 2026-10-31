@@ -15,6 +15,7 @@ class ThingsBoardClient:
                  on_attendance_result: Optional[Callable] = None,
                  initial_volume: int = 75, initial_show_fps: bool = True,
                  initial_stream_enabled: bool = True,
+                 initial_max_faces: int = 3,
                  on_settings_change: Optional[Callable] = None,
                  on_action_request: Optional[Callable] = None):
         self.host, self.port, self.token, self.device_id = host, port, token, device_id
@@ -24,6 +25,7 @@ class ThingsBoardClient:
         self.is_muted = False
         self.show_fps = bool(initial_show_fps)
         self.stream_enabled = bool(initial_stream_enabled)
+        self.max_faces = max(1, min(10, int(initial_max_faces)))
         self.on_settings_change = on_settings_change
         self.on_action_request = on_action_request
         # TB RPC protobuf requestId is int32. UUID event_id provides durable correlation.
@@ -65,14 +67,24 @@ class ThingsBoardClient:
         print(f"[MQTT] [OK] Đã kết nối thành công ThingsBoard broker tại {self.host}:{self.port}")
         for topic in ['attributes', 'attributes/response/+', 'rpc/request/+', 'rpc/response/+']:
             client.subscribe(f'v1/devices/me/{topic}', qos=1)
-        client.publish('v1/devices/me/attributes/request/1', json.dumps({'sharedKeys': 'attendance_mode,mode_changed_at,volume,is_muted,show_fps,stream_enabled'}), qos=1)
+        client.publish('v1/devices/me/attributes/request/1', json.dumps({'sharedKeys': 'volume,is_muted,show_fps,stream_enabled,max_faces'}), qos=1)
+        self.send_telemetry({
+            'current_mode': self.current_mode,
+            'mode': self.current_mode,
+            'checkin_active': self.current_mode == 'CHECK_IN',
+            'checkout_active': self.current_mode == 'CHECK_OUT',
+            'mode_changed_at': int(time.time() * 1000),
+        })
+        self.notify_backend_mode(self.current_mode)
 
     def on_disconnect(self, client, userdata, flags_or_rc, *args):
         self.connected = False
         print(f"[MQTT] Mất kết nối tới ThingsBoard broker!")
 
     def set_mode(self, mode, version=None):
-        if mode not in ('CHECK_IN', 'CHECK_OUT'):
+        if mode in (None, '', 'NONE', 'IDLE', 'OFF'):
+            mode = 'OFF'
+        if mode not in ('CHECK_IN', 'CHECK_OUT', 'OFF'):
             return False
         supplied_version = version
         version = int(version) if version is not None else max(int(time.time() * 1000), self._mode_version + 1)
@@ -81,57 +93,82 @@ class ThingsBoardClient:
         changed = self.current_mode != mode
         self.current_mode, self._mode_version = mode, version
         if changed and self.on_mode_change:
-            self.on_mode_change(mode)
+            try:
+                self.on_mode_change(mode)
+            except Exception as exc:
+                print(f"[MQTT] Lỗi callback on_mode_change: {exc}")
         # Shared-attribute readback must not create an HTTP/attribute relay loop.
         if changed or supplied_version is None:
-            self.send_telemetry({'current_mode': mode, 'mode': mode, 'mode_changed_at': version})
+            self.send_telemetry({
+                'current_mode': mode,
+                'mode': mode,
+                'checkin_active': mode == 'CHECK_IN',
+                'checkout_active': mode == 'CHECK_OUT',
+                'mode_changed_at': version,
+            })
         if changed:
             self.notify_backend_mode(mode)
         return True
 
     def set_volume(self, volume: int):
         vol = max(0, min(100, int(volume)))
-        changed = self.volume != vol
         self.volume = vol
-        if changed:
-            if self.on_settings_change:
+        if self.on_settings_change:
+            try:
                 self.on_settings_change({'volume': self.volume})
-            self.send_telemetry({'volume': self.volume})
-            self.notify_backend_settings({'volume': self.volume})
+            except Exception as e:
+                print(f"[MQTT] Lỗi callback on_settings_change (volume): {e}")
+        self.send_telemetry({'volume': self.volume})
+        self.notify_backend_settings({'volume': self.volume})
         return self.volume
 
     def set_mute(self, is_muted: bool):
         val = bool(is_muted)
-        changed = self.is_muted != val
         self.is_muted = val
-        if changed:
-            if self.on_settings_change:
+        if self.on_settings_change:
+            try:
                 self.on_settings_change({'is_muted': self.is_muted})
-            self.send_telemetry({'is_muted': self.is_muted})
-            self.notify_backend_settings({'is_muted': self.is_muted})
+            except Exception as e:
+                print(f"[MQTT] Lỗi callback on_settings_change (is_muted): {e}")
+        self.send_telemetry({'is_muted': self.is_muted})
+        self.notify_backend_settings({'is_muted': self.is_muted})
         return self.is_muted
 
     def set_show_fps(self, show_fps: bool):
         val = bool(show_fps)
-        changed = self.show_fps != val
         self.show_fps = val
-        if changed:
-            if self.on_settings_change:
+        if self.on_settings_change:
+            try:
                 self.on_settings_change({'show_fps': self.show_fps})
-            self.send_telemetry({'show_fps': self.show_fps})
-            self.notify_backend_settings({'show_fps': self.show_fps})
+            except Exception as e:
+                print(f"[MQTT] Lỗi callback on_settings_change (show_fps): {e}")
+        self.send_telemetry({'show_fps': self.show_fps})
+        self.notify_backend_settings({'show_fps': self.show_fps})
         return self.show_fps
 
     def set_stream_enabled(self, stream_enabled: bool):
         val = bool(stream_enabled)
-        changed = self.stream_enabled != val
         self.stream_enabled = val
-        if changed:
-            if self.on_settings_change:
+        if self.on_settings_change:
+            try:
                 self.on_settings_change({'stream_enabled': self.stream_enabled})
-            self.send_telemetry({'stream_enabled': self.stream_enabled})
-            self.notify_backend_settings({'stream_enabled': self.stream_enabled})
+            except Exception as e:
+                print(f"[MQTT] Lỗi callback on_settings_change (stream_enabled): {e}")
+        self.send_telemetry({'stream_enabled': self.stream_enabled})
+        self.notify_backend_settings({'stream_enabled': self.stream_enabled})
         return self.stream_enabled
+
+    def set_max_faces(self, max_faces: int):
+        val = max(1, min(10, int(max_faces)))
+        self.max_faces = val
+        if self.on_settings_change:
+            try:
+                self.on_settings_change({'max_faces': self.max_faces})
+            except Exception as e:
+                print(f"[MQTT] Lỗi callback on_settings_change (max_faces): {e}")
+        self.send_telemetry({'max_faces': self.max_faces})
+        self.notify_backend_settings({'max_faces': self.max_faces})
+        return self.max_faces
 
     def on_message(self, client, userdata, msg):
         try:
@@ -147,14 +184,44 @@ class ThingsBoardClient:
                 self._deliver(info, payload)
             elif topic.startswith('v1/devices/me/rpc/request/') and isinstance(payload, dict):
                 method, params = payload.get('method'), payload.get('params')
-                if method in ('getValue', 'getMode', 'getValueMethod'):
+                if method == 'getMode':
+                    response = {
+                        'mode': self.current_mode,
+                        'checkin_active': self.current_mode == 'CHECK_IN',
+                        'checkout_active': self.current_mode == 'CHECK_OUT',
+                    }
+                elif method in ('getValue', 'getValueMethod', 'getCheckIn'):
                     response = self.current_mode == 'CHECK_IN'
+                elif method == 'getCheckOut':
+                    response = self.current_mode == 'CHECK_OUT'
                 elif method in ('setValue', 'setMode', 'setValueMethod'):
-                    mode = ('CHECK_IN' if params else 'CHECK_OUT') if isinstance(params, bool) else params
+                    if isinstance(params, dict) and 'mode' in params:
+                        mode = params.get('mode')
+                    elif isinstance(params, bool):
+                        mode = 'CHECK_IN' if params else 'OFF'
+                    else:
+                        mode = params
+                    if mode in (None, '', 'NONE', 'IDLE', 'OFF'):
+                        mode = 'OFF'
                     if not self.set_mode(mode):
                         response = {'error': 'invalid_mode'}
+                    elif method == 'setMode':
+                        response = {
+                            'mode': self.current_mode,
+                            'confirmed': True,
+                            'checkin_active': self.current_mode == 'CHECK_IN',
+                            'checkout_active': self.current_mode == 'CHECK_OUT',
+                        }
                     else:
                         response = self.current_mode == 'CHECK_IN'
+                elif method == 'setCheckIn':
+                    mode = 'CHECK_IN' if bool(params) else ('OFF' if self.current_mode == 'CHECK_IN' else self.current_mode)
+                    self.set_mode(mode)
+                    response = self.current_mode == 'CHECK_IN'
+                elif method == 'setCheckOut':
+                    mode = 'CHECK_OUT' if bool(params) else ('OFF' if self.current_mode == 'CHECK_OUT' else self.current_mode)
+                    self.set_mode(mode)
+                    response = self.current_mode == 'CHECK_OUT'
                 elif method == 'setVolume':
                     vol = params if isinstance(params, (int, float)) else (params.get('volume', 75) if isinstance(params, dict) else 75)
                     self.set_volume(int(vol))
@@ -167,6 +234,10 @@ class ThingsBoardClient:
                     val = params if isinstance(params, bool) else (params.get('stream_enabled', True) if isinstance(params, dict) else True)
                     self.set_stream_enabled(bool(val))
                     response = {'success': True, 'stream_enabled': self.stream_enabled}
+                elif method == 'setMaxFaces':
+                    val = params if isinstance(params, (int, float)) else (params.get('max_faces', 3) if isinstance(params, dict) else 3)
+                    self.set_max_faces(int(val))
+                    response = {'success': True, 'max_faces': self.max_faces}
                 elif method == 'playTestSound':
                     if self.on_action_request:
                         response = self.on_action_request('playTestSound', params or {})
@@ -200,12 +271,18 @@ class ThingsBoardClient:
                         response = self.on_action_request('connectBluetooth', params or {})
                     else:
                         response = {'connected': False, 'deviceName': target_name, 'address': target_addr, 'status': 'disconnected'}
+                elif method == 'disconnectBluetooth':
+                    if self.on_action_request:
+                        response = self.on_action_request('disconnectBluetooth', params or {})
+                    else:
+                        response = {'connected': False, 'deviceName': '', 'status': 'disconnected'}
                 elif method == 'getSettings':
                     response = {
                         'volume': self.volume,
                         'is_muted': self.is_muted,
                         'show_fps': self.show_fps,
                         'stream_enabled': self.stream_enabled,
+                        'max_faces': self.max_faces,
                     }
                 else:
                     response = {'error': f'unknown_method: {method}'}
@@ -231,6 +308,9 @@ class ThingsBoardClient:
                 if 'stream_enabled' in shared:
                     self.stream_enabled = bool(shared['stream_enabled'])
                     updated['stream_enabled'] = self.stream_enabled
+                if 'max_faces' in shared:
+                    self.max_faces = max(1, min(10, int(shared['max_faces'])))
+                    updated['max_faces'] = self.max_faces
 
                 if updated and self.on_settings_change:
                     try:

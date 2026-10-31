@@ -9,16 +9,17 @@ export const modeNotify = async (req: Request, res: Response) => {
   if (process.env.TB_WEBHOOK_SECRET) {
     assertDeviceWebhook(req);
   }
-  const mode = req.body.mode || req.body.current_mode || req.body.attendance_mode;
-  if (!mode || !['CHECK_IN', 'CHECK_OUT'].includes(mode)) {
-    return res.status(400).json({ success: false, message: 'Invalid mode: must be CHECK_IN or CHECK_OUT' });
+  const rawMode = req.body.mode ?? req.body.current_mode ?? req.body.attendance_mode;
+  const mode = rawMode === null || rawMode === '' || rawMode === 'NONE' || rawMode === 'IDLE' || rawMode === 'OFF' ? 'OFF' : rawMode;
+  if (!mode || !['CHECK_IN', 'CHECK_OUT', 'OFF'].includes(mode)) {
+    return res.status(400).json({ success: false, message: 'Invalid mode: must be CHECK_IN, CHECK_OUT, or OFF' });
   }
   console.log(`[Device Mode Notify] Thiết bị ${req.params.id} thông báo đổi chế độ: ${mode}`);
-  const state = service.recordDeviceModeNotify(req.params.id, mode);
+  const state = service.recordDeviceModeNotify(String(req.params.id), mode as service.AttendanceModeValue);
   if (process.env.TB_HOST && process.env.NODE_ENV !== 'test') {
-    service.persistConfirmedAttendanceMode(String(req.params.id), mode).catch(() => {});
+    service.persistConfirmedAttendanceMode(String(req.params.id), mode as service.AttendanceModeValue).catch(() => {});
   }
-  eventBus.publish('device:mode-updated', { deviceId: req.params.id, mode, confirmed: true });
+  eventBus.publish('device:mode-updated', { deviceId: String(req.params.id), mode, confirmed: true });
   successResponse(res, { deviceId: req.params.id, mode, confirmed: true, lastUpdated: state.lastUpdated }, 'Mode notification received');
 };
 
@@ -49,12 +50,13 @@ export const remove = async (req: Request, res: Response) => {
 };
 
 export const setMode = async (req: Request, res: Response) => {
-  const { mode } = req.body;
-  if (!mode || !['CHECK_IN', 'CHECK_OUT'].includes(mode)) {
-    return res.status(400).json({ success: false, message: 'Invalid mode: must be CHECK_IN or CHECK_OUT' });
+  const rawMode = req.body.mode;
+  const mode = rawMode === null || rawMode === '' || rawMode === 'NONE' || rawMode === 'IDLE' || rawMode === 'OFF' ? 'OFF' : rawMode;
+  if (!mode || !['CHECK_IN', 'CHECK_OUT', 'OFF'].includes(mode)) {
+    return res.status(400).json({ success: false, message: 'Invalid mode: must be CHECK_IN, CHECK_OUT, or OFF' });
   }
-  const result = await service.setDeviceAttendanceMode(String(req.params.id), mode);
-  eventBus.publish('device:mode-updated', { deviceId: req.params.id, mode, confirmed: result.confirmed });
+  const result = await service.setDeviceAttendanceMode(String(req.params.id), mode as service.AttendanceModeValue);
+  eventBus.publish('device:mode-updated', { deviceId: String(req.params.id), mode, confirmed: result.confirmed });
   if (result.confirmed) {
     successResponse(res, result, `Pi đã xác nhận ${mode}`);
   } else {
@@ -110,6 +112,12 @@ export const reconnectBluetooth = async (req: Request, res: Response) => {
 
 export const connectBluetooth = async (req: Request, res: Response) => {
   const result = await service.triggerDeviceAction(String(req.params.id), 'bluetooth-connect', req.body);
+  eventBus.publish('device:settings-updated', await service.getDeviceSettings(String(req.params.id)));
+  successResponse(res, result.data, result.message);
+};
+
+export const disconnectBluetooth = async (req: Request, res: Response) => {
+  const result = await service.triggerDeviceAction(String(req.params.id), 'bluetooth-disconnect', req.body);
   eventBus.publish('device:settings-updated', await service.getDeviceSettings(String(req.params.id)));
   successResponse(res, result.data, result.message);
 };

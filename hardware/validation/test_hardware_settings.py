@@ -19,6 +19,7 @@ from hardware.peripherals import (
     get_bluetooth_info,
     get_hardware_telemetry,
     AudioManager,
+    UltrasonicSensor,
 )
 from hardware.iot import ThingsBoardClient
 
@@ -76,6 +77,45 @@ class HardwareSettingsTests(unittest.TestCase):
         mgr = AudioManager(initial_volume=50)
         res = mgr.play_test_sound()
         self.assertTrue(res)
+
+    def test_audio_manager_speak_attendance(self):
+        """Kiểm tra phát âm thanh đọc tên checkin/checkout thành công"""
+        mgr = AudioManager(initial_volume=50)
+        res_in = mgr.speak_attendance("Nguyễn Văn A", mode="CHECK_IN")
+        self.assertTrue(res_in)
+        res_out = mgr.speak_attendance("Trần Thị B", mode="CHECK_OUT")
+        self.assertTrue(res_out)
+
+    def test_ultrasonic_debounce_entry_and_exit(self):
+        """Kiểm tra trễ ổn định 0.5s cả khi đưa tay vào và rút tay ra của cảm biến siêu âm"""
+        sensor = UltrasonicSensor(enabled=True, trigger_distance=20.0, debounce_duration=0.5, name="TEST")
+
+        # 1. Ban đầu: chưa có tay
+        self.assertFalse(sensor.is_person_present())
+
+        # 2. Đưa tay vào (15cm <= 20cm) ở t = 100.0s -> chưa đủ 0.5s nên vẫn False
+        sensor.set_mock_distance(15.0, now=100.0)
+        self.assertFalse(sensor.is_person_present())
+
+        # 3. Ở t = 100.3s (mới được 0.3s) -> vẫn False
+        sensor.set_mock_distance(14.5, now=100.3)
+        self.assertFalse(sensor.is_person_present())
+
+        # 4. Ở t = 100.55s (đã giữ ổn định liên tục 0.55s >= 0.5s) -> Chính thức chuyển sang True
+        sensor.set_mock_distance(14.0, now=100.55)
+        self.assertTrue(sensor.is_person_present())
+
+        # 5. Bắt đầu rút tay ra (50cm > 20cm) ở t = 105.0s -> chưa đủ 0.5s nên vẫn True
+        sensor.set_mock_distance(50.0, now=105.0)
+        self.assertTrue(sensor.is_person_present())
+
+        # 6. Ở t = 105.3s (mới được 0.3s) -> vẫn True
+        sensor.set_mock_distance(55.0, now=105.3)
+        self.assertTrue(sensor.is_person_present())
+
+        # 7. Ở t = 105.55s (đã rút tay ổn định liên tục 0.55s >= 0.5s) -> Chính thức chuyển sang False
+        sensor.set_mock_distance(60.0, now=105.55)
+        self.assertFalse(sensor.is_person_present())
 
     def test_tb_rpc_set_volume(self):
         """Kiểm tra nhận RPC setVolume từ ThingsBoard"""

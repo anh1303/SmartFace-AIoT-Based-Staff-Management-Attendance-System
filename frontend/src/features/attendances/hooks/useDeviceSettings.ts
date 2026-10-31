@@ -5,10 +5,13 @@ import { useAuth } from '../../../context/AuthContext';
 
 export interface DeviceSettings {
   deviceId: string;
+  online: boolean;
+  fps: number;
   volume: number; // 0 - 100
   isMuted: boolean;
   showFps: boolean;
   streamEnabled: boolean;
+  maxFaces: number; // 1 - 10 (MAX_FACES_PER_FRAME)
   wifi: {
     connected: boolean;
     ssid: string;
@@ -39,10 +42,13 @@ export interface BluetoothDevice {
 
 const DEFAULT_SETTINGS: DeviceSettings = {
   deviceId: 'PI4_FRONT_GATE',
+  online: false,
+  fps: 0,
   volume: 75,
   isMuted: false,
   showFps: true,
   streamEnabled: true,
+  maxFaces: 3,
   wifi: {
     connected: false,
     ssid: '',
@@ -123,6 +129,10 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
 
   useEffect(() => {
     fetchSettings();
+    const pollTimer = setInterval(() => {
+      fetchSettings();
+    }, 5000);
+    return () => clearInterval(pollTimer);
   }, [fetchSettings]);
 
   // 2. Lắng nghe cập nhật thời gian thực từ Socket.IO (/attendance)
@@ -219,9 +229,17 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
     patchSettings({ streamEnabled: nextStream });
   }, [settings.streamEnabled, patchSettings]);
 
-  // 8. Test âm thanh (Phát trên Web ngay + gửi lệnh xuống loa Bluetooth Kiosk)
+  // 7b. Cập nhật số khuôn mặt được nhận diện tối đa trên 1 khung hình (MAX_FACES_PER_FRAME)
+  const setMaxFaces = useCallback(
+    (count: number) => {
+      const clamped = Math.max(1, Math.min(10, Math.round(count)));
+      patchSettings({ maxFaces: clamped });
+    },
+    [patchSettings]
+  );
+
+  // 8. Test âm thanh (Gửi lệnh xuống loa/tai nghe Bluetooth của Raspberry Pi)
   const testAudio = useCallback(async () => {
-    playBrowserChime();
     try {
       await apiFetch(`/api/devices/${deviceId}/actions/test-audio`, {
         method: 'POST',
@@ -311,12 +329,45 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
               status: 'connected',
             },
           }));
-          playBrowserChime();
           return true;
         }
         return false;
       } catch (err) {
         console.error('[useDeviceSettings] Lỗi khi đổi thiết bị Bluetooth:', err);
+        return false;
+      } finally {
+        setIsUpdating(false);
+      }
+    },
+    [deviceId]
+  );
+
+  // 13. Ngắt kết nối thiết bị Bluetooth
+  const disconnectBluetooth = useCallback(
+    async (deviceAddr?: string): Promise<boolean> => {
+      try {
+        setIsUpdating(true);
+        const res = await apiFetch<DeviceSettings['bluetooth']>(
+          `/api/devices/${deviceId}/actions/bluetooth-disconnect`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ address: deviceAddr || '' }),
+          }
+        );
+        if (res.success) {
+          setSettings((prev) => ({
+            ...prev,
+            bluetooth: {
+              connected: false,
+              deviceName: '',
+              status: 'disconnected',
+            },
+          }));
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error('[useDeviceSettings] Lỗi khi ngắt kết nối Bluetooth:', err);
         return false;
       } finally {
         setIsUpdating(false);
@@ -336,9 +387,11 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
     toggleMute,
     toggleFps,
     toggleStream,
+    setMaxFaces,
     testAudio,
     reconnectBluetooth,
     connectBluetooth,
+    disconnectBluetooth,
     scanWifi,
     scanBluetooth,
   };

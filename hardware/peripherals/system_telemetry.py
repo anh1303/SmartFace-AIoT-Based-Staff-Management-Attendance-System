@@ -214,57 +214,113 @@ def get_bluetooth_info() -> Dict[str, Any]:
 
 def scan_bluetooth_devices() -> List[Dict[str, Any]]:
     """
-    Quét chủ động tìm các thiết bị Bluetooth xung quanh (tai nghe, loa) và liệt kê kết quả.
+    Quét chủ động tìm các thiết bị Bluetooth xung quanh (tai nghe, loa, điện thoại) và liệt kê kết quả.
+    Giữ phiên bluetoothctl duy nhất trong 5 giây để thu thập đầy đủ thiết bị và tên thân thiện.
     """
-    devices: List[Dict[str, Any]] = []
+    devices_by_addr: Dict[str, Dict[str, Any]] = {}
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
-    # 1. Kích hoạt dò quét sóng (Active Discovery) trong 3.5 - 4 giây để tìm thiết bị mới
+    def is_mac_like_name(addr: str, name: str) -> bool:
+        if not name:
+            return True
+        norm_addr = addr.upper().replace(":", "").replace("-", "")
+        norm_name = name.upper().replace(":", "").replace("-", "")
+        return norm_addr == norm_name
+
+    # 0. Mở khóa rfkill và khởi động Bluetooth
     try:
-        subprocess.run(["bluetoothctl", "--timeout", "4", "scan", "on"], capture_output=True, text=True, timeout=6)
+        subprocess.run(["rfkill", "unblock", "bluetooth"], capture_output=True, text=True, timeout=2)
+    except Exception:
+        pass
+
+    # 1. Quét chủ động qua một phiên bluetoothctl (power on -> default-agent -> scan on -> devices)
+    try:
+        proc = subprocess.Popen(
+            ["bluetoothctl"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        if proc.stdin:
+            proc.stdin.write("power on\n")
+            proc.stdin.write("default-agent\n")
+            proc.stdin.write("scan on\n")
+            proc.stdin.flush()
+
+        import time
+        time.sleep(5.0)
+
+        if proc.stdin:
+            proc.stdin.write("devices\n")
+            proc.stdin.write("scan off\n")
+            proc.stdin.write("quit\n")
+            proc.stdin.flush()
+
+        stdout_data, _ = proc.communicate(timeout=4)
+        for raw_line in (stdout_data or "").splitlines():
+            clean = ansi_escape.sub("", raw_line).strip()
+            # Bắt các dòng "Device XX:XX... Name" hoặc "[NEW] Device XX:XX... Name"
+            m = re.search(r"Device\s+([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})\s+(.+)$", clean)
+            if m:
+                addr = m.group(1).upper()
+                name = m.group(2).strip()
+                # Bỏ qua các dòng trạng thái / thuộc tính
+                if any(name.startswith(prefix) for prefix in ("RSSI:", "TxPower:", "UUIDs:", "ManufacturerData", "ServiceData", "Paired:", "Connected:", "Trusted:", "Blocked:", "Alias:", "LegacyPairing:", "Icon:", "Class:")):
+                    continue
+                # Bỏ qua trường hợp tên trùng địa chỉ MAC
+                if not is_mac_like_name(addr, name):
+                    devices_by_addr[addr] = {
+                        "name": name,
+                        "address": addr,
+                        "connected": False,
+                        "paired": False,
+                    }
     except Exception:
         try:
-            # Fallback cho bản bluetoothctl không có cờ --timeout
-            p = subprocess.Popen(["bluetoothctl", "scan", "on"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            time.sleep(3.5)
-            p.terminate()
-            p.wait(timeout=1)
+            proc.kill()
         except Exception:
             pass
 
-    # 2. Lấy danh sách các thiết bị đã phát hiện được trong bộ đệm bluetoothctl
+    # 2. Đọc thêm các thiết bị đã lưu trong bộ đệm bluetoothctl
     try:
         res = subprocess.run(["bluetoothctl", "devices"], capture_output=True, text=True, timeout=3)
         if res.returncode == 0:
-            seen_addrs = set()
             for line in res.stdout.splitlines():
-                line = line.strip()
-                if line.startswith("Device"):
-                    parts = line.split(maxsplit=2)
+                clean = ansi_escape.sub("", line).strip()
+                if clean.startswith("Device"):
+                    parts = clean.split(maxsplit=2)
                     if len(parts) >= 3:
-                        addr, name = parts[1], parts[2].strip()
-                        # Lọc trùng và bỏ qua các thiết bị vô danh (chỉ hiện MAC)
-                        if addr not in seen_addrs and name and name != addr:
-                            seen_addrs.add(addr)
-                            devices.append({
+                        addr, name = parts[1].upper(), parts[2].strip()
+                        if addr not in devices_by_addr and not is_mac_like_name(addr, name):
+                            devices_by_addr[addr] = {
                                 "name": name,
                                 "address": addr,
                                 "connected": False,
                                 "paired": False,
-                            })
+                            }
     except Exception:
         pass
 
-    # 3. Kiểm tra thiết bị nào đã paired trước đó
+    devices = list(devices_by_addr.values())
+
+    # 3. Đánh dấu thiết bị nào đã paired hoặc đang kết nối
     try:
-        res_paired = subprocess.run(["bluetoothctl", "paired-devices"], capture_output=True, text=True, timeout=3)
+        bt_current = get_bluetooth_info()
+        current_addr = (bt_current.get("address") or "").upper()
+        res_paired = subprocess.run(["bluetoothctl", "devices", "Paired"], capture_output=True, text=True, timeout=3)
+        if res_paired.returncode != 0 or not res_paired.stdout.strip():
+            res_paired = subprocess.run(["bluetoothctl", "paired-devices"], capture_output=True, text=True, timeout=3)
+        paired_addrs = set()
         if res_paired.returncode == 0:
-            paired_addrs = {
-                l.split()[1] for l in res_paired.stdout.splitlines()
-                if l.strip().startswith("Device") and len(l.split()) >= 2
-            }
-            for d in devices:
-                if d["address"] in paired_addrs:
-                    d["paired"] = True
+            for l in res_paired.stdout.splitlines():
+                if l.strip().startswith("Device") and len(l.split()) >= 2:
+                    paired_addrs.add(l.split()[1].upper())
+        for d in devices:
+            if d["address"] in paired_addrs:
+                d["paired"] = True
+            if current_addr and d["address"] == current_addr:
+                d["connected"] = True
     except Exception:
         pass
 
@@ -293,4 +349,5 @@ def get_hardware_telemetry(settings: Optional[Dict[str, Any]] = None) -> Dict[st
         "is_muted": bool(settings.get("is_muted", False)),
         "show_fps": bool(settings.get("show_fps", True)),
         "stream_enabled": bool(settings.get("stream_enabled", True)),
+        "max_faces": int(settings.get("max_faces", 3)),
     }

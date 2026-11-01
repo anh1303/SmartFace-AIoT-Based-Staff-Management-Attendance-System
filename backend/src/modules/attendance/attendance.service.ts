@@ -274,7 +274,50 @@ export async function adjustAttendance(
     const isEmployeeUnlocked = existing && (existing as any).reopened_at !== null
     await assertEditableDay(tx, data.date, emp.id, { ignoreDayLock: Boolean(isEmployeeUnlocked) })
 
-    const overtime = roundHours(data.overtime * 3600), late = roundHours(data.late_early * 3600)
+    const requestedOt = Number(data.overtime) || 0
+    const requestedLateEarly = Number(data.late_early) || 0
+    if (requestedOt < 0 || requestedLateEarly < 0) {
+      throw AppError.badRequest('Số giờ tăng ca và đi trễ/về sớm không được âm')
+    }
+
+    const isOff = existing.attendance_status === 'OFF' || existing.attendance_status === 'NO_SHIFT' || Boolean(calculationDetails?.off) || calculationDetails?.assigned === false
+
+    let finalLateEarly = requestedLateEarly
+    if (isOff) {
+      // Ngày nghỉ / Chưa xếp ca (OFF / NO_SHIFT): Không áp dụng đi trễ / về sớm -> luôn gán bằng 0
+      finalLateEarly = 0
+
+      // Tính tổng thời gian làm việc thực tế từ các cặp quét trong ngày OFF
+      const pairs = Array.isArray(calculationDetails?.pairs) ? (calculationDetails.pairs as any[]) : []
+      const totalActualWorkedSeconds = pairs.reduce((sum: number, p: any) => {
+        const start = p.start ? +new Date(p.start) : 0
+        const end = p.end ? +new Date(p.end) : 0
+        return sum + (end > start ? (end - start) / 1000 : 0)
+      }, 0)
+      const maxAllowedOtHours = roundHours(totalActualWorkedSeconds)
+
+      // Cho phép lớn hơn 4h, nhưng không được vượt quá tổng thời gian đi làm thực tế
+      if (requestedOt > maxAllowedOtHours) {
+        throw AppError.badRequest(`Số giờ tăng ca ngày nghỉ không được vượt quá tổng thời gian làm việc thực tế (${maxAllowedOtHours} giờ)`)
+      }
+    } else {
+      // Ca làm việc thông thường: Giới hạn cứng tối đa 4 giờ tăng ca
+      if (requestedOt > 4) {
+        throw AppError.badRequest('Ca làm việc thông thường chỉ được phê duyệt tối đa 4 giờ tăng ca theo quy định')
+      }
+
+      const scheduledShiftSeconds = Number(calculationDetails?.scheduledShiftSeconds ?? 0)
+      const shiftDurationHours = scheduledShiftSeconds > 0
+        ? roundHours(scheduledShiftSeconds)
+        : (calculationDetails?.scheduledStart && calculationDetails?.scheduledEnd
+            ? roundHours(Math.max(0, (+new Date(calculationDetails.scheduledEnd as string) - +new Date(calculationDetails.scheduledStart as string)) / 1000))
+            : 0)
+      if (shiftDurationHours > 0 && requestedLateEarly > shiftDurationHours) {
+        throw AppError.badRequest(`Số giờ đi trễ/về sớm không được vượt quá thời lượng ca làm việc (${shiftDurationHours} giờ)`)
+      }
+    }
+
+    const overtime = roundHours(requestedOt * 3600), late = roundHours(finalLateEarly * 3600)
     const snapshot = (existing as any).reopened_at || !(existing as any).pre_approval_snapshot
       ? createAttendanceSnapshot(existing)
       : (existing as any).pre_approval_snapshot
@@ -739,27 +782,30 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
         }
 
         const details = (day.calculation_details || {}) as Record<string, any>
-        const isOff = day.attendance_status === 'OFF' || Boolean(details.off)
+        const isOff = day.attendance_status === 'OFF' || day.attendance_status === 'NO_SHIFT' || Boolean(details.off) || details.assigned === false
         const snapshot = (day as any).reopened_at || !(day as any).pre_approval_snapshot
           ? createAttendanceSnapshot(day)
           : (day as any).pre_approval_snapshot
 
-        // Phân loại OFF trước khi kiểm tra thiếu lượt
+        // Phân loại OFF / NO_SHIFT trước khi kiểm tra thiếu lượt: Admin khóa ngày thì toàn bộ công, OT, trễ sớm bằng 0
         if (isOff) {
-          const cappedOt = Math.min(Number(day.overtime_candidate_hours ?? 0), 4)
           const updated = await tx.daily_attendance_summary.update({
             where: { id: day.id },
             data: {
-              attendance_status: 'OFF',
+              attendance_status: day.attendance_status === 'NO_SHIFT' ? 'NO_SHIFT' : 'OFF',
               total_working_hours: 0,
-              overtime: cappedOt,
-              overtime_status: cappedOt > 0 ? 'APPROVED' : 'NONE',
+              overtime: 0,
+              overtime_candidate_hours: 0,
+              overtime_status: 'NONE',
               late_early: 0,
+              late_early_seconds: 0,
+              regular_seconds: 0,
+              overtime_seconds: 0,
               review_status: 'APPROVED',
               approval_source: 'MANUAL',
               approved_by: actorUserId || 'ADMIN',
               approved_at: new Date(),
-              approval_reason: day.approval_reason || (cappedOt > 0 ? 'Chốt ngày nghỉ có làm thêm giờ' : 'Chốt ngày nghỉ'),
+              approval_reason: day.approval_reason || 'Chốt ngày nghỉ (không phát sinh công và tăng ca khi chốt toàn công ty)',
               pre_approval_snapshot: snapshot,
               requires_review: false,
               reopened_at: null,
@@ -786,23 +832,34 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
         )
 
         if (isRealIncompleteOrError) {
+          // Quy tắc mới: Ca thiếu lượt quét không chuyển thành ABSENT mà chuyển trễ/sớm bằng đúng số giờ của ca
+          const scheduledShiftSeconds = Number(details.scheduledShiftSeconds ?? 0)
+          const shiftDurationHours = scheduledShiftSeconds > 0
+            ? roundHours(scheduledShiftSeconds)
+            : (details.scheduledStart && details.scheduledEnd
+                ? roundHours(Math.max(0, (+new Date(details.scheduledEnd) - +new Date(details.scheduledStart)) / 1000))
+                : 0)
+
           const updated = await tx.daily_attendance_summary.update({
             where: { id: day.id },
             data: {
-              attendance_status: 'ABSENT',
+              attendance_status: 'INCOMPLETE',
               total_working_hours: 0,
               overtime: 0,
               overtime_candidate_hours: 0,
               overtime_status: 'NONE',
-              late_early: 0,
+              late_early: shiftDurationHours,
+              late_early_seconds: Math.round(shiftDurationHours * 3600),
+              regular_seconds: 0,
+              overtime_seconds: 0,
               review_status: 'APPROVED',
               approval_source: 'MANUAL',
               approved_by: actorUserId || 'ADMIN',
               approved_at: new Date(),
-              approval_reason: 'Chốt thủ công: ca thiếu lượt/lỗi chuyển thành nghỉ không lý do',
+              approval_reason: `Chốt thủ công: ca thiếu lượt quét quy đổi trễ/sớm toàn bộ ca (${shiftDurationHours} giờ) thay vì nghỉ không phép`,
               pre_approval_snapshot: snapshot,
               requires_review: false,
-              calculation_details: { ...details, absenceCandidate: true },
+              calculation_details: { ...details, absenceCandidate: false },
               reopened_at: null,
               reopened_by: null,
             },
@@ -1241,27 +1298,31 @@ export async function autoCloseDueAttendance(asOf = new Date()) {
         const isPastDay = dateStr < todayVN
         const details = (freshSummary.calculation_details || {}) as Record<string, any>
         const scheduledEnd = details.scheduledEnd ? new Date(details.scheduledEnd) : null
-        const isOff = details.off || freshSummary.attendance_status === 'OFF'
+        const isOff = details.off || details.assigned === false || freshSummary.attendance_status === 'OFF' || freshSummary.attendance_status === 'NO_SHIFT'
         const otCutoff = scheduledEnd ? new Date(+scheduledEnd + 4 * 3600000) : null
 
         const baseSnapshot = createAttendanceSnapshot(freshSummary)
 
         if (isOff) {
           if (isPastDay) {
-            const cappedOt = Math.min(Number(freshSummary.overtime_candidate_hours ?? 0), 4)
+            // Quy tắc mới: Hệ thống tự chốt thì ca OFF / NO_SHIFT toàn bộ giờ làm, tăng ca, trễ sớm đều bằng 0
             const updated = await tx.daily_attendance_summary.update({
               where: { id: freshSummary.id },
               data: {
-                attendance_status: 'OFF',
+                attendance_status: freshSummary.attendance_status === 'NO_SHIFT' ? 'NO_SHIFT' : 'OFF',
                 total_working_hours: 0,
-                overtime: cappedOt,
-                overtime_status: cappedOt > 0 ? 'APPROVED' : 'NONE',
+                overtime: 0,
+                overtime_candidate_hours: 0,
+                overtime_status: 'NONE',
                 late_early: 0,
+                late_early_seconds: 0,
+                regular_seconds: 0,
+                overtime_seconds: 0,
                 review_status: 'APPROVED',
                 approval_source: 'AUTO',
                 approved_at: asOf,
                 approved_by: 'SYSTEM_AUTO',
-                approval_reason: cappedOt > 0 ? 'Tự động chốt: ngày nghỉ có làm thêm giờ' : 'Tự động chốt ngày nghỉ',
+                approval_reason: 'Tự động chốt ngày nghỉ (không phát sinh công và tăng ca do chưa có phê duyệt riêng của quản lý)',
                 pre_approval_snapshot: baseSnapshot,
                 requires_review: false,
                 reopened_at: null,
@@ -1325,38 +1386,50 @@ export async function autoCloseDueAttendance(asOf = new Date()) {
           const snapshot = (freshSummary as any).reopened_at || !(freshSummary as any).pre_approval_snapshot
             ? baseSnapshot
             : (freshSummary as any).pre_approval_snapshot
+
+          // Quy tắc mới: Ca thiếu lượt quét quy đổi trễ/sớm bằng số giờ ca thay vì chuyển thành ABSENT
+          const scheduledShiftSeconds = Number(details.scheduledShiftSeconds ?? 0)
+          const shiftDurationHours = scheduledShiftSeconds > 0
+            ? roundHours(scheduledShiftSeconds)
+            : (details.scheduledStart && details.scheduledEnd
+                ? roundHours(Math.max(0, (+new Date(details.scheduledEnd) - +new Date(details.scheduledStart)) / 1000))
+                : 0)
+
           const updated = await tx.daily_attendance_summary.update({
             where: { id: freshSummary.id },
             data: {
-              attendance_status: 'ABSENT',
+              attendance_status: 'INCOMPLETE',
               total_working_hours: 0,
               overtime: 0,
               overtime_candidate_hours: 0,
               overtime_status: 'NONE',
-              late_early: 0,
+              late_early: shiftDurationHours,
+              late_early_seconds: Math.round(shiftDurationHours * 3600),
+              regular_seconds: 0,
+              overtime_seconds: 0,
               review_status: 'APPROVED',
               approval_source: 'AUTO',
               approved_at: asOf,
               approved_by: 'SYSTEM_AUTO',
-              approval_reason: 'Tự động chốt: ca thiếu lượt sau khi hết thời hạn OT tối đa 4 giờ',
+              approval_reason: `Tự động chốt: ca thiếu lượt quét sau khi hết hạn, quy đổi trễ/sớm toàn bộ ca (${shiftDurationHours} giờ) thay vì nghỉ không phép`,
               pre_approval_snapshot: snapshot,
               requires_review: false,
-              calculation_details: { ...details, absenceCandidate: true },
+              calculation_details: { ...details, absenceCandidate: false },
               reopened_at: null,
               reopened_by: null,
             },
           })
           const rate = sourceHourlyRate(freshSummary.employees, period, wageSnapshot?.hourly_rate, Boolean(payrollOverrides(wageSnapshot).fields.hourly_rate))
           await syncDayAdjustments(tx, updated, rate, adjustmentPolicy?.absence_penalty_rate ?? null, sourceChanged ? undefined : adjustmentBatch)
-          absentConvertedCount++
+          closedCount++
 
           managerUserIds ??= await findActiveManagerAndAdminUserIds(tx)
           pendingNotifications.push(...managerUserIds.map(userId => ({
             user_id: userId,
             employee_id: freshSummary.employee_id,
-            event_key: `auto-absent:${freshSummary.id}`,
-            title: 'Tự động chốt nghỉ không lý do',
-            message: `Nhân viên ${freshSummary.employees.full_name}, ngày ${dateStr} đã được hệ thống tự động chốt thành nghỉ không lý do do thiếu lượt chấm công. Quản lý có thể mở khóa để chỉnh sửa nếu cần.`,
+            event_key: `auto-incomplete:${freshSummary.id}`,
+            title: 'Tự động chốt ca thiếu lượt chấm công',
+            message: `Nhân viên ${freshSummary.employees.full_name}, ngày ${dateStr} đã được hệ thống tự động chốt phạt trễ/sớm toàn ca (${shiftDurationHours} giờ) do thiếu lượt chấm công. Quản lý có thể mở khóa để chỉnh sửa nếu cần.`,
           })))
         }
       }

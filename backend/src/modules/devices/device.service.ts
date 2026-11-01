@@ -3,7 +3,7 @@ import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
 import { isValidUuid } from '../../common/utils.js'
 import { AppError } from '../../common/AppError.js'
-import { logAction } from '../audit-logs/audit.service.js'
+import { logAction } from '../audit-logs/public.js'
 
 export function formatDevice(d: Device) {
   return {
@@ -261,6 +261,16 @@ export async function getDeviceAttendanceMode(deviceId: string) {
 
 export async function setDeviceAttendanceMode(deviceId: string, mode: 'CHECK_IN' | 'CHECK_OUT', actorRole?: string) {
   if (actorRole?.toUpperCase() !== 'ADMIN') throw AppError.forbidden('Only Admin can control shared devices')
+  const existing = deviceModeStore.get(deviceId)
+  if (
+    existing &&
+    existing.mode === mode &&
+    existing.confirmed &&
+    existing.lastUpdated &&
+    Date.now() - new Date(existing.lastUpdated).getTime() < 5000
+  ) {
+    return { deviceId, mode, confirmed: true }
+  }
   let ackTimeout: NodeJS.Timeout
   const ackPromise = new Promise<boolean>((resolve) => {
     pendingModeAcks.set(deviceId, {

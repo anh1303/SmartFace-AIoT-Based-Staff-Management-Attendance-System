@@ -1,4 +1,4 @@
-import { getEmployeeScope, assertCanManageEmployee } from '../employees/employee.permission.js';
+import { getEmployeeScope, assertCanManageEmployee } from '../employees/public.js';
 import { workDateSchema } from '../../common/date.schema.js';
 import { assertDeviceWebhook } from '../../common/device-auth.js';
 import { Request, Response } from 'express';
@@ -101,3 +101,16 @@ export const unlock = async (req: Request, res: Response) => {
   const result = await service.toggleLock(dateStr, false, req.user?.id, req.user?.role);
   successResponse(res, result, 'Đã mở khóa dữ liệu chấm công thành công');
 };
+
+export const unlockEmployee = async (req: Request, res: Response) => {
+  const { employeeId, date, reason } = req.body;
+  if (!employeeId || !date) {
+    return res.status(400).json({ success: false, message: 'employeeId và date là bắt buộc' });
+  }
+  const result = await service.unlockEmployeeAttendance(
+    { employeeId, date, reason },
+    { id: req.user?.id, role: req.user?.role }
+  );
+  successResponse(res, result, result.message);
+};
+

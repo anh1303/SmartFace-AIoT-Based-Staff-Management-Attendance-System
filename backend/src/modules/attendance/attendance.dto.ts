@@ -19,7 +19,7 @@ export const adjustAttendanceSchema = z.object({
   date: workDateSchema,
   reason: z.string().trim().min(1, 'Lý do điều chỉnh là bắt buộc').max(2000),
   late_early: z.number().finite().min(0).max(744).default(0),
-  overtime: z.number().finite().min(0).max(744).default(0),
+  overtime: z.number().finite().min(0).max(4).default(0),
 })
 
 export const checkOutSchema = z.object({

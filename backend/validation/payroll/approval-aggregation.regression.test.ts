@@ -63,7 +63,7 @@ suite('Payroll approval and aggregation regressions on isolated Neon', () => {
     expect((await request(app).patch(`/api/notifications/${adminAlert.id}`).set('Authorization', `Bearer ${token(staff, 'EMPLOYEE')}`).send({ action: 'delete' })).status).toBe(404)
     expect((await list(admin, 'ADMIN')).body.data.some((n: any) => n.id === `server_${adminAlert.id}`)).toBe(true)
   })
-  it('rejects approval when the listed price is unknown', async () => {
+  it('rejects independent decisions when the listed price is unknown', async () => {
     const date = '2026-09-03', employee = await addEmployee(date)
     await raw(employee,date,'CHECK_IN','08:00:00'); await raw(employee,date,'CHECK_OUT','17:00:00')
     await attendance.aggregateDailyAttendance(9,2026,employee.id,date)
@@ -71,7 +71,7 @@ suite('Payroll approval and aggregation regressions on isolated Neon', () => {
     const item = listed.find((entry: any) => entry.kind === 'OVERTIME')
     expect(item).toMatchObject({ amount: null, can_review: false })
     await expect(adjustments.reviewAdjustment(item.id,{ status:'APPROVED',updated_at:item.updated_at },{ id:admin.id,role:'ADMIN' })).rejects.toThrow()
-    await expect(adjustments.reviewAdjustment(item.id,{ status:'REJECTED',updated_at:item.updated_at },{ id:admin.id,role:'ADMIN' })).resolves.toMatchObject({ status: 'REJECTED' })
+    await expect(adjustments.reviewAdjustment(item.id,{ status:'REJECTED',updated_at:item.updated_at },{ id:admin.id,role:'ADMIN' })).rejects.toThrow()
   })
   it('continues current aggregation after a previous-month error', async () => {
     await addEmployee('2026-09-04')

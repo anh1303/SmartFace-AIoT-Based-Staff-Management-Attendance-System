@@ -10,10 +10,10 @@ function calculate(date: string, out: string, assigned = shift) {
 }
 
 describe('Two-thirds attendance policy effective 2026-10-29', () => {
-  it('does not grant wages or a late/early penalty one second below six hours of a nine-hour shift', () => {
+  it('does not grant wages but records late/early penalty one second below six hours of a nine-hour shift', () => {
     const result = calculate('2026-10-29', '13:59:59')
     expect(result.workingHours).toBe(0)
-    expect(result.lateEarlyHours).toBe(0)
+    expect(result.lateEarlyHours).toBe(3)
     expect(result.overtimeCandidateHours).toBe(0)
     expect(result.requiresReview).toBe(true)
     expect(result.reviewReason).toContain('UNDER_MINIMUM_SHIFT')

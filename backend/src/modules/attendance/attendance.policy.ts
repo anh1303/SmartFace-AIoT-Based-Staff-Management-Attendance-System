@@ -1,5 +1,7 @@
 import { annotatePairCredits } from './attendance.details.js'
 import { createHash } from 'node:crypto'
+import { vnDay } from '../../common/utils.js'
+export { vnDay }
 /** Company policy v2026-10-19. Pure calculations; no database, network or rounding per pair. */
 export const ATTENDANCE_POLICY_VERSION = '2026-10-29-v6'
 export const TWO_THIRDS_EFFECTIVE_DATE = '2026-10-29'
@@ -15,12 +17,6 @@ export function roundHours(seconds: number): number {
   const whole = Math.floor(duration / 3600)
   const remainder = duration - whole * 3600
   return whole + (remainder >= 1800 ? 0.5 : 0)
-}
-// Reuse ICU timezone data instead of constructing a formatter on every scan/day.
-const vnDayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
-export const vnDay = (value: Date | string): string => {
-  const date = new Date(value)
-  return Number.isNaN(+date) ? 'Invalid Date' : vnDayFormatter.format(date)
 }
 
 export interface PolicyLog {
@@ -86,6 +82,15 @@ export function shiftBounds(workDate: string, shift: PolicyShift | null) {
   return { start, end, off, isZeroDuration }
 }
 
+export function hasLegacyOvernightBounds(workDate: string, shift: PolicyShift, value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const details = value as Record<string, unknown>
+  if (typeof details.scheduledStart !== 'string' || typeof details.scheduledEnd !== 'string') return false
+  const { start, end, off, isZeroDuration } = shiftBounds(workDate, shift)
+  if (off || isZeroDuration || vnDay(start) === vnDay(end)) return false
+  return +new Date(details.scheduledStart) === +start - 86400000 && +new Date(details.scheduledEnd) === +end - 86400000
+}
+
 /** Snapshot-scoped resolver: no identity data or mutable schedules cached globally. */
 function createWorkDateResolver(assignments: DatedPolicyShift[]) {
   const windows = assignments.map(shift => {
@@ -96,7 +101,7 @@ function createWorkDateResolver(assignments: DatedPolicyShift[]) {
   return (time: Date | string) => {
     const at = +new Date(time)
     if (days.has(at)) return days.get(at)!
-    const candidates = windows.filter(s => !s.off && !s.isZeroDuration && at >= +s.start - 3600000 && at < +s.end)
+    const candidates = windows.filter(s => !s.off && !s.isZeroDuration && at >= +s.start - 3600000 && at < +s.end + 4 * 3600000)
       .sort((a,b) => Number(+a.start > at) - Number(+b.start > at) || +b.start - +a.start)
     const date = candidates[0]?.date || vnDay(time)
     days.set(at, date)
@@ -156,21 +161,26 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
   let lateSeconds = 0
   let earlySeconds = 0
 
+  if (shift && !off && (meetsMinimumShift || (underMinimumShift && twoThirds))) {
+    lateSeconds = actualFirst ? Math.min(scheduledShiftSeconds, Math.max(0, (+actualFirst - +start) / 1000)) : 0
+    earlySeconds = actualLast ? Math.min(scheduledShiftSeconds, Math.max(0, (+end - +actualLast) / 1000)) : 0
+  }
+
   if (meetsMinimumShift) {
     // Lựa chọn B: Tổng giờ làm việc trong ngày = Giờ kết thúc ca - Giờ bắt đầu ca
     regularSeconds = scheduledShiftSeconds
     overtimeSeconds = rawOvertimeSeconds
-    lateSeconds = actualFirst ? Math.min(scheduledShiftSeconds, Math.max(0, (+actualFirst - +start) / 1000)) : 0
-    earlySeconds = actualLast ? Math.min(scheduledShiftSeconds, Math.max(0, (+end - +actualLast) / 1000)) : 0
   }
-  // Below the dated eligibility threshold, retain evidence but grant no automatic wages or penalties.
+  // Dưới ngưỡng 2/3 ca (từ 2026-10-29): không tính công ngày (0 giờ làm), nhưng ghi nhận giờ trễ / sớm thực tế để phạt vi phạm
 
   const lateEarlySeconds = lateSeconds + earlySeconds
   const invalid = ignored.some(l => l.reason === 'INVALID_PAIR' || l.reason === 'INTERRUPTED_PAIR')
   const flagged = source.some(l => l.status && l.status !== 'VALID')
   const orphanOut = !pairs.length && ignored.some(l => l.reason === 'UNPAIRED_CHECK_OUT')
   const noValidPair = sourceEvents.length > 0 && pairs.length === 0
-  const review = Boolean(noValidPair || open || invalid || flagged || orphanOut || underMinimumShift || (!shift && (pairs.length || ignored.length)) || overtimeSeconds > OT_REVIEW_SECONDS)
+  const isMissingOrIncomplete = Boolean(noValidPair || open || invalid || orphanOut || underMinimumShift || (!shift && (pairs.length || ignored.length)))
+  const overtimeCapped = overtimeSeconds > OT_REVIEW_SECONDS
+  const review = Boolean(isMissingOrIncomplete || flagged || overtimeCapped)
   const absenceCandidate = Boolean(shift && !off && scheduledShiftSeconds > 0 && +now >= +end && sourceEvents.length === 0 && !open && !ignored.length)
   let status = off ? 'OFF' : !shift ? 'NO_SHIFT' : !pairs.length && !open && +now < +end ? 'SCHEDULED' : absenceCandidate ? 'ABSENT' : 'PRESENT'
   if (!off && shift && (open || invalid || orphanOut || underMinimumShift)) status = 'INCOMPLETE'
@@ -179,11 +189,12 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
     else if (lateSeconds > 900) status = 'LATE'
     else if (earlySeconds > 0) status = 'EARLY_LEAVE'
   }
-  const candidate = overtimeSeconds > OT_THRESHOLD_SECONDS ? roundHours(overtimeSeconds) : 0
+  const candidate = overtimeSeconds > OT_THRESHOLD_SECONDS ? roundHours(Math.min(overtimeSeconds, OT_REVIEW_SECONDS)) : 0
   return {
     first, last, regularSeconds, overtimeSeconds, lateEarlySeconds, absenceCandidate,
     workingHours: roundHours(regularSeconds), lateEarlyHours: roundHours(lateEarlySeconds),
     overtimeCandidateHours: candidate, status, requiresReview: review,
+    isMissingOrIncomplete, overtimeCapped,
     reviewReason: [
       open ? 'MISSING_CHECK_OUT' : '',
       noValidPair ? 'NO_VALID_PAIR' : '',
@@ -192,7 +203,7 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
       orphanOut ? 'UNPAIRED_CHECK_OUT' : '',
       underMinimumShift ? twoThirds ? 'UNDER_MINIMUM_SHIFT' : 'UNDER_HALF_SHIFT' : '',
       !shift && (pairs.length || ignored.length) ? 'NO_SHIFT' : '',
-      overtimeSeconds > OT_REVIEW_SECONDS ? 'OT_OVER_4H' : '',
+      overtimeCapped ? 'OT_OVER_4H' : '',
     ].filter(Boolean).join(',') || null,
     details: {
       events: sourceEvents,
@@ -215,10 +226,14 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
       meetsMinimumShift,
       minimumShiftNumerator: requiredNumerator,
       minimumShiftDenominator: requiredDenominator,
+      isMissingOrIncomplete,
+      overtimeCapped,
       // Legacy consumers can still read old half-shift evidence.
       ...(!twoThirds ? { meetsHalfShift: meetsMinimumShift } : {}),
       absenceCandidate,
       overviewPairIds: overviewPairs.map(p => [p.inId, p.outId]),
+      lateSeconds,
+      earlySeconds,
       // Internal gaps are evidence only; they do not add late/early penalties.
       internalGapSeconds: Math.max(0, actualFirst && actualLast ? (+actualLast - +actualFirst) / 1000 - pairs.reduce((n, p) => n + (+p.end - +p.start) / 1000, 0) : 0),
     },

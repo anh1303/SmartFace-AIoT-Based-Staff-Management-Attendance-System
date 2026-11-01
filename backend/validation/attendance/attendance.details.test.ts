@@ -35,4 +35,74 @@ describe('Per-checkout work credits and bounded DB writes', () => {
     expect(tx.$executeRaw).toHaveBeenCalledTimes(1);expect(tx.auditLog.createMany).toHaveBeenCalledTimes(1)
     expect(batch.writes.every((w:any)=>w.status==='PENDING'&&w.note==='checked')).toBe(true)
   })
+
+  it('invalidates old shift snapshot on shift change so re-approval captures new 4h shift, not 8h shift', async () => {
+    const { createAttendanceSnapshot, restoreAttendanceFromSnapshot } = await import('../../src/modules/attendance/attendance.snapshot.js')
+    const { invalidateDailySummaryForShiftChange } = await import('../../src/modules/attendance/attendance.contract.js')
+    const { Prisma } = await import('@prisma/client')
+
+    // 1. Initial 8-hour shift approved
+    const summary8h: any = {
+      id: 101n,
+      employee_id: 'emp-1',
+      work_date: new Date('2026-10-26T00:00:00Z'),
+      total_working_hours: 8,
+      regular_seconds: 28800,
+      overtime: 0,
+      review_status: 'NONE',
+    }
+    const snapshot8h = createAttendanceSnapshot(summary8h)
+    summary8h.review_status = 'APPROVED'
+    summary8h.pre_approval_snapshot = snapshot8h
+
+    // 2. Shift edited from 8h to 4h -> invalidateDailySummaryForShiftChange is called
+    let updatedData: any = null
+    const mockTx: any = {
+      daily_attendance_summary: {
+        updateMany: vi.fn(async ({ data }: any) => {
+          updatedData = data
+          return { count: 1 }
+        })
+      },
+      attendanceAdjustment: {
+        updateMany: vi.fn(async () => ({ count: 0 }))
+      }
+    }
+
+    await invalidateDailySummaryForShiftChange('emp-1', new Date('2026-10-26T00:00:00Z'), mockTx)
+
+    // Verify snapshot was invalidated to Prisma.DbNull
+    expect(updatedData.pre_approval_snapshot).toBe(Prisma.DbNull)
+    expect(updatedData.reopened_by).toBe('SHIFT_CHANGED')
+
+    // 3. New 4h shift aggregated
+    const summary4h: any = {
+      ...summary8h,
+      total_working_hours: 4,
+      regular_seconds: 14400,
+      review_status: 'PENDING',
+      reopened_at: updatedData.reopened_at,
+      reopened_by: updatedData.reopened_by,
+      pre_approval_snapshot: null,
+    }
+
+    // 4. Re-approved: fresh snapshot must be captured for 4h shift
+    const snapshot4h = (summary4h.reopened_at || !summary4h.pre_approval_snapshot)
+      ? createAttendanceSnapshot(summary4h)
+      : summary4h.pre_approval_snapshot
+
+    expect(snapshot4h.total_working_hours).toBe(4)
+    expect(snapshot4h.regular_seconds).toBe(14400)
+
+    summary4h.review_status = 'APPROVED'
+    summary4h.pre_approval_snapshot = snapshot4h
+    summary4h.reopened_at = null
+
+    // 5. Manager performs personal unlock: must restore 4h data, NOT 8h data!
+    const restored = restoreAttendanceFromSnapshot(summary4h, summary4h.pre_approval_snapshot, { isPersonalUnlock: true })
+    expect(restored.total_working_hours).toBe(4)
+    expect(restored.regular_seconds).toBe(14400)
+    expect(restored.total_working_hours).not.toBe(8)
+  })
 })
+

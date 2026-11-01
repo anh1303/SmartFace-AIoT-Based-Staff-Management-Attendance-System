@@ -7,8 +7,23 @@ const db = vi.hoisted(() => ({
   daily_attendance_summary: { updateMany: vi.fn() }, auditLog: { create: vi.fn() },
 }))
 vi.mock('../../src/config/database.js', () => ({ prisma: db }))
-vi.mock('../../src/modules/employees/index.js', () => ({ findEmployeeByIdOrCode: vi.fn(async () => ({ id: 'employee1', status: 'ACTIVE', employee_code: 'NV01' })), findEmployeeByUserId: vi.fn() }))
-vi.mock('../../src/modules/attendance/index.js', () => ({ assertEditableDay: vi.fn(), aggregateDailyAttendance: vi.fn(), isAttendanceDateLocked: vi.fn(async () => false) }))
+const mockFindEmployee = vi.hoisted(() => vi.fn(async (id: string, tx?: any) => {
+  if (tx?.employee?.findUnique) return tx.employee.findUnique({ where: { id } })
+  if (tx?.employee?.findFirst) return tx.employee.findFirst({ where: { id } })
+  return { id: 'employee1', status: 'ACTIVE', employee_code: 'NV01' }
+}))
+vi.mock('../../src/modules/employees/public.js', () => ({
+  findEmployeeByIdOrCode: mockFindEmployee,
+  findEmployeeByUserId: vi.fn(),
+  assertCanManageEmployee: vi.fn(),
+}))
+vi.mock('../../src/modules/employees/index.js', () => ({
+  findEmployeeByIdOrCode: mockFindEmployee,
+  findEmployeeByUserId: vi.fn(),
+  assertCanManageEmployee: vi.fn(),
+}))
+vi.mock('../../src/modules/attendance/public.js', () => ({ assertEditableDay: vi.fn(), aggregateDailyAttendance: vi.fn(), isAttendanceDateLocked: vi.fn(async () => false), invalidateDailySummaryForShiftChange: vi.fn() }))
+vi.mock('../../src/modules/attendance/index.js', () => ({ assertEditableDay: vi.fn(), aggregateDailyAttendance: vi.fn(), isAttendanceDateLocked: vi.fn(async () => false), invalidateDailySummaryForShiftChange: vi.fn() }))
 import { assignOrUpdate } from '../../src/modules/shifts/shift.service.js'
 import { shiftTemplateSchema } from '../../src/modules/shifts/template.dto.js'
 
@@ -23,6 +38,25 @@ describe('overnight shifts', () => {
   })
   it.each([['08:00', '08:00'], ['24:00', '06:00'], ['22:00', '06:60'], ['', '06:00']])('rejects invalid or zero-duration OTHER %s–%s before creating a shift', async (start_time, end_time) => {
     await expect(assignOrUpdate({ employee_id: 'employee1', date: '2026-10-31', shift_type: 'OTHER', start_time, end_time }, 'admin', 'ADMIN')).rejects.toThrow()
+    expect(db.employee_shifts.create).not.toHaveBeenCalled()
+  })
+  it('locks payroll period before employee lock and rejects terminated employee', async () => {
+    const executedLocks: string[] = []
+    db.$executeRaw.mockImplementation((queryParts: any, ...values: any[]) => {
+      executedLocks.push(values[0])
+      return Promise.resolve(1)
+    })
+    db.employee = {
+      findUnique: vi.fn(async () => ({ status: 'TERMINATED' }))
+    }
+
+    await expect(
+      assignOrUpdate({ employee_id: 'employee1', date: '2026-11-05', shift_type: 'OFFICE_HOURS' }, 'admin', 'ADMIN')
+    ).rejects.toThrow('TERMINATED')
+
+    // Period lock (payroll:2026-11) MUST precede employee lock (employee:employee1)
+    expect(executedLocks[0]).toBe('payroll:2026-11')
+    expect(executedLocks[1]).toBe('employee:employee1')
     expect(db.employee_shifts.create).not.toHaveBeenCalled()
   })
 })

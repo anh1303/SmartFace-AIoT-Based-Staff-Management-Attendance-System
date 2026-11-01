@@ -1,6 +1,6 @@
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { logAction } from '../audit-logs/audit.service.js'
+import { logAction } from '../audit-logs/public.js'
 
 export interface DepartmentItem {
   id: number

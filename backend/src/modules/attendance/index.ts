@@ -1,10 +1,8 @@
-/**
- * Attendance Module Public API (Facade)
- * Quy định các hàm và kiểu dữ liệu được phép sử dụng từ các module bên ngoài.
- */
-export * from './attendance.lock.js'
-export * from './attendance.service.js'
-export * from './attendance.dto.js'
-export * from './attendance.model.js'
+// Public entry points used by other modules and the application.
+export { isAttendanceDateLocked } from './attendance.lock.js'
+export { assertEditableDay, getAttendanceSummariesByEmployeesAndDateRange } from './attendance.service.js'
+export { aggregateDailyAttendance } from './attendance.aggregation.js'
 export { initializeAttendanceGateway } from './attendance.gateway.js'
+export { startAttendanceCron, stopAttendanceCron } from './attendance.cron.js'
+export { notificationRouter } from './attendance.notifications.js'
 export { attendanceRouter } from './attendance.routes.js'

@@ -6,9 +6,7 @@ import * as service from './device.service.js';
 import { createDeviceSchema, updateDeviceSchema } from './device.dto.js';
 
 export const modeNotify = async (req: Request, res: Response) => {
-  if (process.env.TB_WEBHOOK_SECRET) {
-    assertDeviceWebhook(req);
-  }
+  assertDeviceWebhook(req);
   const mode = req.body.mode || req.body.current_mode || req.body.attendance_mode;
   if (!mode || !['CHECK_IN', 'CHECK_OUT'].includes(mode)) {
     return res.status(400).json({ success: false, message: 'Invalid mode: must be CHECK_IN or CHECK_OUT' });

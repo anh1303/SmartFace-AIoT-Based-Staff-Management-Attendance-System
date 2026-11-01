@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculateDay, pairAttendance, prepareAttendance, roundHours } from '../../src/modules/attendance/attendance.policy.js'
+import { calculateDay, pairAttendance, prepareAttendance, roundHours, hasLegacyOvernightBounds } from '../../src/modules/attendance/attendance.policy.js'
 import { displayAttendanceStatus } from '../../src/modules/attendance/attendance.reasons.js'
 const day = '2026-10-02'
 const shift = { start_time: '08:00', end_time: '17:30', shift_type: 'OFFICE_HOURS' }
@@ -60,6 +60,11 @@ describe('Company policy boundaries', () => {
     expect(r.overtimeCandidateHours).toBe(expected)
   })
   it.each([['21:30:00',false],['21:30:01',true]])('flags raw OT over four hours at %s', (out, expected) => expect(calc([log(1,'CHECK_IN','08:00:00'),log(2,'CHECK_OUT',out)]).requiresReview).toBe(expected))
+  it('caps payable overtime at four hours while preserving measured overtime', () => {
+    const r = calc([log(1,'CHECK_IN','08:00:00'),log(2,'CHECK_OUT','22:30:00')])
+    expect(r.overtimeSeconds).toBe(5 * 3600)
+    expect(r.overtimeCandidateHours).toBe(4)
+  })
   it('allows a 24h pair but rejects 24h plus a second', () => {
     const inside = pairAttendance([log(1,'CHECK_IN','08:00:00'),log(2,'CHECK_OUT','08:00:00','2026-10-03')])
     const outside = pairAttendance([log(1,'CHECK_IN','08:00:00'),log(2,'CHECK_OUT','08:00:01','2026-10-03')])
@@ -93,6 +98,24 @@ describe('Company policy boundaries', () => {
 })
 
 describe('Absence and overnight ownership', () => {
+  it('attributes an overnight shift to its assigned start date across a month boundary', () => {
+    const night = { start_time: '22:00', end_time: '06:00', shift_type: 'OTHER', work_date: '2026-09-30' }
+    const logs = [log(1, 'CHECK_IN', '22:00:00', '2026-09-30'), log(2, 'CHECK_OUT', '06:00:00', '2026-10-01')]
+    const result = calculateDay('2026-09-30', logs, night, new Date('2026-10-01T07:00:00+07:00'), [night])
+    expect(result.details.scheduledStart).toBe(new Date('2026-09-30T22:00:00+07:00').toISOString())
+    expect(result.details.scheduledEnd).toBe(new Date('2026-10-01T06:00:00+07:00').toISOString())
+    expect(result.workingHours).toBe(8)
+    expect(result.details.pairs).toHaveLength(1)
+  })
+  it('identifies summaries saved with the former end-date interpretation', () => {
+    const night = { start_time: '22:00', end_time: '06:00', shift_type: 'OTHER' }
+    expect(hasLegacyOvernightBounds('2026-09-30', night, {
+      scheduledStart: '2026-09-29T22:00:00+07:00', scheduledEnd: '2026-09-30T06:00:00+07:00',
+    })).toBe(true)
+    expect(hasLegacyOvernightBounds('2026-09-30', night, {
+      scheduledStart: '2026-09-30T22:00:00+07:00', scheduledEnd: '2026-10-01T06:00:00+07:00',
+    })).toBe(false)
+  })
   it('proposes absence only after end of an assigned empty shift', () => {
     expect(calculateDay(day, [], shift, new Date(`${day}T12:00:00+07:00`)).absenceCandidate).toBe(false)
     expect(calc([]).absenceCandidate).toBe(true)
@@ -117,18 +140,20 @@ describe('Absence and overnight ownership', () => {
   it('joins checkout after midnight and re-entry to the previous overnight shift', () => {
     const night = { start_time: '22:00', end_time: '06:00', shift_type:'NIGHT' }
     const next = '2026-10-03'
+    const afterNext = '2026-10-04'
     const assignments = [{...night,work_date:day},{...shift,work_date:next}]
     const logs = [log(1,'CHECK_IN','22:00:00'),log(2,'CHECK_OUT','01:00:00',next),log(3,'CHECK_IN','01:30:00',next),log(4,'CHECK_OUT','07:00:00',next)]
-    const previous = calculateDay(day, logs, night, new Date(`${next}T08:00:00+07:00`), assignments)
+    const previous = calculateDay(day, logs, night, new Date(`${afterNext}T08:00:00+07:00`), assignments)
     expect(previous.details.pairs).toHaveLength(2)
     expect(previous.workingHours).toBe(8)
     expect(previous.overtimeCandidateHours).toBe(1)
     expect(previous.lateEarlyHours).toBe(0)
     expect(previous.details.events).toHaveLength(4)
     expect(previous.details.pairs[1].regular_seconds).toBe(4.5 * 3600)
-    expect(calculateDay(next, logs, shift, new Date(`${next}T18:00:00+07:00`), assignments).details.pairs).toHaveLength(0)
+    expect(calculateDay(next, logs, shift, new Date(`${afterNext}T18:00:00+07:00`), assignments).details.pairs).toHaveLength(0)
   })
   it('does not declare a night-shift absence at midnight', () => {
+    const next = '2026-10-03'
     const r = calculateDay(day, [], { start_time:'22:00',end_time:'06:00',shift_type:'NIGHT' }, new Date('2026-10-03T00:30:00+07:00'))
     expect(r.status).toBe('SCHEDULED'); expect(r.absenceCandidate).toBe(false)
   })
@@ -142,13 +167,13 @@ describe('Absence and overnight ownership', () => {
   })
   it('reuses a prepared monthly calculation without changing any daily result', () => {
     const night = { start_time:'22:00',end_time:'06:00',shift_type:'NIGHT' }
-    const assignments = [{...night,work_date:'2026-09-30'},{...shift,work_date:'2026-10-01'}]
+    const assignments = [{...night,work_date:'2026-09-30'},{...shift,work_date:'2026-10-02'}]
     const logs = [
       log(1,'CHECK_IN','22:00:00','2026-09-30'),
       log(2,'CHECK_OUT','01:00:00','2026-10-01'),
       {...log(3,'CHECK_IN','01:30:00','2026-10-01'),status:'FLAGGED'},
       log(4,'CHECK_OUT','07:00:00','2026-10-01'),
-      log(5,'CHECK_OUT','18:00:00','2026-10-01'),
+      log(5,'CHECK_OUT','18:00:00','2026-10-02'),
     ]
     const now = new Date('2026-10-02T12:00:00+07:00')
     const prepared = prepareAttendance(logs,assignments)

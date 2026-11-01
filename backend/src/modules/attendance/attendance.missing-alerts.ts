@@ -1,6 +1,8 @@
 import { shiftBounds, vnDay, attendanceWorkDate, type DatedPolicyShift } from './attendance.policy.js'
 import { prisma } from '../../config/database.js'
-import { isEmployeeManager } from '../employees/employee.permission.js'
+import { isEmployeeManager } from '../employees/public.js'
+import { getActiveEmployeeShiftsWithDetails } from '../shifts/public.js'
+import { findActiveAlertRecipients } from '../auth/public.js'
 
 export type MissingScanKind = 'CHECK_IN' | 'CHECK_OUT' | 'BOTH'
 
@@ -24,10 +26,7 @@ export async function runMissingScanAlerts(now = new Date()) {
     const until = new Date(Math.min(+now, +from + 7 * 86400_000))
     const dateFrom = new Date(`${vnDay(new Date(+from - 3 * 86400_000))}T00:00:00Z`)
     const dateTo = new Date(`${vnDay(until)}T00:00:00Z`)
-    const shifts = await tx.employee_shifts.findMany({
-      where: { work_date: { gte: dateFrom, lte: dateTo }, employees: { status: 'ACTIVE' } },
-      include: { work_shifts: true, employees: { include: { position: true, department: true, users: { include: { roles: true } } } } },
-    })
+    const shifts = await getActiveEmployeeShiftsWithDetails(dateFrom, dateTo, tx)
     const schedule = shifts.map(s => ({ ...s, start_time: s.start_time ?? s.work_shifts.start_time, end_time: s.end_time ?? s.work_shifts.end_time }))
     const due = schedule.filter(s => {
       const bounds = shiftBounds(vnDay(s.work_date), s)
@@ -45,7 +44,7 @@ export async function runMissingScanAlerts(now = new Date()) {
     const ids = [...new Set(due.map(s => s.employee_id))]
     const [logs, users] = await Promise.all([
       tx.attendance_logs.findMany({ where: { employee_id: { in: ids }, event_time: { gte: new Date(+dateFrom - 86400_000), lte: now } } }),
-      tx.user.findMany({ where: { is_active: true, roles: { role_name: { in: ['ADMIN', 'MANAGER'] } } }, include: { roles: true, employees: true } }),
+      findActiveAlertRecipients(tx),
     ])
     const rows: Array<{ user_id: string; employee_id: string; event_key: string; title: string; message: string }> = []
     for (const shift of due) {
@@ -72,9 +71,9 @@ export async function runMissingScanAlerts(now = new Date()) {
       const message = `${shift.employees.full_name}, ngày ${date}, ca ${shift.work_shifts.shift_name} chưa có lượt ${label} hợp lệ. Vui lòng trao đổi với quản lý.`
       const recipients = new Set<string>()
       for (const user of users) {
-        if (user.roles.role_name === 'ADMIN') recipients.add(user.id)
-        else if (user.roles.role_name === 'MANAGER' && shift.employees.departmentId && !isEmployeeManager(shift.employees)
-          && user.employees?.status === 'ACTIVE' && user.employees.departmentId === shift.employees.departmentId && user.id !== shift.employees.user_id) recipients.add(user.id)
+        if (user.role === 'ADMIN') recipients.add(user.id)
+        else if (user.role === 'MANAGER' && shift.employees.departmentId && !isEmployeeManager(shift.employees)
+          && user.status === 'ACTIVE' && user.departmentId === shift.employees.departmentId && user.id !== shift.employees.user_id) recipients.add(user.id)
       }
       if (shift.employees.user_id) recipients.add(shift.employees.user_id)
       for (const user_id of recipients) rows.push({ user_id, employee_id: shift.employee_id, event_key: `missing-shift:${shift.id}`, title, message })

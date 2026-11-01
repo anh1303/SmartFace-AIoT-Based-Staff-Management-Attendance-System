@@ -1,6 +1,4 @@
-import { prisma } from '../../config/database.js'
-import { buildIdOrCodeWhere } from '../../common/utils.js'
-import { isEmployeeManager } from '../employees/employee.permission.js'
+import { attendanceRecipientRooms } from './attendance.recipients.js'
 import type { Server } from 'socket.io'
 import { eventBus } from '../../common/event-bus.js'
 import { socketAuthMiddleware, refreshSocketScope } from '../../sockets/socket.auth.js'
@@ -33,19 +31,9 @@ export const emitAttendanceEvent = async (event: string, payload: unknown, room?
     await Promise.all([...nsp.sockets.values()].map(async socket => {
       try { await refreshSocketScope(socket) } catch { socket.disconnect(true) }
     }))
-    const p = payload as any
-    const empId = p?.employee_uuid || p?.employee_id || p?.employeeId || p?.employees?.id || p?.employees?.employee_code
-    const userId = p?.employee_user_id || p?.user_id || p?.userId || p?.employees?.user_id
-    const employee = empId || userId ? await prisma.employee.findFirst({
-      where: empId ? buildIdOrCodeWhere(String(empId)) : { user_id: String(userId) },
-      include: { position: true, department: true, users: { include: { roles: true } } },
-    }) : null
-    let recipients = nsp.to('ADMIN')
-    if (employee) {
-      if (employee.departmentId && !isEmployeeManager(employee)) recipients = recipients.to(`department:${employee.departmentId}`)
-      recipients = recipients.to(`employee:${employee.id}`)
-      if (employee.user_id) recipients = recipients.to(`user:${employee.user_id}`)
-    }
+    const rooms = await attendanceRecipientRooms(payload)
+    let recipients = nsp.to(rooms[0])
+    for (const target of rooms.slice(1)) recipients = recipients.to(target)
     // Explicit rooms cannot broaden the scope of an event.
     recipients.emit(event, payload)
   } catch (error) {
@@ -78,6 +66,10 @@ eventBus.subscribe('attendance:spoof-blocked', (data) => {
 
 eventBus.subscribe('attendance:unknown', (data) => {
   emitAttendanceEvent('attendance-unknown', data)
+})
+
+eventBus.subscribe('attendance:flagged', (data) => {
+  emitAttendanceEvent('attendance-flagged', data)
 })
 
 // WebRTCPlayer kết nối namespace /attendance để lắng nghe sự kiện đổi mode của thiết bị

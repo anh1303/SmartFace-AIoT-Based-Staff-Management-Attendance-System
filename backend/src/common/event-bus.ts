@@ -22,20 +22,30 @@ export interface DomainEvents {
   'attendance:summary-updated': {
     employeeId?: string
     workDate?: string
+    period?: string
     summary: any
   }
   'attendance:spoof-blocked': {
     employeeId?: string
     device_id?: string
+    event_id?: string
     similarity?: number
     timestamp: string | Date
     status: string
   }
   'attendance:unknown': {
     device_id?: string
+    event_id?: string
     timestamp: string | Date
     status: string
     similarity?: number
+  }
+  'attendance:flagged': {
+    device_id?: string
+    event_id?: string
+    employee_id?: string
+    reason: string
+    timestamp: string | Date
   }
   'device:mode-updated': {
     deviceId: string

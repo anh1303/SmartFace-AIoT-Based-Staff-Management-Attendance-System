@@ -1,8 +1,9 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { logAction } from '../audit-logs/index.js'
+import { logAction } from '../audit-logs/public.js'
 import { env } from '../../config/env.js'
-import { findEmployeeByIdOrCode, assertCanManageEmployee, type EmployeeActor } from '../employees/index.js'
+import { findEmployeeByIdOrCode, findActiveEmployeeIds, assertCanManageEmployee, type EmployeeActor } from '../employees/public.js'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -164,3 +165,71 @@ export async function removeAllWithPermissionCheck(
 
   return removeAll(employeeId, actorUser?.id);
 }
+
+export type FaceMatchCandidate = {
+  emp_id: string
+  employee_code: string
+  full_name: string
+  avatar_url: string | null
+  embedding_type: string
+  similarity: number
+}
+
+/**
+ * Public Contract: Tìm nhân viên khớp với khuôn mặt gần nhất thông qua pgvector (hỗ trợ transaction)
+ */
+export async function findBestFaceMatch(
+  vecLiteral: string,
+  tx?: Prisma.TransactionClient
+): Promise<FaceMatchCandidate | null> {
+  const client = tx ?? prisma
+  const currentModelVersion = env.FACE_AUTH_MODEL_VERSION
+
+  const activeEmployeeIds = await findActiveEmployeeIds(tx)
+  if (!activeEmployeeIds || activeEmployeeIds.length === 0) return null
+
+  const rows: Array<{
+    employee_id: string
+    embedding_type: string
+    similarity: number
+  }> = await client.$queryRaw`
+    SELECT
+      f.employee_id,
+      f.embedding_type,
+      (1 - (f.embedding <=> ${vecLiteral}::vector))::float AS similarity
+    FROM face_embeddings f
+    WHERE f.is_active = true
+      AND f.embedding IS NOT NULL
+      AND f.model_version = ${currentModelVersion}
+      AND f.embedding_type = 'CENTROID'
+      AND f.employee_id = ANY(${activeEmployeeIds}::uuid[])
+    ORDER BY f.embedding <=> ${vecLiteral}::vector ASC
+    LIMIT 1;
+  `
+  if (!rows || rows.length === 0) return null
+  const best = rows[0]
+  const emp = await findEmployeeByIdOrCode(best.employee_id, tx)
+  if (!emp || emp.status !== 'ACTIVE') return null
+  return {
+    emp_id: emp.id,
+    employee_code: emp.employee_code,
+    full_name: emp.full_name,
+    avatar_url: emp.avatar_url ?? null,
+    embedding_type: best.embedding_type,
+    similarity: best.similarity,
+  }
+}
+
+/**
+ * Public Contract: Xóa dữ liệu sinh trắc học khi xóa nhân viên (hỗ trợ transaction)
+ */
+export async function deleteBiometricsForEmployee(
+  employeeId: string,
+  tx?: Prisma.TransactionClient
+) {
+  const client = tx ?? prisma
+  return client.face_embeddings.deleteMany({
+    where: { employee_id: employeeId },
+  })
+}
+

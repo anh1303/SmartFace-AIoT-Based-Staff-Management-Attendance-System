@@ -8,9 +8,11 @@ export interface AdjustmentSource {
   overtime_candidate_hours: unknown
   overtime: unknown
   overtime_status: string
+  review_status?: string | null
   late_early: unknown
   manual_adjustment?: boolean | null
   overtime_reason?: string | null
+  approval_reason?: string | null
   approved_by?: string | null
   approved_at?: Date | null
   calculation_details: unknown
@@ -27,8 +29,9 @@ export async function syncDayAdjustments(tx: Prisma.TransactionClient, day: Adju
   const details = (day.calculation_details || {}) as Record<string, unknown>
   const absence = details.absenceCandidate === true
   const hours = Number(details.scheduledShiftSeconds || 0) / 3600
+  const isDayApproved = day.review_status === 'APPROVED'
   const items = [
-    { kind: 'OVERTIME', hours: Number(day.overtime_status === 'APPROVED' ? day.overtime : day.overtime_candidate_hours), amount: 0 },
+    { kind: 'OVERTIME', hours: Number(isDayApproved ? day.overtime : day.overtime_candidate_hours), amount: 0 },
     { kind: 'LATE_EARLY', hours: Number(day.late_early), amount: 0 },
     { kind: 'ABSENCE', hours: absence ? hours : 0, amount: 0 },
   ]
@@ -44,18 +47,19 @@ export async function syncDayAdjustments(tx: Prisma.TransactionClient, day: Adju
     }
     const active = item.kind === 'ABSENCE' ? absence : item.hours > 0
     const fingerprint = createHash('sha256').update(JSON.stringify([details.fingerprint, details.policy, item, item.kind === 'ABSENCE' ? [hourlyRate, effectiveRate] : null])).digest('hex')
-    if (previous?.source_fingerprint === fingerprint) continue
+    const adjStatus = active ? (isDayApproved ? 'APPROVED' : 'PENDING') : 'VOID'
+    const isUuid = (val: unknown): val is string => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+    const reviewerId = isDayApproved && isUuid(day.approved_by) ? day.approved_by : null
+    if (previous?.source_fingerprint === fingerprint && previous.status === adjStatus) continue
     if (!previous && !active) continue
-    // Migrate an existing explicit daily OT decision, never auto-approve a penalty.
-    const legacyStatus = !previous && item.kind === 'OVERTIME' && ['APPROVED', 'REJECTED'].includes(day.overtime_status) ? day.overtime_status : 'PENDING'
     const data = { ...item, source_fingerprint: fingerprint,
       source_details: { attendance_fingerprint: details.fingerprint ?? null, policy: details.policy ?? null,
         ...(item.kind === 'ABSENCE' ? { hourly_rate: hourlyRate, scheduled_hours: hours, absence_penalty_rate: effectiveRate } : {}) },
-      status: active ? legacyStatus : 'VOID',
-      reviewed_by: legacyStatus !== 'PENDING' ? day.approved_by : null,
-      reviewed_at: legacyStatus !== 'PENDING' ? day.approved_at : null,
+      status: adjStatus,
+      reviewed_by: reviewerId,
+      reviewed_at: isDayApproved ? (day.approved_at || null) : null,
     }
-    const write = { ...key, ...data, note: previous?.note ?? (legacyStatus !== 'PENDING' ? day.overtime_reason : null) }
+    const write = { ...key, ...data, note: previous?.note ?? (isDayApproved ? (day.approval_reason || day.overtime_reason || null) : null) }
     if (batch) batch.writes.push(write)
     else await tx.attendanceAdjustment.upsert({ where: { employee_id_work_date_kind: key }, create: write, update: { ...data } })
     if (previous) {

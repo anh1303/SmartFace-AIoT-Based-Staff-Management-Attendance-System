@@ -10,13 +10,12 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
   const actor = () => ({id:admin.id,role:'ADMIN'})
   const rows = (emp: any) => db.attendanceAdjustment.findMany({where:{employee_id:emp.id},orderBy:{work_date:'asc'}})
   async function fixture(date: string, night = false) {
-    const emp = await db.employee.create({data:{employee_code:`LEDGER-${randomUUID().slice(0,8)}`,full_name:'Ledger Test',hourly_rate:100000}})
+    const emp = await db.employee.create({data:{employee_code:`LEDGER-${randomUUID().slice(0,8)}`,full_name:'Ledger Test',hourly_rate:100000,created_at:new Date('2024-12-01T00:00:00Z')}})
     await db.employee_shifts.create({data:{employee_id:emp.id,shift_id:ws.id,work_date:new Date(`${date}T00:00:00Z`),shift_type:night?'NIGHT':'OFFICE_HOURS',start_time:new Date(`1970-01-01T${night?'22:00':'08:00'}:00Z`),end_time:new Date(`1970-01-01T${night?'06:00':'16:00'}:00Z`)}})
     return emp
   }
   const aggregate = (emp: any, date: string) => attendance.aggregateDailyAttendance(+date.slice(5,7),+date.slice(0,4),emp.id)
   const raw = (emp: any,type: string,date: string,time: string) => db.attendance_logs.create({data:{employee_id:emp.id,type,event_time:new Date(`${date}T${time}+07:00`),status:'VALID',method:'MANUAL'}})
-  const review = (item: any,status: string,note = '') => adjustments.reviewAdjustment(String(item.id),{status,note,updated_at:item.updated_at.toISOString()},actor())
   beforeAll(async () => {
     vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-20T20:00:00+07:00'))
     db = (await import('../../src/config/database.js')).prisma
@@ -29,6 +28,7 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
     await ensureTestPayrollPolicy(db)
   })
   afterAll(async () => {vi.useRealTimers();if(db) await db.$disconnect()})
+
   it('proposes 2x shift wages, stores leave notes and only deducts approved absence', async () => {
     const date='2025-01-03', emp=await fixture(date)
     await aggregate(emp,date)
@@ -37,42 +37,71 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
     let [pay]=await payroll.generate('2025-01',emp.id,admin.id,actor())
     expect(pay.total_absence_penalty).toBe(0)
     await expect(payroll.finalizePeriod('2025-01',admin.id,'ADMIN')).rejects.toThrow(/chờ duyệt/)
-    await review(item,'REJECTED','Nghỉ có phép')
+
+    // Deprecated single-adjustment review must reject with guidance
+    await expect(adjustments.reviewAdjustment(String(item.id),{status:'REJECTED',updated_at:item.updated_at.toISOString()},actor())).rejects.toThrow(/bỏ quy trình duyệt khoản độc lập/)
+
+    // Excused leave: shift is updated to OFF and re-aggregated
+    await db.employee_shifts.update({
+      where: { employee_id_work_date: { employee_id: emp.id, work_date: new Date(`${date}T00:00:00Z`) } },
+      data: { shift_type: 'OFF' }
+    })
     await aggregate(emp,date)
-    ;[item]=await rows(emp);expect(item.status).toBe('REJECTED');expect(item.note).toBe('Nghỉ có phép')
-    await review(item,'APPROVED','Xác minh lại: nghỉ không phép')
+    ;[item]=await rows(emp);expect(item.status).toBe('VOID')
+
+    // Shift restored to work shift -> absence returns as PENDING
+    await db.employee_shifts.update({
+      where: { employee_id_work_date: { employee_id: emp.id, work_date: new Date(`${date}T00:00:00Z`) } },
+      data: { shift_type: 'OFFICE_HOURS' }
+    })
+    await aggregate(emp,date)
+    ;[item]=await rows(emp);expect(item.status).toBe('PENDING')
+
+    // Review day as unexcused absence
+    await attendance.adjustAttendance({ employeeId: emp.id, date, late_early: 0, overtime: 0, reason: 'Xác minh lại: nghỉ không phép' }, admin.id, 'ADMIN')
+    ;[item]=await rows(emp);expect(item.status).toBe('APPROVED')
+
     await expect(payroll.finalizePeriod('2025-01',admin.id,'ADMIN')).rejects.toThrow(/thay đổi/)
     ;[pay]=await payroll.generate('2025-01',emp.id,admin.id,actor());expect(pay.total_absence_penalty).toBe(1600000);expect(pay.net_salary).toBe(0)
     await payroll.finalizePeriod('2025-01',admin.id,'ADMIN')
     const finalized = await db.payrollRecord.findUnique({ where: { employeeId_payroll_period: { employeeId: emp.id, payroll_period: '2025-01' } } })
     expect(finalized.calculation_details.applied_policy_snapshot).toMatchObject({ applied_overtime_rate: 2, applied_late_penalty_rate: 1.5, policy: { absence_penalty_rate: 2 }, approved_absences: [{ amount: 1600000, hours: 8 }] })
-    ;[item]=await rows(emp);await expect(review(item,'REJECTED','Đã chốt')).rejects.toThrow(/chốt|khóa/)
+    await expect(attendance.adjustAttendance({ employeeId: emp.id, date, late_early: 0, overtime: 0, reason: 'Đã chốt' }, admin.id, 'ADMIN')).rejects.toThrow(/chốt|khóa/)
   })
+
   it('reviews OT and late penalties independently by day, with stale-write protection', async () => {
     const date='2025-02-03',emp=await fixture(date)
     await raw(emp,'CHECK_IN',date,'09:00:00');await raw(emp,'CHECK_OUT',date,'17:00:00')
     await aggregate(emp,date)
-    const items=await rows(emp),ot=items.find((r:any)=>r.kind==='OVERTIME'),late=items.find((r:any)=>r.kind==='LATE_EARLY')
+    const items=await rows(emp)
     expect(items).toHaveLength(2)
-    await review(ot,'APPROVED','Làm thêm đã xác nhận')
+
+    // Approve 1h OT and waive late penalty at day level
+    await attendance.adjustAttendance({ employeeId: emp.id, date, late_early: 0, overtime: 1, reason: 'Làm thêm đã xác nhận' }, admin.id, 'ADMIN')
     let [pay]=await payroll.generate('2025-02',emp.id,admin.id,actor())
     expect(pay.total_overtime).toBe(1);expect(pay.total_late_early).toBe(0)
-    await review(late,'REJECTED','Được phép vào muộn')
-    await expect(review(late,'APPROVED')).rejects.toThrow(/thay đổi/)
-    ;[pay]=await payroll.generate('2025-02',emp.id,admin.id,actor());expect(pay.net_salary).toBe(2500000)
+
+    // Re-adjust day to verify late penalty
+    await attendance.unlockEmployeeAttendance(emp.id, date, 'Mở khóa điều chỉnh', admin.id, 'ADMIN')
+    await attendance.adjustAttendance({ employeeId: emp.id, date, late_early: 1, overtime: 1, reason: 'Đã xác minh vào muộn' }, admin.id, 'ADMIN')
+
+    ;[pay]=await payroll.generate('2025-02',emp.id,admin.id,actor());expect(pay.total_late_early).toBe(1)
     await payroll.updateItem(pay.id,{allowance:0,reason:'Điều chỉnh phụ cấp'},actor())
-    const freshLate=(await rows(emp)).find((r:any)=>r.kind==='LATE_EARLY')
-    await review(freshLate,'APPROVED','Đã xác minh')
-    ;[pay]=await payroll.generate('2025-02',emp.id,admin.id,actor());expect(pay.allowance).toBe(0);expect(pay.total_late_early).toBe(1);expect(pay.net_salary).toBe(850000)
+    ;[pay]=await payroll.generate('2025-02',emp.id,admin.id,actor());expect(pay.allowance).toBe(0);expect(pay.net_salary).toBe(850000)
     await expect(payroll.updateItem(pay.id,{total_overtime:20,reason:'Ghi đè'},actor())).rejects.toThrow(/từng khoản/)
   })
+
   it('invalidates reviewed absence when scans arrive, retaining the old decision in audit', async () => {
     const date='2025-03-03',emp=await fixture(date)
-    await aggregate(emp,date);const [absent]=await rows(emp);await review(absent,'APPROVED','Vắng')
+    await aggregate(emp,date)
+    await attendance.adjustAttendance({ employeeId: emp.id, date, late_early: 0, overtime: 0, reason: 'Vắng' }, admin.id, 'ADMIN')
+    expect((await rows(emp))[0].status).toBe('APPROVED')
+
     await raw(emp,'CHECK_IN',date,'08:00:00');await raw(emp,'CHECK_OUT',date,'16:00:00');await aggregate(emp,date)
     const [changed]=await rows(emp);expect(changed.status).toBe('VOID');expect(changed.note).toBe('Vắng')
     expect(await db.auditLog.count({where:{record_id:String(changed.id),action:'INVALIDATE_ADJUSTMENT_REVIEW'}})).toBeGreaterThan(0)
   })
+
   it('joins split overnight attendance across month end and keeps OT on the shift date', async () => {
     const date='2025-04-30',emp=await fixture(date,true)
     await raw(emp,'CHECK_IN',date,'22:00:00');await raw(emp,'CHECK_OUT','2025-05-01','01:00:00')
@@ -83,9 +112,11 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
     const previous=days.find((r:any)=>r.work_date.toISOString().startsWith(date))
     expect(Number(previous.total_working_hours)).toBe(8);expect(previous.calculation_details.pairs).toHaveLength(2)
     const [ot]=await rows(emp);expect(ot.kind).toBe('OVERTIME');expect(ot.status).toBe('PENDING');expect(ot.work_date.toISOString().startsWith(date)).toBe(true)
-    await review(ot,'APPROVED','OT ca đêm')
+
+    await attendance.adjustAttendance({ employeeId: emp.id, date, late_early: 0, overtime: 1, reason: 'OT ca đêm' }, admin.id, 'ADMIN')
     const [pay]=await payroll.generate('2025-04',emp.id,admin.id,actor());expect(pay.total_overtime).toBe(1)
   })
+
   it('assigns live midnight re-entry to yesterday and recomputes the previous month immediately', async () => {
     const date='2025-06-30',emp=await fixture(date,true)
     vi.setSystemTime(new Date('2025-07-01T08:00:00+07:00'))
@@ -124,6 +155,7 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
       const [absence]=await rows(emp);expect(absence.status).toBe('PENDING');expect(Number(absence.amount)).toBe(1600000)
     } finally {process.env.NODE_ENV=original;vi.setSystemTime(new Date('2026-10-20T20:00:00+07:00'))}
   })
+
   it('limits managers to their department and blocks self/peer approval', async () => {
     const suffix=randomUUID().slice(0,8)
     const dept=await db.department.create({data:{department_code:`LEDGER-A-${suffix}`,name:'A'}})
@@ -141,18 +173,19 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
     const listed=await adjustments.listAdjustments('2025-08',undefined,manager)
     expect(listed.map((r:any)=>r.employee_id).sort()).toEqual([self.employee_code,target.employee_code].sort())
     for (const emp of [self,other,peer]) {
-      const [item]=await rows(emp)
-      await expect(adjustments.reviewAdjustment(String(item.id),{status:'APPROVED',updated_at:item.updated_at.toISOString()},manager)).rejects.toThrow()
+      await expect(attendance.adjustAttendance({ employeeId: emp.id, date: '2025-08-03', late_early: 0, overtime: 0, reason: 'Duyệt công' }, manager.id, manager.role)).rejects.toThrow()
     }
-    const [item]=await rows(target)
-    await adjustments.reviewAdjustment(String(item.id),{status:'REJECTED',note:'Có phép',updated_at:item.updated_at.toISOString()},manager)
-    expect((await rows(target))[0].status).toBe('REJECTED')
+    await attendance.adjustAttendance({ employeeId: target.id, date: '2025-08-04', late_early: 0, overtime: 0, reason: 'Có phép' }, manager.id, manager.role)
+    expect((await rows(target))[0].status).toBe('APPROVED')
   })
 
   it('batch-updates an already reviewed item when its source shift changes', async () => {
     const date='2025-09-03',emp=await fixture(date)
     await raw(emp,'CHECK_IN',date,'08:00:00');await raw(emp,'CHECK_OUT',date,'17:00:00');await aggregate(emp,date)
-    const [ot]=await rows(emp);await review(ot,'APPROVED','Đã xác nhận')
+    const [ot]=await rows(emp)
+    await attendance.adjustAttendance({ employeeId: emp.id, date, late_early: 0, overtime: 1, reason: 'Đã xác nhận' }, admin.id, 'ADMIN')
+    expect((await rows(emp))[0].status).toBe('APPROVED')
+
     await db.employee_shifts.update({where:{employee_id_work_date:{employee_id:emp.id,work_date:new Date(`${date}T00:00:00Z`)}},data:{end_time:new Date('1970-01-01T15:00:00Z')}})
     await aggregate(emp,date)
     const [updated]=await rows(emp);expect(updated.status).toBe('PENDING');expect(Number(updated.hours)).toBe(2);expect(updated.note).toBe('Đã xác nhận')

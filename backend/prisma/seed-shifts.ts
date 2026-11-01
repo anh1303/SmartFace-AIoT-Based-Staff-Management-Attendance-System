@@ -116,6 +116,8 @@ async function main() {
 
     for (let empIdx = 0; empIdx < employees.length; empIdx++) {
       const emp = employees[empIdx]
+      const createdDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(emp.createdAt)
+      if (`${yearStr}-${monthStr}-${dayStr}` < createdDay) continue
       const isManager = emp.position?.level === 'MANAGER'
 
       // Quy luật gán lịch:

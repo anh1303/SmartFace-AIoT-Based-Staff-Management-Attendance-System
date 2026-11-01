@@ -24,6 +24,7 @@ const env = { ...process.env, DATABASE_URL: testUrl.toString(), DIRECT_URL: test
 assertIsolatedNeonTestDatabase(env.DATABASE_URL, env.DIRECT_URL)
 const output = path.join(root, 'tmp/neon-test-results', database)
 mkdirSync(output, { recursive: true })
+env.NEON_TEST_RESULTS_DIR = output
 const files = process.argv.slice(2)
 const suites = files.length ? files : [
   'validation/payroll/policy-storage.integration.test.ts',

@@ -13,10 +13,22 @@ const state = vi.hoisted(() => ({
   auditLogs: [] as any[],
 }))
 
-vi.mock('../../src/modules/attendance/index.js', () => ({
-  aggregateDailyAttendance: vi.fn(async () => ({ details: [] })),
-  getAttendanceSummariesByEmployeesAndDateRange: vi.fn(),
-}))
+vi.mock('../../src/modules/attendance/public.js', async (importOriginal) => {
+  const actual: any = await importOriginal()
+  return {
+    ...actual,
+    aggregateDailyAttendance: vi.fn(async () => ({ details: [] })),
+    getAttendanceSummariesByEmployeesAndDateRange: vi.fn(),
+  }
+})
+vi.mock('../../src/modules/attendance/index.js', async (importOriginal) => {
+  const actual: any = await importOriginal()
+  return {
+    ...actual,
+    aggregateDailyAttendance: vi.fn(async () => ({ details: [] })),
+    getAttendanceSummariesByEmployeesAndDateRange: vi.fn(),
+  }
+})
 
 vi.mock('../../src/config/database.js', () => {
   const db: any = {
@@ -101,6 +113,19 @@ vi.mock('../../src/config/database.js', () => {
       })),
     },
     daily_attendance_summary: {
+      findUnique: vi.fn(async (args?: any) => {
+        const empId = args?.where?.employee_id_work_date?.employee_id
+        const wDate = args?.where?.employee_id_work_date?.work_date
+        return state.summaries.find(
+          (s: any) => s.employee_id === empId && +new Date(s.work_date) === +new Date(wDate)
+        ) || null
+      }),
+      findFirst: vi.fn(async (args?: any) => {
+        let rows = state.summaries
+        if (args?.where?.employee_id) rows = rows.filter((s: any) => s.employee_id === args.where.employee_id)
+        if (args?.where?.work_date) rows = rows.filter((s: any) => +new Date(s.work_date) === +new Date(args.where.work_date))
+        return rows[0] || null
+      }),
       findMany: vi.fn(async (args?: any) => {
         let rows = state.summaries
         if (args?.where?.work_date?.lt) {
@@ -618,7 +643,7 @@ describe('Attendance Security & Period Finalization Test Suite', () => {
     })
 
     it('blocks a running overnight shift whose hours come from its template even without a summary for that day', async () => {
-      vi.setSystemTime(new Date('2026-11-01T00:00:01+07:00'))
+      vi.setSystemTime(new Date('2026-10-31T00:00:01+07:00'))
       state.shifts = [{ employee_id: state.employee.id, work_date: new Date('2026-10-31T00:00:00Z'), shift_type: 'NORMAL', start_time: null, end_time: null, work_shifts: { start_time: '22:00', end_time: '06:00' } }]
       await generate('2026-10', state.employee.id, admin.id, admin)
       await expect(finalizePeriod('2026-10', admin.id, admin.role)).rejects.toThrow(/ca chưa kết thúc/)

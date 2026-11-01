@@ -23,10 +23,20 @@ export const ATTENDANCE_REASON_LABELS: Record<string, string> = {
 }
 
 /** Correct the display of frozen summaries without rewriting historical data. */
-export function displayAttendanceStatus(status: string, reviewReason: string | null, details?: unknown): string {
+export function displayAttendanceStatus(status: string, reviewReason: string | null, details?: unknown, now = new Date()): string {
   const reasons = new Set((reviewReason || '').split(','))
   const evidence = details && typeof details === 'object' ? details as Record<string, unknown> : null
   const orphan = Array.isArray(evidence?.pairs) && evidence.pairs.length === 0 && Array.isArray(evidence.ignored)
     && evidence.ignored.some((entry: { reason?: string }) => entry.reason === 'UNPAIRED_CHECK_OUT')
-  return status === 'PRESENT' && (orphan || reasons.has('NO_VALID_PAIR') && reasons.has('UNPAIRED_CHECK_OUT')) ? 'INCOMPLETE' : status
+  if (status === 'PRESENT' && (orphan || reasons.has('NO_VALID_PAIR') && reasons.has('UNPAIRED_CHECK_OUT'))) {
+    return 'INCOMPLETE'
+  }
+  if (status === 'SCHEDULED' && evidence?.scheduledEnd && typeof evidence.scheduledEnd === 'string') {
+    const shiftEnd = new Date(evidence.scheduledEnd)
+    const events = Array.isArray(evidence.events) ? evidence.events : []
+    if (+now >= +shiftEnd && events.length === 0 && !evidence.off) {
+      return 'ABSENT'
+    }
+  }
+  return status
 }

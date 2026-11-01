@@ -8,7 +8,7 @@ const suite = enabled ? describe : describe.skip
 suite('Financial and review safety in PostgreSQL', () => {
   let db: any, attendance: any, payroll: any, shifts: any, admin: any
   const prefix = randomUUID().slice(0,8), period = '2026-09'
-  const employee = (name: string, extra = {}) => db.employee.create({data:{employee_code:`SAFE-${prefix}-${name}`,full_name:name,hourly_rate:100000,...extra}})
+  const employee = (name: string, extra = {}) => db.employee.create({data:{employee_code:`SAFE-${prefix}-${name}`,full_name:name,hourly_rate:100000,createdAt:new Date('2026-09-01T00:00:00Z'),...extra}})
   const raw = (emp: any,type: string,date: string,time: string) => db.attendance_logs.create({data:{employee_id:emp.id,type,event_time:new Date(`${date}T${time}+07:00`),status:'VALID',method:'MANUAL'}})
   beforeAll(async () => {
     vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-09-30T23:00:00+07:00'))
@@ -38,8 +38,8 @@ suite('Financial and review safety in PostgreSQL', () => {
     expect(Number(summary.total_working_hours)).toBe(0);expect(Number(summary.overtime_candidate_hours)).toBe(0)
     await attendance.adjustAttendance({employeeId:emp.id,date,late_early:0,overtime:3,reason:'Làm thêm ngày OFF'},admin.id,'ADMIN')
     const item = await db.attendanceAdjustment.findFirst({where:{employee_id:emp.id,kind:'OVERTIME'}})
-    const adjustments = await import('../../src/modules/payroll/payroll.adjustments.js')
-    await adjustments.reviewAdjustment(String(item.id),{status:'APPROVED',note:'Làm thêm OFF',updated_at:item.updated_at.toISOString()},{id:admin.id,role:'ADMIN'})
+    expect(item).not.toBeNull()
+    expect(item.status).toBe('APPROVED')
     await attendance.aggregateDailyAttendance(9,2026,emp.id)
     summary = await db.daily_attendance_summary.findFirst({where:{employee_id:emp.id}})
     expect(Number(summary.overtime)).toBe(3)

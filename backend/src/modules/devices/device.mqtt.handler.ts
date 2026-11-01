@@ -64,8 +64,8 @@ export function registerDeviceMqttHandlers() {
       const event = parts[3]
 
       if (event === 'status') {
-        // Cập nhật trạng thái thiết bị (in-memory)
-        const device = deviceService.updateStatus(deviceId, payload.status ?? 'OFFLINE')
+        // Cập nhật trạng thái thiết bị (database)
+        const device = await deviceService.updateStatus(deviceId, payload.status ?? 'OFFLINE')
         if (device) eventBus.publish('device:status-changed', { deviceId, status: payload.status ?? 'OFFLINE', details: device })
       }
 

@@ -1,6 +1,24 @@
-import { adjustmentFingerprint } from '../attendance/attendance.adjustments.js'
-import { assertAggregationHealthy } from '../attendance/attendance.alerts.js'
-import { roundHours, ATTENDANCE_POLICY_VERSION, attendancePolicyVersion, vnDay, shiftBounds, prepareAttendance } from '../attendance/attendance.policy.js'
+import { formatPayrollRecord } from './payroll.format.js'
+export { formatPayrollRecord, type RawPayrollRecord } from './payroll.format.js'
+import type { PayrollStatus } from '../../common/constants.js'
+import {
+  adjustmentFingerprint,
+  assertAggregationHealthy,
+  roundHours,
+  ATTENDANCE_POLICY_VERSION,
+  attendancePolicyVersion,
+  shiftBounds,
+  hasLegacyOvernightBounds,
+  prepareAttendance,
+  findDailyAttendanceSummaries,
+  findAttendanceAdjustments,
+  findAttendanceLocks,
+  countPendingDailySummaries,
+  countUnapprovedDailySummaries,
+  countPendingAttendanceAdjustments,
+  purgeAttendanceForEarlySettlement,
+  getSettlementLogsAndSummaries,
+} from '../attendance/public.js'
 import type { EarlySettlementDto } from './payroll.dto.js'
 import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
@@ -8,17 +26,27 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { DEFAULT_PAYROLL_POLICY, assertResolvedPayroll, currentPayrollPeriod, hasMultiplierSnapshot, nextPayrollPeriod, policyForPeriod } from '../../common/payroll-policy.js'
 import { updateBonusPenaltySchema } from './payroll.dto.js'
-import { historicalBreakdown } from '../../common/payroll-history.js'
-import { buildIdOrCodeWhere, calculateNetSalary, computePayrollBreakdown } from '../../common/utils.js'
-import { getEmployeeScope, assertCanManageEmployee } from '../employees/employee.permission.js'
+import { buildIdOrCodeWhere, calculateNetSalary, vnDay, employeeLockKey, payrollPeriodLockKey } from '../../common/utils.js'
+import {
+  getEmployeeScope,
+  assertCanManageEmployee,
+  monthlyHourlyRate,
+  sourceHourlyRate,
+  terminateEmployee,
+  findEmployeesWithFilter,
+} from '../employees/public.js'
+import {
+  getEmployeeShiftsBeforeCutoff,
+  getEmployeeShiftsForEarlySettlement,
+  purgeShiftsForEarlySettlement,
+  getEmployeeShiftsForDateRange,
+} from '../shifts/public.js'
 import { payrollOverrides, requiresHoursReconciliation, workingHoursFingerprint } from './payroll.overrides.js'
-import { monthlyHourlyRate, sourceHourlyRate } from '../employees/employee.wage.js'
-import { logAction } from '../audit-logs/index.js'
+import { logAction } from '../audit-logs/public.js'
 import {
   aggregateDailyAttendance,
   getAttendanceSummariesByEmployeesAndDateRange,
-} from '../attendance/index.js'
-import type { PayrollStatus } from '../../common/constants.js'
+} from '../attendance/public.js'
 
 function appliedPolicySnapshot(policy: Awaited<ReturnType<typeof policyForPeriod>>, overtimeRate: number, lateRate: number, adjustments: Array<{ id: bigint; kind: string; status: string; amount: unknown; hours: unknown; work_date: Date; source_details: unknown }>) {
   const matches = policy && policy.overtime_rate === overtimeRate && policy.late_early_penalty === lateRate
@@ -31,6 +59,20 @@ function appliedPolicySnapshot(policy: Awaited<ReturnType<typeof policyForPeriod
     })),
   }
 }
+
+function assertOvernightSummariesCurrent(
+  summaries: Array<{ employee_id: string; work_date: Date; calculation_details: unknown }>,
+  shifts: Array<{ employee_id: string; work_date: Date; shift_type: string | null; start_time: Date | null; end_time: Date | null; work_shifts: { start_time: Date; end_time: Date } | null }>,
+) {
+  for (const summary of summaries) {
+    const shift = shifts.find(row => row.employee_id === summary.employee_id && +row.work_date === +summary.work_date)
+    if (shift && hasLegacyOvernightBounds(vnDay(summary.work_date), {
+      ...shift, start_time: shift.start_time ?? shift.work_shifts?.start_time, end_time: shift.end_time ?? shift.work_shifts?.end_time,
+    }, summary.calculation_details)) {
+      throw AppError.conflict('Công ca qua đêm được tính theo quy tắc cũ; cần mở khóa và tổng hợp lại trước khi tính hoặc chốt lương')
+    }
+  }
+}
 import {
   isEmployeeManager,
   assertCanAccessEmployeeDetail,
@@ -39,78 +81,8 @@ import {
   findEmployeeByIdOrCode,
   findActiveEmployees,
   findEmployeeByUserId,
-} from '../employees/index.js'
+} from '../employees/public.js'
 
-
-export interface RawPayrollRecord {
-  id: string | bigint
-  payroll_period: string
-  employeeId: string
-  hourly_rate?: { toString(): string } | number | string | null
-  total_working_hours?: { toString(): string } | number | string | null
-  total_overtime?: { toString(): string } | number | string | null
-  total_absence_penalty?: unknown
-  total_late_early?: { toString(): string } | number | string | null
-  allowance?: { toString(): string } | number | string | null
-  net_salary?: { toString(): string } | number | string | null
-  status?: string | null
-  reason?: string | null
-  overtime_rate?: unknown
-  late_penalty_rate?: unknown
-  updated_at?: Date
-  late_early_penalty?: number | null
-  calculation_details?: unknown
-  employee?: { employee_code?: string; full_name?: string; department?: { name?: string } | null } | null
-}
-
-export function formatPayrollRecord(record: RawPayrollRecord) {
-  const hourly_rate = Number(record.hourly_rate || 0)
-  const total_working_hours = Number(record.total_working_hours ?? 0)
-  const total_overtime = Number(record.total_overtime || 0)
-  const total_late_early = Number(record.total_late_early || 0)
-  const allowance = Number(record.allowance || 0)
-  const net_salary = Number(record.net_salary || 0)
-  const details = (record.calculation_details || {}) as Record<string, any>
-  const hasRateSnapshot = hasMultiplierSnapshot(record)
-  const breakdown = hasRateSnapshot ? computePayrollBreakdown({
-    hourly_rate, total_working_hours, total_overtime, total_late_early, allowance,
-    overtime_rate: Number(record.overtime_rate), late_early_penalty: Number(record.late_penalty_rate),
-    total_absence_penalty: Number(record.total_absence_penalty || 0),
-  }) : historicalBreakdown({ hourly_rate, total_working_hours, total_overtime, total_late_early, allowance,
-    total_absence_penalty: Number(record.total_absence_penalty || 0), calculation_details: record.calculation_details })
-  const verifiedHistory = details.rate_snapshot_status === 'LEGACY_VERIFIED' && breakdown?.net_salary === net_salary && record.status !== 'PENDING'
-
-  let status: PayrollStatus = 'PENDING'
-  if (record.status === 'PAID') status = 'PAID'
-  else if (record.status === 'FINALIZED') status = 'FINALIZED'
-  else if (record.status === 'CONFIRMED') status = 'CONFIRMED'
-  else status = 'PENDING'
-
-  return {
-    id: record.id.toString(),
-    payroll_id: `PR-${record.payroll_period.replace('-', '')}-${record.id.toString().padStart(3, '0')}`,
-    employee_id: record.employee?.employee_code || record.employeeId,
-    employee_name: record.employee?.full_name || '',
-    department: record.employee?.department?.name || '',
-    period: record.payroll_period,
-    hourly_rate,
-    total_working_hours,
-    total_overtime,
-    total_late_early,
-    total_absence_penalty: Number(record.total_absence_penalty || 0),
-    allowance,
-    net_salary,
-    overtime_rate: hasRateSnapshot ? Number(record.overtime_rate) : null,
-    late_penalty_rate: hasRateSnapshot ? Number(record.late_penalty_rate) : null,
-    breakdown,
-    updated_at: record.updated_at?.toISOString(),
-    requires_reconciliation: Boolean(details.requires_reconciliation || !hasRateSnapshot && !verifiedHistory),
-    needs_recalculation: Boolean(details.needs_recalculation || !hasRateSnapshot && !verifiedHistory),
-    calculation_details: record.calculation_details,
-    status,
-    reason: record.reason || undefined,
-  }
-}
 
 export async function getBonusPenalty(period = currentPayrollPeriod()) {
   validatePeriod(period)
@@ -200,17 +172,18 @@ export async function list(payroll_period?: string, employeeIdOrCode?: string, r
   const ids = [...new Set(pending.map(row => row.employeeId))]
   const dateRange = { gte: validatePeriod(periods[0]).start, lt: validatePeriod(periods.at(-1)!).end }
   const [summaries, adjustments] = await Promise.all([
-    prisma.daily_attendance_summary.findMany({ where: { employee_id: { in: ids }, work_date: dateRange } }),
-    prisma.attendanceAdjustment.findMany({ where: { employee_id: { in: ids }, work_date: dateRange } }),
+    findDailyAttendanceSummaries({ employeeIds: ids, workDate: dateRange }),
+    findAttendanceAdjustments({ employeeIds: ids, workDate: dateRange }),
   ])
   return records.map(row => {
     if (row.status !== 'PENDING') return formatPayrollRecord(row)
     const source = summaries.filter(s => s.employee_id === row.employeeId && s.work_date.toISOString().slice(0, 7) === row.payroll_period)
-    const items = adjustments.filter(a => a.employee_id === row.employeeId && a.work_date.toISOString().slice(0, 7) === row.payroll_period)
+    const approvedDates = new Set(source.filter(s => (s as any).review_status === 'APPROVED').map(s => vnDay(s.work_date)))
+    const eligibleAdjustments = adjustments.filter(a => a.employee_id === row.employeeId && a.work_date.toISOString().slice(0, 7) === row.payroll_period && a.status === 'APPROVED' && approvedDates.has(vnDay(a.work_date)))
     const details = (row.calculation_details || {}) as Record<string, any>
     const overrides = payrollOverrides(row)
     const requires_reconciliation = requiresHoursReconciliation(overrides.fields, overrides.legacy, workingHoursFingerprint(source))
-    const needs_recalculation = details.source_fingerprint !== summaryFingerprint(source) || details.adjustment_fingerprint !== adjustmentFingerprint(items)
+    const needs_recalculation = details.source_fingerprint !== summaryFingerprint(source) || details.adjustment_fingerprint !== adjustmentFingerprint(eligibleAdjustments)
       || !overrides.fields.hourly_rate && Number(row.hourly_rate) !== monthlyHourlyRate(row.employee, row.payroll_period, row.hourly_rate)
     return formatPayrollRecord({ ...row, calculation_details: { ...details, requires_reconciliation, needs_recalculation } })
   })
@@ -257,10 +230,12 @@ export async function updateItem(
     assertResolvedPayroll(fresh)
     if (+fresh.updated_at !== +record.updated_at || updates.updated_at && updates.updated_at !== fresh.updated_at.toISOString()) throw AppError.conflict('Phiếu lương vừa thay đổi; tải lại trước khi sửa')
     if (['FINALIZED', 'CONFIRMED', 'PAID'].includes(fresh.status)) throw AppError.conflict('Kỳ lương đã khóa')
-    const source = await tx.daily_attendance_summary.findMany({ where: { employee_id: record.employeeId, work_date: { gte: bounds.start, lt: bounds.end } } })
-    const adjustments = await tx.attendanceAdjustment.findMany({ where: { employee_id: record.employeeId, work_date: { gte: bounds.start, lt: bounds.end } } })
+    const source = await findDailyAttendanceSummaries({ employeeId: record.employeeId, workDate: { gte: bounds.start, lt: bounds.end } }, false, tx)
+    const adjustments = await findAttendanceAdjustments({ employeeId: record.employeeId, workDate: { gte: bounds.start, lt: bounds.end } }, false, tx)
+    const approvedDates = new Set(source.filter(s => (s as any).review_status === 'APPROVED').map(s => vnDay(s.work_date)))
+    const eligibleAdjustments = adjustments.filter(a => a.status === 'APPROVED' && approvedDates.has(vnDay(a.work_date)))
     const oldDetails = (fresh.calculation_details || {}) as Record<string, any>
-    if (oldDetails.adjustment_fingerprint !== adjustmentFingerprint(adjustments)) throw AppError.conflict('Các khoản OT/phạt đã thay đổi; tính lại lương trước khi chỉnh phiếu')
+    if (oldDetails.adjustment_fingerprint !== adjustmentFingerprint(eligibleAdjustments)) throw AppError.conflict('Các khoản OT/phạt đã thay đổi; tính lại lương trước khi chỉnh phiếu')
     const sourceFingerprint = summaryFingerprint(source)
     if ((changedHours || changedRate) && !reconciling && oldDetails.source_fingerprint !== sourceFingerprint) throw AppError.conflict('Công đã thay đổi; tính lại lương trước khi điều chỉnh')
     const basis = workingHoursFingerprint(source)
@@ -303,8 +278,8 @@ export async function updateItem(
   return { ...formatPayrollRecord(updated), reason: updates.reason }
 }
 
-function summaryFingerprint(rows: Array<{ id: bigint; total_working_hours: unknown; overtime: unknown; late_early: unknown; overtime_status: string; policy_version: string | null; calculation_details: unknown; requires_review: boolean }>) {
-  return createHash('sha256').update(JSON.stringify([...rows].sort((a,b) => a.id < b.id ? -1 : 1).map(r => [String(r.id), String(r.total_working_hours), String(r.overtime), String(r.late_early), r.overtime_status, r.policy_version, r.requires_review, (r.calculation_details as Record<string, unknown> | null)?.fingerprint]))).digest('hex')
+function summaryFingerprint(rows: Array<{ id: bigint; total_working_hours: unknown; overtime: unknown; late_early: unknown; overtime_status: string; policy_version: string | null; calculation_details: unknown; requires_review: boolean; review_status?: string }>) {
+  return createHash('sha256').update(JSON.stringify([...rows].sort((a,b) => a.id < b.id ? -1 : 1).map(r => [String(r.id), String(r.total_working_hours), String(r.overtime), String(r.late_early), r.overtime_status, (r as any).review_status ?? 'NONE', r.policy_version, r.requires_review, (r.calculation_details as Record<string, unknown> | null)?.fingerprint]))).digest('hex')
 }
 
 function validatePeriod(period: string) {
@@ -334,48 +309,57 @@ export async function finalizePeriod(period: string, actorUserId?: string, actor
       assertCannotModifySelfControlData(actor, row.employee.user_id, 'chốt lương của mình')
       assertCannotModifyOtherManager(actor, row.employee, 'chốt lương')
     }
-    const lockedRows = await tx.attendance_locks.findMany({
-      where: { work_date: { gte: bounds.start, lt: bounds.end }, is_locked: true },
-      select: { work_date: true },
-    })
+    const lockedRows = await findAttendanceLocks(
+      { workDate: { gte: bounds.start, lt: bounds.end }, isLocked: true },
+      tx
+    )
     const lockedWorkDates = lockedRows.map((l: { work_date: Date }) => l.work_date)
     const periodPolicy = await policyForPeriod(period, tx)
-    const pending = await tx.daily_attendance_summary.count({
-      where: {
-        employee_id: { in: rows.map(r => r.employeeId) },
-        work_date: { gte: bounds.start, lt: bounds.end },
-        OR: [
-          { requires_review: true },
-          { overtime_status: 'PENDING' },
-          { policy_version: null },
-        ],
-      },
-    })
-    const pendingAdjustments = await tx.attendanceAdjustment.count({ where: { employee_id: { in: rows.map(r => r.employeeId) }, work_date: { gte: bounds.start, lt: bounds.end }, status: 'PENDING' } })
+    const pending = await countUnapprovedDailySummaries(
+      { employeeIds: rows.map(r => r.employeeId), workDate: { gte: bounds.start, lt: bounds.end } },
+      tx
+    )
+    const pendingAdjustments = await countPendingAttendanceAdjustments(
+      { employeeIds: rows.map(r => r.employeeId), workDate: { gte: bounds.start, lt: bounds.end } },
+      tx
+    )
     if (pendingAdjustments) throw AppError.conflict('Còn khoản OT/phạt chờ duyệt trước khi chốt lương')
-    if (pending) throw AppError.conflict('Còn ngày công/OT cần xác minh hoặc duyệt trước khi chốt lương')
+    if (pending) throw AppError.conflict('Còn ngày công chưa được chốt (APPROVED) hoặc cần xác minh trước khi chốt lương')
+
+    const empIds = rows.map(r => r.employeeId)
+    const [allSources, allShifts, allAdjustments] = await Promise.all([
+      findDailyAttendanceSummaries({ employeeIds: empIds, workDate: { gte: bounds.start, lt: bounds.end } }, false, tx),
+      getEmployeeShiftsForDateRange(empIds, bounds.start, bounds.end, tx),
+      findAttendanceAdjustments({ employeeIds: empIds, workDate: { gte: bounds.start, lt: bounds.end } }, false, tx),
+    ])
+    assertOvernightSummariesCurrent(allSources, allShifts)
+
     for (const row of rows.filter(r => r.status === 'PENDING')) {
-      const source = await tx.daily_attendance_summary.findMany({ where: { employee_id: row.employeeId, work_date: { gte: bounds.start, lt: bounds.end } } })
+      const source = allSources.filter(s => s.employee_id === row.employeeId)
       const overrides = payrollOverrides(row)
       if (overrides.legacy || overrides.fields.working_hours || overrides.fields.hourly_rate) throw AppError.conflict('Phiếu cũ có giờ công hoặc đơn giá chỉnh tay; cần đối chiếu dữ liệu trước khi chốt')
       if (requiresHoursReconciliation(overrides.fields, overrides.legacy, workingHoursFingerprint(source))) throw AppError.conflict('Công chỉnh tay cần đối chiếu với nguồn mới trước khi chốt lương')
       if (source.some(s => !lockedWorkDates.some(date => +date === +s.work_date) && s.policy_version !== attendancePolicyVersion(s.work_date.toISOString().slice(0, 10)))) throw AppError.conflict('Cần tổng hợp lại ngày công theo chính sách đúng ngày hiệu lực')
       if (source.some(s => { const details = s.calculation_details as Record<string, unknown> | null; return details && !details.off && +new Date(String(details.scheduledEnd)) > Date.now() })) throw AppError.conflict('Còn ca chưa kết thúc, bao gồm ca qua đêm; chưa thể chốt lương')
-      if (tx.employee_shifts) {
-        const shifts = await tx.employee_shifts.findMany({
-          where: { employee_id: row.employeeId, work_date: { gte: bounds.start, lt: bounds.end } },
-          include: { work_shifts: true },
-        })
-        for (const s of shifts) {
-          const { end: shiftEnd, off, isZeroDuration } = shiftBounds(vnDay(s.work_date), { ...s, start_time: s.start_time ?? s.work_shifts?.start_time, end_time: s.end_time ?? s.work_shifts?.end_time })
-          if (!off && !isZeroDuration && +shiftEnd > Date.now()) {
-            throw AppError.conflict('Còn ca chưa kết thúc, bao gồm ca qua đêm; chưa thể chốt lương')
-          }
+      const shifts = allShifts.filter(s => s.employee_id === row.employeeId)
+      for (const s of shifts) {
+        const { end: shiftEnd, off, isZeroDuration } = shiftBounds(vnDay(s.work_date), { ...s, start_time: s.start_time ?? s.work_shifts?.start_time, end_time: s.end_time ?? s.work_shifts?.end_time })
+        if (!off && !isZeroDuration && +shiftEnd > Date.now()) {
+          throw AppError.conflict('Còn ca chưa kết thúc, bao gồm ca qua đêm; chưa thể chốt lương')
         }
       }
-      const adjustments = await tx.attendanceAdjustment.findMany({ where: { employee_id: row.employeeId, work_date: { gte: bounds.start, lt: bounds.end } } })
-      if ((row.calculation_details as Record<string, unknown> | null)?.adjustment_fingerprint !== adjustmentFingerprint(adjustments)) throw AppError.conflict('Các khoản OT/phạt đã thay đổi; cần tính lại lương')
-      if ((row.calculation_details as Record<string, unknown> | null)?.source_fingerprint !== summaryFingerprint(source)) throw AppError.conflict('Công/OT đã thay đổi sau lần tính lương; cần tính lại hoặc rà soát phiếu chỉnh tay trước khi chốt')
+      const approvedDateSet = new Set(source.filter(s => (s as any).review_status === 'APPROVED').map(s => vnDay(s.work_date)))
+      const eligibleAdjustments = allAdjustments.filter(a => a.employee_id === row.employeeId && a.status === 'APPROVED' && approvedDateSet.has(vnDay(a.work_date)))
+      const rowDetails = (row.calculation_details as Record<string, any> | null) || {}
+      if (rowDetails.needs_recalculation) {
+        throw AppError.conflict('Dữ liệu công/khoản đã được mở khóa hoặc sửa đổi; cần tính lại bảng lương trước khi chốt')
+      }
+      if (rowDetails.adjustment_fingerprint !== adjustmentFingerprint(eligibleAdjustments)) {
+        throw AppError.conflict('Các khoản OT/phạt đã thay đổi; cần tính lại lương')
+      }
+      if (rowDetails.source_fingerprint !== summaryFingerprint(source)) {
+        throw AppError.conflict('Công/OT đã thay đổi sau lần tính lương; cần tính lại hoặc rà soát phiếu chỉnh tay trước khi chốt')
+      }
       if (!overrides.fields.hourly_rate && Number(row.hourly_rate) !== monthlyHourlyRate(row.employee, period, row.hourly_rate)) {
         throw AppError.conflict('Mức lương giờ nhân viên đã thay đổi; cần tính lại bảng lương trước khi chốt')
       }
@@ -385,7 +369,7 @@ export async function finalizePeriod(period: string, actorUserId?: string, actor
       }
       await tx.payrollRecord.update({ where: { id: row.id }, data: { calculation_details: {
         ...((row.calculation_details as Prisma.JsonObject | null) || {}),
-        applied_policy_snapshot: appliedPolicySnapshot(periodPolicy, Number(row.overtime_rate), Number(row.late_penalty_rate), adjustments),
+        applied_policy_snapshot: appliedPolicySnapshot(periodPolicy, Number(row.overtime_rate), Number(row.late_penalty_rate), eligibleAdjustments),
       } } })
     }
     if (rows.some(r => (r.calculation_details as Record<string, unknown> | null)?.policy !== ATTENDANCE_POLICY_VERSION)) throw AppError.conflict('Cần tính lại bảng lương cũ theo chính sách đã chốt')
@@ -400,20 +384,19 @@ export async function finalizePeriod(period: string, actorUserId?: string, actor
 
     await tx.payrollRecord.updateMany({ where: { id: { in: rows.map(r => r.id) }, status: 'PENDING' }, data: { status: 'FINALIZED' } })
     await tx.auditLog.create({ data: { userId: actorUserId, action: 'FINALIZE_PAYROLL_PERIOD', target_table: 'payroll_records', record_id: period, new_values: { period } } })
-  })
+  }, { maxWait: 20000, timeout: 60000 })
   return list(period, undefined, { id: actorUserId, role: actorRole })
 }
 
-async function settlementImpact(tx: Pick<Prisma.TransactionClient, 'attendance_logs' | 'daily_attendance_summary' | 'attendanceAdjustment' | 'employee_shifts'>, employeeId: string, cutoffDate: string, periodEnd: Date) {
+async function settlementImpact(tx: Prisma.TransactionClient, employeeId: string, cutoffDate: string, periodEnd: Date) {
   const nextDay = new Date(`${cutoffDate}T00:00:00Z`)
   nextDay.setUTCDate(nextDay.getUTCDate() + 1)
   const cutoffDayVN = new Date(`${cutoffDate}T00:00:00+07:00`)
-  const [logs, summaries, adjustments, shifts] = await Promise.all([
-    tx.attendance_logs.findMany({ where: { employee_id: employeeId, OR: [{ work_date: { gte: nextDay } }, { event_time: { gte: cutoffDayVN } }] }, select: { id: true, type: true, status: true, work_date: true, event_time: true } }),
-    tx.daily_attendance_summary.findMany({ where: { employee_id: employeeId, work_date: { gte: nextDay } } }),
-    tx.attendanceAdjustment.findMany({ where: { employee_id: employeeId, work_date: { gte: nextDay } } }),
-    tx.employee_shifts.findMany({ where: { employee_id: employeeId, work_date: { gte: new Date(`${cutoffDate}T00:00:00Z`) } }, include: { work_shifts: true } }),
+  const [attendanceData, shifts] = await Promise.all([
+    getSettlementLogsAndSummaries(employeeId, cutoffDate, cutoffDayVN, tx, nextDay.toISOString().slice(0, 10)),
+    getEmployeeShiftsForEarlySettlement(employeeId, tx),
   ])
+  const { logs, summaries, adjustments } = attendanceData
   const schedule = shifts.map(s => ({ ...s, start_time: s.start_time ?? s.work_shifts?.start_time, end_time: s.end_time ?? s.work_shifts?.end_time }))
   const prepared = prepareAttendance(logs, schedule)
   const pairedDates = new Map(prepared.pairing.pairs.flatMap(pair => [[pair.inId, pair.workDate], [pair.outId, pair.workDate]] as [string, string][]))
@@ -439,7 +422,7 @@ export async function previewEarlySettlement(data: EarlySettlementDto, actorUser
   if (!['ADMIN', 'MANAGER'].includes(actorRole || '')) throw AppError.forbidden()
   const bounds = validatePeriod(data.period)
   if (data.cutoffDate.slice(0, 7) !== data.period || data.cutoffDate > vnDay(new Date())) throw AppError.badRequest('Ngày quyết toán phải thuộc kỳ và không ở tương lai')
-  const employee = await prisma.employee.findFirst({ where: buildIdOrCodeWhere(data.employeeId) })
+  const employee = await findEmployeeByIdOrCode(data.employeeId)
   if (!employee) throw AppError.notFound('Không tìm thấy nhân viên')
   await assertCanManageEmployee({ id: actorUserId, role: actorRole }, employee.id)
   return settlementImpact(prisma, employee.id, data.cutoffDate, bounds.end)
@@ -463,10 +446,7 @@ export async function finalizeEarlySettlement(
   }
 
   const actor = { id: actorUserId, role: actorRole }
-  const emp = await prisma.employee.findFirst({
-    where: buildIdOrCodeWhere(employeeId),
-    include: { users: { include: { roles: true } }, department: true, position: true },
-  })
+  const emp = await findEmployeeByIdOrCode(employeeId)
   if (!emp) throw AppError.notFound('Không tìm thấy nhân viên')
   await assertCanManageEmployee(actor, emp.id)
   if (actorRole !== 'ADMIN') {
@@ -482,9 +462,9 @@ export async function finalizeEarlySettlement(
 
   // 2. Thực hiện transaction quyết toán sớm
   return prisma.$transaction(async tx => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${period}`}))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${payrollPeriodLockKey(period)}))`
     await assertAggregationHealthy(tx, period)
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${emp.id}))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${employeeLockKey(emp.id)}))`
     await assertCanManageEmployee(actor, emp.id, tx)
 
     const record = await tx.payrollRecord.findFirst({
@@ -507,85 +487,59 @@ export async function finalizeEarlySettlement(
     if (impact.blocked) throw AppError.conflict(`Còn công thực tế hoặc khoản đã duyệt sau ngày quyết toán: ${impact.conflict_dates.join(', ')}. Cần đối soát trước khi quyết toán.`)
 
     // Kiểm tra các khoản chưa duyệt hoặc ngày cần review trước cutoffDate
-    const pendingSummaries = await tx.daily_attendance_summary.count({
-      where: {
-        employee_id: emp.id,
-        work_date: { gte: bounds.start, lt: cutoffDateNextDay },
-        OR: [{ requires_review: true }, { overtime_status: 'PENDING' }, { policy_version: null }],
-      },
-    })
+    const pendingSummaries = await countUnapprovedDailySummaries({
+      employeeId: emp.id,
+      workDate: { gte: bounds.start, lt: cutoffDateNextDay },
+    }, tx)
     if (pendingSummaries > 0) {
       throw AppError.conflict('Còn ngày công cần xác minh hoặc OT chờ duyệt trước ngày quyết toán')
     }
 
-    const pendingAdjustments = await tx.attendanceAdjustment.count({
-      where: {
-        employee_id: emp.id,
-        work_date: { gte: bounds.start, lt: cutoffDateNextDay },
-        status: 'PENDING',
-      },
-    })
+    const pendingAdjustments = await countPendingAttendanceAdjustments({
+      employeeId: emp.id,
+      workDate: { gte: bounds.start, lt: cutoffDateNextDay },
+    }, tx)
     if (pendingAdjustments > 0) {
       throw AppError.conflict('Còn khoản phạt/OT chờ duyệt trước ngày quyết toán')
     }
 
-    const shiftsBeforeCutoff = await tx.employee_shifts.findMany({
-      where: { employee_id: emp.id, work_date: { gte: bounds.start, lt: cutoffDateNextDay } },
-      include: { work_shifts: true },
-    })
+    const shiftsBeforeCutoff = await getEmployeeShiftsBeforeCutoff(emp.id, bounds.start, cutoffDateNextDay, tx)
     for (const s of shiftsBeforeCutoff) {
       const { end, off, isZeroDuration } = shiftBounds(vnDay(s.work_date), { ...s, start_time: s.start_time ?? s.work_shifts?.start_time, end_time: s.end_time ?? s.work_shifts?.end_time })
       if (!off && !isZeroDuration && +end > Date.now()) throw AppError.conflict('Còn ca chưa kết thúc; chưa thể quyết toán')
     }
 
-    const settlementSummaries = await tx.daily_attendance_summary.findMany({ where: { employee_id: emp.id, work_date: { gte: bounds.start, lt: cutoffDateNextDay } } })
+    const settlementSummaries = await findDailyAttendanceSummaries({ employeeId: emp.id, workDate: { gte: bounds.start, lt: cutoffDateNextDay } }, false, tx)
+    assertOvernightSummariesCurrent(settlementSummaries, shiftsBeforeCutoff)
     const settlementOverrides = payrollOverrides(record)
     if (requiresHoursReconciliation(settlementOverrides.fields, settlementOverrides.legacy, workingHoursFingerprint(settlementSummaries))) {
       throw AppError.conflict('Công chỉnh tay cần đối chiếu với nguồn mới trước khi chốt lương')
     }
 
-    const removedAdjustments = await tx.attendanceAdjustment.findMany({
-      where: { employee_id: emp.id, work_date: { gte: cutoffDateNextDay, lt: bounds.end } },
-    })
+    const removedAdjustments = await findAttendanceAdjustments({ employeeId: emp.id, workDate: { gte: cutoffDateNextDay, lt: bounds.end } }, false, tx)
     const tomorrow = new Date(`${todayVN}T00:00:00Z`)
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
     const futurePeriodStart = new Date(Math.max(+bounds.end, +tomorrow))
-    const shiftsInPeriod = await tx.employee_shifts.findMany({ where: { employee_id: emp.id, work_date: { gte: cutoffDateNextDay, lt: bounds.end } } })
-    const futureShifts = await tx.employee_shifts.findMany({ where: { employee_id: emp.id, work_date: { gte: futurePeriodStart } } })
 
-    // Xóa/hủy các ca làm việc và tổng hợp tương lai sau cutoffDate của nhân viên này để không phát sinh vắng ảo
-    if (tx.employee_shifts) {
-      await tx.employee_shifts.deleteMany({
-        where: {
-          employee_id: emp.id,
-          work_date: { gte: cutoffDateNextDay, lt: bounds.end },
-        },
-      })
-      await tx.employee_shifts.deleteMany({ where: { employee_id: emp.id, work_date: { gte: futurePeriodStart } } })
-    }
-    if (tx.daily_attendance_summary) {
-      await tx.daily_attendance_summary.deleteMany({
-        where: {
-          employee_id: emp.id,
-          work_date: { gte: cutoffDateNextDay, lt: bounds.end },
-        },
-      })
-    }
-    if (tx.attendanceAdjustment) {
-      await tx.attendanceAdjustment.deleteMany({
-        where: {
-          employee_id: emp.id,
-          work_date: { gte: cutoffDateNextDay, lt: bounds.end },
-        },
-      })
-    }
+    // Xóa/hủy các ca làm việc và tổng hợp tương lai sau cutoffDate của nhân viên này qua shifts module contract
+    const { shiftsInPeriod, futureShifts } = await purgeShiftsForEarlySettlement(
+      emp.id,
+      cutoffDateNextDay,
+      bounds.end,
+      futurePeriodStart,
+      tx
+    )
+    await purgeAttendanceForEarlySettlement(emp.id, { gte: cutoffDateNextDay, lt: bounds.end }, tx)
 
     // Gọi lại logic tính toán của generate cho riêng nhân viên đó trong cùng transaction đến cutoffDate
     const summaries = settlementSummaries
-    const adjustments = await tx.attendanceAdjustment.findMany({
-      where: { employee_id: emp.id, work_date: { gte: bounds.start, lt: cutoffDateNextDay } },
-    })
-    const approved = adjustments.filter(a => a.status === 'APPROVED')
+    const approvedSummaries = summaries.filter(s => (s as any).review_status === 'APPROVED')
+    const approvedDateSet = new Set(approvedSummaries.map(s => vnDay(s.work_date)))
+    const adjustments = await findAttendanceAdjustments({
+      employeeId: emp.id,
+      workDate: { gte: bounds.start, lt: cutoffDateNextDay },
+    }, false, tx)
+    const approved = adjustments.filter(a => a.status === 'APPROVED' && approvedDateSet.has(vnDay(a.work_date)))
     const overrides = payrollOverrides(record)
     const basis = workingHoursFingerprint(summaries)
     const requires_reconciliation = requiresHoursReconciliation(overrides.fields, overrides.legacy, basis)
@@ -635,8 +589,8 @@ export async function finalizeEarlySettlement(
           source_working_hours,
           hours_source_fingerprint: basis,
           source_fingerprint: summaryFingerprint(summaries),
-          adjustment_fingerprint: adjustmentFingerprint(adjustments),
-          applied_policy_snapshot: appliedPolicySnapshot(policy, overtime_rate, late_penalty_rate, adjustments),
+          adjustment_fingerprint: adjustmentFingerprint(approved),
+          applied_policy_snapshot: appliedPolicySnapshot(policy, overtime_rate, late_penalty_rate, approved),
           early_settlement: {
             is_early_settlement: true,
             cutoff_date: cutoffDate,
@@ -649,7 +603,7 @@ export async function finalizeEarlySettlement(
     })
 
     const previousEmployeeStatus = record.employee.status
-    await tx.employee.update({ where: { id: emp.id }, data: { status: 'TERMINATED' } })
+    await terminateEmployee(emp.id, tx)
 
     await tx.auditLog.create({
       data: {
@@ -703,26 +657,49 @@ export async function generate(payroll_period: string, employeeId?: string, acto
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${payroll_period}`}))`
     const currentScope = await getEmployeeScope(actorUser, 'manage', tx)
     if (employeeId) await assertCanManageEmployee(actorUser, employeeId, tx)
-    const employees = await tx.employee.findMany({ where: { AND: [currentScope, employeeId ? buildIdOrCodeWhere(employeeId) : {
-      OR: [{ status: 'ACTIVE' }, { daily_attendance_summary: { some: { work_date: { gte: start, lt: end } } } }],
-    }] }, include: { department: true, position: true, users: { include: { roles: true } } } })
+    const employees = await findEmployeesWithFilter({
+      AND: [
+        currentScope,
+        employeeId ? buildIdOrCodeWhere(employeeId) : {
+          OR: [
+            { status: 'ACTIVE' },
+            { daily_attendance_summary: { some: { work_date: { gte: start, lt: end } } } },
+          ],
+        },
+      ],
+    }, { includeUsersAndRoles: true }, tx)
+    const employeeIds = employees.map(emp => emp.id)
+    const [existingRecords, allSummaries, allAdjustments, allShifts] = employeeIds.length ? await Promise.all([
+      tx.payrollRecord.findMany({ where: { payroll_period, employeeId: { in: employeeIds } } }),
+      findDailyAttendanceSummaries({ employeeIds, workDate: { gte: start, lt: end, lte: new Date(`${today}T00:00:00Z`) } }, false, tx),
+      findAttendanceAdjustments({ employeeIds, workDate: { gte: start, lt: end }, status: 'APPROVED' }, false, tx),
+      getEmployeeShiftsForDateRange(employeeIds, start, end, tx),
+    ]) : [[], [], [], []]
+    assertOvernightSummariesCurrent(allSummaries.filter(summary => summary.review_status === 'APPROVED'), allShifts)
     const results = []
     for (const emp of employees) {
-      const existing = await tx.payrollRecord.findUnique({ where: { employeeId_payroll_period: { employeeId: emp.id, payroll_period } } })
+      const empCreatedDay = emp.createdAt ? vnDay(emp.createdAt) : null
+      const periodEndDay = vnDay(end)
+      if (empCreatedDay && empCreatedDay >= periodEndDay) {
+        continue // Bỏ qua nhân viên tạo hồ sơ sau kỳ tính lương
+      }
+
+      const existing = existingRecords.find(record => record.employeeId === emp.id) ?? null
       if (existing && ['FINALIZED', 'CONFIRMED', 'PAID'].includes(existing.status)) {
         if (employeeId) throw AppError.conflict('Kỳ lương đã khóa/đã trả')
         continue
       }
       assertResolvedPayroll(existing)
       if ((!existing || !hasMultiplierSnapshot(existing)) && !policy) throw AppError.conflict('Chưa có chính sách hệ số được xác minh cho kỳ này')
-      const summaries = await tx.daily_attendance_summary.findMany({ where: { employee_id: emp.id,
-        work_date: { gte: start, lt: end, lte: new Date(`${today}T00:00:00Z`) } } })
-      const adjustments = await tx.attendanceAdjustment.findMany({ where: { employee_id: emp.id, work_date: { gte: start, lt: end } } })
-      const approved = adjustments.filter(a => a.status === 'APPROVED')
+      const summaries = allSummaries.filter(summary => summary.employee_id === emp.id)
+      const approvedSummaries = summaries.filter(s => (s as any).review_status === 'APPROVED')
+      const approvedDateSet = new Set(approvedSummaries.map(s => vnDay(s.work_date)))
+      const adjustments = allAdjustments.filter(adjustment => adjustment.employee_id === emp.id)
+      const approved = adjustments.filter(a => a.status === 'APPROVED' && approvedDateSet.has(vnDay(a.work_date)))
       const overrides = payrollOverrides(existing)
-      const basis = workingHoursFingerprint(summaries)
+      const basis = workingHoursFingerprint(approvedSummaries)
       const requires_reconciliation = false
-      const source_working_hours = summaries.reduce((n, row) => n + Number(row.total_working_hours), 0)
+      const source_working_hours = approvedSummaries.reduce((n, row) => n + Number(row.total_working_hours), 0)
       const total_working_hours = source_working_hours
       const total_late_early = approved.filter(a => a.kind === 'LATE_EARLY').reduce((n, a) => n + Number(a.hours), 0)
       const total_overtime = approved.filter(a => a.kind === 'OVERTIME').reduce((n, a) => n + Number(a.hours), 0)
@@ -741,11 +718,11 @@ export async function generate(payroll_period: string, employeeId?: string, acto
           source_working_hours, hours_source_fingerprint: basis, needs_recalculation: false,
           reason: (existing?.calculation_details as Record<string, any> | null)?.reason ?? null,
           policy: ATTENDANCE_POLICY_VERSION, policy_id: policy?.id ?? null, generated_at: new Date().toISOString(),
-          source_fingerprint: summaryFingerprint(summaries), adjustment_fingerprint: adjustmentFingerprint(adjustments),
-          adjustment_ids: approved.map(a => String(a.id)), summary_ids: summaries.map(s => String(s.id)),
+          source_fingerprint: summaryFingerprint(summaries), adjustment_fingerprint: adjustmentFingerprint(approved),
+          adjustment_ids: approved.map(a => String(a.id)), summary_ids: approvedSummaries.map(s => String(s.id)),
           overtime_rate, late_penalty_rate,
           applied_policy_snapshot: appliedPolicySnapshot(policy, overtime_rate, late_penalty_rate, adjustments),
-          pending_review_days: summaries.filter(s => s.requires_review || s.overtime_status === 'PENDING').map(s => s.work_date.toISOString().slice(0, 10)),
+          pending_review_days: summaries.filter(s => (s as any).review_status !== 'APPROVED').map(s => s.work_date.toISOString().slice(0, 10)),
         } }
       results.push(await tx.payrollRecord.upsert({ where: { employeeId_payroll_period: { employeeId: emp.id, payroll_period } },
         update: data, create: { employeeId: emp.id, payroll_period, ...data }, include: { employee: { include: { department: true } } } }))
@@ -753,5 +730,5 @@ export async function generate(payroll_period: string, employeeId?: string, acto
     await tx.auditLog.create({ data: { userId: actorUserId, action: 'GENERATE_PAYROLL', target_table: 'payroll_records', record_id: payroll_period,
       new_values: { employee_count: results.length, employeeId: employeeId || 'ALL' } } })
     return results.map(formatPayrollRecord)
-  }, { timeout: 30000, maxWait: 10000 })
+  }, { timeout: 60000, maxWait: 20000 })
 }

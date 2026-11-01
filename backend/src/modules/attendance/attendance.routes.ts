@@ -22,3 +22,5 @@ attendanceRouter.patch('/adjust', authorize('ADMIN', 'MANAGER'), asyncHandler(co
 attendanceRouter.get('/locks', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.getLocks));
 attendanceRouter.post('/locks/lock', authorize('ADMIN'), asyncHandler(controller.lock));
 attendanceRouter.post('/locks/unlock', authorize('ADMIN'), asyncHandler(controller.unlock));
+attendanceRouter.post('/unlock-employee', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.unlockEmployee));
+

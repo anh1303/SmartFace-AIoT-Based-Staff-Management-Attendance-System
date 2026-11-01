@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken'
 import { env } from '../config/env.js'
 import { AppError } from '../common/AppError.js'
 
+import { verifyAndLoadActiveUser } from '../modules/auth/public.js'
+
 // role là role_name (string) từ bảng roles: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
 export type AuthUser = {
   id: string
@@ -26,14 +28,17 @@ declare global {
   }
 }
 
-export function authenticate(req: Request, res: Response, next: NextFunction) {
+export async function authenticate(req: Request, res: Response, next: NextFunction) {
   const token = req.cookies?.token || req.headers.authorization?.replace(/^Bearer\s+/i, '')
   if (!token) return next(new AppError(401, 'Authentication token is required'))
   try {
-    req.user = jwt.verify(token, env.JWT_SECRET) as AuthUser
+    req.user = await verifyAndLoadActiveUser(token)
     next()
-  } catch {
+  } catch (err: any) {
     res.clearCookie('token', { path: '/' })
+    if (err instanceof AppError) {
+      return next(err)
+    }
     next(new AppError(401, 'Invalid or expired token'))
   }
 }

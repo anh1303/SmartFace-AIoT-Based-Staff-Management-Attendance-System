@@ -3,7 +3,7 @@ import { syncDayAdjustments } from '../../src/modules/attendance/attendance.adju
 
 describe('Absence snapshot stability', () => {
   const day = { employee_id: 'emp', work_date: new Date('2026-10-01T00:00:00Z'), overtime_candidate_hours: 0,
-    overtime: 0, overtime_status: 'NONE', late_early: 0,
+    overtime: 0, overtime_status: 'NONE', review_status: 'APPROVED', late_early: 0,
     calculation_details: { absenceCandidate: true, scheduledShiftSeconds: 28800, fingerprint: 'same-attendance', policy: 'v6' } }
   it('preserves an approved absence rate when a later policy changes', async () => {
     let saved: any = null

@@ -1,11 +1,20 @@
 import type { Prisma } from '@prisma/client'
-import { assertEditableDay, aggregateDailyAttendance, isAttendanceDateLocked } from '../attendance/index.js'
+import {
+  assertEditableDay,
+  aggregateDailyAttendance,
+  isAttendanceDateLocked,
+  invalidateDailySummaryForShiftChange,
+} from '../attendance/public.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { buildIdOrCodeWhere, formatVNDateISO } from '../../common/utils.js'
-import { logAction } from '../audit-logs/index.js'
-import { assertCanManageEmployee, getEmployeeScope } from '../../common/permission.helper.js'
-import { findEmployeeByIdOrCode, findEmployeeByUserId } from '../employees/index.js'
+import { buildIdOrCodeWhere, formatVNDateISO, employeeLockKey, payrollPeriodLockKey } from '../../common/utils.js'
+import { logAction } from '../audit-logs/public.js'
+import {
+  assertCanManageEmployee,
+  getEmployeeScope,
+  findEmployeeByIdOrCode,
+  findEmployeeByUserId,
+} from '../employees/public.js'
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 
@@ -13,43 +22,22 @@ const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ 
  * 3 Ca làm việc mặc định chuẩn của toàn hệ thống.
  * Giờ bắt đầu và kết thúc là cố định và KHÔNG THỂ SỬA ĐỔI.
  */
-export const STANDARD_SHIFT_CONFIGS = {
-  OFFICE_HOURS: {
-    code: 'OFFICE_HOURS',
-    name: 'Ca Hành Chính',
-    start_time: '08:00',
-    end_time: '17:00',
-    is_fixed: true,
-  },
-  MORNING: {
-    code: 'MORNING',
-    name: 'Ca Sáng',
-    start_time: '08:00',
-    end_time: '12:00',
-    is_fixed: true,
-  },
-  AFTERNOON: {
-    code: 'AFTERNOON',
-    name: 'Ca Chiều',
-    start_time: '13:00',
-    end_time: '17:00',
-    is_fixed: true,
-  },
-  OTHER: {
-    code: 'OTHER',
-    name: 'Ca khác',
-    start_time: '00:00',
-    end_time: '00:00',
-    is_fixed: false,
-  },
-  OFF: {
-    code: 'OFF',
-    name: 'Nghỉ ca',
-    start_time: '00:00',
-    end_time: '00:00',
-    is_fixed: true,
-  },
-} as const
+import {
+  STANDARD_SHIFT_CONFIGS,
+  getDefaultShift,
+  getShiftClient,
+  getEmployeeShiftsByDates,
+  getEmployeeShiftsByFilter,
+  getEmployeeShiftsForDateRange,
+  getEmployeeNearShifts,
+  getEmployeeShiftsForAggregation,
+  getEmployeeShiftsBeforeCutoff,
+  getEmployeeShiftsForEarlySettlement,
+  purgeShiftsForEarlySettlement,
+  deleteShiftsForEmployee,
+  getEmployeeShiftsForRecalculation,
+  getActiveEmployeeShiftsWithDetails,
+} from './shift.queries.js'
 
 function formatTimeHHMM(val: unknown, fallback: string): string {
   if (!val) return fallback
@@ -219,9 +207,31 @@ export async function assignOrUpdate(data: {
   }
 
   const shiftRecord = await prisma.$transaction(async tx => {
+    const shiftPeriod = data.date.slice(0, 7)
+    // Khóa theo thứ tự nhất quán toàn hệ thống: Kỳ lương trước, rồi đến nhân viên
+    if (typeof (tx as any).$executeRaw === 'function') {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${payrollPeriodLockKey(shiftPeriod)}))`
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${employeeLockKey(emp.id)}))`
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${data.date}`}))`
+    }
+
+    // Đọc lại trạng thái nhân viên bên trong transaction sau khi đã có lock
+    const freshEmp = (await findEmployeeByIdOrCode(emp.id, tx)) ?? emp
+    if (!freshEmp || freshEmp.status !== 'ACTIVE') {
+      if (freshEmp?.status === 'TERMINATED') {
+        throw new AppError(400, 'Không thể phân ca làm việc cho nhân viên ĐÃ NGHỈ VIỆC (TERMINATED)!')
+      }
+      if (freshEmp?.status === 'INACTIVE') {
+        throw new AppError(400, 'Không thể phân ca làm việc cho nhân viên đang ở trạng thái TẠM NGƯNG (INACTIVE)!')
+      }
+      throw new AppError(400, `Không thể phân ca làm việc cho nhân viên có trạng thái '${freshEmp?.status || 'UNKNOWN'}'!`)
+    }
+
     await assertEditableDay(tx, data.date, emp.id)
     await assertCanManageEmployee({ id: actorUserId, role: actorRole }, emp.id, tx)
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`shift-type:${standardConfig.code}`}))`
+    if (typeof (tx as any).$executeRaw === 'function') {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`shift-type:${standardConfig.code}`}))`
+    }
 
     const shiftNameMatches: string[] = [standardConfig.name]
     if (standardConfig.code === 'OFFICE_HOURS') shiftNameMatches.push('Full time', 'Ca Hành Chính', 'Ca hành chính')
@@ -288,7 +298,7 @@ export async function assignOrUpdate(data: {
       })
     }
 
-    await tx.daily_attendance_summary.updateMany({ where: { employee_id: emp.id, work_date }, data: { policy_version: null, requires_review: true, review_reason: 'SHIFT_CHANGED' } })
+    await invalidateDailySummaryForShiftChange(emp.id, work_date, tx)
     await tx.auditLog.create({ data: {
       userId: actorUserId,
       action: existingShift ? 'UPDATE_SHIFT' : 'ASSIGN_SHIFT',
@@ -312,9 +322,9 @@ export async function assignOrUpdate(data: {
       },
     } })
 
+    await aggregateDailyAttendance(Number(data.date.slice(5, 7)), Number(data.date.slice(0, 4)), emp.id, data.date, undefined, tx)
     return shiftRecord
-  })
-  await aggregateDailyAttendance(Number(data.date.slice(5, 7)), Number(data.date.slice(0, 4)), emp.id, data.date)
+  }, { maxWait: 20000, timeout: 60000 })
   return formatShift(shiftRecord)
 }
 
@@ -350,89 +360,20 @@ export async function getEmployeeShiftForDate(employeeId: string, workDate: Date
   })
 }
 
-/**
- * Public Module API: Lấy danh sách ca làm việc theo khoảng ngày (cho Attendance batch aggregation)
- */
-export async function getEmployeeShiftsForDateRange(
-  dateRange: { gte: Date; lte: Date },
-  employeeIds?: string[]
-) {
-  return prisma.employee_shifts.findMany({
-    where: {
-      work_date: {
-        gte: dateRange.gte,
-        lte: dateRange.lte,
-      },
-      ...(employeeIds && employeeIds.length > 0 ? { employee_id: { in: employeeIds } } : {}),
-    },
-    include: {
-      work_shifts: true,
-      employees: {
-        select: { id: true, employee_code: true, full_name: true },
-      },
-    },
-  })
-}
 
-/**
- * Public Module API: Lấy ca làm việc mặc định của hệ thống (ưu tiên 'Ca Hành Chính', fallback ca active đầu tiên)
- */
-export async function getDefaultShift(tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  const preferred = await client.work_shifts.findFirst({
-    where: {
-      OR: [
-        { shift_name: { equals: 'Ca Hành Chính', mode: 'insensitive' } },
-        { shift_name: { equals: 'Ca Hanh Chinh', mode: 'insensitive' } },
-      ],
-    },
-  })
-  if (preferred) return preferred
-  return client.work_shifts.findFirst({
-    orderBy: { id: 'asc' },
-  })
-}
-
-/**
- * Public Module API: Lấy ca làm việc theo danh sách ngày và nhân viên (cho Attendance batch query)
- */
-export async function getEmployeeShiftsByDates(
-  dates: Date[],
-  employeeIds: string[],
-  tx?: Prisma.TransactionClient
-) {
-  const client = tx ?? prisma
-  return client.employee_shifts.findMany({
-    where: {
-      employee_id: { in: employeeIds },
-      work_date: { in: dates },
-    },
-    select: {
-      employee_id: true,
-      work_date: true,
-      start_time: true,
-      end_time: true,
-      shift_type: true,
-    },
-  })
-}
-
-/**
- * Public Module API: Lấy danh sách phân ca nhân viên theo bộ lọc linh hoạt (employeeIds, workDate range hoặc đơn lẻ)
- */
-export async function getEmployeeShiftsByFilter(
-  filter: {
-    employeeIds?: string[]
-    workDate?: Date | string | { gte?: Date | string; lte?: Date | string }
-  },
-  tx?: Prisma.TransactionClient
-) {
-  const client = tx ?? prisma
-  return client.employee_shifts.findMany({
-    where: {
-      ...(filter.employeeIds?.length ? { employee_id: { in: filter.employeeIds } } : {}),
-      ...(filter.workDate ? { work_date: filter.workDate as any } : {}),
-    },
-    include: { work_shifts: true },
-  })
-}
+export {
+  STANDARD_SHIFT_CONFIGS,
+  getDefaultShift,
+  getShiftClient,
+  getEmployeeShiftsByDates,
+  getEmployeeShiftsByFilter,
+  getEmployeeShiftsForDateRange,
+  getEmployeeNearShifts,
+  getEmployeeShiftsForAggregation,
+  getEmployeeShiftsBeforeCutoff,
+  getEmployeeShiftsForEarlySettlement,
+  purgeShiftsForEarlySettlement,
+  deleteShiftsForEmployee,
+  getEmployeeShiftsForRecalculation,
+  getActiveEmployeeShiftsWithDetails,
+} from './shift.queries.js'

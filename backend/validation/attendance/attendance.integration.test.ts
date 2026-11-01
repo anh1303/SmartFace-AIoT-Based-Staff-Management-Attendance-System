@@ -19,7 +19,7 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
     await ensureTestPayrollPolicy(db)
     const role = await db.roles.upsert({ where: { role_name: 'ADMIN' }, create: { role_name: 'ADMIN' }, update: {} })
     admin = await db.user.create({ data: { username: `policy-${randomUUID().slice(0,8)}`, passwordHash: 'test-only', role_id: role.id } })
-    emp = await db.employee.create({ data: { employee_code: `TEST-${randomUUID().slice(0,8)}`, full_name: 'Policy Test', hourly_rate: 100000 } })
+    emp = await db.employee.create({ data: { employee_code: `TEST-${randomUUID().slice(0,8)}`, full_name: 'Policy Test', hourly_rate: 100000, createdAt: new Date('2026-10-01T00:00:00Z') } })
     const ws = await db.work_shifts.create({ data: { shift_name:'Policy Test Shift', start_time:new Date('1970-01-01T08:00:00Z'),end_time:new Date('1970-01-01T17:30:00Z') } })
     await db.employee_shifts.create({ data: { employee_id:emp.id,shift_id:ws.id,work_date:new Date(`${date}T00:00:00Z`),shift_type:'OFFICE_HOURS',start_time:ws.start_time,end_time:ws.end_time } })
   })
@@ -35,6 +35,41 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
     expect(summary?.attendance_status).toBe('ABSENT')
     expect(absence?.status).toBe('PENDING')
   })
+  it('waits for a concurrent scan transaction before recalculating and approving', async () => {
+    const employee = await db.employee.create({ data: { employee_code: `RACE-${randomUUID().slice(0,8)}`, full_name: 'Concurrent Scan', hourly_rate: 100000 } })
+    const shift = await db.work_shifts.create({ data: { shift_name: `Race-${randomUUID().slice(0,8)}`, start_time: new Date('1970-01-01T08:00:00Z'), end_time: new Date('1970-01-01T17:00:00Z') } })
+    await db.employee_shifts.create({ data: { employee_id: employee.id, shift_id: shift.id, work_date: new Date(`${date}T00:00:00Z`), shift_type: 'OFFICE_HOURS', start_time: shift.start_time, end_time: shift.end_time } })
+    await service.aggregateDailyAttendance(10, 2026, employee.id, date)
+    let release!: () => void, ready!: () => void
+    const locked = new Promise<void>(resolve => { ready = resolve })
+    const proceed = new Promise<void>(resolve => { release = resolve })
+    const scan = db.$transaction(async (tx: any) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${period}`}))`
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${date}`}))`
+      await tx.attendance_logs.createMany({ data: [
+        { employee_id: employee.id, work_date: new Date(`${date}T00:00:00Z`), event_time: new Date(at('08:00:00')), type: 'CHECK_IN' },
+        { employee_id: employee.id, work_date: new Date(`${date}T00:00:00Z`), event_time: new Date(at('17:00:00')), type: 'CHECK_OUT' },
+      ] })
+      ready()
+      await proceed
+    }, { timeout: 30000 })
+    await locked
+    const approval = service.adjustAttendance({ employeeId: employee.id, date, late_early: 0, overtime: 0, reason: 'Concurrent review' }, admin.id, 'ADMIN')
+    try {
+      let waiting = false
+      for (let i = 0; i < 100 && !waiting; i++) {
+        const rows = await db.$queryRaw`SELECT count(*)::int AS count FROM pg_locks WHERE locktype = 'advisory' AND NOT granted`
+        waiting = rows[0].count > 0
+        if (!waiting) await new Promise(resolve => setTimeout(resolve, 50))
+      }
+      expect(waiting).toBe(true)
+    } finally { release() }
+    await scan
+    await approval
+    const summary = await db.daily_attendance_summary.findUnique({ where: { employee_id_work_date: { employee_id: employee.id, work_date: new Date(`${date}T00:00:00Z`) } } })
+    expect(Number(summary.total_working_hours)).toBeGreaterThan(0)
+    expect(summary.review_status).toBe('APPROVED')
+  })
   it('deduplicates concurrent transport retries but keeps distinct INs', async () => {
     const capture = { eventId:'same-event-1234',capturedAt:at('08:00:00'),deviceId:`TEST_PI_${emp.id}` }
     const results = await Promise.all([service.checkIn({employeeId:emp.id},undefined,capture),service.checkIn({employeeId:emp.id},undefined,capture)])
@@ -49,12 +84,12 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
   it('requires an approval reason and permits more OT than measured', async () => {
     await expect(service.adjustAttendance({employeeId:emp.id,date,late_early:1,overtime:2,reason:''},admin.id,'ADMIN')).rejects.toThrow()
     await service.adjustAttendance({employeeId:emp.id,date,late_early:1,overtime:2.74,reason:'Sự cố thiếu ghi nhận'},admin.id,'ADMIN')
-    const items = await db.attendanceAdjustment.findMany({where:{employee_id:emp.id,status:'PENDING'}})
-    for (const item of items) await adjustments.reviewAdjustment(String(item.id),{status:'APPROVED',note:'Đã kiểm tra',updated_at:item.updated_at.toISOString()},{id:admin.id,role:'ADMIN'})
+    const items = await db.attendanceAdjustment.findMany({where:{employee_id:emp.id,status:'APPROVED'}})
+    expect(items.length).toBeGreaterThan(0)
     await service.aggregateDailyAttendance(10,2026,emp.id)
     const summary = await db.daily_attendance_summary.findFirst({where:{employee_id:emp.id}})
     expect(summary.overtime_status).toBe('APPROVED');expect(Number(summary.overtime)).toBe(2.5)
-    expect(await db.auditLog.count({where:{action:'ADJUST_ATTENDANCE',userId:admin.id}})).toBe(1)
+    expect(await db.auditLog.count({where:{action:'ADJUST_ATTENDANCE',userId:admin.id,record_id:String(summary.id)}})).toBe(1)
   })
   it('generates zero-safe wages, snapshots rates and blocks stale finalize', async () => {
     const generated = await payroll.generate(period,emp.id,admin.id,{id:admin.id,role:'ADMIN'})
@@ -65,9 +100,7 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
     const current = await db.payrollRecord.findFirst({where:{employeeId:emp.id}})
     expect(Number(current.overtime_rate)).toBe(2.0)
     await service.adjustAttendance({employeeId:emp.id,date,late_early:1,overtime:1,reason:'Duyệt lại 1 giờ'},admin.id,'ADMIN')
-    const ot = await db.attendanceAdjustment.findFirst({where:{employee_id:emp.id,kind:'OVERTIME'}})
-    await adjustments.reviewAdjustment(String(ot.id),{status:'APPROVED',note:'Duyệt lại',updated_at:ot.updated_at.toISOString()},{id:admin.id,role:'ADMIN'})
-    await expect(payroll.finalizePeriod(period,admin.id,'ADMIN')).rejects.toThrow(/thay đổi/)
+    await expect(payroll.finalizePeriod(period,admin.id,'ADMIN')).rejects.toThrow(/cần tính lại bảng lương/)
   })
   it('preserves finalized wages and blocks edits/generation on a closed row', async () => {
     await payroll.generate(period,emp.id,admin.id,{id:admin.id,role:'ADMIN'})

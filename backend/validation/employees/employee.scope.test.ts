@@ -51,7 +51,7 @@ describe('employee department authorization', () => {
       rows[1].hourly_rate = 100000
       db.employee.update.mockResolvedValue({ ...rows[1], hourly_rate: 120000 })
       await employees.updateWithManagerCheck('S1', { hourly_rate: 120000 }, { id: 'admin-user', role: 'ADMIN' })
-      expect(db.employee.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ hourly_rate: 120000, hourly_rate_history: [{ period: '0000-01', rate: 100000 }, { period: '2026-10', rate: 120000 }] }) }))
+      expect(db.employee.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ hourly_rate: 120000, hourly_rate_history: [{ period: '0000-01', rate: 100000 }, { period: '2026-11', rate: 120000 }] }) }))
     } finally { vi.useRealTimers() }
   })
   it('reads only self and ordinary staff in the current department', async () => {
@@ -110,6 +110,9 @@ describe('employee department authorization', () => {
     }
     const employeeWhere = db.employee.findMany.mock.lastCall![0].where
     expect(rows.filter(row => matches(row, employeeWhere)).map(row => row.id)).toEqual(['manager', 'staff'])
+    expect(db.employee.count).toHaveBeenCalledWith({
+      where: { AND: [{ id: { in: expect.arrayContaining(['manager', 'staff']) } }, { status: 'ACTIVE' }] },
+    })
   })
   it('intersects an explicit aggregate target with the supplied management scope', async () => {
     const result = await attendance.aggregateDailyAttendance(10, 2026, 'O1', undefined, await getEmployeeScope(manager, 'manage'))

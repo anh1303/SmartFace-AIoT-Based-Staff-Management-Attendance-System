@@ -1,13 +1,12 @@
 import { Router } from 'express';
 import { authRouter } from './modules/auth/index.js';
 import { employeeRouter, departmentRouter, positionRouter } from './modules/employees/index.js';
-import { attendanceRouter } from './modules/attendance/index.js';
+import { attendanceRouter, notificationRouter } from './modules/attendance/index.js';
 import { biometricRouter } from './modules/biometrics/index.js';
 import { deviceRouter } from './modules/devices/index.js';
 import { payrollRouter } from './modules/payroll/index.js';
 import { shiftRouter } from './modules/shifts/index.js';
 import { auditRouter } from './modules/audit-logs/index.js';
-import { notificationRouter } from './modules/attendance/attendance.notifications.js';
 
 export const apiRouter = Router();
 

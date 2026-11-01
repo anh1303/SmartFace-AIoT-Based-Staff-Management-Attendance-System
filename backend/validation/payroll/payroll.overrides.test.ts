@@ -2,7 +2,22 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { adjustmentFingerprint } from '../../src/modules/attendance/attendance.adjustments.js'
 
 const state = vi.hoisted(() => ({ record: null as any, summaries: [] as any[], employee: null as any }))
-vi.mock('../../src/modules/attendance/index.js', () => ({ aggregateDailyAttendance: vi.fn(async () => ({})), getAttendanceSummariesByEmployeesAndDateRange: vi.fn() }))
+vi.mock('../../src/modules/attendance/public.js', async (importOriginal) => {
+  const actual: any = await importOriginal()
+  return {
+    ...actual,
+    aggregateDailyAttendance: vi.fn(async () => ({})),
+    getAttendanceSummariesByEmployeesAndDateRange: vi.fn(),
+  }
+})
+vi.mock('../../src/modules/attendance/index.js', async (importOriginal) => {
+  const actual: any = await importOriginal()
+  return {
+    ...actual,
+    aggregateDailyAttendance: vi.fn(async () => ({})),
+    getAttendanceSummariesByEmployeesAndDateRange: vi.fn(),
+  }
+})
 vi.mock('../../src/config/database.js', () => {
   const db: any = {
     $executeRaw: vi.fn(async () => 1),
@@ -12,6 +27,8 @@ vi.mock('../../src/config/database.js', () => {
     daily_attendance_summary: { findMany: vi.fn(async () => state.summaries), count: vi.fn(async () => 0) },
     attendanceAdjustment: { findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
     attendance_locks: { findMany: vi.fn(async () => []) },
+    employee_shifts: { findMany: vi.fn(async () => []) },
+    work_shifts: { findFirst: vi.fn(async () => null) },
     auditLog: { create: vi.fn(async () => ({})) },
     payrollRecord: {
       findUnique: vi.fn(async () => state.record), findUniqueOrThrow: vi.fn(async () => state.record),
@@ -51,7 +68,7 @@ describe('Unresolved legacy snapshots', () => {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-30T20:00:00+07:00'))
   state.employee = { id: '00000000-0000-4000-8000-000000000001', employee_code: 'NV-001', full_name: 'Test employee', hourly_rate: 100000, status: 'ACTIVE', departmentId: 1, user_id: 'employee-user', department: { name: 'A' }, position: { level: 'EMPLOYEE' }, users: { roles: { role_name: 'EMPLOYEE' } } }
-  state.summaries = [{ id: 1n, employee_id: state.employee.id, work_date: new Date('2026-10-29T00:00:00Z'), total_working_hours: 90, overtime: 0, late_early: 0, overtime_status: 'NONE', policy_version: '2026-10-29-v6', requires_review: false, calculation_details: { fingerprint: 'source-90', scheduledEnd: '2026-10-29T17:00:00+07:00' } }]
+  state.summaries = [{ id: 1n, employee_id: state.employee.id, work_date: new Date('2026-10-29T00:00:00Z'), total_working_hours: 90, overtime: 0, late_early: 0, overtime_status: 'NONE', policy_version: '2026-10-29-v6', requires_review: false, review_status: 'APPROVED', calculation_details: { fingerprint: 'source-90', scheduledEnd: '2026-10-29T17:00:00+07:00' } }]
   state.record = { id: 1n, employeeId: state.employee.id, employee: state.employee, payroll_period: '2026-10', hourly_rate: 100000, total_working_hours: 90, total_overtime: 0, total_late_early: 0, total_absence_penalty: 0, allowance: 1500000, net_salary: 10500000, overtime_rate: 2.0, late_penalty_rate: 1.5, status: 'PENDING', updated_at: new Date(), calculation_details: { adjustment_fingerprint: adjustmentFingerprint([]) } }
 })
 afterEach(() => vi.useRealTimers())

@@ -13,13 +13,20 @@ function historyOf(employee: WageProfile): WageEntry[] {
   return [...history].sort((a, b) => a.period.localeCompare(b.period))
 }
 
-/** Profile changes apply to their whole VN month. Legacy saved months retain their snapshot. */
+/** Profile changes apply to their effective VN month. Legacy saved months retain their snapshot. */
 export function monthlyHourlyRate(employee: WageProfile, period: string, savedRate?: unknown): number {
   const currentPeriod = vnDate.format(new Date()).slice(0, 7)
-  if (period >= currentPeriod) return Number(employee.hourly_rate ?? 0)
-  const effective = historyOf(employee).filter(row => row.period <= period).at(-1)
-  if (effective && effective.period !== BASELINE_PERIOD) return effective.rate
-  if (savedRate != null) return Number(savedRate)
+  const history = historyOf(employee)
+  const effective = history.filter(row => row.period <= period).at(-1)
+
+  if (effective && effective.period !== BASELINE_PERIOD) {
+    return effective.rate
+  }
+
+  if (period < currentPeriod && savedRate != null) {
+    return Number(savedRate)
+  }
+
   return effective?.rate ?? Number(employee.hourly_rate ?? 0)
 }
 

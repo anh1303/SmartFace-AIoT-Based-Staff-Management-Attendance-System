@@ -1,0 +1,413 @@
+import { prisma } from '../../config/database.js';
+import { getEmployeeScope, type EmployeeActor } from '../employees/public.js';
+import { formatVNDateISO, formatVNTime, vnDay } from '../../common/utils.js';
+import type {
+  TodayDashboardResponseDto,
+  DashboardShiftGroupDto,
+  DashboardDepartmentProgressDto,
+  DashboardEmployeeShiftItemDto,
+  DashboardRecentLogDto,
+  DashboardAlertsDto,
+} from './dashboard.dto.js';
+
+const DEPARTMENT_COLORS = [
+  '#3b82f6',
+  '#10b981',
+  '#a855f7',
+  '#f43f5e',
+  '#f59e0b',
+  '#06b6d4',
+  '#6366f1',
+  '#ec4899',
+];
+
+export async function getTodayDashboard(
+  actor?: EmployeeActor
+): Promise<TodayDashboardResponseDto> {
+  const now = new Date();
+  const todayStr = vnDay(now);
+
+  const vnTimeStr = formatVNTime(now);
+  const currentHHMM = vnTimeStr.slice(0, 5);
+  const [curH, curM] = currentHHMM.split(':').map(Number);
+  const nowMinutes = curH * 60 + curM;
+
+  const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  const parts = todayStr.split('-');
+  const d = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T12:00:00+07:00`);
+  const dayName = dayNames[d.getDay()];
+  const dateFormatted = `${dayName}, ${parts[2]}/${parts[1]}/${parts[0]}`;
+
+  const startUtc = new Date(`${todayStr}T00:00:00+07:00`);
+  const endUtc = new Date(`${todayStr}T23:59:59.999+07:00`);
+
+  // RBAC scope
+  const employeeScope = await getEmployeeScope(actor);
+
+  // 1. Employees in scope
+  const employees = await prisma.employee.findMany({
+    where: {
+      AND: [employeeScope, { status: 'ACTIVE' }],
+    },
+    include: {
+      department: true,
+      position: true,
+    },
+    orderBy: [{ departmentId: 'asc' }, { employee_code: 'asc' }],
+  });
+
+  const employeeIds = employees.map((e) => e.id);
+  const empIdToInfoMap = new Map(
+    employees.map((e) => [
+      e.id,
+      {
+        code: e.employee_code,
+        name: e.full_name,
+        avatar: e.avatar_url,
+        dept: e.department?.name || 'Chưa phân phòng',
+      },
+    ])
+  );
+
+  // 2. Query today shifts and attendance logs in parallel
+  const [todayShifts, todayLogs] = await Promise.all([
+    prisma.employee_shifts.findMany({
+      where: {
+        employee_id: { in: employeeIds },
+        work_date: new Date(`${todayStr}T00:00:00Z`),
+        shift_type: { not: 'OFF' },
+      },
+      include: {
+        work_shifts: true,
+      },
+    }),
+    prisma.attendance_logs.findMany({
+      where: {
+        employee_id: { in: employeeIds },
+        event_time: {
+          gte: startUtc,
+          lte: endUtc,
+        },
+      },
+      orderBy: { event_time: 'desc' },
+      take: 500,
+    }),
+  ]);
+
+  // Scheduled employees
+  const scheduledEmpIds = new Set(todayShifts.map((s) => s.employee_id));
+  const workingEmployeesCount =
+    scheduledEmpIds.size > 0 ? scheduledEmpIds.size : employees.length;
+  const totalEmployees = employees.length;
+
+  // Checkins & Checkouts
+  const todayCheckIns = todayLogs.filter((a) => a.type === 'CHECK_IN');
+  const todayCheckOuts = todayLogs.filter(
+    (a) => a.type === 'CHECK_OUT' || a.type === 'TAN_CA'
+  );
+  const checkInCount = todayCheckIns.length;
+  const checkOutCount = todayCheckOuts.length;
+
+  // Currently working count (latest punch per employee is CHECK_IN)
+  const empLatestPunchMap = new Map<string, (typeof todayLogs)[0]>();
+  // todayLogs is sorted descending, so iterate reverse to let later punches overwrite earlier ones
+  for (let i = todayLogs.length - 1; i >= 0; i--) {
+    const log = todayLogs[i];
+    empLatestPunchMap.set(log.employee_id, log);
+  }
+  let currentlyWorkingCount = 0;
+  empLatestPunchMap.forEach((lastPunch) => {
+    if (lastPunch.type === 'CHECK_IN') {
+      currentlyWorkingCount += 1;
+    }
+  });
+
+  // Checked in unique employee IDs
+  const checkedInEmpIds = new Set(todayCheckIns.map((a) => a.employee_id));
+
+  // Punctuality statistics
+  const onTimeCount = todayCheckIns.filter(
+    (a) => a.status === 'VALID' || (!a.status && a.type === 'CHECK_IN')
+  ).length;
+  const lateCount = todayCheckIns.filter(
+    (a) => a.status === 'FLAGGED' || a.status === 'LATE' || a.status === 'EARLY_LEAVE'
+  ).length;
+  const notCheckedInCount = Math.max(0, workingEmployeesCount - checkedInEmpIds.size);
+  const totalPunctuality = onTimeCount + lateCount + notCheckedInCount;
+
+  const onTimePct =
+    totalPunctuality > 0 ? Math.round((onTimeCount / totalPunctuality) * 100) : 0;
+  const latePct =
+    totalPunctuality > 0 ? Math.round((lateCount / totalPunctuality) * 100) : 0;
+  const notCheckedInPct =
+    totalPunctuality > 0 ? Math.max(0, 100 - onTimePct - latePct) : 0;
+
+  const donutData =
+    totalPunctuality === 0
+      ? [{ name: 'Chưa có dữ liệu', value: 1, color: '#334155' }]
+      : [
+          { name: 'Đúng giờ', value: onTimeCount, color: '#10b981' },
+          { name: 'Đi muộn / về sớm', value: lateCount, color: '#f43f5e' },
+          { name: 'Chưa check-in', value: notCheckedInCount, color: '#8b5cf6' },
+        ];
+
+  // Helper for live shift status
+  const getShiftLiveStatus = (startTime: string, endTime: string) => {
+    if (currentHHMM >= startTime && currentHHMM <= endTime) {
+      return {
+        label: 'Đang diễn ra',
+        style:
+          'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+      };
+    }
+    if (currentHHMM < startTime) {
+      return {
+        label: 'Sắp diễn ra',
+        style:
+          'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+      };
+    }
+    return {
+      label: 'Đã kết thúc',
+      style:
+        'bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/20',
+    };
+  };
+
+  // Shifts grouping
+  let shifts: DashboardShiftGroupDto[] = [];
+  if (todayShifts.length === 0) {
+    shifts = [
+      {
+        id: 'office',
+        name: 'Ca hành chính',
+        timeRange: '08:00 - 17:00',
+        startTime: '08:00',
+        endTime: '17:00',
+        count: workingEmployeesCount,
+        type: 'OFFICE_HOURS',
+        liveStatus: getShiftLiveStatus('08:00', '17:00'),
+      },
+    ];
+  } else {
+    const shiftGroupMap = new Map<string, DashboardShiftGroupDto>();
+    todayShifts.forEach((s) => {
+      const startTime = s.start_time
+        ? formatVNTime(s.start_time).slice(0, 5)
+        : s.work_shifts?.start_time
+          ? formatVNTime(s.work_shifts.start_time).slice(0, 5)
+          : '08:00';
+      const endTime = s.end_time
+        ? formatVNTime(s.end_time).slice(0, 5)
+        : s.work_shifts?.end_time
+          ? formatVNTime(s.work_shifts.end_time).slice(0, 5)
+          : '17:00';
+      const key = `${s.shift_type || 'OFFICE_HOURS'}_${startTime}_${endTime}`;
+
+      if (!shiftGroupMap.has(key)) {
+        const name =
+          s.shift_type === 'MORNING'
+            ? 'Ca sáng'
+            : s.shift_type === 'AFTERNOON'
+              ? 'Ca chiều'
+              : s.shift_type === 'OFFICE_HOURS'
+                ? 'Ca hành chính'
+                : 'Ca làm việc';
+        shiftGroupMap.set(key, {
+          id: key,
+          name,
+          timeRange: `${startTime} - ${endTime}`,
+          startTime,
+          endTime,
+          count: 0,
+          type: s.shift_type || 'OFFICE_HOURS',
+          liveStatus: getShiftLiveStatus(startTime, endTime),
+        });
+      }
+      shiftGroupMap.get(key)!.count += 1;
+    });
+
+    shifts = Array.from(shiftGroupMap.values()).sort((a, b) =>
+      a.startTime.localeCompare(b.startTime)
+    );
+  }
+
+  // Department attendance progress
+  const deptMap = new Map<string, { total: number; scheduled: number }>();
+  employees.forEach((emp) => {
+    const dept = emp.department?.name?.trim() || 'Chưa phân phòng';
+    if (!deptMap.has(dept)) {
+      deptMap.set(dept, { total: 0, scheduled: 0 });
+    }
+    const stat = deptMap.get(dept)!;
+    stat.total += 1;
+    if (scheduledEmpIds.has(emp.id)) {
+      stat.scheduled += 1;
+    }
+  });
+
+  const departmentProgress: DashboardDepartmentProgressDto[] = Array.from(
+    deptMap.entries()
+  )
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([name, data], idx) => ({
+      name,
+      scheduled: data.scheduled,
+      total: data.total,
+      pct: data.total > 0 ? Math.round((data.scheduled / data.total) * 100) : 0,
+      color: DEPARTMENT_COLORS[idx % DEPARTMENT_COLORS.length],
+    }));
+
+  // Employee Shift List
+  const empShiftNameMap = new Map<string, string>();
+  todayShifts.forEach((s) => {
+    const name =
+      s.shift_type === 'MORNING'
+        ? 'Ca sáng'
+        : s.shift_type === 'AFTERNOON'
+          ? 'Ca chiều'
+          : s.shift_type === 'OFFICE_HOURS'
+            ? 'Ca HC'
+            : 'Có ca';
+    empShiftNameMap.set(s.employee_id, name);
+  });
+
+  const employeeList: DashboardEmployeeShiftItemDto[] = employees
+    .map((emp) => {
+      const hasShift = scheduledEmpIds.has(emp.id);
+      return {
+        employeeId: emp.employee_code,
+        fullName: emp.full_name,
+        avatar: emp.avatar_url,
+        department: emp.department?.name || 'Chung',
+        hasShift,
+        shiftName: empShiftNameMap.get(emp.id) || (hasShift ? 'Có ca' : 'Nghỉ ca'),
+      };
+    })
+    .sort((a, b) => {
+      if (a.hasShift !== b.hasShift) return a.hasShift ? -1 : 1;
+      return a.fullName.localeCompare(b.fullName, 'vi');
+    });
+
+  // Recent attendance logs (10 latest)
+  const recentLogsRaw = todayLogs.slice(0, 10);
+  const recentLogs: DashboardRecentLogDto[] = recentLogsRaw.map((att) => {
+    const empInfo = empIdToInfoMap.get(att.employee_id);
+    let statusLabel = 'Đúng giờ';
+    let statusStyle = 'bg-[#0c2a20] text-emerald-400 border border-emerald-800/80';
+
+    if (att.status === 'INVALID') {
+      statusLabel = 'Không hợp lệ';
+      statusStyle = 'bg-[#38101a] text-rose-400 border border-rose-800/80';
+    } else if (att.status === 'FLAGGED') {
+      statusLabel = 'Cần xác minh';
+      statusStyle = 'bg-[#2a1d0c] text-amber-400 border border-amber-800/80';
+    } else if (att.status === 'LATE') {
+      statusLabel = 'Đi muộn';
+      statusStyle = 'bg-[#38101a] text-rose-400 border border-rose-800/80';
+    } else if (att.status === 'EARLY_LEAVE') {
+      statusLabel = 'Về sớm';
+      statusStyle = 'bg-[#38101a] text-rose-400 border border-rose-800/80';
+    }
+
+    return {
+      attendance_id: att.id.toString(),
+      employee_id: empInfo?.code || att.employee_id,
+      employee_name: empInfo?.name || empInfo?.code || att.employee_id,
+      avatar: empInfo?.avatar || null,
+      type: att.type,
+      timestamp: att.event_time.toISOString(),
+      device_id: att.device_info || 'Gate-01',
+      verification_score: att.verification_score,
+      status: att.status,
+      statusInfo: {
+        label: statusLabel,
+        style: statusStyle,
+      },
+    };
+  });
+
+  // Alerts
+  const overdueEmployees: string[] = [];
+  todayShifts.forEach((s) => {
+    const startTime = s.start_time
+      ? formatVNTime(s.start_time).slice(0, 5)
+      : s.work_shifts?.start_time
+        ? formatVNTime(s.work_shifts.start_time).slice(0, 5)
+        : '08:00';
+    if (startTime <= currentHHMM && !checkedInEmpIds.has(s.employee_id)) {
+      const emp = empIdToInfoMap.get(s.employee_id);
+      if (emp) overdueEmployees.push(emp.code);
+    }
+  });
+
+  let upcomingShiftNotice: DashboardAlertsDto['upcomingShiftNotice'] = null;
+  const uniqueStartTimes = Array.from(
+    new Set(
+      todayShifts.map((s) =>
+        s.start_time
+          ? formatVNTime(s.start_time).slice(0, 5)
+          : s.work_shifts?.start_time
+            ? formatVNTime(s.work_shifts.start_time).slice(0, 5)
+            : '08:00'
+      )
+    )
+  ).sort();
+
+  for (const st of uniqueStartTimes) {
+    const [h, m] = st.split(':').map(Number);
+    const shiftMinutes = h * 60 + m;
+    const diff = shiftMinutes - nowMinutes;
+    if (diff > 0 && diff <= 60) {
+      const sample = todayShifts.find((s) => {
+        const sTime = s.start_time
+          ? formatVNTime(s.start_time).slice(0, 5)
+          : s.work_shifts?.start_time
+            ? formatVNTime(s.work_shifts.start_time).slice(0, 5)
+            : '08:00';
+        return sTime === st;
+      });
+      const shiftName =
+        sample?.shift_type === 'MORNING'
+          ? 'Ca sáng'
+          : sample?.shift_type === 'AFTERNOON'
+            ? 'Ca chiều'
+            : 'Ca hành chính';
+      upcomingShiftNotice = {
+        name: shiftName,
+        time: st,
+        minutesLeft: diff,
+      };
+      break;
+    }
+  }
+
+  return {
+    dateStr: todayStr,
+    dateFormatted,
+    kpis: {
+      workingEmployeesCount,
+      totalEmployees,
+      checkInCount,
+      currentlyWorkingCount,
+      checkOutCount,
+    },
+    punctuality: {
+      onTimeCount,
+      lateCount,
+      notCheckedInCount,
+      onTimePct,
+      latePct,
+      notCheckedInPct,
+      donutData,
+    },
+    shifts,
+    departmentProgress,
+    employeeList,
+    recentLogs,
+    alerts: {
+      overdueEmployees: Array.from(new Set(overdueEmployees)),
+      upcomingShiftNotice,
+    },
+  };
+}

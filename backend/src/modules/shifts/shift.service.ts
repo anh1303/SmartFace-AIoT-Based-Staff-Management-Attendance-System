@@ -7,7 +7,7 @@ import {
 } from '../attendance/public.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { buildIdOrCodeWhere, formatVNDateISO, employeeLockKey, payrollPeriodLockKey } from '../../common/utils.js'
+import { buildIdOrCodeWhere, formatVNDateISO, getTodayVNString, employeeLockKey, payrollPeriodLockKey } from '../../common/utils.js'
 import { logAction } from '../audit-logs/public.js'
 import {
   assertCanManageEmployee,
@@ -153,7 +153,14 @@ export async function assignOrUpdate(data: {
   start_time?: string
   end_time?: string
   note?: string
-}, actorUserId?: string, actorRole?: string) {
+}, actorUserId?: string, actorRole?: string, options?: { allowPastDate?: boolean }) {
+  const todayVN = getTodayVNString()
+  if (!options?.allowPastDate && data.date < todayVN) {
+    throw AppError.conflict(
+      `Không thể thay đổi hoặc phân bổ ca làm việc cho ngày trong quá khứ (${data.date}). Lịch ca đã qua là dữ liệu cố định để phục vụ đối soát công. Vui lòng sử dụng tính năng Điều chỉnh ngày công tại trang Theo dõi chấm công nếu cần can thiệp.`
+    )
+  }
+
   const emp = await findEmployeeByIdOrCode(data.employee_id)
   if (!emp) throw new AppError(404, 'Employee not found')
 

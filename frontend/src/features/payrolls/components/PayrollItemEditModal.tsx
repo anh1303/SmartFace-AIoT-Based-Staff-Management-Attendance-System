@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { Check } from 'lucide-react';
 import { PayrollRecord } from '../../../types';
-import type { PayrollItemUpdates } from '../../../api/payrollApi';
+import type { PayrollItemUpdates } from '../api/payrollApi';
 
 export interface EditingPayrollItem {
   record: PayrollRecord;

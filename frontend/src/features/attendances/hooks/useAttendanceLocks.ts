@@ -45,6 +45,11 @@ export function useAttendanceLocks() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['attendanceLocks'] });
+      queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
+      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['payrolls'] });
+      queryClient.invalidateQueries({ queryKey: ['payroll'] });
       showToast(
         result.lock
           ? `Đã chốt ca làm việc ngày ${result.date} thành công!`
@@ -78,6 +83,7 @@ export function useAttendanceLocks() {
     locks: query.data || [],
     isDateLocked,
     toggleLock: (date: string, lock: boolean) => toggleLockMutation.mutate({ date, lock }),
+    toggleLockAsync: (date: string, lock: boolean) => toggleLockMutation.mutateAsync({ date, lock }),
     isLoading: query.isLoading,
   };
 }

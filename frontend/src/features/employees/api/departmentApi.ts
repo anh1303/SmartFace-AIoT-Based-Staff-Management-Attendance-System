@@ -1,9 +1,9 @@
-import { apiFetch } from './client';
-import { logger } from '../utils/logger';
+import { apiFetch } from '../../../api/client';
+import { logger } from '../../../utils/logger';
 
 const departmentLogger = logger.child('DepartmentApi');
 
-import { DepartmentItem } from '../types';
+import { DepartmentItem } from '../../../types';
 
 export type { DepartmentItem };
 

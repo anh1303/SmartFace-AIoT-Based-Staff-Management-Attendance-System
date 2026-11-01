@@ -5,8 +5,8 @@ import { afterEach, expect, it, vi } from 'vitest';
 vi.mock('../../src/features/schedules/components/ShiftTemplates', () => ({ ShiftTemplatePicker: () => null, templateAssignment: vi.fn() }));
 import { ShiftEditModal } from '../../src/features/schedules/components/ShiftEditModal';
 import { BulkShiftModal } from '../../src/features/schedules/components/BulkShiftModal';
-vi.mock('../../src/api/payrollApi', () => ({ previewEarlySettlementApi: vi.fn() }));
-import { previewEarlySettlementApi } from '../../src/api/payrollApi';
+vi.mock('../../src/features/payrolls/api/payrollApi', () => ({ previewEarlySettlementApi: vi.fn() }));
+import { previewEarlySettlementApi } from '../../src/features/payrolls/api/payrollApi';
 import { EarlySettlementModal } from '../../src/features/payrolls/components/EarlySettlementModal';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;

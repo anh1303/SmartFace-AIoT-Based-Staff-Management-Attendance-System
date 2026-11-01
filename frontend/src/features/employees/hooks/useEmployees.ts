@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchEmployeesApi, createEmployeeApi, updateEmployeeApi, deleteEmployeeApi } from '../api/employeeApi';
-import { Employee } from '../types';
-import { useToast } from '../context/ToastContext';
+import { Employee } from '../../../types';
+import { useToast } from '../../../context/ToastContext';
 
 export const EMPLOYEES_QUERY_KEY = ['employees'];
 

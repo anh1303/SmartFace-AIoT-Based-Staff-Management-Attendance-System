@@ -5,14 +5,14 @@ import {
   createDepartmentApi,
   updateDepartmentApi,
   deleteDepartmentApi,
-} from '../../../api/departmentApi';
+} from '../api/departmentApi';
 import {
   PositionItem,
   fetchPositionsApi,
   createPositionApi,
   updatePositionApi,
   deletePositionApi,
-} from '../../../api/positionApi';
+} from '../api/positionApi';
 import { useToast } from '../../../context/ToastContext';
 
 export interface UseDepartmentPositionManagerProps {

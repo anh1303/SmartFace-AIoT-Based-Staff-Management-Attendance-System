@@ -5,7 +5,6 @@ import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionU
 import { PayrollRecord } from '../../types';
 import { logger } from '../../utils/logger';
 import { nextPayrollPolicyPeriod } from '../../utils/payrollUtils';
-import { buildPayrollItemUpdates } from '../../features/payrolls/components/PayrollItemEditModal';
 import { useDepartmentPositions } from '@/features/employees';
 import {
   PayrollHeader,
@@ -18,10 +17,12 @@ import {
   PayrollFinalizeModal,
   PayrollUnlockModal,
   EarlySettlementModal,
+  buildPayrollItemUpdates,
+  earlySettlementPayrollApi,
+  fetchBonusPenaltyApi,
+  payrollAttendanceTotals,
 } from '@/features/payrolls';
-import { earlySettlementPayrollApi, fetchBonusPenaltyApi } from '../../api/payrollApi';
-import { useAttendanceSummaries } from '../../features/attendances/hooks/useAttendanceSummaries';
-import { payrollAttendanceTotals } from '../../features/payrolls/payrollAttendance';
+import { useAttendanceSummaries } from '@/features/attendances';
 import { useShiftContext } from '../../context/ShiftContext';
 import { formatVNDateISO } from '../../utils/dateUtils';
 
@@ -49,7 +50,7 @@ export const ManagerPayroll: React.FC = () => {
   const shifts = useShiftContext();
   const monthEnd = new Date(Date.UTC(Number(selectedPeriod.slice(0, 4)), Number(selectedPeriod.slice(5, 7)), 0)).getUTCDate();
   const attendanceSummary = useAttendanceSummaries(`${selectedPeriod}-01`, `${selectedPeriod}-${String(monthEnd).padStart(2, '0')}`);
-  const attendanceTotals = useMemo(() => payrollAttendanceTotals(attendanceSummary.summaries, shifts.workShifts), [attendanceSummary.summaries, shifts.workShifts]);
+  const attendanceTotals = useMemo(() => payrollAttendanceTotals(attendanceSummary.summaries, shifts.workShifts, selectedPeriod), [attendanceSummary.summaries, shifts.workShifts, selectedPeriod]);
   const unprocessedEmployeeIds = useMemo(() => {
     const today = formatVNDateISO(new Date());
     const summarized = new Set(attendanceSummary.summaries.flatMap(s => [`${s.employee_id}_${s.date}`, `${s.employee_uuid}_${s.date}`]));

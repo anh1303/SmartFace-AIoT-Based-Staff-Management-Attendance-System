@@ -1,8 +1,8 @@
 /** Explicit, development-only preview adapter. Never a fallback for a failed real API. */
 import type { ApiResponse } from '../types/api.types';
 import type { Employee, WorkShift, AttendanceRecord, PayrollRecord } from '../types';
-import type { AttendanceAdjustment } from '../features/payrolls/components/AdjustmentReviewPanel';
-import type { Device, DeviceMode } from '../features/devices/deviceApi';
+import type { AttendanceAdjustment } from '@/features/payrolls';
+import type { Device, DeviceMode } from '@/features/devices';
 import { calcPayrollAmount } from '../utils/payrollUtils';
 import { nextPayrollPolicyPeriod } from '../utils/payrollUtils';
 const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });

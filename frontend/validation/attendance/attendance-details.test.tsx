@@ -30,16 +30,17 @@ describe('Attendance details and per-item review', () => {
   it('filters loose scans while retaining both ends of counted overnight pairs and checkout hours', async () => {
     await mount(<AttendanceDayDetails item={item}/>);
     expect(host.textContent).toContain('07:00:00');expect(host.textContent).toContain('2026-10-01');
-    expect(host.textContent).toContain('08:00:00 trong ca');expect(host.textContent).toContain('Công ghi nhận: +08:00:00');
+    expect(host.textContent).toContain('Thời lượng cặp: 08:00:00');expect(host.textContent).toContain('Giờ làm:08:00:00');
     await filter('COUNTED');
     expect(host.textContent).not.toContain('07:00:00');expect(host.textContent).toContain('22:00:00');expect(host.textContent).toContain('06:00:00');
     expect(host.querySelectorAll('tbody tr')).toHaveLength(2);
   });
   it('excludes a matched pair that fails the half-shift rule from the counted-only filter', async () => {
     await mount(<AttendanceDayDetails item={{...item,workingHours:0,validIntervals:item.validIntervals.map(p=>({...p,counted:false,regularSeconds:0,creditedRegularSeconds:0,creditReason:'UNDER_HALF_SHIFT'}))}}/>);
-    await filter('COUNTED');expect(host.querySelectorAll('tbody tr')).toHaveLength(0);
+    await filter('COUNTED');
+    expect(host.textContent).toContain('Không có dữ liệu checkin / checkout trong ca làm việc');
   });
-  it('opens totals and reviews just the selected dated item', async () => {
+  it('opens the selected adjustment as read-only and links to its attendance date', async () => {
     vi.mocked(apiFetch).mockResolvedValue({success:true,data:[
       {id:'11',employee_id:'NV1',employee_name:'Nhân viên 1',date:'2026-10-01',kind:'OVERTIME',hours:1,amount:100000,status:'PENDING',note:'Đã làm thêm',updated_at:'2026-10-02T00:00:00.000Z',can_review:true},
       {id:'12',employee_id:'NV1',employee_name:'Nhân viên 1',date:'2026-10-02',kind:'ABSENCE',hours:8,amount:200000,status:'PENDING',note:null,updated_at:'2026-10-02T00:00:00.000Z',can_review:true},
@@ -48,10 +49,10 @@ describe('Attendance details and per-item review', () => {
     const rows=host.querySelectorAll('tbody tr');expect(rows).toHaveLength(2);
     const first=Array.from(rows).find(row=>row.textContent?.includes('2026-10-01'))!;await click(first.querySelector('button'));await settle();
     expect(vi.mocked(apiFetch).mock.calls.some(([,options])=>options?.method==='PATCH')).toBe(false);
-    await click(document.querySelector('[role=dialog] button[type=submit]'));await settle();
-    const patch=vi.mocked(apiFetch).mock.calls.find(([url,options])=>url==='/api/payroll/adjustments/11' && options?.method==='PATCH');
-    expect(patch).toBeTruthy();expect(JSON.parse(patch![1]!.body as string)).toEqual({status:'APPROVED',note:'Đã làm thêm',updated_at:'2026-10-02T00:00:00.000Z'});
-    expect(vi.mocked(apiFetch).mock.calls.some(([url,options])=>url==='/api/payroll/adjustments/12'&&options?.method==='PATCH')).toBe(false);
+    const dialog = document.querySelector('[role=dialog]')!;
+    expect(dialog.querySelector('button[type=submit]')).toBeNull();
+    expect(dialog.querySelector('a')?.getAttribute('href')).toBe('/app/manager/employees/NV1?tab=attendance&date=2026-10-01');
+    expect(vi.mocked(apiFetch).mock.calls.some(([,options])=>options?.method==='PATCH')).toBe(false);
   });
   it('uses backend overview boundaries instead of unmatched raw scans', async () => {
     const employee={employee_id:'NV1',full_name:'Test',department:'QA',position:'Tester'} as Employee;
@@ -67,11 +68,11 @@ describe('Attendance details and per-item review', () => {
   it('shows matched pairs even when they do not earn half-shift wages', async () => {
     await mount(<AttendanceDayDetails item={{...item,workingHours:0,validIntervals:item.validIntervals.map(p=>({...p,counted:false,regularSeconds:0,creditedRegularSeconds:0,creditReason:'OFF'}))}}/>);
     await filter('MATCHED');expect(host.querySelectorAll('tbody tr')).toHaveLength(2);
-    expect(host.textContent).toContain('Đã ghép cặp');expect(host.textContent).toContain('Công ghi nhận: +00:00:00');expect(host.textContent).toContain('Ngày OFF');
+    expect(host.textContent).toContain('Đã ghép cặp');expect(host.textContent).toContain('Chưa đạt ngưỡng 2/3 ca');
   });
   it('never labels a positive legacy day as uncredited when per-pair fields are missing', async () => {
     await mount(<AttendanceDayDetails item={{...item,workingHours:10,validIntervals:item.validIntervals.map(p=>({...p,counted:undefined,regularSeconds:undefined,creditedRegularSeconds:undefined}))}}/>);
-    expect(host.textContent).toContain('công ngày đã ghi 10h');expect(host.textContent).not.toContain('Chưa tính công');
+    expect(host.textContent).toContain('Giờ làm:10:00:00');expect(host.textContent).not.toContain('Chưa tính công');
   });
 
   it('keeps freshly arrived raw logs visible when the saved summary has no events yet', async () => {
@@ -115,6 +116,28 @@ describe('Attendance details and per-item review', () => {
     expect(rows[0].events[1].time).toBe('--:--:--');
     expect(rows[0].workingHours).toBe(0);
     expect(rows[0].needsReview).toBe(true);
+  });
+
+  it('shows an unpaired check-out in the overview with actual checkout time and displays red warning in details', async () => {
+    let rows: AttendancePairItem[]=[];
+    const checkoutScan = {id:'200',attendance_id:'ATT-200',employee_id:'NV1',timestamp:'2026-10-29T17:10:55+07:00',type:'CHECK_OUT',status:'VALID',method:'FACE',device_id:'GATE-01',verification_score:0.95,punctuality:'ON_TIME'};
+    function Probe() {
+      rows=useAttendancePairs([{employee_id:'NV1',full_name:'Khôi',department:'IT',position:'Dev'} as Employee],
+        [{employee_id:'NV1',date:'2026-10-29',start_time:'08:00',end_time:'17:00',shift_type:'OFFICE_HOURS'} as WorkShift],
+        [checkoutScan],
+        '2026-10-29','2026-10-29','','ALL',{}, {},'ALL','ALL',{'NV1_2026-10-29':{employee_id:'NV1',date:'2026-10-29',first_check_in:null,last_check_out:null,total_working_hours:0,requires_review:true,review_reason:'UNPAIRED_CHECK_OUT',calculation_details:{events:[{id:'200',type:'CHECK_OUT',time:'2026-10-29T17:10:55+07:00',status:'VALID',method:'FACE'}],pairs:[],ignored:[{id:'200',reason:'UNPAIRED_CHECK_OUT'}]}}});
+      return null;
+    }
+    await mount(<Probe/>);
+    expect(rows[0].events[0].time).toBe('--:--:--');
+    expect(rows[0].events[1].time).toBe('17:10:55');
+    expect(rows[0].events[1].methodLabel).toBe('Face-id');
+    expect(rows[0].events[1].device_id).toBe('GATE-01');
+
+    await mount(<AttendanceDayDetails item={rows[0]}/>);
+    const pairingCell = Array.from(host.querySelectorAll('td')).find(td => td.textContent?.includes('Thiếu check-in cho lượt check-out'));
+    expect(pairingCell).toBeTruthy();
+    expect(pairingCell?.className).toContain('text-rose-600');
   });
 
 });

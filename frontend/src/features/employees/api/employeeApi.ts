@@ -1,5 +1,5 @@
-import { apiFetch } from './client';
-import { Employee } from '../types';
+import { apiFetch } from '../../../api/client';
+import { Employee } from '../../../types';
 
 interface RawEmployee {
   id: string;
@@ -24,14 +24,30 @@ interface RawEmployee {
 }
 
 export async function fetchEmployeesApi(): Promise<Employee[]> {
-  const data = await apiFetch('/api/employees?limit=100');
-  const dataObj = data.data as { items?: RawEmployee[] } | RawEmployee[] | undefined;
-  const rawList: RawEmployee[] = Array.isArray(dataObj)
-    ? dataObj
-    : (Array.isArray(dataObj?.items) ? dataObj.items : []);
+  const allRaw: RawEmployee[] = [];
+  let page = 1;
+  const limit = 100;
+  let totalPages = 1;
 
-  if (data.success && rawList.length > 0) {
-    return rawList.map((emp) => ({
+  while (page <= totalPages) {
+    const data = await apiFetch(`/api/employees?page=${page}&limit=${limit}`);
+    if (!data.success || !data.data) break;
+
+    const dataObj = data.data as { items?: RawEmployee[]; pagination?: { totalPages?: number } } | RawEmployee[];
+    if (Array.isArray(dataObj)) {
+      allRaw.push(...dataObj);
+      break;
+    } else {
+      const items = Array.isArray(dataObj.items) ? dataObj.items : [];
+      allRaw.push(...items);
+      totalPages = dataObj.pagination?.totalPages ?? 1;
+      if (items.length === 0 || page >= totalPages) break;
+      page++;
+    }
+  }
+
+  if (allRaw.length > 0) {
+    return allRaw.map((emp) => ({
       id: emp.id,
       employee_id: emp.employee_code || emp.employee_id || emp.id,
       full_name: emp.full_name,

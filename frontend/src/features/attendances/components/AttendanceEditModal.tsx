@@ -85,9 +85,15 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
     currentReason: string
   ) => {
     const totalLE = (leH || 0) * 3600 + (leM || 0) * 60 + (leS || 0);
+    const totalOT = (_otH || 0) * 3600 + (_otM || 0) * 60 + (_otS || 0);
 
     if (![leH, leM, leS, _otH, _otM, _otS].every(Number.isFinite) || totalLE < 0 || leH < 0 || _otH < 0 || leM < 0 || leM > 59 || _otM < 0 || _otM > 59 || leS < 0 || leS > 59 || _otS < 0 || _otS > 59) {
       setModalError('Nhập thời gian hợp lệ, không âm; phút/giây từ 0–59.');
+      return false;
+    }
+
+    if (totalOT > 4 * 3600) {
+      setModalError('Thời gian tăng ca không được vượt quá 4 giờ.');
       return false;
     }
 
@@ -184,7 +190,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
 
           {editingItem.isOffDay && (
             <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-[11px] leading-relaxed">
-              ℹ️ <strong>Ngày nghỉ (OFF):</strong> Nhân viên không có giờ công tiêu chuẩn. Quản lý có thể nhập và phê duyệt giờ tăng ca (OT) làm thêm cho ngày này.
+              ℹ️ <strong>Ngày nghỉ (OFF):</strong> Hệ thống không tự tính OT từ lượt quét. Quản lý cần nhập giờ làm thêm, tối đa 4 giờ, và lưu để phê duyệt.
             </div>
           )}
 
@@ -256,7 +262,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                 Thời gian Tăng ca (OT)
               </label>
               <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                Thực tế: <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{editingItem.initialOTSec == null ? '—' : formatSecondsToHHMMSS(editingItem.initialOTSec)}</span>
+                Thực tế: <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{editingItem.isOffDay || editingItem.initialOTSec == null ? '—' : formatSecondsToHHMMSS(editingItem.initialOTSec)}</span>
               </span>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -265,7 +271,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                 <input
                   type="number"
                   min={0}
-                  max={744}
+                  max={4}
                   value={inputOTHours}
                   disabled={isSubmitting}
                   onChange={(e) => handleOTChange(e.target.value === '' ? '' : Number(e.target.value), inputOTMinutes, inputOTSeconds)}

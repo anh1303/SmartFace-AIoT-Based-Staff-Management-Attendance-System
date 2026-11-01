@@ -15,7 +15,7 @@ import { EmployeeProvider, useEmployeeContext } from './EmployeeContext';
 import { ShiftProvider, useShiftContext } from './ShiftContext';
 import { AttendanceProvider, useAttendanceContext } from './AttendanceContext';
 import { PayrollProvider, usePayrollContext } from './PayrollContext';
-import type { PayrollItemUpdates } from '../api/payrollApi';
+import type { PayrollItemUpdates } from '@/features/payrolls';
 import { NotificationProvider, useNotifications } from '../features/notifications';
 
 
@@ -41,6 +41,7 @@ export interface AppContextType {
 
   // Attendance
   attendance: AttendanceRecord[];
+  isAttendanceTruncated: boolean;
   addAttendanceRecord: (record: Omit<AttendanceRecord, 'attendance_id'>) => void;
 
   // Payroll
@@ -99,6 +100,7 @@ const AppConsumerBridge: React.FC<{ children: React.ReactNode }> = ({ children }
 
     // Attendance
     attendance: attendanceCtx.attendance,
+    isAttendanceTruncated: attendanceCtx.isTruncated,
     addAttendanceRecord: attendanceCtx.addAttendanceRecord,
 
     // Payroll
@@ -138,6 +140,7 @@ const AppConsumerBridge: React.FC<{ children: React.ReactNode }> = ({ children }
     shiftCtx.workShifts,
     shiftCtx.assignOrUpdateShift,
     attendanceCtx.attendance,
+    attendanceCtx.isTruncated,
     attendanceCtx.addAttendanceRecord,
     payrollCtx.payroll,
     payrollCtx.isLoadingPayroll,

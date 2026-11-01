@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { usePayroll } from '../hooks/usePayroll';
-import type { PayrollItemUpdates } from '../api/payrollApi';
+import { usePayroll, type PayrollItemUpdates } from '../features/payrolls/hooks/usePayroll';
 import { PayrollRecord, BonusPenaltyPolicy } from '../types';
 
 export interface PayrollContextType {

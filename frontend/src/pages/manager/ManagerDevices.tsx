@@ -6,9 +6,16 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Modal } from '../../components/common/Modal';
 import { PageHeaderBanner } from '../../components/common/PageHeaderBanner';
-import { deviceApi, validDeviceIp, type Device, type DeviceInput, type DeviceStatus, type AttendanceMode } from '../../features/devices/deviceApi';
-import { confirmsRequestedMode } from '../../features/devices/deviceModeState';
-import { useDeviceRealtime } from '../../features/devices/useDeviceRealtime';
+import {
+  deviceApi,
+  validDeviceIp,
+  confirmsRequestedMode,
+  useDeviceRealtime,
+  type Device,
+  type DeviceInput,
+  type DeviceStatus,
+  type AttendanceMode,
+} from '@/features/devices';
 const labels = { ONLINE: 'Trực tuyến', OFFLINE: 'Ngoại tuyến', MAINTENANCE: 'Bảo trì' };
 const time = (value: string | null) => value ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Chưa ghi nhận';
 function Status({ status }: {

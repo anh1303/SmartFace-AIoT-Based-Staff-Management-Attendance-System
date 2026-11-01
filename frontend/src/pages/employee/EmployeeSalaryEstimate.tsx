@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PageHeaderBanner } from '../../components/common';
-import { PayslipBreakdown } from '../../features/payrolls/components/PayslipBreakdown';
+import { PayslipBreakdown } from '@/features/payrolls';
 import { formatPayrollRateLabel } from '../../utils/payrollUtils';
 
 export const EmployeeSalaryEstimate: React.FC = () => {

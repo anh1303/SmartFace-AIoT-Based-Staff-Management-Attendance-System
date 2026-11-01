@@ -17,13 +17,15 @@ import {
   useAttendancePairs,
   AttendancePairItem,
   exportAttendanceToCSV,
+  useRawLogsPagination,
 } from '@/features/attendances';
-import { fetchAttendancePaginatedApi } from '../../api/attendanceApi';
 import { AttendanceRecord } from '../../types';
 import { ChevronLeft, ChevronRight, RefreshCw, FileText } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchAttendanceApi } from '@/features/attendances/api/attendanceApi';
 
 export const ManagerAttendanceMonitor: React.FC = () => {
-  const { attendance, employees, workShifts, showToast, role, currentUser } = useApp();
+  const { employees, workShifts, showToast, role, currentUser } = useApp();
   const isManager = role === 'manager';
   const managerDept = currentUser?.department;
 
@@ -31,6 +33,17 @@ export const ManagerAttendanceMonitor: React.FC = () => {
 
   const [startDate, setStartDate] = useState<string>(() => getTodayVNString());
   const [endDate, setEndDate] = useState<string>(() => getTodayVNString());
+  const adjacentDate = (date: string, days: number) => {
+    const value = new Date(`${date}T00:00:00Z`);
+    value.setUTCDate(value.getUTCDate() + days);
+    return value.toISOString().slice(0, 10);
+  };
+  const attendanceQuery = useQuery({
+    queryKey: ['attendance', { startDate, endDate, fetchAllPages: true }],
+    queryFn: () => fetchAttendanceApi({ startDate: adjacentDate(startDate, -1), endDate: adjacentDate(endDate, 1), fetchAllPages: true }),
+    enabled: Boolean(currentUser) && Boolean(startDate && endDate) && startDate <= endDate,
+  });
+  const attendance = attendanceQuery.data || [];
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState(() => {
     if (role === 'manager' && currentUser?.department) {
@@ -55,11 +68,23 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   });
 
   const { devices, isError: isDevicesError } = useDevices(role === 'admin');
-  const { isDateLocked, toggleLock } = useAttendanceLocks();
+  const { isDateLocked, toggleLockAsync } = useAttendanceLocks();
   // useAttendanceSummaries lấy đúng khoảng ngày đang xem [startDate, endDate]
-  const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap, adjustAttendance } = useAttendanceSummaries(startDate, endDate);
+  const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap, adjustAttendance, unlockEmployeeAttendance, refetch: refetchSummaries } = useAttendanceSummaries(startDate, endDate);
 
-  const isCurrentDateLocked = isDateLocked(startDate) || (startDate !== endDate && isDateLocked(endDate));
+  const getDatesInRange = (startStr: string, endStr: string): string[] => {
+    const dates: string[] = [];
+    const curr = new Date(`${startStr}T00:00:00Z`);
+    const end = new Date(`${endStr}T00:00:00Z`);
+    while (curr <= end) {
+      dates.push(curr.toISOString().slice(0, 10));
+      curr.setUTCDate(curr.getUTCDate() + 1);
+    }
+    return dates;
+  };
+
+  const datesInRange = getDatesInRange(startDate, endDate);
+  const isCurrentDateLocked = datesInRange.length > 0 && datesInRange.every(d => isDateLocked(d));
 
   // useAttendancePairs tiêu thụ giờ, cặp và cờ rà soát từ backend summary
   const employeePairs = useAttendancePairs(
@@ -74,6 +99,23 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     customLateEarlyMap,
     departmentFilter,
     positionFilter,
+    workingHoursMap,
+    summaryMap
+  );
+
+  // Danh sách toàn hệ thống (không lọc) để tính chính xác cảnh báo chốt ca cho toàn bộ nhân sự
+  const allEmployeePairs = useAttendancePairs(
+    employees,
+    workShifts,
+    attendance,
+    startDate,
+    endDate,
+    '',
+    'ALL',
+    customOvertimeMap,
+    customLateEarlyMap,
+    'ALL',
+    'ALL',
     workingHoursMap,
     summaryMap
   );
@@ -97,8 +139,10 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   } | null>(null);
 
   const handleOpenEditModal = (item: AttendancePairItem) => {
-    // Cho phép mở modal nếu nhân viên có chấm công, hoặc là ngày OFF (quản lý xử lý OT ngày OFF), hoặc đã có OT
-    if (!item.hasCheckedIn && !item.hasCheckedOut && !item.rawEvents.length && !item.isOffDay && item.currentOTSec === 0) {
+    // Cho phép mở modal nếu nhân viên có ca làm việc (!isUnassigned), hoặc có chấm công, hoặc là ngày OFF, hoặc đã có OT
+    const hasWorkShift = !item.isUnassigned;
+    const hasScanData = item.hasCheckedIn || item.hasCheckedOut || item.rawEvents.length > 0;
+    if (!hasWorkShift && !hasScanData && !item.isOffDay && item.currentOTSec === 0) {
       showToast('Không có dữ liệu ca hoặc chấm công để điều chỉnh', 'warning');
       return;
     }
@@ -120,11 +164,51 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleToggleLock = () => {
+  const handleToggleLock = async () => {
     if (role !== 'admin' || !startDate) return;
-    toggleLock(startDate, !isCurrentDateLocked);
-    if (startDate !== endDate) {
-      toggleLock(endDate, !isCurrentDateLocked);
+    const targetLockState = !isCurrentDateLocked;
+    const dates = getDatesInRange(startDate, endDate);
+
+    if (targetLockState) {
+      // Đang thực hiện CHỐT CA: Kiểm tra các ca lỗi/thiếu lượt sẽ bị chuyển thành ABSENT trên TOÀN HỆ THỐNG
+      const affectedIncompleteItems = allEmployeePairs.filter(item => {
+        if (item.isOffDay || item.isUnassigned) return false;
+        const isMissingCheckout = item.hasCheckedIn && !item.hasCheckedOut;
+        const isMissingCheckin = !item.hasCheckedIn && item.hasCheckedOut;
+        const isReviewNeeded = item.needsReview && item.reviewReason?.split(',').some(r => ['MISSING_CHECK_OUT', 'NO_VALID_PAIR', 'INVALID_PAIR', 'FLAGGED_EVENT', 'UNPAIRED_CHECK_OUT', 'UNDER_MINIMUM_SHIFT', 'UNDER_HALF_SHIFT'].includes(r));
+        return isMissingCheckout || isMissingCheckin || Boolean(isReviewNeeded);
+      });
+
+      if (affectedIncompleteItems.length > 0) {
+        const sampleList = affectedIncompleteItems.slice(0, 5).map(item =>
+          `• ${item.employee.full_name} (${item.employee.employee_id}) - Ngày ${item.date}: Ca ${item.shift.name} (${item.hasCheckedIn && !item.hasCheckedOut ? 'Thiếu check-out' : 'Thiếu/lỗi lượt quẹt'})`
+        ).join('\n');
+        const moreText = affectedIncompleteItems.length > 5 ? `\n... và ${affectedIncompleteItems.length - 5} ca khác.` : '';
+        const confirmed = window.confirm(
+          `CẢNH BÁO CHỐT CA TOÀN HỆ THỐNG:\nThao tác khóa ngày sẽ áp dụng cho TOÀN BỘ NHÂN VIÊN trong hệ thống (không phân biệt bộ lọc trên màn hình).\nPhát hiện ${affectedIncompleteItems.length} ca thiếu lượt / lỗi chấm công trên toàn hệ thống trong phạm vi ngày đã chọn sẽ được hệ thống chốt thành NGHỈ KHÔNG LÝ DO (ABSENT):\n\n${sampleList}${moreText}\n\nBạn có chắc chắn muốn tiếp tục chốt ca toàn hệ thống cho ${dates.length === 1 ? `ngày ${startDate}` : `${dates.length} ngày (từ ${startDate} đến ${endDate})`} không?`
+        );
+        if (!confirmed) return;
+      } else {
+        const confirmed = window.confirm(
+          `Xác nhận chốt ca TOÀN HỆ THỐNG cho tất cả nhân viên trong ${dates.length === 1 ? `ngày ${startDate}` : `${dates.length} ngày (từ ${startDate} đến ${endDate})`}?`
+        );
+        if (!confirmed) return;
+      }
+    } else {
+      // Đang thực hiện MỞ KHÓA
+      const confirmed = window.confirm(
+        `Xác nhận mở khóa chỉnh sửa ca làm việc TOÀN HỆ THỐNG cho ${dates.length === 1 ? `ngày ${startDate}` : `${dates.length} ngày (từ ${startDate} đến ${endDate})`}?`
+      );
+      if (!confirmed) return;
+    }
+
+    try {
+      for (const d of dates) {
+        await toggleLockAsync(d, targetLockState);
+      }
+      refetchSummaries();
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi cập nhật trạng thái chốt ca', 'error');
     }
   };
 
@@ -149,38 +233,36 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     showToast('Đã lưu dữ liệu điều chỉnh chấm công vào CSDL thành công', 'success');
   };
 
-  // PHÂN TRANG RAW LOGS: Xem lịch sử quẹt thẻ toàn hệ thống không bị giới hạn ở 5000 bản ghi
-  const [showRawLogs, setShowRawLogs] = useState(false);
-  const [rawLogPage, setRawLogPage] = useState(1);
-  const [rawLogPageSize] = useState(50);
-  const [rawLogsData, setRawLogsData] = useState<AttendanceRecord[]>([]);
-  const [hasMoreRawLogs, setHasMoreRawLogs] = useState(false);
-  const [isLoadingRawLogs, setIsLoadingRawLogs] = useState(false);
-
-  const loadRawLogsPage = async (page: number) => {
-    setIsLoadingRawLogs(true);
-    try {
-      const res = await fetchAttendancePaginatedApi({
-        startDate,
-        endDate,
-        page,
-        limit: rawLogPageSize,
-      });
-      setRawLogsData(res.data);
-      setHasMoreRawLogs(res.hasMore);
-      setRawLogPage(page);
-    } catch {
-      showToast('Không thể tải trang nhật ký quẹt thẻ', 'error');
-    } finally {
-      setIsLoadingRawLogs(false);
+  const handleUnlockEmployee = async (item: AttendancePairItem) => {
+    if (window.confirm(`Bạn có chắc chắn muốn mở khóa ngày công ${item.date} của nhân viên ${item.employee.full_name} để xét duyệt lại?`)) {
+      try {
+        await unlockEmployeeAttendance({
+          employeeId: item.employee.employee_id,
+          date: item.date,
+        });
+        refetchSummaries();
+      } catch (err: any) {
+        showToast(err.message || 'Không thể mở khóa ngày công', 'error');
+      }
     }
   };
 
-  useEffect(() => {
-    if (showRawLogs) {
-      loadRawLogsPage(1);
-    }
-  }, [showRawLogs, startDate, endDate]);
+  // PHÂN TRANG RAW LOGS: Xem lịch sử quẹt thẻ toàn hệ thống không bị giới hạn ở 5000 bản ghi
+  const {
+    showRawLogs,
+    setShowRawLogs,
+    rawLogPage,
+    rawLogPageSize,
+    rawLogsData,
+    hasMoreRawLogs,
+    isLoadingRawLogs,
+    loadRawLogsPage,
+  } = useRawLogsPagination({
+    startDate,
+    endDate,
+    pageSize: 50,
+    showToast,
+  });
 
   return (
     <div className="space-y-6">
@@ -191,6 +273,22 @@ export const ManagerAttendanceMonitor: React.FC = () => {
         onToggleLock={handleToggleLock}
         onExportCSV={handleExportCSV}
       />
+
+      {(attendanceQuery.isError || attendanceQuery.isLoading) && (
+        <div role="alert" className="p-4 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">Lưu ý:</span>
+            <span>{attendanceQuery.isError ? 'Không thể tải đầy đủ lượt quẹt cho khoảng ngày đã chọn.' : 'Đang tải lượt quẹt cho khoảng ngày đã chọn.'}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowRawLogs(true)}
+            className="px-3 py-1 bg-amber-600 text-white hover:bg-amber-700 rounded-lg text-xs font-medium whitespace-nowrap transition-colors"
+          >
+            Mở nhật ký
+          </button>
+        </div>
+      )}
 
       {role === 'admin' && <DeviceStatusCards devices={devices} isError={isDevicesError} />}
 
@@ -236,7 +334,9 @@ export const ManagerAttendanceMonitor: React.FC = () => {
         startDate={startDate}
         endDate={endDate}
         onOpenEditModal={handleOpenEditModal}
+        onUnlockEmployee={handleUnlockEmployee}
       />
+
 
       {/* Mục phân trang lịch sử Raw Logs (Khắc phục việc dừng âm thầm ở 5.000 bản ghi) */}
       {showRawLogs && (

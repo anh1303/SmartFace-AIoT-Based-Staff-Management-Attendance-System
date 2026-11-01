@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { useAttendance } from '@/features/attendances';
+import { useAttendance } from '../features/attendances/hooks/useAttendance';
 import { AttendanceRecord } from '../types';
 
 export interface AttendanceContextType {
   attendance: AttendanceRecord[];
   isLoading: boolean;
   isError: boolean;
+  isTruncated: boolean;
   refetchAttendance: () => void;
   addAttendanceRecord: (record: Omit<AttendanceRecord, 'attendance_id'>) => void;
 }
@@ -19,12 +20,14 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     attendance: attendanceHook.attendance,
     isLoading: attendanceHook.isLoading,
     isError: attendanceHook.isError,
+    isTruncated: attendanceHook.isTruncated,
     refetchAttendance: attendanceHook.refetchAttendance,
     addAttendanceRecord: attendanceHook.addAttendanceRecord,
   }), [
     attendanceHook.attendance,
     attendanceHook.isLoading,
     attendanceHook.isError,
+    attendanceHook.isTruncated,
     attendanceHook.refetchAttendance,
     attendanceHook.addAttendanceRecord,
   ]);

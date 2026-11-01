@@ -10,11 +10,12 @@ import {
   updateBonusPenaltyApi,
   PayrollItemUpdates,
 } from '../api/payrollApi';
-import { PayrollRecord, BonusPenaltyPolicy } from '../types';
-import { useToast } from '../context/ToastContext';
+import { PayrollRecord, BonusPenaltyPolicy } from '../../../types';
+import { useToast } from '../../../context/ToastContext';
 
 export const PAYROLL_QUERY_KEY = ['payroll'];
 export const BONUS_PENALTY_QUERY_KEY = ['bonusPenalty'];
+export type { PayrollItemUpdates };
 
 export function usePayroll() {
   const queryClient = useQueryClient();

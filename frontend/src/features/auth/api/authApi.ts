@@ -1,8 +1,9 @@
-import { apiFetch } from './client';
-import { UserSession, Role } from '../types';
+import { apiFetch } from '../../../api/client';
+import { UserSession, Role } from '../../../types';
 
 export const DEFAULT_USERS: Record<Role, UserSession> = {
   admin: {
+    username: 'admin',
     employee_id: 'ADMIN',
     full_name: 'Quản trị viên',
     email: 'admin@aiot.corp',
@@ -14,6 +15,7 @@ export const DEFAULT_USERS: Record<Role, UserSession> = {
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
   },
   manager: {
+    username: 'manager',
     employee_id: 'NV-001',
     full_name: 'Nguyễn Văn A',
     email: 'anv@aiot.corp',
@@ -27,6 +29,7 @@ export const DEFAULT_USERS: Record<Role, UserSession> = {
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
   },
   employee: {
+    username: 'employee',
     employee_id: 'NV-002',
     full_name: 'Lê Hoàng Phúc',
     email: 'employee@company.com',
@@ -62,6 +65,7 @@ export async function loginApi(identifier: string, password?: string, rememberMe
     const isManagerOrAdmin = targetRole === 'admin' || targetRole === 'manager';
 
     const session: UserSession = {
+      username: user.username || user.employee_id || (targetRole === 'admin' ? 'admin' : 'employee'),
       employee_id: user.employee_id || user.username || (targetRole === 'admin' ? 'ADMIN' : 'EMP-001'),
       full_name: user.full_name || user.username,
       email: user.email || '',
@@ -103,6 +107,7 @@ export async function meApi(): Promise<UserSession | null> {
       const isManagerOrAdmin = targetRole === 'admin' || targetRole === 'manager';
 
       return {
+        username: user.username || user.employee_id || (targetRole === 'admin' ? 'admin' : 'employee'),
         employee_id: user.employee_id || user.username || (targetRole === 'admin' ? 'ADMIN' : 'EMP-001'),
         full_name: user.full_name || user.username,
         email: user.email || '',

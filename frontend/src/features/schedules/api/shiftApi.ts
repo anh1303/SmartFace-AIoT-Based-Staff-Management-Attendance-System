@@ -1,5 +1,5 @@
-import { apiFetch } from './client';
-import { WorkShift } from '../types';
+import { apiFetch } from '../../../api/client';
+import { WorkShift } from '../../../types';
 
 export async function fetchShiftsApi(): Promise<WorkShift[]> {
   const res = await apiFetch('/api/shifts');

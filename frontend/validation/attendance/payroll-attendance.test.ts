@@ -23,4 +23,20 @@ describe('monthly attendance for payroll', () => {
     expect(totals.get('NV1')).toBe(2);
     expect(totals.get('NV2')).toBe(0);
   });
+
+  it('excludes September 30 absence from October totals when 30/9 is absent and 1/10 is present', () => {
+    const rows = [
+      { employee_id: 'NV1', date: '2026-09-30', status: 'ABSENT', assigned_shift_type: 'OFFICE_HOURS' },
+      { employee_id: 'NV1', date: '2026-10-01', status: 'PRESENT', assigned_shift_type: 'OFFICE_HOURS' },
+    ] as BackendAttendanceSummaryItem[];
+
+    const shifts = [
+      { employee_id: 'NV1', date: '2026-09-30', shift_type: 'OFFICE_HOURS' },
+      { employee_id: 'NV1', date: '2026-10-01', shift_type: 'OFFICE_HOURS' },
+    ] as WorkShift[];
+
+    // When calculating October ('2026-10') payroll attendance totals:
+    const totals = payrollAttendanceTotals(rows, shifts, '2026-10');
+    expect(totals.get('NV1')).toBe(0);
+  });
 });

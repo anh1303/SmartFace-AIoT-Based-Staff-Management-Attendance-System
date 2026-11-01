@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { previewEarlySettlementApi, type EarlySettlementPreview } from '../../../api/payrollApi';
+import { previewEarlySettlementApi, type EarlySettlementPreview } from '../api/payrollApi';
 import { Modal } from '../../../components/common/Modal';
 import { AlertCircle, Calendar, UserCheck, ShieldAlert } from 'lucide-react';
 import { PayrollRecord } from '../../../types';

@@ -2,7 +2,7 @@ import React from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Employee } from '../../../types';
-import { EnrollFaceResult } from '../../../api/biometricApi';
+import { EnrollFaceResult } from '../api/biometricApi';
 
 interface FaceConfirmModalProps {
   isOpen: boolean;

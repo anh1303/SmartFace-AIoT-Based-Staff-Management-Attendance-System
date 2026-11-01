@@ -9,7 +9,7 @@ import {
   Power
 } from 'lucide-react';
 import { Employee } from '../../../types';
-import { resetEmployeePasswordApi } from '../../../api/employeeApi';
+import { resetEmployeePasswordApi } from '../api/employeeApi';
 
 interface EmployeeAccountTabProps {
   currentEmp: Employee;

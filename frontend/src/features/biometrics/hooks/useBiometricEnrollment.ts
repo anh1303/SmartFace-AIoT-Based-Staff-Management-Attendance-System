@@ -4,7 +4,7 @@ import { useApp } from '../../../context/AppContext';
 import { useAuth } from '../../../context/AuthContext';
 import { isAnotherManager } from '../../../utils/permissionUtils';
 import { logger } from '../../../utils/logger';
-import { enrollFaceImagesApi, deleteEmployeeBiometricsApi, EnrollFaceResult } from '../../../api/biometricApi';
+import { enrollFaceImagesApi, deleteEmployeeBiometricsApi, EnrollFaceResult } from '../api/biometricApi';
 import { Employee } from '../../../types';
 import { FacePhotoItem } from '../components/FaceEnrollmentSection';
 import { FingerprintStep } from '../components/FingerprintEnrollmentSection';

@@ -1,5 +1,5 @@
-import { apiFetch } from './client';
-import { AttendanceRecord } from '../types';
+import { apiFetch } from '../../../api/client';
+import { AttendanceRecord } from '../../../types';
 
 export interface FetchAttendanceParams {
   startDate?: string;
@@ -10,7 +10,13 @@ export interface FetchAttendanceParams {
   limit?: number | string;
   page?: number;
   fetchAllPages?: boolean;
+  onTruncated?: (totalLoaded: number) => void;
 }
+
+export type AttendanceRecordList = AttendanceRecord[] & {
+  isTruncated?: boolean;
+  totalLoaded?: number;
+};
 
 export interface PaginatedAttendanceResponse {
   data: AttendanceRecord[];
@@ -25,7 +31,7 @@ export interface PaginatedAttendanceResponse {
  * Hỗ trợ phân trang liên tục hoặc tự động nạp tiếp các trang (auto-paginate)
  * để lịch sử không bị dừng âm thầm ở mốc 5.000 bản ghi.
  */
-export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promise<AttendanceRecord[]> {
+export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promise<AttendanceRecordList> {
   const pageSize = Number(params?.limit) || 5000;
   let currentPage = Number(params?.page) || 1;
 
@@ -45,26 +51,41 @@ export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promis
   if (params?.page !== undefined && !params.fetchAllPages) {
     const res = await apiFetch(buildUrl(currentPage, pageSize));
     if (res.success && Array.isArray(res.data)) {
-      return res.data;
+      const records: AttendanceRecordList = res.data;
+      records.totalLoaded = records.length;
+      return records;
     }
-    return [];
+    const emptyRecords: AttendanceRecordList = [];
+    emptyRecords.totalLoaded = 0;
+    return emptyRecords;
   }
 
   // Tự động phân trang tiếp để nạp trọn vẹn lịch sử không bị ngắt ở 5000 bản ghi
-  const allRecords: AttendanceRecord[] = [];
+  const allRecords: AttendanceRecordList = [];
   while (true) {
     const res = await apiFetch(buildUrl(currentPage, pageSize));
-    if (!res.success || !Array.isArray(res.data) || res.data.length === 0) {
+    if (!res.success || !Array.isArray(res.data)) throw new Error(res.message || 'Không thể tải nhật ký chấm công');
+    if (res.data.length === 0) {
       break;
     }
     allRecords.push(...res.data);
     // Nếu số lượng bản ghi trả về ít hơn pageSize, đã hết dữ liệu
     if (res.data.length < pageSize || (!params?.fetchAllPages && allRecords.length >= 50000)) {
+      if (!params?.fetchAllPages && allRecords.length >= 50000 && res.data.length >= pageSize) {
+        allRecords.isTruncated = true;
+        console.warn(
+          '[AttendanceApi] Data limit of 50,000 records reached. Additional server records were truncated. Please provide a startDate/endDate range filter.'
+        );
+        if (params?.onTruncated) {
+          params.onTruncated(allRecords.length);
+        }
+      }
       break;
     }
     currentPage++;
   }
 
+  allRecords.totalLoaded = allRecords.length;
   return allRecords;
 }
 

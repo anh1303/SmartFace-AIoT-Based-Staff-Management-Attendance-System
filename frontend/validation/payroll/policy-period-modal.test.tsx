@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PayrollPolicyModal, type PolicyFormData } from '../../src/features/payrolls/components/PayrollPolicyModal'
 
 const fetchPolicy = vi.hoisted(() => vi.fn())
-vi.mock('../../src/api/payrollApi', () => ({ fetchBonusPenaltyApi: fetchPolicy }))
+vi.mock('../../src/features/payrolls/api/payrollApi', () => ({ fetchBonusPenaltyApi: fetchPolicy }))
 ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
 const initial: PolicyFormData = { effective_period: '2090-11', overtime_rate: 2, late_early_penalty: 1.5, absence_penalty_rate: 2, description: '' }

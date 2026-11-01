@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { useEmployees } from '../hooks/useEmployees';
+import { useEmployees } from '../features/employees/hooks/useEmployees';
 import { Employee } from '../types';
 
 export interface EmployeeContextType {

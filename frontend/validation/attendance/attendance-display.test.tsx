@@ -1,8 +1,8 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect } from 'vitest';
-import { useAttendancePairs } from '../../src/hooks/useAttendancePairs';
-import type { AttendanceSummary } from '../../src/features/attendance/hooks/useAttendanceSummaries';
+import { useAttendancePairs } from '../../src/features/attendances/hooks/useAttendancePairs';
+import type { AttendanceSummary } from '../../src/features/attendances/hooks/useAttendanceSummaries';
 import type { Employee, WorkShift } from '../../src/types';
 const employee = { employee_id:'NV-001',full_name:'Test',department:'QA',position:'Tester' } as Employee;
 const shift = { employee_id:'NV-001',date:'2026-10-02',start_time:'08:00',end_time:'17:30',shift_type:'OFFICE_HOURS' } as WorkShift;

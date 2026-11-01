@@ -16,6 +16,7 @@ import {
   useAttendanceSocket,
   useAttendancePairs,
   AttendancePairItem,
+  EditingItemState,
   exportAttendanceToCSV,
   useRawLogsPagination,
 } from '@/features/attendances';
@@ -122,21 +123,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
 
   // Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<{
-    employee: AttendancePairItem['employee'];
-    shiftName: string;
-    shiftTimeRange: string;
-    start_time: string;
-    end_time: string;
-    inTime: string;
-    outTime: string;
-    initialOTSec: number | null;
-    currentOTSec: number;
-    initialLateEarlySec: number | null;
-    currentLateEarlySec: number;
-    date: string;
-    isOffDay?: boolean;
-  } | null>(null);
+  const [editingItem, setEditingItem] = useState<EditingItemState | null>(null);
 
   const handleOpenEditModal = (item: AttendancePairItem) => {
     // Cho phép mở modal nếu nhân viên có ca làm việc (!isUnassigned), hoặc có chấm công, hoặc là ngày OFF, hoặc đã có OT
@@ -159,7 +146,8 @@ export const ManagerAttendanceMonitor: React.FC = () => {
       initialLateEarlySec: item.initialLateEarlySec,
       currentLateEarlySec: item.currentLateEarlySec,
       date: item.date,
-      isOffDay: item.isOffDay,
+      isOffDay: item.isOffDay || item.isUnassigned,
+      rawWorkSeconds: item.rawWorkSeconds,
     });
     setIsEditModalOpen(true);
   };
@@ -170,7 +158,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     const dates = getDatesInRange(startDate, endDate);
 
     if (targetLockState) {
-      // Đang thực hiện CHỐT CA: Kiểm tra các ca lỗi/thiếu lượt sẽ bị chuyển thành ABSENT trên TOÀN HỆ THỐNG
+      // Đang thực hiện CHỐT CA: Kiểm tra các ca lỗi/thiếu lượt sẽ bị quy đổi thành trễ/sớm toàn ca trên TOÀN HỆ THỐNG
       const affectedIncompleteItems = allEmployeePairs.filter(item => {
         if (item.isOffDay || item.isUnassigned) return false;
         const isMissingCheckout = item.hasCheckedIn && !item.hasCheckedOut;
@@ -185,7 +173,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
         ).join('\n');
         const moreText = affectedIncompleteItems.length > 5 ? `\n... và ${affectedIncompleteItems.length - 5} ca khác.` : '';
         const confirmed = window.confirm(
-          `CẢNH BÁO CHỐT CA TOÀN HỆ THỐNG:\nThao tác khóa ngày sẽ áp dụng cho TOÀN BỘ NHÂN VIÊN trong hệ thống (không phân biệt bộ lọc trên màn hình).\nPhát hiện ${affectedIncompleteItems.length} ca thiếu lượt / lỗi chấm công trên toàn hệ thống trong phạm vi ngày đã chọn sẽ được hệ thống chốt thành NGHỈ KHÔNG LÝ DO (ABSENT):\n\n${sampleList}${moreText}\n\nBạn có chắc chắn muốn tiếp tục chốt ca toàn hệ thống cho ${dates.length === 1 ? `ngày ${startDate}` : `${dates.length} ngày (từ ${startDate} đến ${endDate})`} không?`
+          `CẢNH BÁO CHỐT CA TOÀN HỆ THỐNG:\nThao tác khóa ngày sẽ áp dụng cho TOÀN BỘ NHÂN VIÊN trong hệ thống (không phân biệt bộ lọc trên màn hình).\nPhát hiện ${affectedIncompleteItems.length} ca thiếu lượt / lỗi chấm công trên toàn hệ thống trong phạm vi ngày đã chọn sẽ được hệ thống chốt quy đổi phạt ĐI TRỄ / VỀ SỚM TOÀN BỘ CA (không tính công, không chuyển thành nghỉ không phép):\n\n${sampleList}${moreText}\n\nBạn có chắc chắn muốn tiếp tục chốt ca toàn hệ thống cho ${dates.length === 1 ? `ngày ${startDate}` : `${dates.length} ngày (từ ${startDate} đến ${endDate})`} không?`
         );
         if (!confirmed) return;
       } else {

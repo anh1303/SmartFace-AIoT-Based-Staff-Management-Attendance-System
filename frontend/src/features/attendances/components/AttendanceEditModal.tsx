@@ -18,6 +18,7 @@ export interface EditingItemState {
   currentLateEarlySec: number;
   date: string;
   isOffDay?: boolean;
+  rawWorkSeconds?: number;
 }
 
 interface AttendanceEditModalProps {
@@ -92,17 +93,9 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
       return false;
     }
 
-    if (totalOT > 4 * 3600) {
-      setModalError('Thời gian tăng ca không được vượt quá 4 giờ.');
-      return false;
-    }
-
-    if (editingItem.initialLateEarlySec != null && totalLE > editingItem.initialLateEarlySec && editingItem.initialLateEarlySec > 0) {
-      setModalError(`Thời gian đi trễ/về sớm không được vượt quá thời gian trễ/sớm thực tế (${formatSecondsToHHMMSS(editingItem.initialLateEarlySec)})`);
-      return false;
-    }
-
-    // BỎ GIỚI HẠN: OT không bị chặn bởi initialOTSec để quản lý tự do điều chỉnh/duyệt OT kể cả ngày OFF
+    // Backend là Single Source of Truth kiểm tra toàn bộ giới hạn logic nghiệp vụ:
+    // - Tăng ca ca thường <= 4h, ca OFF <= thời gian quét thực tế
+    // - Đi trễ/về sớm ca thường <= thời lượng ca làm việc, ca OFF = 0
 
     if (!currentReason.trim() || currentReason.trim().length < 3) {
       setModalError('Cần ghi lý do duyệt/điều chỉnh (ít nhất 3 ký tự).');
@@ -126,14 +119,14 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
   };
 
   const handleSave = async () => {
-    const totalInputLESec = (inputLEHours || 0) * 3600 + (inputLEMinutes || 0) * 60 + (inputLESeconds || 0);
+    const totalInputLESec = editingItem.isOffDay ? 0 : (inputLEHours || 0) * 3600 + (inputLEMinutes || 0) * 60 + (inputLESeconds || 0);
     const totalInputOTSec = (inputOTHours || 0) * 3600 + (inputOTMinutes || 0) * 60 + (inputOTSeconds || 0);
 
-    if (!validateInputs(inputLEHours || 0, inputLEMinutes || 0, inputLESeconds || 0, inputOTHours || 0, inputOTMinutes || 0, inputOTSeconds || 0, reason)) {
+    if (!validateInputs(editingItem.isOffDay ? 0 : (inputLEHours || 0), editingItem.isOffDay ? 0 : (inputLEMinutes || 0), editingItem.isOffDay ? 0 : (inputLESeconds || 0), inputOTHours || 0, inputOTMinutes || 0, inputOTSeconds || 0, reason)) {
       return;
     }
 
-    const roundedLEHours = roundPayableHours(totalInputLESec);
+    const roundedLEHours = editingItem.isOffDay ? 0 : roundPayableHours(totalInputLESec);
     const roundedOTHours = roundPayableHours(totalInputOTSec);
 
     setIsSubmitting(true);
@@ -190,7 +183,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
 
           {editingItem.isOffDay && (
             <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300 text-[11px] leading-relaxed">
-              ℹ️ <strong>Ngày nghỉ (OFF):</strong> Hệ thống không tự tính OT từ lượt quét. Quản lý cần nhập giờ làm thêm, tối đa 4 giờ, và lưu để phê duyệt.
+              ℹ️ <strong>Ngày nghỉ / Chưa có ca:</strong> Không áp dụng đi trễ / về sớm. Quản lý có thể phê duyệt tăng ca (OT) dựa trên thời gian làm việc thực tế.
             </div>
           )}
 
@@ -201,58 +194,61 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
             </div>
           )}
 
-          {/* Input 1: Late / Early (Chỉ áp dụng nếu không phải ngày OFF) */}
-          {!editingItem.isOffDay && (
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-rose-500 dark:text-rose-400" />
-                  Thời gian Đi trễ / Về sớm
-                </label>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                  Thực tế: <span className="font-mono text-rose-600 dark:text-rose-400 font-semibold">{editingItem.initialLateEarlySec == null ? '—' : formatSecondsToHHMMSS(editingItem.initialLateEarlySec)}</span>
-                </span>
+          {/* Input 1: Late / Early (Vô hiệu hóa nếu là ngày OFF / chưa xếp ca) */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-rose-500 dark:text-rose-400" />
+                Thời gian Đi trễ / Về sớm
+                {editingItem.isOffDay && (
+                  <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 italic">
+                    (Vô hiệu hóa cho ca OFF / Chưa xếp ca)
+                  </span>
+                )}
+              </label>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                Thực tế: <span className="font-mono text-rose-600 dark:text-rose-400 font-semibold">{editingItem.isOffDay ? '00:00:00' : (editingItem.initialLateEarlySec == null ? '—' : formatSecondsToHHMMSS(editingItem.initialLateEarlySec))}</span>
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Giờ</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={editingItem.isOffDay ? 0 : inputLEHours}
+                  disabled={isSubmitting || Boolean(editingItem.isOffDay)}
+                  onChange={(e) => handleLEChange(e.target.value === '' ? '' : Number(e.target.value), inputLEMinutes, inputLESeconds)}
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Giờ</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={23}
-                    value={inputLEHours}
-                    disabled={isSubmitting}
-                    onChange={(e) => handleLEChange(e.target.value === '' ? '' : Number(e.target.value), inputLEMinutes, inputLESeconds)}
-                    className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Phút</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={59}
-                    value={inputLEMinutes}
-                    disabled={isSubmitting}
-                    onChange={(e) => handleLEChange(inputLEHours, e.target.value === '' ? '' : Number(e.target.value), inputLESeconds)}
-                    className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Giây</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={59}
-                    value={inputLESeconds}
-                    disabled={isSubmitting}
-                    onChange={(e) => handleLEChange(inputLEHours, inputLEMinutes, e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
-                  />
-                </div>
+              <div>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Phút</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={editingItem.isOffDay ? 0 : inputLEMinutes}
+                  disabled={isSubmitting || Boolean(editingItem.isOffDay)}
+                  onChange={(e) => handleLEChange(inputLEHours, e.target.value === '' ? '' : Number(e.target.value), inputLESeconds)}
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Giây</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={editingItem.isOffDay ? 0 : inputLESeconds}
+                  disabled={isSubmitting || Boolean(editingItem.isOffDay)}
+                  onChange={(e) => handleLEChange(inputLEHours, inputLEMinutes, e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl px-3 py-2 text-slate-900 dark:text-white text-center font-mono focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
               </div>
             </div>
-          )}
+          </div>
 
           {/* Input 2: Overtime */}
           <div className="space-y-2">
@@ -262,7 +258,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                 Thời gian Tăng ca (OT)
               </label>
               <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                Thực tế: <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{editingItem.isOffDay || editingItem.initialOTSec == null ? '—' : formatSecondsToHHMMSS(editingItem.initialOTSec)}</span>
+                Thực tế: <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{editingItem.isOffDay ? (editingItem.rawWorkSeconds ? formatSecondsToHHMMSS(editingItem.rawWorkSeconds) : (editingItem.initialOTSec != null ? formatSecondsToHHMMSS(editingItem.initialOTSec) : '—')) : (editingItem.initialOTSec == null ? '—' : formatSecondsToHHMMSS(editingItem.initialOTSec))}</span>
               </span>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -271,7 +267,6 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
                 <input
                   type="number"
                   min={0}
-                  max={4}
                   value={inputOTHours}
                   disabled={isSubmitting}
                   onChange={(e) => handleOTChange(e.target.value === '' ? '' : Number(e.target.value), inputOTMinutes, inputOTSeconds)}

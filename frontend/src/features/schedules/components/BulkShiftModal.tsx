@@ -275,6 +275,10 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
               );
             })}
           </div>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1">
+            <span>ℹ️</span>
+            <span>Hệ thống sẽ tự động bỏ qua các ngày trong quá khứ để bảo vệ dữ liệu chấm công đã hoàn thành.</span>
+          </p>
         </div>
 
         <div>

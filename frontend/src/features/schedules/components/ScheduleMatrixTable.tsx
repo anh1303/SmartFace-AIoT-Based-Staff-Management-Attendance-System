@@ -1,6 +1,7 @@
 import {Avatar} from '../../../components/common/Avatar';
 import React from 'react';
 import { Employee, WorkShift } from '../../../types';
+import { getTodayVNString } from '../../../utils/dateUtils';
 
 export interface DayOfWeekItem {
   name: string;
@@ -22,11 +23,14 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
   workShifts,
   onCellClick,
 }) => {
-  const renderShiftBadge = (shift: WorkShift | undefined) => {
+  const todayVN = getTodayVNString();
+
+  const renderShiftBadge = (shift: WorkShift | undefined, isPast = false) => {
     if (!shift || shift.shift_type === 'OFF') {
       return (
-        <div className="py-2 px-1 rounded-lg bg-slate-100 dark:bg-[#0b0d19] text-slate-400 dark:text-slate-500 text-[11px] text-center border border-slate-200/80 dark:border-[#21264b] group-hover:border-slate-300 dark:group-hover:border-blue-900/50 transition-colors truncate">
-          Nghỉ ca
+        <div className={`py-2 px-1 rounded-lg bg-slate-100 dark:bg-[#0b0d19] text-slate-400 dark:text-slate-500 text-[11px] text-center border border-slate-200/80 dark:border-[#21264b] transition-colors truncate flex items-center justify-center gap-1 ${isPast ? 'opacity-70' : 'group-hover:border-slate-300 dark:group-hover:border-blue-900/50'}`}>
+          <span>Nghỉ ca</span>
+          {isPast && <span className="text-[10px] opacity-75" title="Đã qua (Đã khóa)">🔒</span>}
         </div>
       );
     }
@@ -51,12 +55,15 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
 
     return (
       <div
-        className={`py-1.5 px-1.5 xl:px-2 rounded-lg border text-xs text-center transition-all shadow-xs ${colorClass} w-full overflow-hidden`}
-        title={tooltipText}
+        className={`py-1.5 px-1.5 xl:px-2 rounded-lg border text-xs text-center transition-all shadow-xs ${colorClass} ${isPast ? 'opacity-85 saturate-75 border-dashed' : ''} w-full overflow-hidden`}
+        title={tooltipText + (isPast ? '\n[Ca đã qua - Chỉ xem chi tiết]' : '')}
       >
-        <p className="font-bold tracking-tight truncate text-[11px] xl:text-xs text-center">
-          {typeName}
-        </p>
+        <div className="flex items-center justify-center gap-1">
+          <p className="font-bold tracking-tight truncate text-[11px] xl:text-xs text-center">
+            {typeName}
+          </p>
+          {isPast && <span className="text-[10px] shrink-0" title="Đã qua (Đã khóa)">🔒</span>}
+        </div>
         <p className="font-mono text-[10px] xl:text-[11px] text-slate-700 dark:text-slate-200 mt-0.5 truncate text-center">
           {shift.start_time} - {shift.end_time}
         </p>
@@ -135,6 +142,7 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
                     const shift = workShifts.find(
                       (s) => s.employee_id === emp.employee_id && s.date === day.date
                     );
+                    const isPast = day.date < todayVN;
 
                     return (
                       <td
@@ -144,10 +152,25 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
                             : ''
                           } ${isInactive
                             ? 'cursor-not-allowed opacity-60'
-                            : 'cursor-pointer group hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
+                            : isPast
+                              ? 'cursor-pointer group hover:bg-slate-100/50 dark:hover:bg-[#151933]/60'
+                              : 'cursor-pointer group hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
                           } transition-colors`}
                       >
-                        <button type="button" className="w-full min-h-16 rounded-md focus-visible:outline-blue-600" aria-label={`Phân ca ${emp.full_name}, ${day.name} ngày ${day.label}`} disabled={isInactive} onClick={()=>onCellClick(emp.employee_id,emp.full_name,day.date,`${day.name} (${day.label})`)}>{renderShiftBadge(shift)}{shift?.shift_type==='OTHER'&&shift.note&&<span className="block text-xs text-slate-500 dark:text-slate-300 px-1 mt-1 truncate" title={shift.note}>{shift.note}</span>}</button>
+                        <button
+                          type="button"
+                          className="w-full min-h-16 rounded-md focus-visible:outline-blue-600"
+                          aria-label={isPast ? `Xem chi tiết ca ${emp.full_name}, ${day.name} ngày ${day.label} (Đã khóa)` : `Phân ca ${emp.full_name}, ${day.name} ngày ${day.label}`}
+                          disabled={isInactive}
+                          onClick={() => onCellClick(emp.employee_id, emp.full_name, day.date, `${day.name} (${day.label})`)}
+                        >
+                          {renderShiftBadge(shift, isPast)}
+                          {shift?.shift_type === 'OTHER' && shift.note && (
+                            <span className="block text-xs text-slate-500 dark:text-slate-300 px-1 mt-1 truncate" title={shift.note}>
+                              {shift.note}
+                            </span>
+                          )}
+                        </button>
                       </td>
                     );
                   })}

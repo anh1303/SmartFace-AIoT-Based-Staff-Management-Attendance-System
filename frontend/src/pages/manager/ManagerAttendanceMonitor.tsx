@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { getTodayVNString } from '../../utils/dateUtils';
 import { useDepartmentPositions } from '@/features/employees';
@@ -25,15 +26,44 @@ import { ChevronLeft, ChevronRight, RefreshCw, FileText } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAttendanceApi } from '@/features/attendances/api/attendanceApi';
 
+const useSafeSearchParams = () => {
+  try {
+    return useSearchParams();
+  } catch {
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    const params = new URLSearchParams(search);
+    return [params, () => {}] as const;
+  }
+};
+
 export const ManagerAttendanceMonitor: React.FC = () => {
   const { employees, workShifts, showToast, role, currentUser } = useApp();
   const isManager = role === 'manager';
   const managerDept = currentUser?.department;
 
+  const [searchParams] = useSafeSearchParams();
+  const paramDate = searchParams.get('date');
+  const paramSearch = searchParams.get('search') || searchParams.get('employeeId');
+
   const { liveEvents, isSocketConnected, clearEvents } = useAttendanceSocket({ showToast });
 
-  const [startDate, setStartDate] = useState<string>(() => getTodayVNString());
-  const [endDate, setEndDate] = useState<string>(() => getTodayVNString());
+  const [startDate, setStartDate] = useState<string>(() => paramDate || getTodayVNString());
+  const [endDate, setEndDate] = useState<string>(() => paramDate || getTodayVNString());
+  const [searchTerm, setSearchTerm] = useState(() => paramSearch || '');
+
+  // Cập nhật bộ lọc khi URL search params thay đổi (khi điều hướng từ Lịch làm việc)
+  useEffect(() => {
+    const urlDate = searchParams.get('date');
+    const urlSearch = searchParams.get('search') || searchParams.get('employeeId');
+    if (urlDate) {
+      setStartDate(urlDate);
+      setEndDate(urlDate);
+    }
+    if (urlSearch !== null && urlSearch !== undefined) {
+      setSearchTerm(urlSearch);
+    }
+  }, [searchParams]);
+
   const adjacentDate = (date: string, days: number) => {
     const value = new Date(`${date}T00:00:00Z`);
     value.setUTCDate(value.getUTCDate() + days);
@@ -45,7 +75,6 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     enabled: Boolean(currentUser) && Boolean(startDate && endDate) && startDate <= endDate,
   });
   const attendance = attendanceQuery.data || [];
-  const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState(() => {
     if (role === 'manager' && currentUser?.department) {
       return currentUser.department;

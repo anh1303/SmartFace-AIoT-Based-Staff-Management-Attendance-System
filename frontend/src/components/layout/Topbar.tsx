@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, Sun, Moon, ChevronRight } from 'lucide-react';
+import { Menu, Sun, Moon, ChevronRight, Clock } from 'lucide-react';
 import { FloatingNotificationBubble } from '../../features/notifications';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -27,6 +27,31 @@ export const Topbar: React.FC<{
   const { role } = useAuth();
   const { pathname } = useLocation();
   const parts = pathname.split('/');
+
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timeStr = currentTime.toLocaleTimeString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  const dateStr = currentTime.toLocaleDateString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 
   return (
     <header className="sf-topbar">
@@ -57,15 +82,16 @@ export const Topbar: React.FC<{
       </div>
 
       <div className="flex items-center gap-3">
-        <span className="hidden sm:block text-xs text-slate-500">
-          {new Date().toLocaleDateString('vi-VN', {
-            timeZone: 'Asia/Ho_Chi_Minh',
-            weekday: 'short',
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-          })}
-        </span>
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#151936] border border-slate-200 dark:border-cyan-500/30 shadow-xs dark:shadow-[0_0_12px_rgba(6,182,212,0.12)]">
+          <Clock className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0 animate-pulse" />
+          <span className="font-mono font-extrabold text-sm text-cyan-600 dark:text-cyan-300 tracking-wider">
+            {timeStr}
+          </span>
+          <span className="text-slate-300 dark:text-slate-600 font-light">|</span>
+          <span className="font-bold text-xs text-slate-700 dark:text-slate-200 uppercase tracking-tight">
+            {dateStr}
+          </span>
+        </div>
         <FloatingNotificationBubble />
         <button
           className="sf-icon-button"

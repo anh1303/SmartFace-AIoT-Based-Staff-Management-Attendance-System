@@ -3,7 +3,7 @@
 @theme { --font-sans: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; --font-mono: 'SFMono-Regular', Consolas, monospace; --text-xs: .8125rem; }
 :root { --bg-page:#f8fafc;--bg-card:#fff;--border-card:#e2e8f0;--text-main:#0f172a;--text-muted:#475569;--text-sub:#64748b;--accent-primary:#2563eb;--accent-primary-hover:#1d4ed8;--accent-light:#eff6ff;--sf-radius:8px;--sf-shadow:0 1px 2px #0f172a08;color-scheme:light; }
 .dark {--bg-page:#0f172a;--bg-card:#172033;--border-card:#334155;--text-main:#f1f5f9;--text-muted:#cbd5e1;--text-sub:#94a3b8;color-scheme:dark;}
-@layer base {body{margin:0;font-family:var(--font-sans);font-size:14px;color:var(--text-main);background:var(--bg-page);-webkit-font-smoothing:antialiased;}h1,h2,h3,.font-heading{font-family:var(--font-sans);letter-spacing:-.025em;}button,a,input,select,textarea{touch-action:manipulation;}button:not(:disabled),summary{cursor:pointer;}button:disabled{cursor:not-allowed;}th{text-align:inherit;font-weight:600;}td{font-variant-numeric:tabular-nums;}input,select,textarea{min-height:40px;}input[type=checkbox],input[type=radio]{min-height:18px;min-width:18px;accent-color:#2563eb;}label{font-weight:500;}a,button,input,select,textarea,summary{outline-offset:3px;} :focus-visible{outline:2px solid #2563eb!important;}input:read-only{color:var(--text-muted);} }
+@layer base {body{margin:0;font-family:var(--font-sans);font-size:14px;color:var(--text-main);background:var(--bg-page);-webkit-font-smoothing:antialiased;}h1,h2,h3,.font-heading{font-family:var(--font-sans);letter-spacing:-.025em;}button,a,input,select,textarea{touch-action:manipulation;}button:not(:disabled),summary{cursor:pointer;}button:disabled{cursor:not-allowed;}th{text-align:inherit;font-weight:600;}td{font-variant-numeric:tabular-nums;}input,select,textarea{min-height:40px;}input[type=checkbox],input[type=radio]{min-height:18px;min-width:18px;accent-color:#2563eb;}input[type=range]{min-height:unset;}label{font-weight:500;}a,button,input,select,textarea,summary{outline-offset:3px;} :focus-visible{outline:2px solid #2563eb!important;}input:read-only{color:var(--text-muted);} }
 .sf-app{display:flex;min-height:100dvh;background:var(--bg-card);color:var(--text-main);}
 .sf-sidebar{width:248px;flex-shrink:0;display:flex;flex-direction:column;height:100dvh;position:sticky;top:0;border-right:1px solid var(--border-card);background:var(--bg-card);z-index:40;}
 .sf-brand{display:flex;align-items:center;gap:12px;padding:24px 20px 12px;color:#2563eb;}.sf-brand span{color:var(--text-main);font-size:23px;font-weight:750;letter-spacing:-1px;}.sf-nav-label{font-size:12px;font-weight:600;color:var(--text-sub);padding:0 12px;margin:0 0 8px;}.sf-nav-link{display:flex;align-items:center;gap:11px;min-height:42px;padding:10px 12px;border-radius:7px;color:var(--text-muted);font-size:14px;font-weight:500;margin:2px 0;text-decoration:none;}.sf-nav-link svg{flex-shrink:0;}.sf-nav-link:hover{background:var(--bg-page);}.sf-nav-link.active{color:#1d4ed8;background:#eff6ff;font-weight:600;}.dark .sf-nav-link.active{color:#93c5fd;background:#1e3a5f;}.sf-user{display:flex;align-items:center;gap:10px;padding:18px 16px;border-top:1px solid var(--border-card);}.sf-avatar{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#eff6ff;color:#2563eb;flex-shrink:0;}
@@ -88,3 +88,35 @@
 .dark .sf-profile-avatar,.dark .sf-content .text-blue-700,.dark [role=dialog] .text-blue-700{color:#93c5fd;}
 .dark .sf-content .text-slate-500,.dark [role=dialog] .text-slate-500{color:var(--text-sub);}
 .dark .sf-content .text-slate-600,.dark [role=dialog] .text-slate-600{color:var(--text-muted);}
+
+/* Custom sleek slider track & thumb */
+input[type=range].sf-slider {
+  min-height: 0 !important;
+  height: 6px;
+  border-radius: 9999px;
+  outline: none;
+}
+input[type=range].sf-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #a855f7;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+input[type=range].sf-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.18);
+}
+input[type=range].sf-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #a855f7;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}

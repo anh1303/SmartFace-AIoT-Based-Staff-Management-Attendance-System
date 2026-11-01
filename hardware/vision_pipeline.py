@@ -3,12 +3,13 @@ import math
 import time
 import config
 
-def limit_faces(detections):
+def limit_faces(detections, max_faces=None):
     """Select largest faces; stable sorting preserves detector order for ties."""
-    if len(detections) <= config.MAX_FACES_PER_FRAME:
+    limit = config.MAX_FACES_PER_FRAME if max_faces is None else int(max_faces)
+    if limit <= 0 or len(detections) <= limit:
         return list(detections)
     return sorted(detections, key=lambda d: max(0, d['bbox'][2] - d['bbox'][0])
-                  * max(0, d['bbox'][3] - d['bbox'][1]), reverse=True)[:config.MAX_FACES_PER_FRAME]
+                  * max(0, d['bbox'][3] - d['bbox'][1]), reverse=True)[:limit]
 
 def _pad_face_skip_reason(detection, frame_shape):
     """Reject low-confidence or incomplete faces near the camera-frame edge."""
@@ -137,7 +138,10 @@ def update_track_pad(
 
     for (detection, track, crop_bbox), res in zip(due, results):
         score = float(res.get("pad_score", res.get("logit_diff")))
-        track.update_pad(res["is_real"], score, res.get("threshold_logit"))
+        try:
+            track.update_pad(res["is_real"], score, res.get("threshold_logit"))
+        except TypeError:
+            track.update_pad(res["is_real"], score)
         if diagnostic_log:
             exp_score = math.exp(-abs(score))
             p_real = 1.0 / (1.0 + exp_score) if score >= 0 else exp_score / (1.0 + exp_score)

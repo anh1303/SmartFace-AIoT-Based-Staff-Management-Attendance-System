@@ -49,8 +49,8 @@ def _get_env_bool(key: str, default: bool) -> bool:
 
 
 # Explicit experiment switch: the selected adaptive profile overrides env tuning.
-PAD_ADAPTIVE_ENABLED = _get_env_bool("PAD_ADAPTIVE_ENABLED", False)
-PAD_ADAPTIVE_CONFIG_PATH = _get_env_str("PAD_ADAPTIVE_CONFIG_PATH", 'models/R7_SC_FULL_local80_candidate_runtime.json')
+PAD_ADAPTIVE_ENABLED = _get_env_bool("PAD_ADAPTIVE_ENABLED", True)
+PAD_ADAPTIVE_CONFIG_PATH = _get_env_str("PAD_ADAPTIVE_CONFIG_PATH", 'models/R7_SC_FULL_pi_all1136_balanced_runtime.json')
 
 
 def _load_pad_runtime_config():
@@ -256,7 +256,9 @@ _runtime_pad_threshold_logit = _runtime_float(
     math.log(_runtime_pad_threshold / (1.0 - _runtime_pad_threshold)),
 )
 _pad_threshold_env = None if PAD_ADAPTIVE_ENABLED else _get_env_str("PAD_THRESHOLD", None)
-_pad_threshold_logit_env = None if PAD_ADAPTIVE_ENABLED else _get_env_str("PAD_THRESHOLD_LOGIT", None)
+_pad_threshold_logit_env = None if PAD_ADAPTIVE_ENABLED else (
+    _get_env_str("PAD_THRESHOLD_LOGIT", None) or _get_env_str("FAS_LOGIT_THRESHOLD", None)
+)
 
 
 def _threshold_override(name, raw):

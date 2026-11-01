@@ -17,15 +17,20 @@ from typing import Optional
 
 
 class UltrasonicSensor:
+    # Khóa dùng chung giữa nhiều cảm biến siêu âm để tránh phát sóng siêu âm cùng lúc gây nhiễu chéo (cross-talk)
+    _SHARED_PING_LOCK = threading.Lock()
+
     def __init__(
         self,
         enabled: bool = True,
         trig_pin: int = 23,
         echo_pin: int = 27,
         max_distance: float = 100.0,
-        trigger_distance: float = 50.0,
+        trigger_distance: float = 20.0,
         poll_interval: float = 0.08,
-        window_size: int = 5,
+        window_size: int = 3,
+        debounce_duration: float = 0.5,
+        name: str = "ULTRASONIC",
     ):
         """
         Khởi tạo cảm biến siêu âm.
@@ -34,21 +39,28 @@ class UltrasonicSensor:
         :param trig_pin: Chân GPIO xuất xung Trigger (BCM numbering).
         :param echo_pin: Chân GPIO nhận xung Echo (BCM numbering).
         :param max_distance: Khoảng cách tối đa hợp lệ (cm). Vượt quá ngưỡng này coi là không có người.
-        :param trigger_distance: Khoảng cách ngưỡng để kích hoạt trạng thái THỨC (cm).
+        :param trigger_distance: Khoảng cách ngưỡng để kích hoạt trạng thái THỨC / CHỌN MODE (cm).
         :param poll_interval: Chu kỳ đo giữa các lần phát xung (giây, mặc định 0.08s = 12.5Hz).
         :param window_size: Số lượng mẫu đo lưu trong hàng đợi để tính trung vị (Median Filter).
+        :param debounce_duration: Thời gian duy trì trạng thái ổn định liên tục để chuyển đổi (giây, mặc định 0.5s).
+        :param name: Tên định danh cảm biến (ví dụ: CHECK_IN, CHECK_OUT).
         """
         self.enabled = enabled
+        self.name = name
         self.trig_pin = trig_pin
         self.echo_pin = echo_pin
         self.max_distance = float(max_distance)
         self.trigger_distance = float(trigger_distance)
         self.poll_interval = float(poll_interval)
-        self.window_size = max(3, int(window_size))
+        self.window_size = max(1, int(window_size))
+        self.debounce_duration = max(0.0, float(debounce_duration))
 
         self._lock = threading.Lock()
         self._samples = collections.deque(maxlen=self.window_size)
         self._current_distance: Optional[float] = None
+        self._presence_state = False
+        self._candidate_state = False
+        self._candidate_start_time = 0.0
         self._is_active = False
         self._thread: Optional[threading.Thread] = None
         self._gpio = None
@@ -67,11 +79,11 @@ class UltrasonicSensor:
             self._gpio.setup(self.trig_pin, GPIO.OUT)
             self._gpio.setup(self.echo_pin, GPIO.IN)
             self._gpio.output(self.trig_pin, False)
-            # Cho cảm biến 0.1s ổn định chân điện áp
-            time.sleep(0.1)
-            print(f"[ULTRASONIC] Đã khởi tạo GPIO (BCM TRIG={self.trig_pin}, ECHO={self.echo_pin})")
+            # Cho cảm biến 0.05s ổn định chân điện áp
+            time.sleep(0.05)
+            print(f"[{self.name}] Đã khởi tạo GPIO (BCM TRIG={self.trig_pin}, ECHO={self.echo_pin}, Ngưỡng={self.trigger_distance}cm)")
         except Exception as e:
-            print(f"[ULTRASONIC] [WARN] Không thể nạp RPi.GPIO ({e}). Kích hoạt Mock Dummy Mode!")
+            print(f"[{self.name}] [WARN] Không thể nạp RPi.GPIO ({e}). Kích hoạt Mock Dummy Mode!")
             self._mock_mode = True
 
     def start(self):
@@ -80,59 +92,85 @@ class UltrasonicSensor:
             return
 
         self._is_active = True
-        self._thread = threading.Thread(target=self._worker_loop, daemon=True, name="UltrasonicThread")
+        self._thread = threading.Thread(target=self._worker_loop, daemon=True, name=f"Ultrasonic_{self.name}")
         self._thread.start()
-        print(f"[ULTRASONIC] Background Thread đã chạy (Tần số: {1.0 / self.poll_interval:.1f}Hz, Ngưỡng: {self.trigger_distance}cm, Max: {self.max_distance}cm)")
+        print(f"[{self.name}] Background Thread đã chạy (Tần số: {1.0 / self.poll_interval:.1f}Hz, Ngưỡng: {self.trigger_distance}cm, Max: {self.max_distance}cm)")
 
     def _measure_once(self) -> Optional[float]:
         """
         Phát xung trigger 10us và đo độ rộng xung Echo để tính khoảng cách (cm).
-        Có timeout an toàn 30ms (tương đương max ~5m) để chống treo thread.
+        Có timeout an toàn 25ms và khóa chống nhiễu chéo giữa 2 cảm biến.
         """
         if self._mock_mode or self._gpio is None:
-            # Ở chế độ test trên máy tính, trả về khoảng cách giả lập (30cm: luôn có người)
-            return 30.0
+            # Ở chế độ giả lập không có GPIO, trả về None (không che cảm biến)
+            return None
 
         GPIO = self._gpio
-        try:
-            # 1. Phát xung Trigger 10 microseconds
-            GPIO.output(self.trig_pin, True)
-            time.sleep(0.00001)
-            GPIO.output(self.trig_pin, False)
+        with UltrasonicSensor._SHARED_PING_LOCK:
+            try:
+                # 1. Phát xung Trigger 10 microseconds
+                GPIO.output(self.trig_pin, True)
+                time.sleep(0.00001)
+                GPIO.output(self.trig_pin, False)
 
-            # 2. Chờ Echo lên mức HIGH (Timeout 30ms)
-            start_wait = time.monotonic()
-            pulse_start = start_wait
-            while GPIO.input(self.echo_pin) == 0:
-                pulse_start = time.monotonic()
-                if pulse_start - start_wait > 0.03:
-                    return None  # Timeout không thấy phản hồi
+                # 2. Chờ Echo lên mức HIGH (Timeout 25ms)
+                start_wait = time.monotonic()
+                pulse_start = start_wait
+                while GPIO.input(self.echo_pin) == 0:
+                    pulse_start = time.monotonic()
+                    if pulse_start - start_wait > 0.025:
+                        return None  # Timeout không thấy phản hồi
 
-            # 3. Chờ Echo xuống mức LOW (Timeout 30ms)
-            pulse_end = pulse_start
-            while GPIO.input(self.echo_pin) == 1:
-                pulse_end = time.monotonic()
-                if pulse_end - pulse_start > 0.03:
-                    return None  # Timeout xung quá dài
+                # 3. Chờ Echo xuống mức LOW (Timeout 25ms)
+                pulse_end = pulse_start
+                while GPIO.input(self.echo_pin) == 1:
+                    pulse_end = time.monotonic()
+                    if pulse_end - pulse_start > 0.025:
+                        return None  # Timeout xung quá dài
 
-            # 4. Tính khoảng cách dựa trên vận tốc âm thanh 343 m/s = 34300 cm/s
-            duration = pulse_end - pulse_start
-            distance_cm = (duration * 34300.0) / 2.0
+                # 4. Tính khoảng cách dựa trên vận tốc âm thanh 343 m/s = 34300 cm/s
+                duration = pulse_end - pulse_start
+                distance_cm = (duration * 34300.0) / 2.0
 
-            # Giới hạn vật lý của cảm biến (khoảng 2cm đến max_distance cm)
-            if 2.0 <= distance_cm <= (self.max_distance + 20.0):
-                return round(distance_cm, 1)
-            return None
-        except Exception:
-            return None
+                # Giới hạn vật lý của cảm biến (khoảng 1.5cm đến max_distance cm)
+                if 1.5 <= distance_cm <= (self.max_distance + 20.0):
+                    return round(distance_cm, 1)
+                return None
+            except Exception:
+                return None
+
+    def _update_presence_state(self, now: float):
+        """
+        Cập nhật trạng thái người hiện diện có debounce 2 chiều:
+        - Đưa tay vào: Phải liên tục <= trigger_distance trong >= debounce_duration (0.5s) mới chuyển True.
+        - Rút tay ra: Phải liên tục > trigger_distance (hoặc None) trong >= debounce_duration (0.5s) mới chuyển False.
+        """
+        raw_present = (
+            self._current_distance is not None
+            and 1.5 <= self._current_distance <= self.trigger_distance
+        )
+        if self.debounce_duration <= 0.0:
+            self._presence_state = raw_present
+            return
+
+        if raw_present != self._presence_state:
+            if self._candidate_state != raw_present:
+                self._candidate_state = raw_present
+                self._candidate_start_time = now
+            elif now - self._candidate_start_time >= self.debounce_duration:
+                self._presence_state = raw_present
+        else:
+            self._candidate_state = self._presence_state
+            self._candidate_start_time = now
 
     def _worker_loop(self):
         """Vòng lặp đọc dữ liệu liên tục trong thread ngầm."""
         while self._is_active:
             raw_dist = self._measure_once()
+            now = time.monotonic()
 
-            if raw_dist is not None:
-                with self._lock:
+            with self._lock:
+                if raw_dist is not None:
                     self._samples.append(raw_dist)
                     # Tính trung vị (Median) để loại bỏ nhiễu spike đột ngột
                     if len(self._samples) >= 3:
@@ -140,13 +178,14 @@ class UltrasonicSensor:
                         self._current_distance = round(median_val, 1)
                     else:
                         self._current_distance = raw_dist
-            else:
-                # Nếu đo lỗi nhiều lần liên tiếp, làm sạch mẫu để chuyển về trạng thái không có người
-                with self._lock:
+                else:
+                    # Nếu đo lỗi nhiều lần liên tiếp, làm sạch mẫu để chuyển về trạng thái không có người
                     if len(self._samples) > 0:
                         self._samples.popleft()
                     if len(self._samples) == 0:
                         self._current_distance = None
+
+                self._update_presence_state(now)
 
             time.sleep(self.poll_interval)
 
@@ -158,17 +197,21 @@ class UltrasonicSensor:
         with self._lock:
             return self._current_distance
 
+    def set_mock_distance(self, dist: Optional[float], now: Optional[float] = None):
+        """Hỗ trợ unit test và giả lập giá trị khoảng cách mà không cần GPIO."""
+        with self._lock:
+            self._current_distance = dist
+            self._update_presence_state(now if now is not None else time.monotonic())
+
     def is_person_present(self) -> bool:
         """
-        Kiểm tra xem có người đứng trong vùng kích hoạt (khoảng cách <= trigger_distance) hay không.
+        Kiểm tra xem có người/tay đưa vào vùng kích hoạt (khoảng cách <= trigger_distance) hay không.
+        Đã được lọc trễ ổn định (debounce 0.5s) cả khi đưa tay vào và khi rút tay ra.
         """
         if not self.enabled:
-            return True  # Nếu tắt cảm biến siêu âm, luôn coi là có người (AI chạy liên tục)
-
-        dist = self.get_distance()
-        if dist is None:
             return False
-        return 2.0 <= dist <= self.trigger_distance
+        with self._lock:
+            return self._presence_state
 
     def stop(self):
         """Dừng worker thread và dọn dẹp GPIO."""
@@ -181,4 +224,4 @@ class UltrasonicSensor:
                 self._gpio.cleanup((self.trig_pin, self.echo_pin))
             except Exception:
                 pass
-        print("[ULTRASONIC] Cảm biến siêu âm đã tắt an toàn.")
+        print(f"[{self.name}] Cảm biến siêu âm đã tắt an toàn.")

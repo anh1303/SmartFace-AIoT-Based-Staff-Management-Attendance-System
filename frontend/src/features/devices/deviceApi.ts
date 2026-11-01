@@ -1,6 +1,6 @@
 import { api } from '../../api/client';
 export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
-export type AttendanceMode = 'CHECK_IN' | 'CHECK_OUT';
+export type AttendanceMode = 'CHECK_IN' | 'CHECK_OUT' | 'OFF';
 export interface Device {
     id: string;
     name: string;

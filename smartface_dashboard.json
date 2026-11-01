@@ -505,6 +505,110 @@
                   "color": "#38bdf8",
                   "settings": {},
                   "_hash": 0.3555
+                },
+                {
+                  "name": "attendance_latch",
+                  "type": "timeseries",
+                  "label": "attendance_latch",
+                  "color": "#818cf8",
+                  "settings": {},
+                  "_hash": 0.3666
+                },
+                {
+                  "name": "distance",
+                  "type": "timeseries",
+                  "label": "distance",
+                  "color": "#06b6d4",
+                  "settings": {},
+                  "_hash": 0.3777
+                },
+                {
+                  "name": "cpu_temp",
+                  "type": "timeseries",
+                  "label": "cpu_temp",
+                  "color": "#ef4444",
+                  "settings": {},
+                  "_hash": 0.3888
+                },
+                {
+                  "name": "ram_usage",
+                  "type": "timeseries",
+                  "label": "ram_usage",
+                  "color": "#f97316",
+                  "settings": {},
+                  "_hash": 0.3999
+                },
+                {
+                  "name": "disk_usage",
+                  "type": "timeseries",
+                  "label": "disk_usage",
+                  "color": "#a855f7",
+                  "settings": {},
+                  "_hash": 0.4111
+                },
+                {
+                  "name": "wifi_ssid",
+                  "type": "timeseries",
+                  "label": "wifi_ssid",
+                  "color": "#38bdf8",
+                  "settings": {},
+                  "_hash": 0.4222
+                },
+                {
+                  "name": "wifi_signal",
+                  "type": "timeseries",
+                  "label": "wifi_signal",
+                  "color": "#22c55e",
+                  "settings": {},
+                  "_hash": 0.4333
+                },
+                {
+                  "name": "bluetooth_device",
+                  "type": "timeseries",
+                  "label": "bluetooth_device",
+                  "color": "#6366f1",
+                  "settings": {},
+                  "_hash": 0.4444
+                },
+                {
+                  "name": "bluetooth_connected",
+                  "type": "timeseries",
+                  "label": "bluetooth_connected",
+                  "color": "#10b981",
+                  "settings": {},
+                  "_hash": 0.4555
+                },
+                {
+                  "name": "volume",
+                  "type": "timeseries",
+                  "label": "volume",
+                  "color": "#ec4899",
+                  "settings": {},
+                  "_hash": 0.4666
+                },
+                {
+                  "name": "is_muted",
+                  "type": "timeseries",
+                  "label": "is_muted",
+                  "color": "#94a3b8",
+                  "settings": {},
+                  "_hash": 0.4777
+                },
+                {
+                  "name": "show_fps",
+                  "type": "timeseries",
+                  "label": "show_fps",
+                  "color": "#eab308",
+                  "settings": {},
+                  "_hash": 0.4888
+                },
+                {
+                  "name": "stream_enabled",
+                  "type": "timeseries",
+                  "label": "stream_enabled",
+                  "color": "#14b8a6",
+                  "settings": {},
+                  "_hash": 0.4999
                 }
               ]
             }
@@ -545,8 +649,8 @@
           "color": "rgba(0, 0, 0, 0.87)",
           "padding": "0px",
           "settings": {
-            "cardHtml": "<div class=\"gate-status-card\">\n  <div class=\"header-row\">\n    <div class=\"device-name\">PI4_FRONT_GATE</div>\n    <div class=\"badge status-badge\">● ONLINE</div>\n  </div>\n  \n  <div class=\"telemetry-body\">\n    <div class=\"mode-container\">\n      <div class=\"mode-label\">CHẾ ĐỘ ĐIỂM DANH HIỆN TẠI</div>\n      <div class=\"mode-value\">${current_mode:CHECK_IN}</div>\n    </div>\n    \n    <div class=\"telemetry-badges\">\n      <div class=\"badge-item\">\n        <span class=\"badge-label\">AI State:</span>\n        <span class=\"badge-val badge-${ai_state:SLEEP}\">${ai_state:SLEEP}</span>\n      </div>\n      <div class=\"badge-item\">\n        <span class=\"badge-label\">Hiện diện:</span>\n        <span class=\"badge-val presence-${person_present:false}\">${person_present:false}</span>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"footer-row\">\n    <div class=\"info-item\">Camera: <span>640x480 (cấu hình 15 FPS)</span></div>\n    <div class=\"info-item\">Tốc độ: <span>${fps:0} FPS</span></div>\n    <div class=\"info-item\">Model: <span>ArcFace + MiniFAS</span></div>\n  </div>\n</div>",
-            "cardCss": ".gate-status-card {\n  width: 100%;\n  height: 100%;\n  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);\n  border: 1px solid #334155;\n  border-radius: 12px;\n  padding: 16px 22px;\n  display: flex;\n  flex-direction: column;\n  justify-content: space-between;\n  box-sizing: border-box;\n  font-family: 'Inter', -apple-system, sans-serif;\n}\n.header-row {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\n.device-name {\n  color: #94a3b8;\n  font-size: 13px;\n  font-weight: 700;\n  letter-spacing: 0.05em;\n  text-transform: uppercase;\n}\n.status-badge {\n  background: rgba(16, 185, 129, 0.15);\n  color: #10b981;\n  border: 1px solid rgba(16, 185, 129, 0.4);\n  padding: 3px 10px;\n  border-radius: 20px;\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.05em;\n}\n.telemetry-body {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  margin: 6px 0;\n}\n.mode-label {\n  color: #64748b;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.06em;\n  text-transform: uppercase;\n}\n.mode-value {\n  color: #38bdf8;\n  font-size: 28px;\n  font-weight: 800;\n  letter-spacing: -0.02em;\n  text-shadow: 0 0 20px rgba(56, 189, 248, 0.3);\n}\n.telemetry-badges {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  align-items: flex-end;\n}\n.badge-item {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  font-size: 12px;\n}\n.badge-label {\n  color: #94a3b8;\n  font-weight: 600;\n}\n.badge-val {\n  padding: 2px 8px;\n  border-radius: 6px;\n  font-weight: 700;\n  font-size: 11px;\n}\n.badge-AWAKE {\n  background: rgba(16, 185, 129, 0.2);\n  color: #10b981;\n  border: 1px solid rgba(16, 185, 129, 0.4);\n}\n.badge-SLEEP {\n  background: rgba(100, 116, 139, 0.2);\n  color: #94a3b8;\n  border: 1px solid rgba(100, 116, 139, 0.3);\n}\n.presence-true {\n  background: rgba(56, 189, 248, 0.2);\n  color: #38bdf8;\n  border: 1px solid rgba(56, 189, 248, 0.4);\n}\n.presence-false {\n  background: rgba(100, 116, 139, 0.2);\n  color: #94a3b8;\n  border: 1px solid rgba(100, 116, 139, 0.3);\n}\n.footer-row {\n  display: flex;\n  justify-content: space-between;\n  border-top: 1px solid #334155;\n  padding-top: 10px;\n}\n.info-item {\n  color: #64748b;\n  font-size: 11px;\n}\n.info-item span {\n  color: #cbd5e1;\n  font-weight: 600;\n}"
+            "cardHtml": "<div class=\"gate-status-card\">\n  <div class=\"header-row\">\n    <div class=\"device-info\">\n      <span class=\"device-name\">PI4_FRONT_GATE</span>\n      <span class=\"device-model\">Raspberry Pi 4 Model B</span>\n    </div>\n    <div class=\"badge status-badge\">● ${status:ONLINE}</div>\n  </div>\n  \n  <div class=\"telemetry-body\">\n    <div class=\"mode-container\">\n      <div class=\"mode-label\">CHẾ ĐỘ ĐIỂM DANH HIỆN TẠI</div>\n      <div class=\"mode-value\">${current_mode:CHECK_IN}</div>\n    </div>\n    \n    <div class=\"telemetry-badges\">\n      <div class=\"badge-item\">\n        <span class=\"badge-label\">AI State:</span>\n        <span class=\"badge-val badge-${ai_state:AWAKE}\">${ai_state:AWAKE}</span>\n      </div>\n      <div class=\"badge-item\">\n        <span class=\"badge-label\">Chốt điểm danh:</span>\n        <span class=\"badge-val latch-${attendance_latch:READY}\">${attendance_latch:READY}</span>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"section-divider\"></div>\n\n  <!-- Hardware Health Metrics -->\n  <div class=\"hw-section\">\n    <div class=\"section-title\">🖥️ SỨC KHỎE HỆ THỐNG PI 4</div>\n    <div class=\"hw-grid\">\n      <div class=\"hw-box\">\n        <span class=\"hw-name\">Nhiệt độ CPU</span>\n        <span class=\"hw-val val-temp\">${cpu_temp:48.5}°C</span>\n      </div>\n      <div class=\"hw-box\">\n        <span class=\"hw-name\">Sử dụng RAM</span>\n        <span class=\"hw-val\">${ram_usage:38}%</span>\n      </div>\n      <div class=\"hw-box\">\n        <span class=\"hw-name\">Dung lượng Disk</span>\n        <span class=\"hw-val\">${disk_usage:35}%</span>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"section-divider\"></div>\n\n  <!-- Wireless & Peripherals Status -->\n  <div class=\"periph-section\">\n    <div class=\"section-title\">📶 KẾT NỐI & NGOẠI VI KIOSK</div>\n    <div class=\"periph-grid\">\n      <div class=\"periph-box\">\n        <span class=\"periph-name\">Wi-Fi Kiosk:</span>\n        <span class=\"periph-val\">📶 ${wifi_ssid:SmartFace-HQ-5G} (${wifi_signal:88}%)</span>\n      </div>\n      <div class=\"periph-box\">\n        <span class=\"periph-name\">Loa Bluetooth:</span>\n        <span class=\"periph-val\">🎧 ${bluetooth_device:JBL Go 3}</span>\n      </div>\n      <div class=\"periph-box\">\n        <span class=\"periph-name\">Âm lượng Loa:</span>\n        <span class=\"periph-val\">🔊 ${volume:75}%</span>\n      </div>\n      <div class=\"periph-box\">\n        <span class=\"periph-name\">Màn hình LCD:</span>\n        <span class=\"periph-val badge-toggle\">FPS: ${show_fps:true}</span>\n      </div>\n      <div class=\"periph-box\">\n        <span class=\"periph-name\">Camera Stream:</span>\n        <span class=\"periph-val badge-toggle\">Stream: ${stream_enabled:true}</span>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"footer-row\">\n    <div class=\"info-item\">Camera: <span>640x480 (15 FPS)</span></div>\n    <div class=\"info-item\">Tốc độ: <span>${fps:0} FPS</span></div>\n    <div class=\"info-item\">Model: <span>ArcFace + MiniFAS</span></div>\n  </div>\n</div>",
+            "cardCss": ".gate-status-card {\n  width: 100%;\n  height: 100%;\n  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);\n  border: 1px solid #334155;\n  border-radius: 12px;\n  padding: 14px 18px;\n  display: flex;\n  flex-direction: column;\n  justify-content: space-between;\n  box-sizing: border-box;\n  font-family: \"Inter\", -apple-system, sans-serif;\n  color: #e2e8f0;\n}\n.header-row {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\n.device-info {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n.device-name {\n  color: #f8fafc;\n  font-size: 13px;\n  font-weight: 700;\n  letter-spacing: 0.05em;\n  text-transform: uppercase;\n}\n.device-model {\n  color: #64748b;\n  font-size: 10px;\n  font-weight: 500;\n}\n.status-badge {\n  background: rgba(16, 185, 129, 0.15);\n  color: #10b981;\n  border: 1px solid rgba(16, 185, 129, 0.4);\n  padding: 3px 10px;\n  border-radius: 20px;\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.05em;\n}\n.telemetry-body {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  margin: 4px 0;\n}\n.mode-label {\n  color: #64748b;\n  font-size: 10px;\n  font-weight: 600;\n  letter-spacing: 0.06em;\n  text-transform: uppercase;\n}\n.mode-value {\n  color: #38bdf8;\n  font-size: 24px;\n  font-weight: 800;\n  letter-spacing: -0.02em;\n  text-shadow: 0 0 16px rgba(56, 189, 248, 0.3);\n}\n.telemetry-badges {\n  display: flex;\n  flex-direction: column;\n  gap: 4px;\n  align-items: flex-end;\n}\n.badge-item {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  font-size: 11px;\n}\n.badge-label {\n  color: #94a3b8;\n  font-weight: 600;\n}\n.badge-val {\n  padding: 2px 7px;\n  border-radius: 6px;\n  font-weight: 700;\n  font-size: 10px;\n}\n.badge-AWAKE {\n  background: rgba(16, 185, 129, 0.2);\n  color: #10b981;\n  border: 1px solid rgba(16, 185, 129, 0.4);\n}\n.badge-SLEEP {\n  background: rgba(100, 116, 139, 0.2);\n  color: #94a3b8;\n  border: 1px solid rgba(100, 116, 139, 0.3);\n}\n.latch-READY {\n  background: rgba(56, 189, 248, 0.2);\n  color: #38bdf8;\n  border: 1px solid rgba(56, 189, 248, 0.4);\n}\n.latch-LOCKED {\n  background: rgba(245, 158, 11, 0.2);\n  color: #f59e0b;\n  border: 1px solid rgba(245, 158, 11, 0.4);\n}\n.section-divider {\n  height: 1px;\n  background: #334155;\n  margin: 4px 0;\n}\n.section-title {\n  color: #94a3b8;\n  font-size: 10px;\n  font-weight: 700;\n  letter-spacing: 0.05em;\n  margin-bottom: 4px;\n  text-transform: uppercase;\n}\n.hw-grid {\n  display: grid;\n  grid-template-columns: repeat(3, 1fr);\n  gap: 8px;\n}\n.hw-box {\n  background: rgba(15, 23, 42, 0.6);\n  border: 1px solid rgba(51, 65, 85, 0.8);\n  border-radius: 8px;\n  padding: 6px 8px;\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n.hw-name {\n  color: #64748b;\n  font-size: 9px;\n  font-weight: 600;\n  text-transform: uppercase;\n}\n.hw-val {\n  color: #f1f5f9;\n  font-size: 13px;\n  font-weight: 700;\n}\n.val-temp {\n  color: #10b981;\n}\n.periph-grid {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 6px;\n}\n.periph-box {\n  background: rgba(15, 23, 42, 0.5);\n  border: 1px solid rgba(51, 65, 85, 0.6);\n  border-radius: 6px;\n  padding: 3px 8px;\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  font-size: 10px;\n}\n.periph-name {\n  color: #94a3b8;\n  font-weight: 600;\n}\n.periph-val {\n  color: #38bdf8;\n  font-weight: 700;\n}\n.badge-toggle {\n  color: #a7f3d0;\n}\n.footer-row {\n  display: flex;\n  justify-content: space-between;\n  border-top: 1px solid #334155;\n  padding-top: 6px;\n  margin-top: 2px;\n}\n.info-item {\n  color: #64748b;\n  font-size: 10px;\n}\n.info-item span {\n  color: #cbd5e1;\n  font-weight: 600;\n}"
           },
           "title": "Trạng Thái Cổng & Thiết Bị Pi 4",
           "dropShadow": false,

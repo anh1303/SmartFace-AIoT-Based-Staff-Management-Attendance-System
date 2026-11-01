@@ -80,6 +80,7 @@ def main():
             html = cfg["settings"]["cardHtml"]
             for old, new in {"${current_mode:CHECK_IN}": "${current_mode}",
                              "${ai_state:SLEEP}": "${ai_state}",
+                             "${ai_state:AWAKE}": "${ai_state}",
                              "${attendance_latch:READY}": "${attendance_latch}",
                              "${distance:--}": "${distance:1}"}.items():
                 html = html.replace(old, new)

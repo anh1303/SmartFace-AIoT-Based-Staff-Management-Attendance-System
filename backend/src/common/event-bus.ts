@@ -52,6 +52,7 @@ export interface DomainEvents {
     mode: string
     confirmed: boolean
   }
+  'device:settings-updated': any
   'device:status-changed': {
     deviceId: string
     status: string

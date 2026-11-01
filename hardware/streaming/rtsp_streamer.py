@@ -33,6 +33,10 @@ class RTSPStreamer:
 
     def start_ffmpeg(self):
         self._close_process()
+        # Giới hạn framerate và cấu hình Keyframe ngắn (GOP=10 ~ 1.0-1.5s)
+        # để WebRTC (WHEP) bắt hình tức thì khi client kết nối, không phải chờ IDR keyframe
+        stream_fps = min(15, max(5, int(self.fps)))
+        gop_size = max(5, stream_fps)
         command = [
             "ffmpeg",
             "-y",
@@ -40,12 +44,15 @@ class RTSPStreamer:
             "-vcodec", "rawvideo",
             "-pix_fmt", "bgr24",
             "-s", f"{self.width}x{self.height}",
-            "-r", str(self.fps),
+            "-r", str(stream_fps),
             "-i", "-",
             "-c:v", "libx264",
             "-pix_fmt", "yuv420p",
             "-preset", "ultrafast",
             "-tune", "zerolatency",
+            "-g", str(gop_size),
+            "-keyint_min", str(max(2, gop_size // 2)),
+            "-sc_threshold", "0",
             "-b:v", "800k",
             "-f", "rtsp",
             "-rtsp_transport", "tcp",
@@ -146,6 +153,21 @@ class RTSPStreamer:
                         pass
             if stderr_msg:
                 print(f"[STREAM ERROR] Chi tiết FFmpeg: {stderr_msg}")
+
+    def set_enabled(self, enabled: bool):
+        """Kích hoạt hoặc tạm dừng luồng RTSP từ xa."""
+        if self.enabled == enabled:
+            return
+        self.enabled = enabled
+        if not enabled:
+            print("[STREAM] Tạm dừng luồng RTSP (stream_enabled=False).")
+            self._close_process()
+        else:
+            print("[STREAM] Kích hoạt lại luồng RTSP (stream_enabled=True).")
+            if self._worker is None or not self._worker.is_alive():
+                self._stop.clear()
+                self._worker = threading.Thread(target=self._run, daemon=True)
+                self._worker.start()
 
     def stop(self):
         self._stop.set()

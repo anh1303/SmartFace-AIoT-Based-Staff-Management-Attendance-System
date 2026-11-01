@@ -16,6 +16,7 @@ import uuid
 import os
 import sys
 import time
+import subprocess
 from pathlib import Path
 import cv2
 import numpy as np
@@ -69,7 +70,7 @@ def get_env_bool(key: str, default: bool) -> bool:
 
 # Cấu hình thiết bị & server
 DEVICE_ID = get_env_str("DEVICE_ID", "PI4_FRONT_GATE")
-INITIAL_MODE = get_env_str("INITIAL_MODE", "CHECK_IN")
+INITIAL_MODE = get_env_str("INITIAL_MODE", "OFF")
 
 TB_HOST = get_env_str("TB_HOST", "127.0.0.1")
 TB_PORT = get_env_int("TB_PORT", 1883)
@@ -110,13 +111,20 @@ TFT_BGR = get_env_bool("TFT_BGR", False)
 TFT_INVERT = get_env_bool("TFT_INVERT", False)
 TFT_DISPLAY_FPS = get_env_float("TFT_DISPLAY_FPS", 10.0)
 
-# Cấu hình Cảm biến siêu âm Wake-on-Presence (Tiết kiệm CPU & Chống Spam)
+# Cấu hình 2 Cảm biến siêu âm chọn chế độ CHECK_IN / CHECK_OUT & Wake-on-Presence
 ULTRASONIC_ENABLED = get_env_bool("ULTRASONIC_ENABLED", True)
-ULTRASONIC_TRIG_PIN = get_env_int("ULTRASONIC_TRIG_PIN", 23)
-ULTRASONIC_ECHO_PIN = get_env_int("ULTRASONIC_ECHO_PIN", 27)
-ULTRASONIC_TRIGGER_DISTANCE = get_env_float("ULTRASONIC_TRIGGER_DISTANCE", 50.0)
+# Chân GPIO cố định phần cứng (BCM numbering, cố định trong mã nguồn):
+# Cảm biến #1: CHECK_IN (Vào ca)  -> TRIG = Pin 16 (GPIO 23), ECHO = Pin 13 (GPIO 27)
+ULTRASONIC_CHECKIN_TRIG_PIN = 23
+ULTRASONIC_CHECKIN_ECHO_PIN = 27
+# Cảm biến #2: CHECK_OUT (Ra ca) -> TRIG = Pin 11 (GPIO 17), ECHO = Pin 15 (GPIO 22)
+ULTRASONIC_CHECKOUT_TRIG_PIN = 17
+ULTRASONIC_CHECKOUT_ECHO_PIN = 22
+# Ngưỡng khoảng cách đưa tay vào kích hoạt chế độ (mặc định <= 20.0 cm)
+ULTRASONIC_TRIGGER_DISTANCE = get_env_float("ULTRASONIC_TRIGGER_DISTANCE", 20.0)
 ULTRASONIC_MAX_DISTANCE = get_env_float("ULTRASONIC_MAX_DISTANCE", 100.0)
-ULTRASONIC_SLEEP_DELAY = get_env_float("ULTRASONIC_SLEEP_DELAY", 5.0)
+ULTRASONIC_DEBOUNCE_SECONDS = get_env_float("ULTRASONIC_DEBOUNCE_SECONDS", 0.5)
+ULTRASONIC_SLEEP_DELAY = get_env_float("ULTRASONIC_SLEEP_DELAY", 0.5)
 FACE_LOST_RESET_SECONDS = get_env_float("FACE_LOST_RESET_SECONDS", 1.5)
 
 # Tự động phát hiện môi trường Headless (SSH trên Pi) để tránh lỗi Qt xcb abort()
@@ -140,7 +148,13 @@ from alignment.aligner import get_input_face
 from iot import ThingsBoardClient
 from streaming import RTSPStreamer
 from display import TFTDisplay
-from peripherals import UltrasonicSensor
+from peripherals import (
+    UltrasonicSensor,
+    AudioManager,
+    get_hardware_telemetry,
+    scan_bluetooth_devices,
+    get_bluetooth_info,
+)
 
 # Trạng thái toàn cục
 current_mode = INITIAL_MODE
@@ -221,7 +235,8 @@ def main(args=None):
     print(f"  Max Faces/Frame  : {MAX_FACES_PER_FRAME if MAX_FACES_PER_FRAME > 0 else 'KHÔNG GIỚI HẠN (All faces)'}")
     print(f"  Cooldown         : {COOLDOWN_SEC}s mỗi Track")
     print(f"  TFT ST7789V SPI  : {'BẬT (320x240)' if TFT_ENABLED else 'TẮT'}")
-    print(f"  Ultrasonic Sensor: {'BẬT (TRIG=' + str(ULTRASONIC_TRIG_PIN) + ', ECHO=' + str(ULTRASONIC_ECHO_PIN) + ', Ngưỡng=' + str(ULTRASONIC_TRIGGER_DISTANCE) + 'cm)' if ULTRASONIC_ENABLED else 'TẮT'}")
+    print(f"  Ultrasonic #1 IN : {'BẬT (TRIG=GPIO' + str(ULTRASONIC_CHECKIN_TRIG_PIN) + ' [Pin 16], ECHO=GPIO' + str(ULTRASONIC_CHECKIN_ECHO_PIN) + ' [Pin 13], <= ' + str(ULTRASONIC_TRIGGER_DISTANCE) + 'cm, delay=' + str(ULTRASONIC_DEBOUNCE_SECONDS) + 's)' if ULTRASONIC_ENABLED else 'TẮT'}")
+    print(f"  Ultrasonic #2 OUT: {'BẬT (TRIG=GPIO' + str(ULTRASONIC_CHECKOUT_TRIG_PIN) + ' [Pin 11], ECHO=GPIO' + str(ULTRASONIC_CHECKOUT_ECHO_PIN) + ' [Pin 15], <= ' + str(ULTRASONIC_TRIGGER_DISTANCE) + 'cm, delay=' + str(ULTRASONIC_DEBOUNCE_SECONDS) + 's)' if ULTRASONIC_ENABLED else 'TẮT'}")
     print("=======================================================\n")
 
     result_queue = queue.SimpleQueue()
@@ -244,6 +259,16 @@ def main(args=None):
             status_banner = f"{emp_name} - {mode}: {'ĐÃ LƯU, CẦN KIỂM TRA' if review else 'THÀNH CÔNG'} ({sim:.2f})"
             status_banner_time = time.time()
             print(f"[EDGE] 🎉 ĐIỂM DANH THÀNH CÔNG: {emp_name} ({mode}) - Similarity: {sim:.2f}")
+            try:
+                bt_info = get_bluetooth_info()
+                audio_manager.speak_attendance(
+                    emp_name=emp_name,
+                    mode=mode,
+                    target_mac=bt_info.get("address", ""),
+                    target_name=bt_info.get("deviceName", ""),
+                )
+            except Exception as e:
+                print(f"[AUDIO WARN] Lỗi phát âm thanh điểm danh: {e}")
         elif is_matched and not is_success:
             emp = res.get("employee", {})
             emp_name = emp.get("full_name") or emp.get("employee_code") or "Nhân viên"
@@ -256,7 +281,135 @@ def main(args=None):
             status_banner_time = time.time()
             print(f"[EDGE] ⚠️ KHÔNG KHỚP: {res.get('message', 'Không tìm thấy')} (Sim: {sim:.2f})")
 
-    # 1. Khởi động kết nối MQTT ThingsBoard với cơ chế Two-way RPC
+    # Quản lý cài đặt ngoại vi & âm thanh
+    current_show_fps = vision.SHOW_FPS
+    current_stream_enabled = STREAM_ENABLED
+    current_max_faces = MAX_FACES_PER_FRAME
+    current_volume = 75
+    current_is_muted = False
+    audio_manager = AudioManager(initial_volume=current_volume, initial_muted=current_is_muted)
+
+    def _persist_env_max_faces(val: int):
+        env_path = BASE_DIR / ".env"
+        if not env_path.exists():
+            return
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            updated_lines = []
+            found = False
+            for line in lines:
+                if line.strip().startswith("MAX_FACES_PER_FRAME="):
+                    updated_lines.append(f"MAX_FACES_PER_FRAME={val}\n")
+                    found = True
+                else:
+                    updated_lines.append(line)
+            if not found:
+                updated_lines.append(f"\nMAX_FACES_PER_FRAME={val}\n")
+            with open(env_path, "w", encoding="utf-8") as f:
+                f.writelines(updated_lines)
+        except Exception as exc:
+            print(f"[SETTINGS] Không thể ghi MAX_FACES_PER_FRAME vào .env: {exc}")
+
+    def on_settings_change(new_settings: dict):
+        nonlocal current_show_fps, current_stream_enabled, current_max_faces, current_volume, current_is_muted
+        if "show_fps" in new_settings:
+            current_show_fps = bool(new_settings["show_fps"])
+            print(f"[SETTINGS] Đã đổi FPS LCD: {current_show_fps}")
+        if "stream_enabled" in new_settings:
+            current_stream_enabled = bool(new_settings["stream_enabled"])
+            streamer.set_enabled(current_stream_enabled)
+            tb_client.send_telemetry({"stream_enabled": current_stream_enabled})
+            print(f"[SETTINGS] Đã đổi trạng thái Camera (phần cứng + stream): {'BẬT' if current_stream_enabled else 'TẮT'}")
+        if "max_faces" in new_settings:
+            current_max_faces = max(1, min(10, int(new_settings["max_faces"])))
+            vision.MAX_FACES_PER_FRAME = current_max_faces
+            _persist_env_max_faces(current_max_faces)
+            print(f"[SETTINGS] Đã đổi số khuôn mặt nhận diện tối đa (MAX_FACES_PER_FRAME): {current_max_faces}")
+        if "volume" in new_settings:
+            current_volume = int(new_settings["volume"])
+            audio_manager.set_volume(current_volume)
+            print(f"[SETTINGS] Đã đổi âm lượng: {current_volume}%")
+        if "is_muted" in new_settings:
+            current_is_muted = bool(new_settings["is_muted"])
+            audio_manager.set_mute(current_is_muted)
+
+    def on_action_request(action: str, params: dict):
+        if action == "playTestSound":
+            bt_info = get_bluetooth_info()
+            target_mac = bt_info.get("address", "")
+            target_name = bt_info.get("deviceName", "")
+            success = audio_manager.play_test_sound(target_mac=target_mac, target_name=target_name)
+            return {"success": success, "message": "Played test sound"}
+        if action == "scanBluetooth":
+            devices = scan_bluetooth_devices()
+            print(f"[BLUETOOTH] Quét thực tế phát hiện {len(devices)} thiết bị")
+            return devices
+        if action == "scanWifi":
+            return []
+        if action == "reconnectBluetooth":
+            bt_info = get_bluetooth_info()
+            addr = bt_info.get("address", "")
+            if not addr:
+                try:
+                    res_p = subprocess.run(["bluetoothctl", "devices", "Paired"], capture_output=True, text=True, timeout=3)
+                    for l in res_p.stdout.splitlines():
+                        if l.strip().startswith("Device"):
+                            parts = l.split()
+                            if len(parts) >= 2:
+                                addr = parts[1]
+                                break
+                except Exception:
+                    pass
+            if addr:
+                try:
+                    subprocess.run(["bluetoothctl", "connect", addr], capture_output=True, text=True, timeout=6)
+                except Exception:
+                    pass
+            return get_bluetooth_info()
+        if action == "connectBluetooth":
+            target_name = params.get("name", "") if isinstance(params, dict) else ""
+            target_addr = params.get("address", "") if isinstance(params, dict) else ""
+            print(f"[BLUETOOTH] Đang kết nối tới: {target_name} ({target_addr})")
+            connected = False
+            if target_addr:
+                try:
+                    subprocess.run(["bluetoothctl", "pair", target_addr], capture_output=True, text=True, timeout=6)
+                    subprocess.run(["bluetoothctl", "trust", target_addr], capture_output=True, text=True, timeout=3)
+                    res = subprocess.run(["bluetoothctl", "connect", target_addr], capture_output=True, text=True, timeout=6)
+                    info_res = subprocess.run(["bluetoothctl", "info", target_addr], capture_output=True, text=True, timeout=2)
+                    connected = "Connected: yes" in (info_res.stdout or "") or (res.returncode == 0 and "Connection successful" in (res.stdout or ""))
+                except Exception as e:
+                    print(f"[BLUETOOTH] Lỗi kết nối {target_addr}: {e}")
+            if connected:
+                tb_client.send_telemetry({"bluetooth_device": target_name, "bluetooth_connected": True})
+            return {
+                "success": True,
+                "connected": connected,
+                "deviceName": target_name,
+                "address": target_addr,
+                "status": "connected" if connected else "disconnected",
+            }
+        if action == "disconnectBluetooth":
+            target_addr = params.get("address", "") if isinstance(params, dict) else ""
+            print(f"[BLUETOOTH] Đang ngắt kết nối loa Bluetooth ({target_addr or 'mặc định'})")
+            try:
+                if target_addr:
+                    subprocess.run(["bluetoothctl", "disconnect", target_addr], capture_output=True, text=True, timeout=5)
+                else:
+                    subprocess.run(["bluetoothctl", "disconnect"], capture_output=True, text=True, timeout=5)
+            except Exception as e:
+                print(f"[BLUETOOTH] Lỗi khi ngắt kết nối: {e}")
+            tb_client.send_telemetry({"bluetooth_device": "", "bluetooth_connected": False})
+            return {
+                "success": True,
+                "connected": False,
+                "deviceName": "",
+                "status": "disconnected",
+            }
+        return {"success": True, "message": f"Handled action {action}"}
+
+    # 1. Khởi động kết nối MQTT ThingsBoard với cơ chế Two-way RPC & Settings Sync
     tb_client = ThingsBoardClient(
         host=TB_HOST,
         port=TB_PORT,
@@ -265,6 +418,12 @@ def main(args=None):
         initial_mode=current_mode,
         on_mode_change=on_mode_change,
         on_attendance_result=None,
+        initial_volume=current_volume,
+        initial_show_fps=current_show_fps,
+        initial_stream_enabled=current_stream_enabled,
+        initial_max_faces=current_max_faces,
+        on_settings_change=on_settings_change,
+        on_action_request=on_action_request,
     )
 
     # 2. Khởi tạo Pipeline AI: Detector + Tracker + AntiSpoof + Embedder
@@ -305,19 +464,33 @@ def main(args=None):
     else:
         raise ValueError("RECOGNITION_BACKEND must be local or server")
 
-    # 3. Mở Camera
-    cap = cv2.VideoCapture(CAM_INDEX)
-    if not cap.isOpened():
-        print(f"[ERROR] Không thể mở Camera tại index {CAM_INDEX}!")
-        tb_client.stop()
-        sys.exit(1)
+    # 3. Mở Camera (chỉ mở khi camera đang được bật; có thể tắt/bật lại từ xa)
+    def open_camera():
+        camera = cv2.VideoCapture(CAM_INDEX)
+        if not camera.isOpened():
+            camera.release()
+            return None
+        if vision.CAMERA_BUFFER_SIZE > 0:
+            camera.set(cv2.CAP_PROP_BUFFERSIZE, vision.CAMERA_BUFFER_SIZE)
+        if vision.CAMERA_FORCE_RESOLUTION:
+            camera.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
+            camera.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
+        camera.set(cv2.CAP_PROP_FPS, FPS)
+        return camera
 
-    if vision.CAMERA_BUFFER_SIZE > 0:
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, vision.CAMERA_BUFFER_SIZE)
-    if vision.CAMERA_FORCE_RESOLUTION:
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, WIDTH)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
-    cap.set(cv2.CAP_PROP_FPS, FPS)
+    cap = None
+    if current_stream_enabled:
+        cap = open_camera()
+        if cap is None:
+            print(f"[ERROR] Không thể mở Camera tại index {CAM_INDEX}!")
+            tb_client.stop()
+            sys.exit(1)
+    else:
+        print("[CAMERA] Camera đang TẮT (camera_enabled=False); không mở phần cứng camera.")
+
+    camera_off_frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
+    cv2.putText(camera_off_frame, "CAMERA OFF", (max(10, WIDTH // 2 - 120), HEIGHT // 2),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (180, 180, 180), 2, cv2.LINE_AA)
 
     # 4. Khởi tạo Live Streamer (RTSP -> MediaMTX)
     streamer = RTSPStreamer(RTSP_URL, WIDTH, HEIGHT, FPS, enabled=STREAM_ENABLED)
@@ -336,15 +509,27 @@ def main(args=None):
         max_fps=TFT_DISPLAY_FPS,
     )
 
-    # 6. Khởi tạo Cảm biến siêu âm Wake-on-Presence
-    ultrasonic = UltrasonicSensor(
+    # 6. Khởi tạo 2 Cảm biến siêu âm (Sensor 1: CHECK_IN, Sensor 2: CHECK_OUT)
+    ultrasonic_checkin = UltrasonicSensor(
         enabled=ULTRASONIC_ENABLED,
-        trig_pin=ULTRASONIC_TRIG_PIN,
-        echo_pin=ULTRASONIC_ECHO_PIN,
+        trig_pin=ULTRASONIC_CHECKIN_TRIG_PIN,
+        echo_pin=ULTRASONIC_CHECKIN_ECHO_PIN,
         max_distance=ULTRASONIC_MAX_DISTANCE,
         trigger_distance=ULTRASONIC_TRIGGER_DISTANCE,
+        debounce_duration=ULTRASONIC_DEBOUNCE_SECONDS,
+        name="ULTRASONIC_CHECKIN",
     )
-    ultrasonic.start()
+    ultrasonic_checkout = UltrasonicSensor(
+        enabled=ULTRASONIC_ENABLED,
+        trig_pin=ULTRASONIC_CHECKOUT_TRIG_PIN,
+        echo_pin=ULTRASONIC_CHECKOUT_ECHO_PIN,
+        max_distance=ULTRASONIC_MAX_DISTANCE,
+        trigger_distance=ULTRASONIC_TRIGGER_DISTANCE,
+        debounce_duration=ULTRASONIC_DEBOUNCE_SECONDS,
+        name="ULTRASONIC_CHECKOUT",
+    )
+    ultrasonic_checkin.start()
+    ultrasonic_checkout.start()
 
     last_hb_time = time.time()
     last_detection_time = None
@@ -354,9 +539,9 @@ def main(args=None):
     status_banner = ""
     status_banner_time = 0.0
 
-    # Trạng thái máy hữu hạn Wake-on-Presence & Chống Spam Latch
-    is_awake = not ULTRASONIC_ENABLED
-    last_present_time = time.time() if not ULTRASONIC_ENABLED else 0.0
+    # Trạng thái máy hữu hạn Wake-on-Presence & Chọn Chế Độ Cảm Biến Đôi
+    is_awake = current_mode in ("CHECK_IN", "CHECK_OUT")
+    last_sensor_mode = "OFF"
     attendance_latch = False
     last_mode_generation = mode_generation
     presence_generation = 0
@@ -365,9 +550,41 @@ def main(args=None):
     last_face_seen_time = 0.0
     last_active_track_id = None
     last_telemetry_time = 0.0
+    last_hw_telemetry_time = 0.0
     frame_id = 0
     last_submission_embedding = None
     previous_recognition_tracks = {}
+
+    def _evaluate_ultrasonic_mode():
+        nonlocal last_sensor_mode
+        d_in = ultrasonic_checkin.get_distance() if ULTRASONIC_ENABLED else None
+        d_out = ultrasonic_checkout.get_distance() if ULTRASONIC_ENABLED else None
+        in_trig = ultrasonic_checkin.is_person_present() if ULTRASONIC_ENABLED else False
+        out_trig = ultrasonic_checkout.is_person_present() if ULTRASONIC_ENABLED else False
+
+        if ULTRASONIC_ENABLED:
+            if in_trig and out_trig:
+                s_mode = "CHECK_IN" if (d_in or 999.0) <= (d_out or 999.0) else "CHECK_OUT"
+            elif in_trig:
+                s_mode = "CHECK_IN"
+            elif out_trig:
+                s_mode = "CHECK_OUT"
+            else:
+                s_mode = "OFF"
+
+            if s_mode in ("CHECK_IN", "CHECK_OUT"):
+                if current_mode != s_mode:
+                    d_active = d_in if s_mode == "CHECK_IN" else d_out
+                    print(f"[SENSOR] 🖐️ Cảm biến {s_mode} kích hoạt ổn định (d = {d_active}cm <= {ULTRASONIC_TRIGGER_DISTANCE}cm trong >= {ULTRASONIC_DEBOUNCE_SECONDS}s) -> BẬT {s_mode}!")
+                    tb_client.set_mode(s_mode)
+            elif last_sensor_mode in ("CHECK_IN", "CHECK_OUT") and s_mode == "OFF":
+                if current_mode != "OFF":
+                    print(f"[SENSOR] 💤 Đã rút tay khỏi cảm biến {last_sensor_mode} ổn định (trong >= {ULTRASONIC_DEBOUNCE_SECONDS}s) -> TẮT chế độ điểm danh (OFF)!")
+                    tb_client.set_mode("OFF")
+
+            last_sensor_mode = s_mode
+
+        return d_in, d_out, in_trig, out_trig
 
     recognition_worker = RecognitionWorker(embedder, queue_size=vision.RECOGNITION_QUEUE_SIZE)
     identity_cache = IdentityCache(vision.RECOGNITION_CACHE_TTL_SECONDS,
@@ -380,6 +597,56 @@ def main(args=None):
                 attendance_latch = False
                 last_submission = None
                 last_mode_generation = mode_generation
+
+            # ── 0. Bật/Tắt camera phần cứng từ xa (camera_enabled) ───────────
+            if not current_stream_enabled:
+                _evaluate_ultrasonic_mode()
+                if cap is not None:
+                    cap.release()
+                    cap = None
+                    print('[CAMERA] Đã TẮT camera phần cứng (ngừng lấy frame).')
+                    for track in previous_recognition_tracks.values():
+                        if getattr(track, 'recognition_eligible', False):
+                            track.verification_generation += 1
+                            track.invalidate_recognition()
+                            track.recognition_eligible = False
+                    previous_recognition_tracks = {}
+                    attendance_latch = False
+                    last_submission = None
+                    recognition_worker.retain(set())
+                    camera_failures = 0
+                    tb_client.send_telemetry({'ai_state': 'CAMERA_OFF', 'fps': 0.0, 'status': 'ONLINE',
+                                              'stream_enabled': False})
+                recognition_worker.poll()
+                now_idle = time.time()
+                if now_idle - last_hw_telemetry_time >= 10.0:
+                    tb_client.send_telemetry(get_hardware_telemetry({
+                        'volume': current_volume,
+                        'is_muted': current_is_muted,
+                        'show_fps': current_show_fps,
+                        'stream_enabled': False,
+                        'max_faces': current_max_faces,
+                    }))
+                    last_hw_telemetry_time = now_idle
+                if now_idle - last_telemetry_time >= 5.0:
+                    tb_client.send_telemetry({'ai_state': 'CAMERA_OFF', 'fps': 0.0, 'status': 'ONLINE'})
+                    last_telemetry_time = now_idle
+                if tft_display.wants_frame():
+                    tft_display.show_frame(camera_off_frame)
+                time.sleep(0.2)
+                continue
+            if cap is None:
+                cap = open_camera()
+                if cap is None:
+                    camera_failures += 1
+                    if camera_failures == 1:
+                        print('[CAMERA] Không thể mở lại camera; sẽ thử lại.')
+                        tb_client.send_telemetry({'ai_state': 'CAMERA_ERROR', 'status': 'DEGRADED'})
+                    time.sleep(1.0)
+                    continue
+                camera_failures = 0
+                print('[CAMERA] Đã BẬT lại camera phần cứng.')
+
             ret, frame = cap.read()
             if not ret:
                 camera_failures += 1
@@ -407,34 +674,27 @@ def main(args=None):
             now_wall = time.time()
             now_mono = time.monotonic()
             tft_due = tft_display.wants_frame()
-            render_output = SHOW_GUI or STREAM_ENABLED or tft_due
+            render_output = SHOW_GUI or current_stream_enabled or tft_due
 
             # Heartbeat định kỳ 10 giây một lần gửi lên ThingsBoard
             if now_wall - last_hb_time >= 10.0:
                 current_fps = fps_counter / (now_wall - last_hb_time)
                 fps_counter = 0
                 last_hb_time = now_wall
-                if vision.SHOW_FPS:
+                if current_show_fps:
                     print(f"[FPS] {current_fps:.1f} (average over 10s)")
 
-            # ── 4.1. Đánh giá Trạng thái Siêu âm (Wake-on-Presence) ───────────
-            dist = ultrasonic.get_distance() if ULTRASONIC_ENABLED else None
-            person_present = ultrasonic.is_person_present() if ULTRASONIC_ENABLED else True
+            # ── 4.1. Đánh giá 2 Cảm biến Siêu âm (CHECK_IN & CHECK_OUT <= 20cm) ──
+            dist_in, dist_out, in_present, out_present = _evaluate_ultrasonic_mode()
 
-            if person_present:
-                if not is_awake:
-                    print(f"[EDGE] ⚡ PHÁT HIỆN NGƯỜI (d = {dist}cm <= {ULTRASONIC_TRIGGER_DISTANCE}cm) -> AI THỨC DẬY!")
-                is_awake = True
-                last_present_time = now_wall
-            else:
-                if ULTRASONIC_ENABLED:
-                    if is_awake and (now_wall - last_present_time >= ULTRASONIC_SLEEP_DELAY):
-                        print(f"[EDGE] 💤 Không có người trong {ULTRASONIC_SLEEP_DELAY}s (Khoảng cách: {dist}cm) -> AI CHUYỂN SANG NGỦ!")
-                        is_awake = False
-                        attendance_latch = False
-                        last_submission = None
-                        presence_generation += 1
-                        last_active_track_id = None
+            person_present = in_present or out_present
+            was_awake = is_awake
+            is_awake = current_mode in ("CHECK_IN", "CHECK_OUT")
+            if was_awake and not is_awake:
+                attendance_latch = False
+                last_submission = None
+                presence_generation += 1
+                last_active_track_id = None
 
             # Cơ chế Hybrid Reset: Khi đang thức và đã khóa chốt, nếu mất mặt cũ trong FACE_LOST_RESET_SECONDS
             if is_awake and attendance_latch:
@@ -450,8 +710,12 @@ def main(args=None):
                 calc_fps = current_fps if current_fps > 0 else (fps_counter / max(0.1, (now_wall - last_hb_time)))
                 tb_client.send_telemetry({
                     "fps": round(calc_fps, 1),
-                    "distance": round(dist, 1) if dist is not None else -1.0,
+                    "distance": round(dist_in, 1) if dist_in is not None else -1.0,
+                    "distance_checkin": round(dist_in, 1) if dist_in is not None else -1.0,
+                    "distance_checkout": round(dist_out, 1) if dist_out is not None else -1.0,
                     "person_present": person_present,
+                    "checkin_active": current_mode == "CHECK_IN",
+                    "checkout_active": current_mode == "CHECK_OUT",
                     "ai_state": "AWAKE" if is_awake else "SLEEP",
                     "attendance_latch": "LOCKED" if attendance_latch else "READY",
                     "current_mode": current_mode,
@@ -459,6 +723,18 @@ def main(args=None):
                     "status": "ONLINE",
                 })
                 last_telemetry_time = now_wall
+
+            # ── 4.3. Đồng bộ Sức Khỏe Phần Cứng Pi 4 & Ngoại Vi (mỗi 10s non-blocking) ──
+            if now_wall - last_hw_telemetry_time >= 10.0:
+                hw_telemetry = get_hardware_telemetry({
+                    "volume": current_volume,
+                    "is_muted": current_is_muted,
+                    "show_fps": current_show_fps,
+                    "stream_enabled": current_stream_enabled,
+                    "max_faces": current_max_faces,
+                })
+                tb_client.send_telemetry(hw_telemetry)
+                last_hw_telemetry_time = now_wall
 
             # ── 5. Detection Cadence + Tracking Stage (Chỉ chạy khi THỨC) ─────
             tracked = []
@@ -696,6 +972,7 @@ def main(args=None):
                     attendance_latch = False
                     last_submission = None
                     response_track.last_scan_sent = 0.0
+                    response_track.last_recognition_time = None
                     continue
                 on_attendance_result(response)
                 if not (response.get('success') and response.get('matched')):
@@ -705,9 +982,9 @@ def main(args=None):
 
             # ── 7. Vẽ Thanh Thông Tin & Banners Lên Video ────────────────────
             # Compact status; telemetry still carries FPS/distance for diagnostics.
-            if not is_awake:
-                banner_bg = (50, 50, 50)  # Xám sẫm khi AI đang ngủ
-                banner_text = f"{current_mode} | SLEEP"
+            if not is_awake or current_mode == "OFF":
+                banner_bg = (50, 50, 50)  # Xám sẫm khi cả 2 cảm biến đều tắt (IDLE/SLEEP)
+                banner_text = "IDLE (OFF) | DUA TAY VAO CAM BIEN (<20CM)"
             else:
                 banner_bg = (180, 100, 0) if current_mode == "CHECK_IN" else (0, 100, 200)
                 latch_str = "WAIT NEXT PERSON" if attendance_latch else "READY"
@@ -725,6 +1002,18 @@ def main(args=None):
                     2,
                     cv2.LINE_AA
                 )
+                if current_show_fps:
+                    calc_fps = current_fps if current_fps > 0 else (fps_counter / max(0.1, (now_wall - last_hb_time)))
+                    cv2.putText(
+                        frame,
+                        f"{calc_fps:.1f} FPS",
+                        (WIDTH - 110, 24),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.55,
+                        (0, 255, 255),
+                        2,
+                        cv2.LINE_AA,
+                    )
 
             # Bottom Banner: Thông báo điểm danh vừa gửi thành công
             if render_output and status_banner and (now_wall - status_banner_time < 3.0):
@@ -780,16 +1069,22 @@ def main(args=None):
     finally:
         stopped = recognition_worker.close()
         print(f"[Recognition worker] stopped={stopped}")
-        cap.release()
+        if cap is not None:
+            cap.release()
         if SHOW_GUI:
             try:
                 cv2.destroyAllWindows()
             except Exception:
                 pass
-        ultrasonic.stop()
+        ultrasonic_checkin.stop()
+        ultrasonic_checkout.stop()
         if tft_display.cleanup() is False:
             print("[TFT] Worker còn chờ SPI; sẽ tự đóng tài nguyên khi driver trả về.")
         streamer.stop()
+        try:
+            tb_client.send_telemetry({"status": "OFFLINE", "ai_state": "OFFLINE", "fps": 0.0})
+        except Exception:
+            pass
         tb_client.stop()
         print("[EXIT] Pi Edge Client đã tắt an toàn.")
 

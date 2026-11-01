@@ -6,153 +6,6 @@
   "configuration": {
     "description": "Dashboard giám sát thời gian thực cổng điểm danh Raspberry Pi 4 AIoT",
     "widgets": {
-      "4642eea0-c3b8-48d7-9f5e-db0078808e4d": {
-        "id": "4642eea0-c3b8-48d7-9f5e-db0078808e4d",
-        "type": "latest",
-        "typeFullFqn": "system.analogue_gauges.radial_gauge_canvas_gauges",
-        "sizeX": 8,
-        "sizeY": 7,
-        "row": 0,
-        "col": 0,
-        "config": {
-          "datasources": [
-            {
-              "type": "entity",
-              "entityAliasId": "3e904359-de03-4499-89ef-7b3dbb0e1932",
-              "dataKeys": [
-                {
-                  "name": "fps",
-                  "type": "timeseries",
-                  "label": "FPS",
-                  "color": "#10b981",
-                  "settings": {},
-                  "_hash": 0.12345
-                }
-              ]
-            }
-          ],
-          "timewindow": {
-            "displayValue": "",
-            "selectedTab": 0,
-            "realtime": {
-              "realtimeType": 1,
-              "interval": 1000,
-              "timewindowMs": 60000,
-              "quickInterval": "CURRENT_DAY",
-              "hideInterval": false,
-              "hideLastInterval": false,
-              "hideQuickInterval": false
-            },
-            "history": {
-              "historyType": 0,
-              "interval": 1000,
-              "timewindowMs": 60000,
-              "fixedTimewindow": {
-                "startTimeMs": 1791950996909,
-                "endTimeMs": 1792037396909
-              },
-              "quickInterval": "CURRENT_DAY",
-              "hideInterval": false,
-              "hideLastInterval": false,
-              "hideFixedInterval": false,
-              "hideQuickInterval": false
-            },
-            "aggregation": {
-              "type": "AVG",
-              "limit": 25000
-            }
-          },
-          "showTitle": true,
-          "backgroundColor": "rgb(255, 255, 255)",
-          "color": "rgba(0, 0, 0, 0.87)",
-          "padding": "8px",
-          "settings": {
-            "maxValue": 30,
-            "startAngle": 45,
-            "ticksAngle": 270,
-            "showBorder": true,
-            "defaultColor": "#e65100",
-            "needleCircleSize": 10,
-            "highlights": [
-              {
-                "from": 0,
-                "to": 10,
-                "color": "rgba(239, 68, 68, 0.5)"
-              },
-              {
-                "from": 10,
-                "to": 20,
-                "color": "rgba(245, 158, 11, 0.5)"
-              },
-              {
-                "from": 20,
-                "to": 30,
-                "color": "rgba(16, 185, 129, 0.5)"
-              }
-            ],
-            "showUnitTitle": true,
-            "colorPlate": "#fff",
-            "colorMajorTicks": "#444",
-            "colorMinorTicks": "#666",
-            "minorTicks": 5,
-            "valueInt": 3,
-            "highlightsWidth": 15,
-            "valueBox": true,
-            "animation": true,
-            "animationDuration": 500,
-            "animationRule": "cycle",
-            "colorNeedleShadowUp": "rgba(2, 255, 255, 0)",
-            "numbersFont": {
-              "family": "Roboto",
-              "size": 18,
-              "style": "normal",
-              "weight": "500",
-              "color": "#616161"
-            },
-            "titleFont": {
-              "family": "Roboto",
-              "size": 24,
-              "style": "normal",
-              "weight": "500",
-              "color": "#888"
-            },
-            "unitsFont": {
-              "family": "Roboto",
-              "size": 22,
-              "style": "normal",
-              "weight": "500",
-              "color": "#616161"
-            },
-            "valueFont": {
-              "family": "Segment7Standard",
-              "size": 36,
-              "style": "normal",
-              "weight": "normal",
-              "shadowColor": "rgba(0, 0, 0, 0.49)",
-              "color": "#444"
-            },
-            "minValue": 0,
-            "colorNeedleShadowDown": "rgba(188,143,143,0.45)",
-            "colorValueBoxRect": "#888",
-            "colorValueBoxRectEnd": "#666",
-            "colorValueBoxBackground": "#babab2",
-            "colorValueBoxShadow": "rgba(0,0,0,1)"
-          },
-          "title": "Camera FPS (Tốc độ khung hình)",
-          "dropShadow": true,
-          "enableFullscreen": true,
-          "titleStyle": {
-            "fontSize": "16px",
-            "fontWeight": 400
-          },
-          "widgetStyle": {},
-          "widgetCss": "",
-          "pageSize": 1024,
-          "decimals": 0,
-          "noDataDisplayMessage": "",
-          "configMode": "basic"
-        }
-      },
       "3c59e4be-03a5-44c8-ab5f-62b49183941d": {
         "id": "3c59e4be-03a5-44c8-ab5f-62b49183941d",
         "type": "timeseries",
@@ -545,7 +398,7 @@
           "color": "rgba(0, 0, 0, 0.87)",
           "padding": "0px",
           "settings": {
-            "cardHtml": "<div class=\"gate-status-card\">\n  <div class=\"header-row\">\n    <div class=\"device-name\">PI4_FRONT_GATE</div>\n    <div class=\"badge status-badge\">● ${status}</div>\n  </div>\n  \n  <div class=\"telemetry-body\">\n    <div class=\"mode-container\">\n      <div class=\"mode-label\">CHẾ ĐỘ ĐIỂM DANH HIỆN TẠI</div>\n      <div class=\"mode-value\">${current_mode}</div>\n    </div>\n    \n    <div class=\"telemetry-badges\">\n      <div class=\"badge-item\">\n        <span class=\"badge-label\">AI State:</span>\n        <span class=\"badge-val badge-${ai_state}\">${ai_state}</span>\n      </div>\n      <div class=\"badge-item\">\n        <span class=\"badge-label\">Hiện diện:</span>\n        <span class=\"badge-val presence-${person_present:false}\">${person_present:false}</span>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"footer-row\">\n    <div class=\"info-item\">Camera: <span>640x480 (cấu hình 15 FPS)</span></div>\n    <div class=\"info-item\">Tốc độ: <span>${fps:0} FPS</span></div>\n    <div class=\"info-item\">Model: <span>ArcFace + MiniFAS</span></div>\n  </div>\n</div>",
+            "cardHtml": "<div class=\"gate-status-card\">\n  <div class=\"header-row\">\n    <div class=\"device-name\">${entityLabel}</div>\n    <div class=\"badge status-badge\">● ${status}</div>\n  </div>\n  \n  <div class=\"telemetry-body\">\n    <div class=\"mode-container\">\n      <div class=\"mode-label\">CHẾ ĐỘ ĐIỂM DANH HIỆN TẠI</div>\n      <div class=\"mode-value\">${current_mode}</div>\n    </div>\n    \n    <div class=\"telemetry-badges\">\n      <div class=\"badge-item\">\n        <span class=\"badge-label\">AI State:</span>\n        <span class=\"badge-val badge-${ai_state}\">${ai_state}</span>\n      </div>\n      <div class=\"badge-item\">\n        <span class=\"badge-label\">Hiện diện:</span>\n        <span class=\"badge-val presence-${person_present:false}\">${person_present:false}</span>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"footer-row\">\n    <div class=\"info-item\">Camera: <span>640x480 (cấu hình 15 FPS)</span></div>\n    <div class=\"info-item\">Tốc độ: <span>${fps:0} FPS</span></div>\n    <div class=\"info-item\">Model: <span>ArcFace + MiniFAS</span></div>\n  </div>\n</div>",
             "cardCss": ".gate-status-card {\n  width: 100%;\n  height: 100%;\n  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);\n  border: 1px solid #334155;\n  border-radius: 12px;\n  padding: 16px 22px;\n  display: flex;\n  flex-direction: column;\n  justify-content: space-between;\n  box-sizing: border-box;\n  font-family: 'Inter', -apple-system, sans-serif;\n}\n.header-row {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n}\n.device-name {\n  color: #94a3b8;\n  font-size: 13px;\n  font-weight: 700;\n  letter-spacing: 0.05em;\n  text-transform: uppercase;\n}\n.status-badge {\n  background: rgba(16, 185, 129, 0.15);\n  color: #10b981;\n  border: 1px solid rgba(16, 185, 129, 0.4);\n  padding: 3px 10px;\n  border-radius: 20px;\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.05em;\n}\n.telemetry-body {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  margin: 6px 0;\n}\n.mode-label {\n  color: #64748b;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.06em;\n  text-transform: uppercase;\n}\n.mode-value {\n  color: #38bdf8;\n  font-size: 28px;\n  font-weight: 800;\n  letter-spacing: -0.02em;\n  text-shadow: 0 0 20px rgba(56, 189, 248, 0.3);\n}\n.telemetry-badges {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  align-items: flex-end;\n}\n.badge-item {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  font-size: 12px;\n}\n.badge-label {\n  color: #94a3b8;\n  font-weight: 600;\n}\n.badge-val {\n  padding: 2px 8px;\n  border-radius: 6px;\n  font-weight: 700;\n  font-size: 11px;\n}\n.badge-AWAKE {\n  background: rgba(16, 185, 129, 0.2);\n  color: #10b981;\n  border: 1px solid rgba(16, 185, 129, 0.4);\n}\n.badge-SLEEP {\n  background: rgba(100, 116, 139, 0.2);\n  color: #94a3b8;\n  border: 1px solid rgba(100, 116, 139, 0.3);\n}\n.presence-true {\n  background: rgba(56, 189, 248, 0.2);\n  color: #38bdf8;\n  border: 1px solid rgba(56, 189, 248, 0.4);\n}\n.presence-false {\n  background: rgba(100, 116, 139, 0.2);\n  color: #94a3b8;\n  border: 1px solid rgba(100, 116, 139, 0.3);\n}\n.footer-row {\n  display: flex;\n  justify-content: space-between;\n  border-top: 1px solid #334155;\n  padding-top: 10px;\n}\n.info-item {\n  color: #64748b;\n  font-size: 11px;\n}\n.info-item span {\n  color: #cbd5e1;\n  font-weight: 600;\n}"
           },
           "title": "Trạng Thái Cổng & Thiết Bị Pi 4",
@@ -563,35 +416,103 @@
       },
       "35fa7634-b016-40c0-b681-a833ad7ad31b": {
         "id": "35fa7634-b016-40c0-b681-a833ad7ad31b",
-        "type": "rpc",
-        "typeFullFqn": "system.control_widgets.switch_control",
-        "sizeX": 11,
-        "sizeY": 5,
-        "row": 7,
-        "col": 13,
+        "type": "latest",
+        "typeFullFqn": "system.cards.html_value_card",
+        "sizeX": 8,
+        "sizeY": 6,
+        "row": 0,
+        "col": 16,
         "config": {
-          "targetDeviceAliases": [
-            "3e904359-de03-4499-89ef-7b3dbb0e1932"
+          "datasources": [
+            {
+              "type": "entity",
+              "entityAliasId": "3e904359-de03-4499-89ef-7b3dbb0e1932",
+              "dataKeys": [
+                {
+                  "name": "current_mode",
+                  "type": "timeseries",
+                  "label": "current_mode",
+                  "color": "#38bdf8",
+                  "settings": {},
+                  "_hash": 0.4111
+                },
+                {
+                  "name": "checkin_active",
+                  "type": "timeseries",
+                  "label": "checkin_active",
+                  "color": "#10b981",
+                  "settings": {},
+                  "_hash": 0.4222
+                },
+                {
+                  "name": "checkout_active",
+                  "type": "timeseries",
+                  "label": "checkout_active",
+                  "color": "#f59e0b",
+                  "settings": {},
+                  "_hash": 0.4333
+                },
+                {
+                  "name": "distance_checkin",
+                  "type": "timeseries",
+                  "label": "distance_checkin",
+                  "color": "#10b981",
+                  "settings": {},
+                  "_hash": 0.4444
+                },
+                {
+                  "name": "distance_checkout",
+                  "type": "timeseries",
+                  "label": "distance_checkout",
+                  "color": "#f59e0b",
+                  "settings": {},
+                  "_hash": 0.4555
+                }
+              ]
+            }
           ],
+          "timewindow": {
+            "displayValue": "",
+            "selectedTab": 0,
+            "realtime": {
+              "realtimeType": 1,
+              "interval": 1000,
+              "timewindowMs": 60000,
+              "quickInterval": "CURRENT_DAY",
+              "hideInterval": false,
+              "hideLastInterval": false,
+              "hideQuickInterval": false
+            },
+            "history": {
+              "historyType": 0,
+              "interval": 1000,
+              "timewindowMs": 60000,
+              "fixedTimewindow": {
+                "startTimeMs": 1791950996911,
+                "endTimeMs": 1792037396911
+              },
+              "quickInterval": "CURRENT_DAY",
+              "hideInterval": false,
+              "hideLastInterval": false,
+              "hideFixedInterval": false,
+              "hideQuickInterval": false
+            },
+            "aggregation": {
+              "type": "AVG",
+              "limit": 25000
+            }
+          },
           "showTitle": true,
-          "backgroundColor": "#e6e7e8",
+          "backgroundColor": "#fff",
           "color": "rgba(0, 0, 0, 0.87)",
           "padding": "0px",
           "settings": {
-            "requestTimeout": 10000,
-            "initialValue": true,
-            "getValueMethod": "getValue",
-            "setValueMethod": "setValue",
-            "showOnOffLabels": true,
-            "title": "BẬT = CHECK_IN (Vào Ca) | TẮT = CHECK_OUT (Tan Ca)",
-            "retrieveValueMethod": "rpc",
-            "valueKey": "attendance_mode",
-            "parseValueFunction": "return data === true;",
-            "convertValueFunction": "return value;"
+            "cardHtml": "<div class=\"mode-control-card\">\n  <div class=\"mode-header\">\n    <span class=\"mode-subtitle\">CHỌN CHẾ ĐỘ ĐIỂM DANH (NHẤN LẠI NÚT ĐANG BẬT ĐỂ TẮT)</span>\n    <span class=\"mode-current-pill pill-${current_mode}\">● ${current_mode}</span>\n  </div>\n  <div class=\"mode-buttons-grid\">\n    <div id=\"btnCheckIn\" class=\"mode-btn btn-checkin active-${checkin_active:false} mode-${current_mode}\">\n      <div id=\"btnCheckIn\" class=\"btn-icon\">⇥</div>\n      <div id=\"btnCheckIn\" class=\"btn-title\">VÀO CA</div>\n      <div id=\"btnCheckIn\" class=\"btn-code\">CHECK_IN</div>\n      <div id=\"btnCheckIn\" class=\"btn-dist\">Cảm biến #1: ${distance_checkin:0} cm</div>\n    </div>\n    <div id=\"btnCheckOut\" class=\"mode-btn btn-checkout active-${checkout_active:false} mode-${current_mode}\">\n      <div id=\"btnCheckOut\" class=\"btn-icon\">⇤</div>\n      <div id=\"btnCheckOut\" class=\"btn-title\">RA CA</div>\n      <div id=\"btnCheckOut\" class=\"btn-code\">CHECK_OUT</div>\n      <div id=\"btnCheckOut\" class=\"btn-dist\">Cảm biến #2: ${distance_checkout:0} cm</div>\n    </div>\n  </div>\n</div>",
+            "cardCss": ".mode-control-card {\n  width: 100%;\n  height: 100%;\n  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);\n  border: 1px solid #334155;\n  border-radius: 12px;\n  padding: 14px 18px;\n  display: flex;\n  flex-direction: column;\n  justify-content: space-between;\n  box-sizing: border-box;\n  font-family: 'Inter', -apple-system, sans-serif;\n  user-select: none;\n}\n.mode-header {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  gap: 8px;\n  margin-bottom: 10px;\n}\n.mode-subtitle {\n  color: #94a3b8;\n  font-size: 10px;\n  font-weight: 700;\n  letter-spacing: 0.05em;\n  text-transform: uppercase;\n}\n.mode-current-pill {\n  padding: 3px 10px;\n  border-radius: 999px;\n  font-size: 11px;\n  font-weight: 800;\n  letter-spacing: 0.04em;\n  background: rgba(100, 116, 139, 0.2);\n  color: #94a3b8;\n  border: 1px solid rgba(100, 116, 139, 0.35);\n}\n.pill-CHECK_IN {\n  background: rgba(16, 185, 129, 0.2);\n  color: #10b981;\n  border-color: rgba(16, 185, 129, 0.5);\n}\n.pill-CHECK_OUT {\n  background: rgba(245, 158, 11, 0.2);\n  color: #f59e0b;\n  border-color: rgba(245, 158, 11, 0.5);\n}\n.mode-buttons-grid {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 12px;\n  flex: 1;\n}\n.mode-btn {\n  border-radius: 12px;\n  border: 2px solid #334155;\n  background: rgba(15, 23, 42, 0.65);\n  color: #94a3b8;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  padding: 10px 8px;\n  cursor: pointer;\n  transition: all 0.18s ease;\n  text-align: center;\n}\n.mode-btn:hover {\n  border-color: #64748b;\n  color: #e2e8f0;\n  transform: translateY(-1px);\n}\n.mode-btn:active {\n  transform: translateY(0px) scale(0.98);\n}\n.btn-icon {\n  font-size: 22px;\n  font-weight: 800;\n  line-height: 1;\n  margin-bottom: 4px;\n}\n.btn-title {\n  font-size: 16px;\n  font-weight: 800;\n  letter-spacing: 0.03em;\n}\n.btn-code {\n  font-size: 11px;\n  font-weight: 700;\n  opacity: 0.8;\n  margin-top: 2px;\n}\n.btn-dist {\n  font-size: 10px;\n  font-weight: 600;\n  margin-top: 6px;\n  padding: 2px 8px;\n  border-radius: 6px;\n  background: rgba(255, 255, 255, 0.06);\n}\n.btn-checkin.active-true,\n.btn-checkin.mode-CHECK_IN {\n  background: linear-gradient(135deg, rgba(16, 185, 129, 0.32) 0%, rgba(5, 150, 105, 0.22) 100%);\n  border-color: #10b981;\n  color: #ecfdf5;\n  box-shadow: 0 0 20px rgba(16, 185, 129, 0.28);\n}\n.btn-checkin.active-true .btn-icon,\n.btn-checkin.mode-CHECK_IN .btn-icon {\n  color: #34d399;\n}\n.btn-checkout.active-true,\n.btn-checkout.mode-CHECK_OUT {\n  background: linear-gradient(135deg, rgba(245, 158, 11, 0.32) 0%, rgba(217, 119, 6, 0.22) 100%);\n  border-color: #f59e0b;\n  color: #fffbeb;\n  box-shadow: 0 0 20px rgba(245, 158, 11, 0.28);\n}\n.btn-checkout.active-true .btn-icon,\n.btn-checkout.mode-CHECK_OUT .btn-icon {\n  color: #fbbf24;\n}"
           },
-          "title": "Công Tắc Cổng (Vào Ca / Tan Ca)",
-          "dropShadow": true,
-          "enableFullscreen": false,
+          "title": "Công Tắc Cổng (Vào Ca / Ra Ca)",
+          "dropShadow": false,
+          "enableFullscreen": true,
           "widgetStyle": {},
           "titleStyle": {
             "fontSize": "16px",
@@ -599,17 +520,24 @@
           },
           "useDashboardTimewindow": true,
           "showLegend": false,
-          "actions": {},
-          "decimals": 2,
-          "targetDevice": {
-            "type": "entity",
-            "entityAliasId": "3e904359-de03-4499-89ef-7b3dbb0e1932"
-          },
-          "targetDeviceId": "efbab930-c7f6-11f1-b4f0-4bfc18af14d5",
-          "datasources": [],
-          "targetDeviceAliasIds": [
-            "3e904359-de03-4499-89ef-7b3dbb0e1932"
-          ]
+          "actions": {
+            "elementClick": [
+              {
+                "name": "btnCheckIn",
+                "icon": "login",
+                "type": "custom",
+                "customFunction": "var $injector = widgetContext.$scope.$injector;\nvar deviceService = $injector.get(widgetContext.servicesMap.get('deviceService'));\nvar devId = (entityId && entityId.id) ? entityId.id : 'efbab930-c7f6-11f1-b4f0-4bfc18af14d5';\nvar curMode = 'OFF';\nif (widgetContext.data) {\n  for (var i = 0; i < widgetContext.data.length; i++) {\n    var dk = widgetContext.data[i];\n    if (dk.dataKey && dk.dataKey.name === 'current_mode' && dk.data && dk.data.length > 0) {\n      curMode = String(dk.data[dk.data.length - 1][1]).toUpperCase();\n    }\n  }\n}\nvar nextMode = (curMode === 'CHECK_IN') ? 'OFF' : 'CHECK_IN';\ndeviceService.sendTwoWayRpcCommand(devId, { method: 'setMode', params: nextMode, timeout: 5000 }).subscribe();",
+                "id": "a1b2c3d4-1111-4000-8000-000000000001"
+              },
+              {
+                "name": "btnCheckOut",
+                "icon": "logout",
+                "type": "custom",
+                "customFunction": "var $injector = widgetContext.$scope.$injector;\nvar deviceService = $injector.get(widgetContext.servicesMap.get('deviceService'));\nvar devId = (entityId && entityId.id) ? entityId.id : 'efbab930-c7f6-11f1-b4f0-4bfc18af14d5';\nvar curMode = 'OFF';\nif (widgetContext.data) {\n  for (var i = 0; i < widgetContext.data.length; i++) {\n    var dk = widgetContext.data[i];\n    if (dk.dataKey && dk.dataKey.name === 'current_mode' && dk.data && dk.data.length > 0) {\n      curMode = String(dk.data[dk.data.length - 1][1]).toUpperCase();\n    }\n  }\n}\nvar nextMode = (curMode === 'CHECK_OUT') ? 'OFF' : 'CHECK_OUT';\ndeviceService.sendTwoWayRpcCommand(devId, { method: 'setMode', params: nextMode, timeout: 5000 }).subscribe();",
+                "id": "a1b2c3d4-2222-4000-8000-000000000002"
+              }
+            ]
+          }
         }
       },
       "b1a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d": {
@@ -627,10 +555,10 @@
               "entityAliasId": "3e904359-de03-4499-89ef-7b3dbb0e1932",
               "dataKeys": [
                 {
-                  "name": "distance",
+                  "name": "distance_checkin",
                   "type": "timeseries",
-                  "label": "Khoảng cách (cm)",
-                  "color": "#38bdf8",
+                  "label": "Khoảng cách Vào Ca (cm)",
+                  "color": "#10b981",
                   "settings": {
                     "yAxisId": "default",
                     "showInLegend": true,
@@ -681,9 +609,9 @@
             },
             "thresholds": [
               {
-                "thresholdValue": 50,
+                "thresholdValue": 20,
                 "thresholdColor": "#10b981",
-                "thresholdName": "Ngưỡng Kích Hoạt (≤ 50cm)"
+                "thresholdName": "Ngưỡng Kích Hoạt Vào Ca (≤ 20cm)"
               }
             ],
             "dataZoom": true,
@@ -862,7 +790,306 @@
             },
             "padding": "12px"
           },
-          "title": "Cảm Biến Khoảng Cách (HC-SR04)",
+          "title": "Cảm Biến Siêu Âm #1 — Vào Ca (CHECK_IN)",
+          "dropShadow": true,
+          "enableFullscreen": true,
+          "titleStyle": null,
+          "mobileHeight": null,
+          "configMode": "basic",
+          "actions": {},
+          "showTitleIcon": false,
+          "titleIcon": "thermostat",
+          "iconColor": "#1F6BDD",
+          "useDashboardTimewindow": false,
+          "displayTimewindow": true,
+          "titleFont": {
+            "size": 16,
+            "sizeUnit": "px",
+            "family": "Roboto",
+            "weight": "500",
+            "style": "normal",
+            "lineHeight": "24px"
+          },
+          "titleColor": "rgba(0, 0, 0, 0.87)",
+          "titleTooltip": "",
+          "widgetStyle": {},
+          "widgetCss": "",
+          "pageSize": 1024,
+          "units": "cm",
+          "decimals": 1,
+          "noDataDisplayMessage": "",
+          "timewindowStyle": {
+            "showIcon": false,
+            "iconSize": "24px",
+            "icon": null,
+            "iconPosition": "left",
+            "font": {
+              "size": 12,
+              "sizeUnit": "px",
+              "family": "Roboto",
+              "weight": "400",
+              "style": "normal",
+              "lineHeight": "16px"
+            },
+            "color": "rgba(0, 0, 0, 0.38)",
+            "displayTypePrefix": true
+          },
+          "margin": "0px",
+          "borderRadius": "0px",
+          "iconSize": "0px"
+        }
+      },
+      "b2a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5e": {
+        "id": "b2a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5e",
+        "type": "timeseries",
+        "typeFullFqn": "system.time_series_chart",
+        "sizeX": 8,
+        "sizeY": 7,
+        "row": 6,
+        "col": 0,
+        "config": {
+          "datasources": [
+            {
+              "type": "entity",
+              "entityAliasId": "3e904359-de03-4499-89ef-7b3dbb0e1932",
+              "dataKeys": [
+                {
+                  "name": "distance_checkout",
+                  "type": "timeseries",
+                  "label": "Khoảng cách Ra Ca (cm)",
+                  "color": "#f59e0b",
+                  "settings": {
+                    "yAxisId": "default",
+                    "showInLegend": true,
+                    "type": "line",
+                    "lineSettings": {
+                      "showLine": true,
+                      "smooth": true,
+                      "lineWidth": 3
+                    }
+                  },
+                  "_hash": 0.65432
+                }
+              ]
+            }
+          ],
+          "timewindow": {
+            "hideAggregation": false,
+            "hideAggInterval": false,
+            "hideTimezone": false,
+            "selectedTab": 0,
+            "realtime": {
+              "realtimeType": 0,
+              "timewindowMs": 60000,
+              "quickInterval": "CURRENT_DAY",
+              "interval": 1000
+            },
+            "aggregation": {
+              "type": "AVG",
+              "limit": 25000
+            },
+            "timezone": null
+          },
+          "showTitle": true,
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgba(0, 0, 0, 0.87)",
+          "padding": "0px",
+          "settings": {
+            "showLegend": true,
+            "legendConfig": {
+              "direction": "column",
+              "position": "top",
+              "sortDataKeys": false,
+              "showMin": false,
+              "showMax": false,
+              "showAvg": true,
+              "showTotal": false,
+              "showLatest": false
+            },
+            "thresholds": [
+              {
+                "thresholdValue": 20,
+                "thresholdColor": "#f59e0b",
+                "thresholdName": "Ngưỡng Kích Hoạt Ra Ca (≤ 20cm)"
+              }
+            ],
+            "dataZoom": true,
+            "stack": false,
+            "yAxis": {
+              "show": true,
+              "label": "",
+              "labelFont": {
+                "family": "Roboto",
+                "size": 12,
+                "sizeUnit": "px",
+                "style": "normal",
+                "weight": "600",
+                "lineHeight": "1"
+              },
+              "labelColor": "rgba(0, 0, 0, 0.54)",
+              "position": "left",
+              "showTickLabels": true,
+              "tickLabelFont": {
+                "family": "Roboto",
+                "size": 12,
+                "sizeUnit": "px",
+                "style": "normal",
+                "weight": "400",
+                "lineHeight": "1"
+              },
+              "tickLabelColor": "rgba(0, 0, 0, 0.54)",
+              "showTicks": true,
+              "ticksColor": "rgba(0, 0, 0, 0.54)",
+              "showLine": true,
+              "lineColor": "rgba(0, 0, 0, 0.54)",
+              "showSplitLines": true,
+              "splitLinesColor": "rgba(0, 0, 0, 0.12)"
+            },
+            "xAxis": {
+              "show": true,
+              "label": "",
+              "labelFont": {
+                "family": "Roboto",
+                "size": 12,
+                "sizeUnit": "px",
+                "style": "normal",
+                "weight": "600",
+                "lineHeight": "1"
+              },
+              "labelColor": "rgba(0, 0, 0, 0.54)",
+              "position": "bottom",
+              "showTickLabels": true,
+              "tickLabelFont": {
+                "family": "Roboto",
+                "size": 10,
+                "sizeUnit": "px",
+                "style": "normal",
+                "weight": "400",
+                "lineHeight": "1"
+              },
+              "tickLabelColor": "rgba(0, 0, 0, 0.54)",
+              "ticksFormat": {},
+              "showTicks": true,
+              "ticksColor": "rgba(0, 0, 0, 0.54)",
+              "showLine": true,
+              "lineColor": "rgba(0, 0, 0, 0.54)",
+              "showSplitLines": true,
+              "splitLinesColor": "rgba(0, 0, 0, 0.12)"
+            },
+            "legendLabelFont": {
+              "family": "Roboto",
+              "size": 12,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "400",
+              "lineHeight": "16px"
+            },
+            "legendLabelColor": "rgba(0, 0, 0, 0.76)",
+            "showTooltip": true,
+            "tooltipTrigger": "axis",
+            "tooltipValueFont": {
+              "family": "Roboto",
+              "size": 12,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "500",
+              "lineHeight": "16px"
+            },
+            "tooltipValueColor": "rgba(0, 0, 0, 0.76)",
+            "tooltipShowDate": true,
+            "tooltipDateFormat": {
+              "format": null,
+              "lastUpdateAgo": false,
+              "custom": false,
+              "auto": true,
+              "autoDateFormatSettings": {}
+            },
+            "tooltipDateFont": {
+              "family": "Roboto",
+              "size": 11,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "400",
+              "lineHeight": "16px"
+            },
+            "tooltipDateColor": "rgba(0, 0, 0, 0.76)",
+            "tooltipDateInterval": true,
+            "tooltipBackgroundColor": "rgba(255, 255, 255, 0.76)",
+            "tooltipBackgroundBlur": 4,
+            "background": {
+              "type": "color",
+              "color": "#fff",
+              "overlay": {
+                "enabled": false,
+                "color": "rgba(255,255,255,0.72)",
+                "blur": 3
+              }
+            },
+            "yAxes": {
+              "default": {
+                "units": "cm",
+                "decimals": 1,
+                "show": true,
+                "label": "",
+                "labelFont": {
+                  "family": "Roboto",
+                  "size": 12,
+                  "sizeUnit": "px",
+                  "style": "normal",
+                  "weight": "600",
+                  "lineHeight": "1"
+                },
+                "labelColor": "rgba(0, 0, 0, 0.54)",
+                "position": "left",
+                "showTickLabels": true,
+                "tickLabelFont": {
+                  "family": "Roboto",
+                  "size": 12,
+                  "sizeUnit": "px",
+                  "style": "normal",
+                  "weight": "400",
+                  "lineHeight": "1"
+                },
+                "tickLabelColor": "rgba(0, 0, 0, 0.54)",
+                "ticksFormatter": null,
+                "showTicks": true,
+                "ticksColor": "rgba(0, 0, 0, 0.54)",
+                "showLine": true,
+                "lineColor": "rgba(0, 0, 0, 0.54)",
+                "showSplitLines": true,
+                "splitLinesColor": "rgba(0, 0, 0, 0.12)",
+                "id": "default",
+                "order": 0,
+                "min": 0,
+                "max": 100
+              }
+            },
+            "noAggregationBarWidthSettings": {
+              "strategy": "group",
+              "groupWidth": {
+                "relative": true,
+                "relativeWidth": 2,
+                "absoluteWidth": 1000
+              },
+              "barWidth": {
+                "relative": true,
+                "relativeWidth": 2,
+                "absoluteWidth": 1000
+              }
+            },
+            "animation": {
+              "animation": true,
+              "animationThreshold": 2000,
+              "animationDuration": 500,
+              "animationEasing": "cubicOut",
+              "animationDelay": 0,
+              "animationDurationUpdate": 300,
+              "animationEasingUpdate": "cubicOut",
+              "animationDelayUpdate": 0
+            },
+            "padding": "12px"
+          },
+          "title": "Cảm Biến Siêu Âm #2 — Ra Ca (CHECK_OUT)",
           "dropShadow": true,
           "enableFullscreen": true,
           "titleStyle": null,
@@ -933,13 +1160,6 @@
         "layouts": {
           "main": {
             "widgets": {
-              "4642eea0-c3b8-48d7-9f5e-db0078808e4d": {
-                "sizeX": 8,
-                "sizeY": 7,
-                "row": 6,
-                "col": 0,
-                "mobileOrder": 1
-              },
               "3c59e4be-03a5-44c8-ab5f-62b49183941d": {
                 "sizeX": 16,
                 "sizeY": 7,
@@ -959,14 +1179,21 @@
                 "sizeY": 6,
                 "row": 0,
                 "col": 16,
-                "mobileOrder": 5
+                "mobileOrder": 4
               },
               "b1a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d": {
                 "sizeX": 8,
                 "sizeY": 6,
                 "row": 0,
                 "col": 0,
-                "mobileOrder": 4
+                "mobileOrder": 1
+              },
+              "b2a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5e": {
+                "sizeX": 8,
+                "sizeY": 7,
+                "row": 6,
+                "col": 0,
+                "mobileOrder": 2
               }
             },
             "gridSettings": {
@@ -1025,6 +1252,6 @@
     "id": "74c05500-c7f6-11f1-9b9a-73474c36c48d"
   },
   "assignedCustomers": null,
-  "version": 18,
+  "version": 20,
   "externalId": null
 }

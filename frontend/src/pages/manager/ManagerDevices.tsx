@@ -6,16 +6,29 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Modal } from '../../components/common/Modal';
 import { PageHeaderBanner } from '../../components/common/PageHeaderBanner';
-import { deviceApi, validDeviceIp, type Device, type DeviceInput, type DeviceStatus, type AttendanceMode } from '../../features/devices/deviceApi';
-import { confirmsRequestedMode } from '../../features/devices/deviceModeState';
-import { useDeviceRealtime } from '../../features/devices/useDeviceRealtime';
+import {
+  deviceApi,
+  validDeviceIp,
+  confirmsRequestedMode,
+  useDeviceRealtime,
+  type Device,
+  type DeviceInput,
+  type DeviceStatus,
+  type AttendanceMode,
+} from '@/features/devices';
 import { DeviceKioskSettingsPanel } from '../../features/devices/components/DeviceKioskSettingsPanel';
+
 const labels = { ONLINE: 'Trực tuyến', OFFLINE: 'Ngoại tuyến', MAINTENANCE: 'Bảo trì' };
 const time = (value: string | null) => value ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Chưa ghi nhận';
 function Status({ status }: {
     status: DeviceStatus;
 }) { const Icon = status === 'ONLINE' ? Wifi : status === 'MAINTENANCE' ? Wrench : WifiOff; return <span className={`sf-badge ${status === 'ONLINE' ? 'success' : status === 'MAINTENANCE' ? 'warning' : ''}`}><Icon size={14}/>{labels[status]}</span>; }
 export const ManagerDevices: React.FC = () => {
+    const { role } = useAuth();
+    return role === 'admin' ? <DeviceManagement/> : <p className="sf-feedback warning">Chỉ Admin được quản lý và điều khiển thiết bị dùng chung.</p>;
+};
+
+const DeviceManagement: React.FC = () => {
     const { id } = useParams();
     const [params, setParams] = useSearchParams();
     const navigate = useNavigate();

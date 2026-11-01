@@ -55,10 +55,13 @@ export interface AttendancePairItem {
   hasCheckedOut: boolean;
   isOffDay: boolean;
   isUnassigned: boolean;
-  initialLateEarlySec: number;
+  status: string;
+  isAbsent: boolean;
+  isShiftEnded?: boolean;
+  initialLateEarlySec: number | null;
   currentLateEarlySec: number;
   lateEarlyStr: string;
-  initialOTSec: number;
+  initialOTSec: number | null;
   currentOTSec: number;
   overtimeStr: string;
   date: string;
@@ -71,13 +74,17 @@ export interface AttendancePairItem {
   pendingOtHours: number;
   needsReview: boolean;
   reviewReason: string | null;
+  reasonLabels?: Record<string, string>;
   policyVersion: string | null;
   isLegacyNoPolicy: boolean;
   overtimeStatus: string;
   candidateHours: number;
   pairIntervals: string[];
   hasPairData?: boolean;
+  reviewStatus?: 'NONE' | 'PENDING' | 'APPROVED';
+  isApproved?: boolean;
 }
+
 
 export function useAttendancePairs(
   employees: Employee[],
@@ -138,22 +145,116 @@ export function useAttendancePairs(
         const uuidKey = `${sum.employee_uuid}_${sum.date}`;
         if (!scheduledShiftKeys.has(key) && !scheduledShiftKeys.has(uuidKey)) {
           scheduledShiftKeys.add(key);
+          const details = sum.calculation_details;
+          const hasScheduled = details && Number(details.scheduledShiftSeconds || 0) > 0 && details.scheduledStart && details.scheduledEnd && !details.off;
+          let shiftType = 'UNASSIGNED';
+          let startTime = '--:--';
+          let endTime = '--:--';
+          if (hasScheduled) {
+            startTime = formatVNTime(details.scheduledStart).slice(0, 5);
+            endTime = formatVNTime(details.scheduledEnd).slice(0, 5);
+            if (startTime === '08:00' && endTime === '12:00') shiftType = 'MORNING';
+            else if (startTime === '13:00' && endTime === '17:00') shiftType = 'AFTERNOON';
+            else if (startTime === '08:00' && endTime === '17:00') shiftType = 'OFFICE_HOURS';
+            else shiftType = 'CUSTOM';
+          }
           unassignedEntries.push({
             employee_id: sum.employee_id,
             date: sum.date,
-            shift_type: 'UNASSIGNED',
-            start_time: '--:--',
-            end_time: '--:--',
+            shift_type: shiftType,
+            start_time: startTime,
+            end_time: endTime,
           });
         }
       });
     }
 
+    const allClaimedEventIds = new Set<string>();
+    if (summaryMap) {
+      Object.values(summaryMap).forEach((sum: any) => {
+        if (!sum?.calculation_details) return;
+        const pairs = sum.calculation_details.pairs || [];
+        pairs.forEach((p: any) => {
+          if (p.inId) allClaimedEventIds.add(String(p.inId));
+          if (p.outId) allClaimedEventIds.add(String(p.outId));
+        });
+        const events = sum.calculation_details.events || [];
+        events.forEach((ev: any) => {
+          if (ev.id) allClaimedEventIds.add(String(ev.id));
+        });
+      });
+    }
+
+    const isPlausibleOvernightCheckout = (empId: string, empUuid: string | undefined, log: AttendanceRecord, dateStr: string) => {
+      const prevD = new Date(`${dateStr}T00:00:00Z`);
+      prevD.setUTCDate(prevD.getUTCDate() - 1);
+      const prevDateStr = prevD.toISOString().slice(0, 10);
+      const prevShift = workShifts.find(s => 
+        (s.employee_id === empId || (empUuid && s.employee_id === empUuid)) &&
+        s.date === prevDateStr &&
+        s.end_time < s.start_time
+      );
+      if (!prevShift) return false;
+
+      // Check if yesterday's shift already has a claimed or paired checkout
+      const prevSummary = summaryMap?.[`${empId}_${prevDateStr}`] || (empUuid ? summaryMap?.[`${empUuid}_${prevDateStr}`] : undefined);
+      if (prevSummary) {
+        const hasClaimedCheckout = (prevSummary.calculation_details?.pairs || []).some((p: any) => Boolean(p.outId)) || Boolean(prevSummary.last_check_out);
+        if (hasClaimedCheckout) {
+          // Yesterday's overnight shift already has a paired checkout.
+          // This checkout cannot be the overnight shift checkout.
+          return false;
+        }
+      }
+
+      const logTime = (log as any).time || (log.timestamp ? formatVNTime(log.timestamp) : '');
+      if (!logTime || logTime === '--:--:--') return false;
+      const [logH, logM] = logTime.split(':').map(Number);
+      const logMinutes = (isNaN(logH) ? 0 : logH) * 60 + (isNaN(logM) ? 0 : logM);
+
+      const [endH, endM] = prevShift.end_time.split(':').map(Number);
+      const shiftEndMinutes = (isNaN(endH) ? 6 : endH) * 60 + (isNaN(endM) ? 0 : endM);
+
+      const isMorningWindow = logMinutes <= 14 * 60;
+      const isWithinShiftEndWindow = logMinutes <= shiftEndMinutes + 6 * 60;
+
+      const hasYesterdayCheckIn = attendance.some(a =>
+        (a.employee_id === empId || (empUuid && a.employee_id === empUuid)) &&
+        a.type === 'CHECK_IN' &&
+        formatVNDateISO(a.timestamp) === prevDateStr
+      );
+
+      if (!isMorningWindow || !isWithinShiftEndWindow || !hasYesterdayCheckIn) {
+        return false;
+      }
+
+      // If there are multiple morning checkouts without a summary, only the earliest one
+      // is the plausible overnight checkout candidate; later checkouts must not be swallowed.
+      const earlierMorningCheckout = attendance.find(a => {
+        if ((a.employee_id !== empId && (!empUuid || a.employee_id !== empUuid))) return false;
+        if (a.type !== 'CHECK_OUT' && a.type !== 'TAN_CA') return false;
+        if (formatVNDateISO(a.timestamp) !== dateStr) return false;
+        const aId = String(a.id || a.attendance_id || '');
+        const logId = String(log.id || log.attendance_id || '');
+        if (aId && logId && aId === logId) return false;
+        return +new Date(a.timestamp) < +new Date(log.timestamp);
+      });
+
+      if (earlierMorningCheckout) {
+        return false;
+      }
+
+      return true;
+    };
+
     for (const log of attendance) {
+      const logId = String(log.id || log.attendance_id || '');
+      if (logId && allClaimedEventIds.has(logId)) continue;
       const emp = employees.find(e => e.employee_id === log.employee_id || e.id === log.employee_id);
       if (!emp) continue;
       const date = formatVNDateISO(log.timestamp);
       if (startDate && date < startDate || endDate && date > endDate) continue;
+      if (log.type === 'CHECK_OUT' && isPlausibleOvernightCheckout(emp.employee_id, emp.id, log, date)) continue;
       if (scheduledShiftKeys.has(`${emp.employee_id}_${date}`) || emp.id && scheduledShiftKeys.has(`${emp.id}_${date}`)) continue;
       scheduledShiftKeys.add(`${emp.employee_id}_${date}`);
       unassignedEntries.push({employee_id:emp.employee_id,date,shift_type:'UNASSIGNED',start_time:'--:--',end_time:'--:--'});
@@ -194,26 +295,49 @@ export function useAttendancePairs(
       }
 
       const shiftDate = empShift.date;
-      const isOffDay = empShift.shift_type === 'OFF';
-      const isUnassigned = empShift.shift_type === 'UNASSIGNED';
+      const summaryKey = `${emp.employee_id}_${shiftDate}`;
+      const fallbackKey = emp.id ? `${emp.id}_${shiftDate}` : '';
+      const summary = summaryMap?.[summaryKey] || (fallbackKey ? summaryMap?.[fallbackKey] : undefined);
+
+      const details = summary?.calculation_details;
+      const hasScheduledFromSummary = details && Number(details.scheduledShiftSeconds || 0) > 0 && details.scheduledStart && details.scheduledEnd && !details.off;
+
+      const effectiveShiftType = (empShift.shift_type === 'UNASSIGNED' && hasScheduledFromSummary)
+        ? (formatVNTime(details.scheduledStart).slice(0, 5) === '08:00' && formatVNTime(details.scheduledEnd).slice(0, 5) === '12:00'
+            ? 'MORNING'
+            : formatVNTime(details.scheduledStart).slice(0, 5) === '13:00' && formatVNTime(details.scheduledEnd).slice(0, 5) === '17:00'
+              ? 'AFTERNOON'
+              : formatVNTime(details.scheduledStart).slice(0, 5) === '08:00' && formatVNTime(details.scheduledEnd).slice(0, 5) === '17:00'
+                ? 'OFFICE_HOURS'
+                : 'CUSTOM')
+        : empShift.shift_type;
+
+      const effectiveStartTime = (empShift.shift_type === 'UNASSIGNED' && hasScheduledFromSummary)
+        ? formatVNTime(details.scheduledStart).slice(0, 5)
+        : empShift.start_time;
+
+      const effectiveEndTime = (empShift.shift_type === 'UNASSIGNED' && hasScheduledFromSummary)
+        ? formatVNTime(details.scheduledEnd).slice(0, 5)
+        : empShift.end_time;
+
+      const isOffDay = effectiveShiftType === 'OFF' || details?.off === true;
+      const isUnassigned = effectiveShiftType === 'UNASSIGNED';
 
       const shiftName = isOffDay
         ? 'Ngày OFF'
         : isUnassigned
           ? 'Chưa phân ca'
-          : empShift.end_time < empShift.start_time ? 'Ca qua đêm' : empShift.shift_type === 'MORNING'
+          : effectiveEndTime < effectiveStartTime ? 'Ca qua đêm' : effectiveShiftType === 'MORNING'
             ? 'Ca sáng'
-            : empShift.shift_type === 'AFTERNOON'
+            : effectiveShiftType === 'AFTERNOON'
               ? 'Ca chiều'
-              : 'Ca hành chính';
+              : effectiveShiftType === 'OFFICE_HOURS'
+                ? 'Ca hành chính'
+                : 'Ca làm việc';
 
       const shiftTimeRange = isOffDay || isUnassigned
         ? isOffDay ? 'Nghỉ tuần / Nghỉ lễ' : '--:-- – --:--'
-        : `${empShift.start_time} – ${empShift.end_time}`;
-
-      const summaryKey = `${emp.employee_id}_${shiftDate}`;
-      const fallbackKey = emp.id ? `${emp.id}_${shiftDate}` : '';
-      const summary = summaryMap?.[summaryKey] || (fallbackKey ? summaryMap?.[fallbackKey] : undefined);
+        : `${effectiveStartTime} – ${effectiveEndTime}`;
 
       // 3. Số giờ làm việc lấy trực tiếp từ summary backend (không tự tạo công 9h khi có sự kiện lẻ)
       const regularHours = isOffDay
@@ -237,7 +361,7 @@ export function useAttendancePairs(
             ? customLateEarlyMap[fallbackKey]
             : Math.round((Number(summary?.late_early) || 0) * 3600));
       const lateEarlyStr = formatSecondsToHHMMSS(currentLateEarlySec);
-      const initialLateEarlySec = currentLateEarlySec;
+      const initialLateEarlySec = summary?.late_early_seconds != null ? Number(summary.late_early_seconds) : null;
 
       // Giờ tăng ca (OT) đã duyệt và đề xuất
       const approvedOtHours = summary?.approved_overtime_hours ?? (Number(summary?.overtime) || 0);
@@ -251,11 +375,20 @@ export function useAttendancePairs(
             ? customOvertimeMap[fallbackKey]
             : Math.round(approvedOtHours * 3600));
       const overtimeStr = formatSecondsToHHMMSS(currentOTSec);
-      const initialOTSec = currentOTSec;
+      const initialOTSec = summary?.overtime_seconds != null ? Number(summary.overtime_seconds) : null;
 
       // Cờ rà soát và phiên bản chính sách
       const needsReview = summary?.requires_review ?? summary?.needs_review ?? false;
-      const reviewReason = summary?.review_reason ?? null;
+      const rawReviewReason: string | null = summary?.review_reason ?? null;
+      const reviewReason = isUnassigned
+        ? (rawReviewReason
+            ? rawReviewReason
+                .split(',')
+                .filter(Boolean)
+                .map((r: string) => (r === 'UNDER_MINIMUM_SHIFT' || r === 'UNDER_HALF_SHIFT' ? 'NO_SHIFT' : r))
+                .join(',') || (needsReview ? 'NO_SHIFT' : null)
+            : (needsReview ? 'NO_SHIFT' : null))
+        : rawReviewReason;
       const policyVersion = summary?.policy_version ?? null;
       const isLegacyNoPolicy = summary ? summary.is_legacy_no_policy : false;
 
@@ -299,7 +432,7 @@ export function useAttendancePairs(
           rawStatus: log.raw_status || log.status,
           pairingReason: summary?.calculation_details?.ignored?.find((i: any) => i.id === (log.id || log.attendance_id))?.reason,
           type: log.type === 'CHECK_OUT' || log.type === 'TAN_CA' ? 'CHECK_OUT' : 'CHECK_IN',
-          label: log.type === 'CHECK_OUT' || log.type === 'TAN_CA' ? 'Hết ca' : 'Vào Ca',
+          label: log.type === 'CHECK_OUT' || log.type === 'TAN_CA' ? 'Check out' : 'Check in',
           time: formatVNTime(log.timestamp),
           isFace,
           methodLabel,
@@ -329,13 +462,36 @@ export function useAttendancePairs(
         durationSeconds: (+new Date(p.end) - +new Date(p.start)) / 1000,
         durationStr: formatSecondsToHHMMSS((+new Date(p.end) - +new Date(p.start)) / 1000), isValid: true,
         inId: p.inId, outId: p.outId, counted: p.counted, regularSeconds: p.regular_seconds, overtimeSeconds: p.overtime_seconds,
-        creditedRegularSeconds: p.credited_regular_seconds, creditReason: p.credit_reason,
+        creditedRegularSeconds: p.credited_regular_seconds,
+        creditReason: isUnassigned && (p.credit_reason === 'UNDER_MINIMUM_SHIFT' || p.credit_reason === 'UNDER_HALF_SHIFT') ? 'NO_SHIFT' : p.credit_reason,
       }));
-      // The server owns overview boundaries. A loose OUT must never become an IN.
-      const checkInLog = summary?.first_check_in ? empLogs.find(l => l.type === 'CHECK_IN' && +new Date(l.timestamp) === +new Date(summary.first_check_in)) : undefined;
-      const checkOutLog = summary?.last_check_out ? empLogs.find(l => (l.type === 'CHECK_OUT' || l.type === 'TAN_CA') && +new Date(l.timestamp) === +new Date(summary.last_check_out)) : undefined;
-      const checkInTime = summary?.first_check_in ? formatVNTime(summary.first_check_in) : '--:--:--';
-      const checkOutTime = summary?.last_check_out ? formatVNTime(summary.last_check_out) : '--:--:--';
+      // Show a pending valid check-in or unpaired check-out without treating it as a completed work interval.
+      const ignoredIds = new Set((summary?.calculation_details?.ignored || []).map((event: any) => event.id));
+      const pendingCheckIn = !summary?.first_check_in && policyPairs.length === 0
+        ? (empLogs.find(l => l.type === 'CHECK_IN' && l.status === 'VALID' && !ignoredIds.has(l.id || l.attendance_id))
+           || empLogs.find(l => l.type === 'CHECK_IN'))
+        : undefined;
+      const pendingCheckOut = !summary?.last_check_out && policyPairs.length === 0
+        ? empLogs.filter(l => l.type === 'CHECK_OUT' || l.type === 'TAN_CA').at(-1)
+        : undefined;
+
+      const checkInLog = summary?.first_check_in
+        ? empLogs.find(l => l.type === 'CHECK_IN' && +new Date(l.timestamp) === +new Date(summary.first_check_in))
+        : pendingCheckIn;
+      const checkOutLog = summary?.last_check_out
+        ? empLogs.find(l => (l.type === 'CHECK_OUT' || l.type === 'TAN_CA') && +new Date(l.timestamp) === +new Date(summary.last_check_out))
+        : pendingCheckOut;
+
+      const checkInTime = summary?.first_check_in
+        ? formatVNTime(summary.first_check_in)
+        : pendingCheckIn
+          ? formatVNTime(pendingCheckIn.timestamp)
+          : '--:--:--';
+      const checkOutTime = summary?.last_check_out
+        ? formatVNTime(summary.last_check_out)
+        : pendingCheckOut
+          ? formatVNTime(pendingCheckOut.timestamp)
+          : '--:--:--';
       const hasCheckedIn = checkInTime !== '--:--:--';
       const hasCheckedOut = checkOutTime !== '--:--:--';
 
@@ -345,7 +501,7 @@ export function useAttendancePairs(
       const checkInRow: AttendanceEventItem = {
         id: `${emp.employee_id}-${shiftDate}-in`,
         type: 'CHECK_IN',
-        label: 'Vào Ca',
+        label: 'Check in',
         time: checkInTime,
         isFace: isCheckInFace,
         methodLabel: checkInLog ? (isCheckInFace ? 'Face-id' : 'Vân tay') : 'UNRECORDED',
@@ -376,7 +532,7 @@ export function useAttendancePairs(
       const checkOutRow: AttendanceEventItem = {
         id: `${emp.employee_id}-${shiftDate}-out`,
         type: 'CHECK_OUT',
-        label: 'Hết ca',
+        label: 'Check out',
         time: checkOutTime,
         isFace: isCheckOutFace,
         methodLabel: checkOutLog ? (isCheckOutFace ? 'Face-id' : 'Vân tay') : 'UNRECORDED',
@@ -402,15 +558,19 @@ export function useAttendancePairs(
             : '--',
       };
 
+      const status = summary?.status || (isOffDay ? 'OFF' : isUnassigned ? 'NO_SHIFT' : 'SCHEDULED');
+      const isAbsent = summary?.is_absent ?? (status === 'ABSENT' || Boolean((summary?.calculation_details as any)?.absenceCandidate));
+      const isShiftEnded = summary?.is_shift_ended ?? (status === 'ABSENT');
+
       return {
         employee: emp,
         shift: {
           name: shiftName,
           timeRange: shiftTimeRange,
-          start_time: empShift.start_time,
-          end_time: empShift.end_time,
+          start_time: effectiveStartTime,
+          end_time: effectiveEndTime,
           date: shiftDate,
-          shift_type: empShift.shift_type,
+          shift_type: effectiveShiftType,
         },
         events: [checkInRow, checkOutRow],
         validIntervals,
@@ -419,6 +579,9 @@ export function useAttendancePairs(
         hasCheckedOut,
         isOffDay,
         isUnassigned,
+        status,
+        isAbsent,
+        isShiftEnded,
         initialLateEarlySec,
         currentLateEarlySec,
         lateEarlyStr,
@@ -435,6 +598,7 @@ export function useAttendancePairs(
         pendingOtHours,
         needsReview,
         reviewReason,
+        reasonLabels: { ...summary?.reason_labels, NO_SHIFT: 'Chưa phân ca' },
         policyVersion,
         isLegacyNoPolicy,
         overtimeStatus: (summary as any)?.overtime_status || 'NONE',
@@ -443,8 +607,11 @@ export function useAttendancePairs(
         pairIntervals: Array.isArray((summary as any)?.calculation_details?.pairs)
           ? (summary as any).calculation_details.pairs.map((p: any) => `${formatVNTime(p.start)} → ${formatVNTime(p.end)}`)
           : [],
+        reviewStatus: (summary as any)?.review_status || 'NONE',
+        isApproved: (summary as any)?.review_status === 'APPROVED',
       };
     });
+
 
     const validPairs = pairs.filter((item): item is AttendancePairItem => item !== null);
 

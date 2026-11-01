@@ -12,7 +12,7 @@ export const shiftRouter = Router();
 shiftRouter.use(authenticate);
 
 shiftRouter.get('/templates', authorize('ADMIN','MANAGER'), asyncHandler(async(req,res)=>{successResponse(res,await listShiftTemplates());}));
-shiftRouter.post('/templates', authorize('ADMIN','MANAGER'), asyncHandler(async(req,res)=>{const input=shiftTemplateSchema.parse(req.body);successResponse(res,await createShiftTemplate(input,req.user!.id),'Đã tạo ca tùy chỉnh',201);}));
+shiftRouter.post('/templates', authorize('ADMIN'), asyncHandler(async(req,res)=>{const input=shiftTemplateSchema.parse(req.body);successResponse(res,await createShiftTemplate(input,req.user!.id),'Đã tạo ca tùy chỉnh',201);}));
 
 shiftRouter.get('/',  asyncHandler(controller.list));
 shiftRouter.post('/', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.assignShift));

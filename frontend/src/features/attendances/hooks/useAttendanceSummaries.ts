@@ -11,11 +11,15 @@ export interface BackendAttendanceSummaryItem {
   total_working_hours: number;
   raw_work_seconds: number;
   late_early: number;
+  late_early_seconds?: number | null;
+  overtime_seconds?: number | null;
   overtime: number;
   approved_overtime_hours: number;
   proposed_overtime_hours: number;
   pending_overtime_hours: number;
   status: string;
+  is_absent?: boolean;
+  is_shift_ended?: boolean;
   first_check_in: string | null;
   last_check_out: string | null;
   needs_review: boolean;
@@ -24,6 +28,7 @@ export interface BackendAttendanceSummaryItem {
   overtime_candidate_hours?: number;
   calculation_details?: { pairs?: Array<{ inId: string; outId: string; start: string; end: string; counted?: boolean; regular_seconds?: number; overtime_seconds?: number; credited_regular_seconds?: number; credit_reason?: string }>; events?: Array<{ id: string; type: string; time: string; status: string; method?: string; device_info?: string; verification_score?: number | null }>; ignored?: Array<{ id: string; reason: string }>; [key: string]: unknown };
   review_reason: string | null;
+  reason_labels?: Record<string, string>;
   policy_version: string | null;
   is_legacy_no_policy: boolean;
   shift_name?: string;
@@ -57,17 +62,25 @@ export interface SummaryMap {
   summaries: BackendAttendanceSummaryItem[];
 }
 
+function getPreviousDay(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export function useAttendanceSummaries(startDate?: string, endDate?: string, employeeId?: string) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
   const effectiveEnd = endDate || startDate;
+  const effectiveStart = startDate ? getPreviousDay(startDate) : undefined;
 
   const query = useQuery({
     queryKey: ['attendanceSummaries', startDate || 'ALL', effectiveEnd || 'ALL', employeeId || 'ALL'],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
-      if (startDate) searchParams.append('startDate', startDate);
+      if (effectiveStart) searchParams.append('startDate', effectiveStart);
+      else if (startDate) searchParams.append('startDate', startDate);
       if (effectiveEnd) searchParams.append('endDate', effectiveEnd);
       if (employeeId) searchParams.append('employeeId', employeeId);
 
@@ -85,7 +98,6 @@ export function useAttendanceSummaries(startDate?: string, endDate?: string, emp
 
       if (res.success && Array.isArray(res.data)) {
         res.data.forEach((s: BackendAttendanceSummaryItem) => {
-          summariesList.push(s);
           const otSec = Math.round((Number(s.approved_overtime_hours ?? s.overtime) || 0) * 3600);
           const leSec = Math.round((Number(s.late_early) || 0) * 3600);
           const wh = Number(s.regular_hours ?? s.total_working_hours) || 0;
@@ -103,6 +115,11 @@ export function useAttendanceSummaries(startDate?: string, endDate?: string, emp
             stMap[k] = status;
             sumMap[k] = s;
           });
+
+          // Only include in public summaries list if it falls within requested range
+          if ((!startDate || s.date >= startDate) && (!effectiveEnd || s.date <= effectiveEnd)) {
+            summariesList.push(s);
+          }
         });
       }
 
@@ -139,9 +156,35 @@ export function useAttendanceSummaries(startDate?: string, endDate?: string, emp
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
       queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['payrolls'] });
+      queryClient.invalidateQueries({ queryKey: ['payroll'] });
     },
     onError: (err: Error) => {
       showToast(err.message || 'Không thể kết nối đến máy chủ để lưu thay đổi!', 'error');
+    },
+  });
+
+  const unlockEmployeeMutation = useMutation({
+    mutationFn: async (payload: { employeeId: string; date: string; reason?: string }) => {
+      const res = await apiFetch('/api/attendance/unlock-employee', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      if (!res.success) {
+        throw new Error(res.message || 'Lỗi mở khóa ngày công của nhân viên');
+      }
+      return res.data;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
+      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['payrolls'] });
+      queryClient.invalidateQueries({ queryKey: ['payroll'] });
+      showToast(data?.message || 'Đã mở khóa ngày công thành công', 'success');
+    },
+    onError: (err: Error) => {
+      showToast(err.message || 'Không thể mở khóa ngày công của nhân viên!', 'error');
     },
   });
 
@@ -157,5 +200,7 @@ export function useAttendanceSummaries(startDate?: string, endDate?: string, emp
     error: query.error,
     refetch: query.refetch,
     adjustAttendance: adjustMutation.mutateAsync,
+    unlockEmployeeAttendance: unlockEmployeeMutation.mutateAsync,
   };
 }
+

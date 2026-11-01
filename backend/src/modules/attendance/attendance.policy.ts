@@ -1,7 +1,16 @@
 import { annotatePairCredits } from './attendance.details.js'
 import { createHash } from 'node:crypto'
+import { vnDay } from '../../common/utils.js'
+export { vnDay }
 /** Company policy v2026-10-19. Pure calculations; no database, network or rounding per pair. */
-export const ATTENDANCE_POLICY_VERSION = '2026-10-26-v5'
+export const ATTENDANCE_POLICY_VERSION = '2026-11-01-v7'
+export const TWO_THIRDS_EFFECTIVE_DATE = '2026-10-29'
+export const POLICY_V7_EFFECTIVE_DATE = '2026-11-01'
+export function attendancePolicyVersion(workDate: string): string {
+  if (workDate >= POLICY_V7_EFFECTIVE_DATE) return ATTENDANCE_POLICY_VERSION
+  if (workDate >= TWO_THIRDS_EFFECTIVE_DATE) return '2026-10-29-v6'
+  return '2026-10-26-v5'
+}
 export const MAX_PAIR_MS = 24 * 60 * 60 * 1000
 export const OT_THRESHOLD_SECONDS = 30 * 60
 export const OT_REVIEW_SECONDS = 4 * 60 * 60
@@ -11,12 +20,6 @@ export function roundHours(seconds: number): number {
   const whole = Math.floor(duration / 3600)
   const remainder = duration - whole * 3600
   return whole + (remainder >= 1800 ? 0.5 : 0)
-}
-// Reuse ICU timezone data instead of constructing a formatter on every scan/day.
-const vnDayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
-export const vnDay = (value: Date | string): string => {
-  const date = new Date(value)
-  return Number.isNaN(+date) ? 'Invalid Date' : vnDayFormatter.format(date)
 }
 
 export interface PolicyLog {
@@ -51,7 +54,7 @@ export function pairAttendance(logs: PolicyLog[], assignments: DatedPolicyShift[
       const start = new Date(pending.event_time), end = new Date(log.event_time)
       const duration = end.getTime() - start.getTime()
       if (duration > 0 && duration <= MAX_PAIR_MS) {
-        pairs.push({ inId: String(pending.id), outId: String(log.id), start, end, workDate: workDate(start) })
+        pairs.push({ inId: String(pending.id), outId: String(log.id), start, end, workDate: resolvePairWorkDate(start, end, assignments, workDate) })
       } else {
         ignored.push({ id: String(pending.id), date: vnDay(start), reason: 'INVALID_PAIR' },
           { id: String(log.id), date: vnDay(end), reason: 'INVALID_PAIR' })
@@ -82,6 +85,15 @@ export function shiftBounds(workDate: string, shift: PolicyShift | null) {
   return { start, end, off, isZeroDuration }
 }
 
+export function hasLegacyOvernightBounds(workDate: string, shift: PolicyShift, value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const details = value as Record<string, unknown>
+  if (typeof details.scheduledStart !== 'string' || typeof details.scheduledEnd !== 'string') return false
+  const { start, end, off, isZeroDuration } = shiftBounds(workDate, shift)
+  if (off || isZeroDuration || vnDay(start) === vnDay(end)) return false
+  return +new Date(details.scheduledStart) === +start - 86400000 && +new Date(details.scheduledEnd) === +end - 86400000
+}
+
 /** Snapshot-scoped resolver: no identity data or mutable schedules cached globally. */
 function createWorkDateResolver(assignments: DatedPolicyShift[]) {
   const windows = assignments.map(shift => {
@@ -92,12 +104,56 @@ function createWorkDateResolver(assignments: DatedPolicyShift[]) {
   return (time: Date | string) => {
     const at = +new Date(time)
     if (days.has(at)) return days.get(at)!
-    const candidates = windows.filter(s => !s.off && !s.isZeroDuration && at >= +s.start - 3600000 && at < +s.end)
-      .sort((a,b) => Number(+a.start > at) - Number(+b.start > at) || +b.start - +a.start)
+    // Cửa sổ trước ca mở rộng tối đa 4 giờ (đặc biệt cho ca bắt đầu lúc 00:00)
+    const candidates = windows.filter(s => !s.off && !s.isZeroDuration && at >= +s.start - 4 * 3600000 && at < +s.end + 4 * 3600000)
+      .sort((a,b) => {
+        const inA = at >= +a.start && at <= +a.end ? 1 : 0
+        const inB = at >= +b.start && at <= +b.end ? 1 : 0
+        if (inA !== inB) return inB - inA
+        const distA = Math.min(Math.abs(at - +a.start), Math.abs(at - +a.end))
+        const distB = Math.min(Math.abs(at - +b.start), Math.abs(at - +b.end))
+        return distA - distB
+      })
     const date = candidates[0]?.date || vnDay(time)
     days.set(at, date)
     return date
   }
+}
+
+/** Xác định ngày công của cặp quét theo phần thời gian thực sự giao thoa (overlap) với ca */
+export function resolvePairWorkDate(
+  start: Date,
+  end: Date,
+  assignments: DatedPolicyShift[] = [],
+  singleLogResolver: (t: Date | string) => string = createWorkDateResolver(assignments)
+): string {
+  const windows = assignments.map(shift => {
+    const date = vnDay(shift.work_date)
+    return { date, ...shiftBounds(date, shift) }
+  })
+
+  let bestOverlap = 0
+  let bestCandidate: { date: string; start: Date } | null = null
+
+  for (const s of windows) {
+    if (s.off || s.isZeroDuration) continue
+    const overlap = Math.max(0, Math.min(+end, +s.end) - Math.max(+start, +s.start))
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap
+      bestCandidate = s
+    } else if (overlap > 0 && overlap === bestOverlap && bestCandidate) {
+      // Khi nhiều ca cùng là ứng viên và có thời gian giao thoa bằng nhau, ưu tiên ca có start gần start của cặp quét hơn
+      if (Math.abs(+start - +s.start) < Math.abs(+start - +bestCandidate.start)) {
+        bestCandidate = s
+      }
+    }
+  }
+
+  if (bestOverlap > 0 && bestCandidate) {
+    return bestCandidate.date
+  }
+
+  return singleLogResolver(start)
 }
 
 /** A re-entry after midnight still belongs to the assigned overnight shift. */
@@ -134,61 +190,66 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
     }
   }
 
-  // Overview entry is restricted to one hour before/in shift; exit is the last paired OUT.
-  // Earlier scans remain in the evidence and actual duration calculations.
-  const overviewPairs = pairs.filter(p => +p.start >= +start - 3600000 && +p.start <= +end)
-  const first = overviewPairs[0]?.start ?? null
+  // Shift pairs that overlap with this shift window; overview boundaries use the first overlapping pair and the last matched checkout.
+  const shiftPairs = pairs.filter(p => Math.min(+p.end, +end) > Math.max(+p.start, +start))
+  const first = (shiftPairs[0] ?? pairs[0])?.start ?? null
   const last = pairs.at(-1)?.end ?? null
   const actualFirst = pairs[0]?.start ?? null
   const actualLast = pairs.at(-1)?.end ?? null
-  const meetsHalfShift = Boolean(shift && !off && scheduledShiftSeconds > 0 && actualWorkedSecondsInShift >= scheduledShiftSeconds / 2)
-  const underHalfShift = Boolean(shift && !off && pairs.length > 0 && !meetsHalfShift)
+  const twoThirds = workDate >= TWO_THIRDS_EFFECTIVE_DATE
+  const requiredNumerator = twoThirds ? 2 : 1
+  const requiredDenominator = twoThirds ? 3 : 2
+  const meetsMinimumShift = Boolean(shift && !off && scheduledShiftSeconds > 0 && actualWorkedSecondsInShift * requiredDenominator >= scheduledShiftSeconds * requiredNumerator)
+  const underMinimumShift = Boolean(shift && !off && pairs.length > 0 && !meetsMinimumShift)
 
   let regularSeconds = 0
   let overtimeSeconds = 0
   let lateSeconds = 0
   let earlySeconds = 0
 
-  if (meetsHalfShift) {
-    // Lựa chọn B: Tổng giờ làm việc trong ngày = Giờ kết thúc ca - Giờ bắt đầu ca
-    regularSeconds = scheduledShiftSeconds
-    overtimeSeconds = rawOvertimeSeconds
+  if (shift && !off && (meetsMinimumShift || (underMinimumShift && twoThirds))) {
     lateSeconds = actualFirst ? Math.min(scheduledShiftSeconds, Math.max(0, (+actualFirst - +start) / 1000)) : 0
     earlySeconds = actualLast ? Math.min(scheduledShiftSeconds, Math.max(0, (+end - +actualLast) / 1000)) : 0
   }
-  // Nếu !meetsHalfShift (chưa được 1 nửa thời gian ca hoặc không đi làm):
-  // regularSeconds = 0 -> workingHours = 0
-  // overtimeSeconds = 0 -> overtimeCandidateHours = 0
-  // lateSeconds = 0, earlySeconds = 0 -> lateEarlyHours = 0
+
+  if (meetsMinimumShift) {
+    // Lựa chọn B: Tổng giờ làm việc trong ngày = Giờ kết thúc ca - Giờ bắt đầu ca
+    regularSeconds = scheduledShiftSeconds
+    overtimeSeconds = rawOvertimeSeconds
+  }
+  // Dưới ngưỡng 2/3 ca (từ 2026-10-29): không tính công ngày (0 giờ làm), nhưng ghi nhận giờ trễ / sớm thực tế để phạt vi phạm
 
   const lateEarlySeconds = lateSeconds + earlySeconds
   const invalid = ignored.some(l => l.reason === 'INVALID_PAIR' || l.reason === 'INTERRUPTED_PAIR')
   const flagged = source.some(l => l.status && l.status !== 'VALID')
   const orphanOut = !pairs.length && ignored.some(l => l.reason === 'UNPAIRED_CHECK_OUT')
   const noValidPair = sourceEvents.length > 0 && pairs.length === 0
-  const review = Boolean(noValidPair || open || invalid || flagged || orphanOut || underHalfShift || (!shift && (pairs.length || ignored.length)) || overtimeSeconds > OT_REVIEW_SECONDS)
+  const isMissingOrIncomplete = Boolean(noValidPair || open || invalid || orphanOut || underMinimumShift || (!shift && (pairs.length || ignored.length)))
+  const overtimeCapped = overtimeSeconds > OT_REVIEW_SECONDS
+  const review = Boolean(isMissingOrIncomplete || flagged || overtimeCapped)
   const absenceCandidate = Boolean(shift && !off && scheduledShiftSeconds > 0 && +now >= +end && sourceEvents.length === 0 && !open && !ignored.length)
   let status = off ? 'OFF' : !shift ? 'NO_SHIFT' : !pairs.length && !open && +now < +end ? 'SCHEDULED' : absenceCandidate ? 'ABSENT' : 'PRESENT'
-  if (!off && shift && (open || invalid || underHalfShift)) status = 'INCOMPLETE'
-  else if (!off && shift && first && meetsHalfShift) {
+  if (!off && shift && (open || invalid || orphanOut || underMinimumShift)) status = 'INCOMPLETE'
+  else if (!off && shift && first && meetsMinimumShift) {
     if (lateSeconds > 900 && earlySeconds > 0) status = 'LATE_AND_EARLY'
     else if (lateSeconds > 900) status = 'LATE'
     else if (earlySeconds > 0) status = 'EARLY_LEAVE'
   }
-  const candidate = overtimeSeconds > OT_THRESHOLD_SECONDS ? roundHours(overtimeSeconds) : 0
+  const candidate = overtimeSeconds > OT_THRESHOLD_SECONDS ? roundHours(Math.min(overtimeSeconds, OT_REVIEW_SECONDS)) : 0
   return {
     first, last, regularSeconds, overtimeSeconds, lateEarlySeconds, absenceCandidate,
     workingHours: roundHours(regularSeconds), lateEarlyHours: roundHours(lateEarlySeconds),
     overtimeCandidateHours: candidate, status, requiresReview: review,
+    isMissingOrIncomplete, overtimeCapped,
     reviewReason: [
       open ? 'MISSING_CHECK_OUT' : '',
       noValidPair ? 'NO_VALID_PAIR' : '',
       invalid ? 'INVALID_PAIR' : '',
       flagged ? 'FLAGGED_EVENT' : '',
       orphanOut ? 'UNPAIRED_CHECK_OUT' : '',
-      underHalfShift ? 'UNDER_HALF_SHIFT' : '',
+      underMinimumShift ? twoThirds ? 'UNDER_MINIMUM_SHIFT' : 'UNDER_HALF_SHIFT' : '',
       !shift && (pairs.length || ignored.length) ? 'NO_SHIFT' : '',
-      overtimeSeconds > OT_REVIEW_SECONDS ? 'OT_OVER_4H' : '',
+      overtimeCapped ? 'OT_OVER_4H' : '',
     ].filter(Boolean).join(',') || null,
     details: {
       events: sourceEvents,
@@ -196,21 +257,29 @@ export function calculateDay(workDate: string, logs: PolicyLog[], shift: PolicyS
         logs: source.map(l => [String(l.id), l.type, new Date(l.event_time).toISOString(), l.status]),
         start: start.toISOString(), end: end.toISOString(), off: Boolean(off), assigned: Boolean(shift),
       })).digest('hex'),
-      policy: ATTENDANCE_POLICY_VERSION,
+      policy: attendancePolicyVersion(workDate),
       pairs: annotatePairCredits(pairs.map(p => ({ ...p, start: p.start.toISOString(), end: p.end.toISOString() })), {
         start: start.toISOString(), end: end.toISOString(), scheduledSeconds: scheduledShiftSeconds,
-        workingHours: roundHours(regularSeconds), candidateHours: candidate, off: Boolean(off),
+        workingHours: roundHours(regularSeconds), candidateHours: candidate, off: Boolean(off), requiredNumerator, requiredDenominator,
       }),
-      details_version: 2,
+      details_version: 3,
       ignored,
       off: Boolean(off),
       scheduledStart: start.toISOString(),
       scheduledEnd: end.toISOString(),
       actualWorkedSecondsInShift,
       scheduledShiftSeconds,
-      meetsHalfShift,
+      meetsMinimumShift,
+      minimumShiftNumerator: requiredNumerator,
+      minimumShiftDenominator: requiredDenominator,
+      isMissingOrIncomplete,
+      overtimeCapped,
+      // Legacy consumers can still read old half-shift evidence.
+      ...(!twoThirds ? { meetsHalfShift: meetsMinimumShift } : {}),
       absenceCandidate,
-      overviewPairIds: overviewPairs.map(p => [p.inId, p.outId]),
+      overviewPairIds: shiftPairs.map(p => [p.inId, p.outId]),
+      lateSeconds,
+      earlySeconds,
       // Internal gaps are evidence only; they do not add late/early penalties.
       internalGapSeconds: Math.max(0, actualFirst && actualLast ? (+actualLast - +actualFirst) / 1000 - pairs.reduce((n, p) => n + (+p.end - +p.start) / 1000, 0) : 0),
     },

@@ -23,8 +23,8 @@ Từ thư mục gốc repo, sau khi đã cài dependencies theo lockfile:
 npm run build --prefix backend
 npm run lint --prefix frontend
 npm run build --prefix frontend
-npm test --prefix backend -- validation/attendance.policy.test.ts validation/webhook-validation.test.ts validation/financial-validation.test.ts validation/policy-defaults.test.ts
-npm test --prefix frontend -- validation/attendance-display.test.tsx validation/payroll-request.test.ts validation/time-rounding.test.ts
+npm test --prefix backend -- validation/attendance/attendance.policy.test.ts validation/devices/webhook-validation.test.ts validation/payroll/financial-validation.test.ts validation/payroll/policy-defaults.test.ts
+npm test --prefix frontend -- validation/attendance/attendance-display.test.tsx validation/payroll/payroll-request.test.ts validation/attendance/time-rounding.test.ts
 python3 -m unittest discover -s hardware/validation -p 'test_*.py' -v
 python3 -m py_compile hardware/edge_client.py hardware/iot/thingsboard_client.py hardware/streaming/rtsp_streamer.py scripts/deploy_thingsboard_dashboard.py
 ```
@@ -33,17 +33,11 @@ Kiểm thử Socket.IO tạo listener localhost, không dùng DB:
 
 ```bash
 cd backend
-RUN_SOCKET_TESTS=1 npm test -- validation/socket-auth.test.ts
+RUN_SOCKET_TESTS=1 npm test -- validation/auth/socket-auth.test.ts
 cd ..
 ```
 
-Kiểm thử PostgreSQL thật trong container **không gắn volume**, cổng loopback 55439 phải trống. Image `pgvector/pgvector:pg16` cần có sẵn:
-
-```bash
-bash scripts/test_attendance_policy.sh
-```
-
-Script tự tạo/dọn container riêng, gán rõ cả `DATABASE_URL` và `DIRECT_URL` sang DB `policy_check`, chạy migrations rồi regression tests. Bộ integration test từ chối URL khác. Không dùng `source backend/.env`, `migrate reset`, `db push` hoặc seed trên dữ liệu doanh nghiệp để chạy các test này.
+Các test PostgreSQL có thao tác ghi và yêu cầu DB kiểm thử cô lập. Bộ test hiện chỉ chấp nhận URL `policy_check` trên loopback; không thay đổi hoặc bỏ cơ chế bảo vệ này để chạy trực tiếp trên DB doanh nghiệp. Không chạy `migrate reset`, `db push` hoặc seed trên dữ liệu doanh nghiệp để kiểm thử.
 
 ## Đưa bản sửa vào vận hành
 

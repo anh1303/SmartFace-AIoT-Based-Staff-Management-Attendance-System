@@ -1,6 +1,7 @@
+import { attendanceRecipientRooms } from './attendance.recipients.js'
 import type { Server } from 'socket.io'
 import { eventBus } from '../../common/event-bus.js'
-import { socketAuthMiddleware } from '../../sockets/socket.auth.js'
+import { socketAuthMiddleware, refreshSocketScope } from '../../sockets/socket.auth.js'
 
 let io: Server | undefined
 
@@ -10,16 +11,7 @@ export const initializeAttendanceGateway = (server: Server) => {
   nsp.use(socketAuthMiddleware)
   nsp.on('connection', (socket) => {
     const user = socket.data.user
-    if (user?.role) {
-      socket.join(user.role)
-    }
-    if (user?.id) {
-      socket.join(`user:${user.id}`)
-    }
-    const empId = user?.employeeId || user?.employee_id
-    if (empId) {
-      socket.join(`employee:${empId}`)
-    }
+    const empId = user?.employeeId
     socket.emit('connected', {
       namespace: '/attendance',
       user: user ? { id: user.id, role: user.role, employeeId: empId } : undefined,
@@ -31,22 +23,22 @@ export const initializeAttendanceGateway = (server: Server) => {
  * @internal INTERNAL USE ONLY - Do not call from controllers or services.
  * Services must publish domain events via eventBus instead.
  */
-export const emitAttendanceEvent = (event: string, payload: unknown, room?: string) => {
+export const emitAttendanceEvent = async (event: string, payload: unknown, room?: string) => {
   if (!io) return
   const nsp = io.of('/attendance')
-  if (room) {
-    nsp.to(room).emit(event, payload)
-    return
+  try {
+    // Refresh before delivery so department transfers and role changes revoke old subscriptions.
+    await Promise.all([...nsp.sockets.values()].map(async socket => {
+      try { await refreshSocketScope(socket) } catch { socket.disconnect(true) }
+    }))
+    const rooms = await attendanceRecipientRooms(payload)
+    let recipients = nsp.to(rooms[0])
+    for (const target of rooms.slice(1)) recipients = recipients.to(target)
+    // Explicit rooms cannot broaden the scope of an event.
+    recipients.emit(event, payload)
+  } catch (error) {
+    console.error('[Attendance Gateway] Unable to authorize event recipients', error)
   }
-
-  // Use a union of rooms so a manager receiving their own event gets one copy.
-  const p = payload as any
-  const empId = p?.employee_id || p?.employeeId || p?.employee_uuid || p?.employees?.id || p?.employees?.employee_code
-  const userId = p?.employee_user_id || p?.user_id || p?.userId || p?.employees?.user_id
-  let recipients = nsp.to('ADMIN').to('MANAGER')
-  if (empId) recipients = recipients.to(`employee:${empId}`)
-  if (userId) recipients = recipients.to(`user:${userId}`)
-  recipients.emit(event, payload)
 }
 
 // Tự động lắng nghe Domain Events từ EventBus và broadcast tới Socket.IO clients
@@ -74,6 +66,10 @@ eventBus.subscribe('attendance:spoof-blocked', (data) => {
 
 eventBus.subscribe('attendance:unknown', (data) => {
   emitAttendanceEvent('attendance-unknown', data)
+})
+
+eventBus.subscribe('attendance:flagged', (data) => {
+  emitAttendanceEvent('attendance-flagged', data)
 })
 
 // WebRTCPlayer kết nối namespace /attendance để lắng nghe sự kiện đổi mode của thiết bị

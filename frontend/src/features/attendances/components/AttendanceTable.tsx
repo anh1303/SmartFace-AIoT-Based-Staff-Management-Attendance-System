@@ -1,6 +1,6 @@
 import { AttendanceDayDetails } from './AttendanceDayDetails';
 import React, { useState } from 'react';
-import { ScanFace, Fingerprint, Edit, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { ScanFace, Fingerprint, Edit, Clock, ChevronDown, ChevronUp, Unlock } from 'lucide-react';
 import { AttendancePairItem, AttendanceEventItem } from '../hooks/useAttendancePairs';
 import {
   TableContainer,
@@ -16,6 +16,7 @@ interface AttendanceTableProps {
   startDate: string;
   endDate: string;
   onOpenEditModal: (item: AttendancePairItem) => void;
+  onUnlockEmployee?: (item: AttendancePairItem) => void;
 }
 
 export const AttendanceTable: React.FC<AttendanceTableProps> = ({
@@ -23,6 +24,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
   startDate,
   endDate,
   onOpenEditModal,
+  onUnlockEmployee,
 }) => {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
@@ -141,7 +143,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
             const { employee, shift, events, lateEarlyStr, overtimeStr } = item;
             const checkInEv = events[0] || {
               type: 'CHECK_IN',
-              label: 'Vào Ca',
+              label: 'Check in',
               time: '--:--:--',
               isFace: true,
               methodLabel: 'UNRECORDED',
@@ -152,7 +154,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
             };
             const checkOutEv = events[1] || {
               type: 'CHECK_OUT',
-              label: 'Hết ca',
+              label: 'Check out',
               time: '--:--:--',
               isFace: true,
               methodLabel: 'UNRECORDED',
@@ -164,6 +166,11 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
 
             const rowKey = `${employee.employee_id}-${item.date}-${shift.name}`;
             const isExpanded = Boolean(expandedRows[rowKey]);
+            const eventTypes = new Set(item.rawEvents.map(event => event.type));
+            const isAbsent = Boolean(item.isAbsent || item.status === 'ABSENT');
+            const missingCode = item.validIntervals.length === 0 && eventTypes.size === 1
+              ? eventTypes.has('CHECK_IN') ? 'MISSING_CHECK_OUT' : eventTypes.has('CHECK_OUT') ? 'UNPAIRED_CHECK_OUT' : null
+              : null;
 
             return (
               <React.Fragment key={rowKey}>
@@ -193,6 +200,15 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                         <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate" title={employee.employee_id}>
                           {employee.employee_id}
                         </p>
+                        {isAbsent && (
+                          <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">
+                            Nghỉ làm không lý do
+                          </p>
+                        )}
+                        {missingCode && <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">{item.reasonLabels?.[missingCode] || 'Chấm công chưa đầy đủ'}</p>}
+                        {!missingCode && item.needsReview && item.reviewReason?.split(',').filter(code => code === 'MISSING_CHECK_OUT' || code === 'UNPAIRED_CHECK_OUT').map(code => (
+                          <p key={code} className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold">{item.reasonLabels?.[code] || 'Chấm công chưa đầy đủ'}</p>
+                        ))}
                         {item.rawEvents && item.rawEvents.length > 0 && (
                           <button
                             type="button"
@@ -228,11 +244,11 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                     </div>
                   </td>
 
-                  {/* Cột 3: SỰ KIỆN - Vào Ca (Căn giữa, có đường kẻ đáy) */}
+                  {/* Cột 3: SỰ KIỆN - Check in (Căn giữa, có đường kẻ đáy) */}
                   <td className="py-2.5 px-2 align-middle text-center border-r border-slate-200 dark:border-[#202752] border-b border-slate-200 dark:border-[#202752] bg-white dark:bg-[#0f1224]">
                     <div className="flex items-center justify-center gap-1.5 text-xs">
                       <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0 shadow-[0_0_6px_rgba(56,189,248,0.6)]"></span>
-                      <span className="text-sky-600 dark:text-sky-300 font-medium whitespace-nowrap">Vào Ca</span>
+                      <span className="text-sky-600 dark:text-sky-300 font-medium whitespace-nowrap">Check in</span>
                     </div>
                   </td>
 
@@ -291,25 +307,37 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                     rowSpan={2}
                     className="py-2.5 px-1.5 align-middle text-center border-b border-slate-200 dark:border-[#202752] bg-white dark:bg-[#0f1224]"
                   >
-                    <button
-                      type="button"
-                      onClick={() => onOpenEditModal(item)}
-                      className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#181d38] dark:hover:bg-[#232a52] text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-[#2b3563] text-xs font-medium transition-all shadow-xs cursor-pointer group whitespace-nowrap"
-                      title={item.isOffDay ? 'Điều chỉnh hoặc phê duyệt OT ngày nghỉ (OFF)' : 'Chỉnh sửa giờ trễ/sớm và tăng ca'}
-                    >
-                      <Edit className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
-                      <span>Sửa</span>
-                    </button>
+                    {item.isApproved ? (
+                      <button
+                        type="button"
+                        onClick={() => onUnlockEmployee?.(item)}
+                        className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 text-xs font-semibold transition-all shadow-xs cursor-pointer group whitespace-nowrap"
+                        title="Mở khóa ngày công của nhân viên này để điều chỉnh hoặc xét duyệt lại"
+                      >
+                        <Unlock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 group-hover:text-amber-800 dark:group-hover:text-amber-200 transition-colors" />
+                        <span>Mở khóa</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onOpenEditModal(item)}
+                        className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#181d38] dark:hover:bg-[#232a52] text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-[#2b3563] text-xs font-medium transition-all shadow-xs cursor-pointer group whitespace-nowrap"
+                        title={item.isOffDay ? 'Điều chỉnh hoặc phê duyệt OT ngày nghỉ (OFF)' : 'Chỉnh sửa giờ trễ/sớm và tăng ca'}
+                      >
+                        <Edit className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
+                        <span>Xét duyệt</span>
+                      </button>
+                    )}
                   </td>
                 </tr>
 
                 {/* DÒNG 2: Chỉ gồm 5 ô tương ứng của HẾT CA (có đường kẻ đáy) */}
                 <tr className="hover:bg-slate-50/50 dark:hover:bg-[#161a38]/40 transition-colors border-b border-slate-200 dark:border-[#202752]">
-                  {/* Cột 3: SỰ KIỆN - Hết ca (Căn giữa) */}
+                  {/* Cột 3: SỰ KIỆN - Check out (Căn giữa) */}
                   <td className="py-2.5 px-2 align-middle text-center border-r border-slate-200 dark:border-[#202752] border-b border-slate-200 dark:border-[#202752] bg-white dark:bg-[#0f1224]">
                     <div className="flex items-center justify-center gap-1.5 text-xs">
                       <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 shrink-0 shadow-[0_0_6px_rgba(232,121,249,0.6)]"></span>
-                      <span className="text-fuchsia-600 dark:text-fuchsia-300 font-medium whitespace-nowrap">Hết ca</span>
+                      <span className="text-fuchsia-600 dark:text-fuchsia-300 font-medium whitespace-nowrap">Check out</span>
                     </div>
                   </td>
 

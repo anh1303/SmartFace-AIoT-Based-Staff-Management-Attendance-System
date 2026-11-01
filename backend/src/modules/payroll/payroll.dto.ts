@@ -1,11 +1,12 @@
 import { z } from 'zod'
-import { PAYROLL_STATUS } from '../../common/constants.js'
-
+import { workDateSchema } from '../../common/date.schema.js'
+const multiplierSchema = z.number().finite().min(0).max(50).multipleOf(0.0001)
 export const updateBonusPenaltySchema = z.object({
-  overtime_rate: z.number().finite().min(0).max(99999999.99).optional(),
-  late_early_penalty: z.number().finite().min(0).max(1000000000).optional(),
-  absence_penalty_rate: z.number().finite().min(0).max(1).optional(),
-  description: z.string().optional(),
+  overtime_rate: multiplierSchema.optional(),
+  late_early_penalty: multiplierSchema.optional(),
+  absence_penalty_rate: multiplierSchema.optional(),
+  effective_period: z.string().regex(/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/).optional(),
+  description: z.string().max(255).optional(),
 })
 
 export const generatePayrollSchema = z
@@ -24,21 +25,9 @@ export const generatePayrollSchema = z
 
 export const updatePayrollSchema = z.object({
   reason: z.string().trim().min(1).max(2000).optional(),
-  hourly_rate: z.number().finite().min(0).max(1000000000).optional(),
-  allowance: z.number().finite().min(0).max(1000000000000).optional(),
-  total_working_hours: z.number().finite().min(0).max(744).optional(),
-  working_hours: z.number().finite().min(0).max(744).optional(),
-  total_overtime: z.number().finite().min(0).max(744).optional(),
-  total_late_early: z.number().finite().min(0).max(744).optional(),
-  status: z
-    .enum([
-      PAYROLL_STATUS.PENDING,
-      PAYROLL_STATUS.FINALIZED,
-      PAYROLL_STATUS.CONFIRMED,
-      PAYROLL_STATUS.PAID,
-    ])
-    .optional(),
-})
+  updated_at: z.string().datetime().optional(),
+  allowance: z.number().finite().min(0).max(1000000000000),
+}).strict()
 
 export type UpdateBonusPenaltyDto = z.infer<typeof updateBonusPenaltySchema>
 export type GeneratePayrollDto = z.infer<typeof generatePayrollSchema>
@@ -49,3 +38,12 @@ export const reviewAdjustmentSchema = z.object({
   note: z.string().trim().max(2000).optional(),
   updated_at: z.string().datetime(),
 })
+
+export const earlySettlementSchema = z.object({
+  employeeId: z.string().min(1, 'Mã nhân viên là bắt buộc'),
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Kỳ lương phải có dạng YYYY-MM'),
+  cutoffDate: workDateSchema,
+  reason: z.string().trim().min(1, 'Lý do quyết toán sớm là bắt buộc').max(2000),
+})
+
+export type EarlySettlementDto = z.infer<typeof earlySettlementSchema>

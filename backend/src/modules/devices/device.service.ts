@@ -3,7 +3,7 @@ import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
 import { isValidUuid } from '../../common/utils.js'
 import { AppError } from '../../common/AppError.js'
-import { logAction } from '../audit-logs/audit.service.js'
+import { logAction } from '../audit-logs/public.js'
 import { eventBus } from '../../common/event-bus.js'
 
 export function formatDevice(d: Device) {
@@ -119,7 +119,9 @@ export async function get(id: string) {
 export async function create(
   data: { name: string; location: string; ip?: string | null; status?: string },
   actorUserId?: string,
+  actorRole?: string,
 ) {
+  if (actorRole?.toUpperCase() !== 'ADMIN') throw AppError.forbidden('Only Admin can manage shared devices')
   const device = await prisma.device.create({
     data: {
       name: data.name,
@@ -149,7 +151,9 @@ export async function update(
   id: string,
   data: { name?: string; location?: string; ip?: string | null; status?: string },
   actorUserId?: string,
+  actorRole?: string,
 ) {
+  if (actorRole?.toUpperCase() !== 'ADMIN') throw AppError.forbidden('Only Admin can manage shared devices')
   const existing = await get(id)
   let dbRecord = await prisma.device.findUnique({ where: { id } })
   if (!dbRecord) {
@@ -219,7 +223,8 @@ export async function update(
   return formatDevice(updated)
 }
 
-export async function remove(id: string, actorUserId?: string): Promise<void> {
+export async function remove(id: string, actorUserId?: string, actorRole?: string): Promise<void> {
+  if (actorRole?.toUpperCase() !== 'ADMIN') throw AppError.forbidden('Only Admin can manage shared devices')
   const existing = await get(id)
   await prisma.device.delete({ where: { id } })
 
@@ -423,7 +428,19 @@ export async function getDeviceAttendanceMode(deviceId: string) {
   return { deviceId, mode: cached.mode || 'OFF', confirmed: cached.confirmed }
 }
 
-export async function setDeviceAttendanceMode(deviceId: string, mode: AttendanceModeValue) {
+export async function setDeviceAttendanceMode(deviceId: string, mode: AttendanceModeValue, actorRole?: string) {
+  if (actorRole && actorRole.toUpperCase() !== 'ADMIN') throw AppError.forbidden('Only Admin can control shared devices')
+  const existing = deviceModeStore.get(deviceId)
+  if (
+    existing &&
+    existing.mode === mode &&
+    existing.confirmed &&
+    existing.lastUpdated &&
+    Date.now() - new Date(existing.lastUpdated).getTime() < 5000
+  ) {
+    return { deviceId, mode, confirmed: true, lastUpdated: existing.lastUpdated }
+  }
+
   let ackTimeout: NodeJS.Timeout
   const ackPromise = new Promise<boolean>((resolve) => {
     pendingModeAcks.set(deviceId, {

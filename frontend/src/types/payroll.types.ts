@@ -1,7 +1,17 @@
 export type PayrollStatus = 'PENDING' | 'CONFIRMED' | 'FINALIZED' | 'PAID';
 
+export interface PayrollBreakdown {
+  base_salary: number;
+  overtime_pay: number;
+  late_early_deduction: number;
+  absence_deduction: number;
+  allowance: number;
+  net_salary: number;
+}
+
 export interface BonusPenaltyPolicy {
   id?: number;
+  effective_period?: string | null;
   overtime_rate: number;
   late_early_penalty: number;
   absence_penalty_rate?: number;
@@ -29,4 +39,9 @@ export interface PayrollRecord {
   overtime_rate?: number | null;
   late_penalty_rate?: number | null;
   late_early_penalty?: number | null;
+  breakdown?: PayrollBreakdown | null;
+  needs_recalculation?: boolean;
+  requires_reconciliation?: boolean;
+  updated_at?: string;
+  calculation_details?: unknown;
 }

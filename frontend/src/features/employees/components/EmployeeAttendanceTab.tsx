@@ -213,7 +213,7 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
         <span><strong>{attendanceStats.workDays}</strong> ngày làm việc</span>
         <span><strong>{attendanceStats.totalLogs}</strong> lượt quét · {attendanceStats.checkIns} vào / {attendanceStats.checkOuts} ra</span>
         <span><strong>{attendanceStats.lateCount + attendanceStats.earlyLeaveCount}</strong> lượt trễ / sớm</span>
-        <span>Điểm xác thực TB: <strong>{attendanceStats.avgConfidence}%</strong></span>
+        <span>Điểm xác thực TB: <strong className={attendanceStats.avgConfidence > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}>{attendanceStats.avgConfidence}%</strong></span>
       </div>
 
       {currentEmp && <details className="sf-panel p-4"><summary className="font-semibold">Các khoản OT & phạt trong kỳ · Xem và đối chiếu</summary><div className="mt-5"><AdjustmentReviewPanel period={(startDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })).slice(0,7)} employeeId={currentEmp.employee_id} /></div></details>}

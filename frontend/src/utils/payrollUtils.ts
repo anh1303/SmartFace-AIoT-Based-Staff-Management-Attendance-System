@@ -1,20 +1,22 @@
 /**
- * Utility functions for payroll calculations and rate formatting.
- * Consolidates the standard business logic across Manager and Employee modules:
- * - When rate <= 10, it is treated as a multiplier of hourlyRate: amount = hours * rate * hourlyRate
- * - When rate > 10, it is treated as a fixed monetary rate per hour: amount = hours * rate
+ * Tính số tiền theo công thức hệ số: Số giờ * Hệ số * Lương theo giờ
  */
-
 export function calcPayrollAmount(hours: number, rate: number, hourlyRate: number): number {
   if (!hours || hours <= 0 || !rate || rate <= 0) return 0;
-  return rate <= 10 ? hours * rate * hourlyRate : hours * rate;
+  return hours * rate * hourlyRate;
 }
 
+/**
+ * Hiển thị nhãn hệ số lương (ví dụ: "2x" hoặc "2x lương giờ (200.000 ₫/h)")
+ */
 export function formatPayrollRateLabel(rate: number, hourlyRate?: number): string {
-  if (rate <= 10) {
-    return hourlyRate
-      ? `${rate}x lương giờ (${(rate * hourlyRate).toLocaleString('vi-VN')} ₫/h)`
-      : `${rate}x`;
+  if (hourlyRate) {
+    return `${rate}x lương giờ (${Math.round(rate * hourlyRate).toLocaleString('vi-VN')} ₫/h)`;
   }
-  return `${rate.toLocaleString('vi-VN')} ₫/h`;
+  return `${rate}x`;
+}
+
+export function nextPayrollPolicyPeriod(): string {
+  const [year, month] = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).slice(0, 7).split('-').map(Number);
+  return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7);
 }

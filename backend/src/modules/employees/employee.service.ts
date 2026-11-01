@@ -1,91 +1,32 @@
+import { formatEmployee } from './employee.format.js'
+export { formatEmployee, type RawEmployeeDb } from './employee.format.js'
 import type { Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { buildIdOrCodeWhere, generateUniqueEmployeeCode, generateRandomPassword } from '../../common/utils.js'
+import { buildIdOrCodeWhere, generateRandomPassword } from '../../common/utils.js'
+import { generateUniqueEmployeeCode } from './employee.code.js'
 import { sendAccountCredentialsEmail, type EmailSendResult } from '../../common/email.service.js'
-import { logAction } from '../audit-logs/index.js'
+import { logAction } from '../audit-logs/public.js'
 import {
   findAuthUserByUsername,
   createAuthUser,
   updateAuthUser,
   getDefaultRole,
   deleteAuthUser,
-} from '../auth/index.js'
+} from '../auth/public.js'
+import { deleteBiometricsForEmployee } from '../biometrics/public.js'
+import { deleteShiftsForEmployee } from '../shifts/public.js'
 import { employeeInclude } from './employee.model.js'
-import { assertCanAccessEmployeeDetail } from './employee.permission.js'
+import { recordHourlyRateChange } from './employee.wage.js'
+import { vnDay, payrollPeriodLockKey } from '../../common/utils.js'
+import { nextPayrollPeriod } from '../../common/payroll-policy.js'
+import { hasAttendanceActivity } from '../attendance/public.js'
+import { hasPayrollActivity } from '../payroll/public.js'
+import { assertCanAccessEmployeeDetail, assertCanManageEmployee, getEmployeeScope, isEmployeeManager, type EmployeeActor } from './employee.permission.js'
 
-export interface RawEmployeeDb {
-  id: string
-  employee_code?: string | null
-  full_name: string
-  department?: { name?: string } | null
-  position?: { id?: number; name?: string; level?: string; position_code?: string } | string | null
-  positionId?: number | null
-  phone?: string | null
-  email?: string | null
-  status?: string | null
-  createdAt?: Date | null
-  updatedAt?: Date | null
-  face_embeddings?: unknown[] | null
-  fingerprint_enrolled?: boolean | null
-  avatar_url?: string | null
-  hourly_rate?: { toString(): string } | number | string | bigint | null
-  departmentId?: number | null
-  users?: {
-    id?: string
-    username?: string
-    is_active?: boolean
-    roles?: { role_name?: string } | null
-  } | null
-}
-
-export function formatEmployee(emp: RawEmployeeDb) {
-  const roleName =
-    emp.users?.roles?.role_name?.toUpperCase() ||
-    (emp.department?.name === 'Quản lý' ? 'MANAGER' : 'EMPLOYEE')
-
-  const posName =
-    typeof emp.position === 'string'
-      ? emp.position
-      : emp.position?.name || ''
-  const posLevel =
-    typeof emp.position === 'object' && emp.position
-      ? (emp.position as any).level
-      : undefined
-
-  const isManager =
-    roleName === 'MANAGER' ||
-    roleName === 'ADMIN' ||
-    posLevel === 'MANAGER' ||
-    Boolean(posName && /quản lý|manager/i.test(posName)) ||
-    Boolean(emp.department?.name && /quản lý/i.test(emp.department.name))
-
-  return {
-    id: emp.id,
-    employee_id: emp.employee_code || emp.id,
-    username: emp.users?.username || emp.employee_code || emp.id,
-    full_name: emp.full_name,
-    department: emp.department?.name || '',
-    position: posName,
-    positionId: emp.positionId ?? (typeof emp.position === 'object' && emp.position ? (emp.position as any).id : null),
-    positionLevel: posLevel,
-    phone: emp.phone || '',
-    email: emp.email || '',
-    status: emp.status,
-    role: roleName,
-    is_manager: isManager,
-    created_at: emp.createdAt ? emp.createdAt.toISOString() : new Date().toISOString(),
-    updated_at: emp.updatedAt ? emp.updatedAt.toISOString() : new Date().toISOString(),
-    face_enrolled: Array.isArray(emp.face_embeddings) && emp.face_embeddings.length > 0,
-    fingerprint_enrolled: Boolean(emp.fingerprint_enrolled),
-    avatar: emp.avatar_url || '',
-    hourly_rate: emp.hourly_rate ? Number(emp.hourly_rate) : 0,
-    departmentId: emp.departmentId,
-  }
-}
-
-export async function list(query: Record<string, unknown>) {
+export async function list(query: Record<string, unknown>, actor?: EmployeeActor) {
+  const scope = await getEmployeeScope(actor)
   const page = Math.max(1, Number(query.page) || 1)
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 20))
   const search = typeof query.search === 'string' ? query.search : ''
@@ -96,6 +37,7 @@ export async function list(query: Record<string, unknown>) {
       : undefined
 
   const where = {
+    AND: [scope],
     ...(search
       ? {
         OR: [
@@ -153,7 +95,7 @@ export async function create(data: {
   avatar?: string | null
   avatar_url?: string | null
   fingerprint_enrolled?: boolean | null
-}, actorUserId?: string) {
+}, actorUserId?: string, actorRole?: string) {
   let deptId = data.departmentId ?? data.department_id
   let posId = data.positionId ?? data.position_id
 
@@ -236,7 +178,7 @@ export async function create(data: {
 
   // 5. Tìm vai trò EMPLOYEE mặc định cho nhân viên mới qua auth module
   const fallbackRole = await getDefaultRole()
-  if (!fallbackRole) {
+  if (!fallbackRole || fallbackRole.role_name.toUpperCase() !== 'EMPLOYEE') {
     throw new AppError(500, 'Không tìm thấy vai trò (roles) trong hệ thống để gán cho người dùng mới')
   }
 
@@ -244,6 +186,11 @@ export async function create(data: {
 
   // 6. Thực hiện tạo User và Employee đồng thời trong transaction
   const { created, user } = await prisma.$transaction(async (tx) => {
+    if (actorRole?.toUpperCase() === 'MANAGER') {
+      await getEmployeeScope({ id: actorUserId, role: actorRole }, 'manage', tx)
+      const self = await tx.employee.findFirst({ where: { user_id: actorUserId } })
+      if (!self?.departmentId || self.departmentId !== deptId) throw AppError.forbidden('Employee department changed; refresh before creating staff')
+    }
     // 6.1 Tạo tài khoản đăng nhập User mới qua auth module API
     const newUser = await createAuthUser(
       {
@@ -343,8 +290,16 @@ export async function update(
     fingerprint_enrolled?: boolean
   },
   actorUserId?: string,
-) {
-  const existing = await prisma.employee.findFirst({
+  tx?: Prisma.TransactionClient,
+): Promise<ReturnType<typeof formatEmployee>> {
+  if (!tx) return prisma.$transaction(client => update(idOrCode, data, actorUserId, client))
+  const client = tx
+  const currentPeriod = vnDay(new Date()).slice(0, 7)
+  const ratePeriod = nextPayrollPeriod(currentPeriod)
+  if (data.hourly_rate !== undefined && typeof (tx as any).$executeRaw === 'function') {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${payrollPeriodLockKey(ratePeriod)}))`
+  }
+  const existing = await client.employee.findFirst({
     where: buildIdOrCodeWhere(idOrCode),
     include: employeeInclude,
   })
@@ -354,14 +309,14 @@ export async function update(
   let posId = data.positionId ?? data.position_id
 
   if (deptId === undefined && data.department) {
-    const dept = await prisma.department.findFirst({
+    const dept = await client.department.findFirst({
       where: { name: { equals: data.department.trim(), mode: 'insensitive' } },
     })
     if (dept) {
       deptId = dept.id
     } else {
       // Nếu frontend truyền tên chức vụ vào trường department
-      const foundPos = await prisma.position.findFirst({
+      const foundPos = await client.position.findFirst({
         where: { name: { equals: data.department.trim(), mode: 'insensitive' } },
       })
       if (foundPos) {
@@ -381,7 +336,7 @@ export async function update(
       if (!isNaN(parsedId)) {
         posId = parsedId
       } else {
-        const found = await prisma.position.findFirst({
+        const found = await client.position.findFirst({
           where: {
             name: { equals: data.position.trim(), mode: 'insensitive' },
             ...(deptId ? { departmentId: deptId } : {}),
@@ -396,13 +351,13 @@ export async function update(
   }
 
   if (deptId === undefined && posId) {
-    const p = await prisma.position.findUnique({ where: { id: posId } })
+    const p = await client.position.findUnique({ where: { id: posId } })
     if (p) deptId = p.departmentId
   }
 
   const rateVal = data.hourly_rate
 
-  const updated = await prisma.employee.update({
+  const updated = await client.employee.update({
     where: { id: existing.id },
     data: {
       ...(data.full_name !== undefined ? { full_name: data.full_name } : {}),
@@ -415,13 +370,14 @@ export async function update(
         ? { avatar_url: data.avatar_url ?? data.avatar }
         : {}),
       ...(rateVal !== undefined ? { hourly_rate: rateVal } : {}),
+      ...(rateVal !== undefined && rateVal !== Number(existing.hourly_rate ?? 0) ? { hourly_rate_history: recordHourlyRateChange(existing, rateVal, ratePeriod) } : {}),
       ...(data.fingerprint_enrolled !== undefined ? { fingerprint_enrolled: data.fingerprint_enrolled } : {}),
     },
     include: employeeInclude,
   })
 
   if (existing.user_id && data.status !== undefined) {
-    await updateAuthUser(existing.user_id, { is_active: data.status === 'ACTIVE' }).catch(() => { })
+    await updateAuthUser(existing.user_id, { is_active: data.status === 'ACTIVE' }, client)
   }
 
   await logAction({
@@ -461,28 +417,23 @@ export async function remove(idOrCode: string, actorUserId?: string) {
 
   // Tuyệt đối không xóa cứng (Hard Delete / Cascade Delete) nhân sự đã phát sinh dữ liệu chấm công/lương
   // để bảo toàn lịch sử chấm công, bảng lương cũ và báo cáo chi phí kiểm toán (Audit).
-  const [logCount, summaryCount, payrollCount] = await Promise.all([
-    prisma.attendance_logs.count({ where: { employee_id: existing.id } }),
-    prisma.daily_attendance_summary.count({ where: { employee_id: existing.id } }),
-    prisma.payrollRecord.count({ where: { employeeId: existing.id } }),
+  const [hasAttendance, hasPayroll] = await Promise.all([
+    hasAttendanceActivity(existing.id),
+    hasPayrollActivity(existing.id),
   ])
 
-  if (logCount > 0 || summaryCount > 0 || payrollCount > 0) {
+  if (hasAttendance || hasPayroll) {
     throw AppError.badRequest(
       'Không thể xóa vĩnh viễn nhân sự đã phát sinh dữ liệu chấm công hoặc bảng lương để bảo đảm toàn vẹn dữ liệu và kiểm toán (Audit). Vui lòng chuyển trạng thái nhân viên sang Đã nghỉ việc (INACTIVE)!'
     )
   }
 
   return prisma.$transaction(async (tx) => {
-    // 1. Xóa dữ liệu sinh trắc học Face Embeddings
-    await tx.face_embeddings.deleteMany({
-      where: { employee_id: existing.id },
-    })
+    // 1. Xóa dữ liệu sinh trắc học Face Embeddings qua Biometrics module contract
+    await deleteBiometricsForEmployee(existing.id, tx)
 
-    // 2. Xóa ca làm việc employee_shifts
-    await tx.employee_shifts.deleteMany({
-      where: { employee_id: existing.id },
-    })
+    // 2. Xóa ca làm việc qua Shifts module contract
+    await deleteShiftsForEmployee(existing.id, tx)
 
     // 3. Xóa bản ghi nhân viên
     await tx.employee.delete({
@@ -514,7 +465,8 @@ export async function remove(idOrCode: string, actorUserId?: string) {
 // Alias terminate để đảm bảo tương thích
 export const terminate = remove
 
-export async function resetPassword(idOrCode: string, actorUserId?: string) {
+export async function resetPassword(idOrCode: string, actorUserId?: string, actorRole?: string) {
+  await assertCanManageEmployee({ id: actorUserId, role: actorRole }, idOrCode)
   const existing = await prisma.employee.findFirst({
     where: buildIdOrCodeWhere(idOrCode),
     include: employeeInclude,
@@ -540,7 +492,7 @@ export async function resetPassword(idOrCode: string, actorUserId?: string) {
   } else {
     // Nếu nhân viên chưa có User thì tạo mới qua auth module
     const fallbackRole = await getDefaultRole()
-    if (!fallbackRole) {
+    if (!fallbackRole || fallbackRole.role_name.toUpperCase() !== 'EMPLOYEE') {
       throw new AppError(500, 'Không tìm thấy vai trò (roles) trong hệ thống')
     }
 
@@ -601,11 +553,41 @@ export async function resetPassword(idOrCode: string, actorUserId?: string) {
   }
 }
 
+async function scopeEmployeeChanges(body: any, actor?: EmployeeActor) {
+  if (actor?.role?.toUpperCase() === 'ADMIN') return body;
+  if (actor?.role?.toUpperCase() !== 'MANAGER' || !actor.id) throw AppError.forbidden('Employee management denied');
+  const self = await prisma.employee.findFirst({ where: { user_id: actor.id } });
+  if (!self?.departmentId) throw AppError.forbidden('A department is required to manage employees');
+  for (const key of ['departmentId', 'department_id']) {
+    if (body[key] !== undefined && body[key] !== self.departmentId) throw AppError.forbidden('Cannot move employees outside your department');
+  }
+  if (body.department) {
+    const department = await prisma.department.findFirst({ where: { name: { equals: String(body.department).trim(), mode: 'insensitive' } } });
+    if (department?.id !== self.departmentId) throw AppError.forbidden('Cannot manage another department');
+  }
+  let positionId = body.positionId ?? body.position_id;
+  if (positionId === undefined && body.position != null && body.position !== '') {
+    const candidate = Number(body.position);
+    if (Number.isInteger(candidate) && candidate > 0) positionId = candidate;
+    else {
+      const position = await prisma.position.findFirst({ where: { departmentId: self.departmentId, name: { equals: String(body.position).trim(), mode: 'insensitive' } } });
+      if (!position || isEmployeeManager({ position })) throw AppError.forbidden('Invalid staff position');
+      positionId = position.id;
+    }
+  }
+  if (positionId != null) {
+    const position = await prisma.position.findUnique({ where: { id: positionId } });
+    if (!position || position.departmentId !== self.departmentId || isEmployeeManager({ position })) throw AppError.forbidden('Invalid staff position');
+  }
+  return { ...body, departmentId: self.departmentId, ...(positionId !== undefined ? { positionId } : {}) };
+}
+
 export async function createWithManagerCheck(
   body: any,
   actorUserId?: string,
   actorRole?: string
 ) {
+  body = await scopeEmployeeChanges(body, { id: actorUserId, role: actorRole });
   if (actorRole === 'MANAGER') {
     const pos = typeof body.position === 'string' ? body.position.trim() : '';
     const dept = (body.department || '').trim();
@@ -632,7 +614,7 @@ export async function createWithManagerCheck(
     departmentId: body.departmentId || body.department_id,
     positionId: body.positionId || body.position_id,
   };
-  return create(empData, actorUserId);
+  return create(empData, actorUserId, actorRole);
 }
 
 export async function updateWithManagerCheck(
@@ -640,11 +622,8 @@ export async function updateWithManagerCheck(
   updates: any,
   actorUser?: { id?: string; role?: string }
 ) {
-  await assertCanAccessEmployeeDetail(
-    actorUser,
-    id,
-    'Quản lý không có quyền chỉnh sửa thông tin của quản lý khác'
-  );
+  await assertCanManageEmployee(actorUser, id);
+  updates = await scopeEmployeeChanges(updates, actorUser);
 
   if (actorUser?.role === 'MANAGER') {
     const pos = typeof updates.position === 'string' ? updates.position.trim() : '';
@@ -664,7 +643,10 @@ export async function updateWithManagerCheck(
     }
   }
 
-  return update(id, updates, actorUser?.id);
+  return prisma.$transaction(async tx => {
+    await assertCanManageEmployee(actorUser, id, tx);
+    return update(id, updates, actorUser?.id, tx);
+  });
 }
 
 export async function getByIdWithManagerCheck(
@@ -679,81 +661,20 @@ export async function getByIdWithManagerCheck(
   return get(id);
 }
 
-/**
- * Public Module API: Tìm một nhân viên theo UUID hoặc mã nhân viên (hỗ trợ transaction)
- */
-export async function findEmployeeByIdOrCode(idOrCode: string, tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.findFirst({
-    where: buildIdOrCodeWhere(idOrCode),
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Lấy danh sách nhân viên theo danh sách ID (Batch Query tối ưu, hỗ trợ transaction)
- */
-export async function findEmployeesByIds(ids: string[], tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.findMany({
-    where: { id: { in: ids } },
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Lấy tất cả nhân viên đang hoạt động (ACTIVE, hỗ trợ transaction)
- */
-export async function findActiveEmployees(tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.findMany({
-    where: { status: 'ACTIVE' },
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Tìm nhân viên theo user_id tài khoản (hỗ trợ transaction)
- */
-export async function findEmployeeByUserId(userId: string, tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.findFirst({
-    where: { user_id: userId },
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Tìm nhân viên theo email (hỗ trợ transaction)
- */
-export async function findEmployeeByEmail(email: string, tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.findFirst({
-    where: { email },
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Tạo nhân viên mới (dành cho module auth khi đăng ký, hỗ trợ transaction)
- */
-export async function createEmployee(
-  data: Prisma.EmployeeUncheckedCreateInput,
-  tx?: Prisma.TransactionClient
-) {
-  const client = tx ?? prisma
-  return client.employee.create({
-    data,
-    include: employeeInclude,
-  })
-}
-
-/**
- * Public Module API: Đếm tổng số nhân viên đang hoạt động (ACTIVE)
- */
-export async function countActiveEmployees(tx?: Prisma.TransactionClient) {
-  const client = tx ?? prisma
-  return client.employee.count({ where: { status: 'ACTIVE' } })
-}
-
-
+export {
+  getEmployeeClient,
+  findEmployeeByIdOrCode,
+  findEmployeesByIds,
+  findActiveEmployees,
+  findActiveEmployeeIds,
+  findEmployeeByUserId,
+  findEmployeeByEmail,
+  createEmployee,
+  countActiveEmployees,
+  findEmployeeByIdOrUserId,
+  countScopedEmployees,
+  terminateEmployee,
+  findEmployeesWithFilter,
+  findEmployeeWageProfile,
+  findEmployeeWithRelations,
+} from './employee.queries.js'

@@ -122,6 +122,7 @@ export const EmployeeAttendance: React.FC = () => {
       />
 
       {/* View Switcher Tabs */}
+      <p className="text-sm text-slate-600 dark:text-slate-300">Quên quét không được tự tính công cho thời gian thiếu. Nếu được quản lý chấp thuận bù tiền, khoản bù được ghi vào phụ cấp cuối tháng.</p>
       <div className="flex flex-wrap items-center gap-2 p-1 bg-slate-100 dark:bg-[#13162b] border border-slate-200 dark:border-[#21264b] rounded-2xl w-fit">
         <button
           type="button"

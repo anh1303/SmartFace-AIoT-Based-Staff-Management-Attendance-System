@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../common/AppError.js';
 import { buildIdOrCodeWhere } from '../../common/utils.js';
@@ -25,85 +26,53 @@ export function isEmployeeManager(target: {
   );
 }
 
-/**
- * Kiểm tra phân quyền truy cập hồ sơ nhân viên:
- * 1. ADMIN: Có tất cả quyền, truy cập được toàn bộ hồ sơ.
- * 2. EMPLOYEE: Chỉ có thể xem thông tin của chính mình.
- * 3. MANAGER (Quản lý): Có thể xem hồ sơ nhân viên thông thường và chính mình,
- *    nhưng KHÔNG ĐƯỢC xem hồ sơ chi tiết của các Manager (Quản lý) khác.
- */
+export type EmployeeActor = { id?: string; role?: string; employee_id?: string | null; employeeId?: string | null };
+
+/** Resolve the current database department, never a department or employee claim from a token. */
+export async function getEmployeeScope(
+  actor: EmployeeActor | undefined,
+  mode: 'read' | 'manage' = 'read',
+  tx?: Prisma.TransactionClient
+): Promise<Prisma.EmployeeWhereInput> {
+  if (!actor) throw AppError.unauthorized();
+  const role = actor.role?.toUpperCase();
+  if (role === 'ADMIN') return {};
+  if (!actor.id || !['EMPLOYEE', 'MANAGER'].includes(role || '')) throw AppError.forbidden('Employee access denied');
+  const client = tx ?? prisma;
+  if (tx && mode === 'manage' && role === 'MANAGER') {
+    await tx.$executeRaw`SELECT id FROM employees
+      WHERE user_id::text = ${actor.id}
+      OR department_id = (SELECT department_id FROM employees WHERE user_id::text = ${actor.id})
+      ORDER BY id FOR UPDATE`;
+  }
+  const self = await client.employee.findFirst({ where: { user_id: actor.id } });
+  if (!self) return { id: { in: [] } };
+  if (role === 'EMPLOYEE' || !self.departmentId) return { id: { in: mode === 'read' ? [self.id] : [] } };
+  const colleagues = await client.employee.findMany({
+    where: { departmentId: self.departmentId },
+    include: { position: true, department: true, users: { include: { roles: true } } },
+  });
+  const ids = colleagues.filter(employee => employee.id !== self.id && !isEmployeeManager(employee)).map(employee => employee.id);
+  if (mode === 'read') ids.push(self.id);
+  return { id: { in: ids } };
+}
+
 export async function assertCanAccessEmployeeDetail(
-  user: { id?: string; role?: string; employee_id?: string | null; employeeId?: string | null } | undefined,
+  actor: EmployeeActor | undefined,
   targetIdOrCode: string,
-  customForbiddenMessage = 'Bạn không có quyền xem thông tin chi tiết của quản lý khác'
+  forbiddenMessage = 'Employee access denied'
 ) {
-  if (!user) {
-    throw AppError.unauthorized();
-  }
+  const scope = await getEmployeeScope(actor);
+  if (actor?.role?.toUpperCase() === 'ADMIN') return;
+  const target = await prisma.employee.findFirst({ where: { AND: [scope, buildIdOrCodeWhere(targetIdOrCode)] } });
+  if (!target) throw AppError.forbidden(forbiddenMessage);
+}
 
-  const role = user.role?.toUpperCase();
-
-  // 1. ADMIN có tất cả quyền
-  if (role === 'ADMIN') {
-    return;
-  }
-
-  // 2. EMPLOYEE chỉ xem được chính mình
-  if (role === 'EMPLOYEE') {
-    const selfEmp = await prisma.employee.findFirst({
-      where: { user_id: user.id },
-    });
-    if (!selfEmp) {
-      throw AppError.notFound('Không tìm thấy thông tin hồ sơ nhân viên của bạn');
-    }
-    const isSelf = selfEmp.id === targetIdOrCode || selfEmp.employee_code === targetIdOrCode;
-    if (!isSelf) {
-      throw AppError.forbidden('Bạn không có quyền xem thông tin của nhân viên khác');
-    }
-    return;
-  }
-
-  // 3. MANAGER: Không thể xem chi tiết của Quản lý khác
-  if (role === 'MANAGER') {
-    const target = await prisma.employee.findFirst({
-      where: buildIdOrCodeWhere(targetIdOrCode),
-      include: {
-        department: true, position: true,
-        users: {
-          select: {
-            id: true,
-            roles: { select: { role_name: true } },
-          },
-        },
-      },
-    });
-
-    if (!target) {
-      throw AppError.notFound('Không tìm thấy thông tin nhân viên');
-    }
-
-    // Kiểm tra có phải chính mình không
-    const selfEmp = await prisma.employee.findFirst({
-      where: { user_id: user.id },
-    });
-    const isSelf =
-      (selfEmp && (selfEmp.id === target.id || selfEmp.employee_code === target.employee_code)) ||
-      target.user_id === user.id;
-
-    if (isSelf) {
-      return; // Quản lý được xem chính mình
-    }
-
-    // Chốt chặn: Quản lý chỉ được xem nhân viên thuộc phòng ban mình phụ trách
-    if (selfEmp?.departmentId && target.departmentId && selfEmp.departmentId !== target.departmentId) {
-      throw AppError.forbidden('Quản lý chỉ có quyền xem thông tin nhân viên thuộc phòng ban mình phụ trách');
-    }
-
-    // Kiểm tra nhân viên mục tiêu có phải là Quản lý không
-    if (isEmployeeManager(target)) {
-      throw AppError.forbidden(customForbiddenMessage);
-    }
-  }
+export async function assertCanManageEmployee(actor: EmployeeActor | undefined, targetIdOrCode: string, tx?: Prisma.TransactionClient) {
+  const scope = await getEmployeeScope(actor, 'manage', tx);
+  if (actor?.role?.toUpperCase() === 'ADMIN') return;
+  const target = await (tx ?? prisma).employee.findFirst({ where: { AND: [scope, buildIdOrCodeWhere(targetIdOrCode)] } });
+  if (!target) throw AppError.forbidden('Employee management denied');
 }
 
 /**

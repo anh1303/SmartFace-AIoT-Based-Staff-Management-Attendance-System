@@ -1,9 +1,9 @@
 import React from 'react';
-import { CreditCard, Printer } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
 import { PayrollRecord, Employee } from '../../../types';
 import { PayslipBreakdown } from '../../payrolls/components/PayslipBreakdown';
-import { calcPayrollAmount } from '../../../utils/payrollUtils';
+
 
 interface EmployeePayslipModalProps {
   payslip: PayrollRecord | null;
@@ -18,32 +18,10 @@ export const EmployeePayslipModal: React.FC<EmployeePayslipModalProps> = ({
   payslip,
   onClose,
   currentEmp,
-  hourlyRate,
   otRate,
   penaltyRate,
 }) => {
   if (!payslip) return null;
-
-  // Ưu tiên đơn giá snapshot lưu trong phiếu nếu có, thay vì cấu hình mới áp lên phiếu cũ
-  const slipHourly = payslip.hourly_rate !== undefined && payslip.hourly_rate !== null
-    ? Number(payslip.hourly_rate)
-    : Number(hourlyRate || 0);
-
-  const effectiveOtRate = payslip.overtime_rate !== undefined && payslip.overtime_rate !== null
-    ? Number(payslip.overtime_rate)
-    : otRate;
-
-  const effectivePenaltyRate = payslip.late_penalty_rate !== undefined && payslip.late_penalty_rate !== null
-    ? Number(payslip.late_penalty_rate)
-    : penaltyRate;
-
-  const slipWorking = Number(payslip.total_working_hours ?? payslip.working_hours ?? 0);
-  const slipOT = Number(payslip.total_overtime ?? 0);
-  const slipLate = Number(payslip.total_late_early ?? 0);
-  const slipOTAmount = calcPayrollAmount(slipOT, effectiveOtRate, slipHourly);
-  const slipLateAmount = calcPayrollAmount(slipLate, effectivePenaltyRate, slipHourly);
-  const slipAllowance = Number(payslip.allowance ?? 0);
-  const slipBase = slipWorking * slipHourly;
 
   return (
     <Modal

@@ -13,10 +13,10 @@ deviceRouter.post('/:id/settings-notify', asyncHandler(controller.settingsNotify
 
 deviceRouter.post('/:id/face-embedding', asyncHandler(authenticateFaceExtraction), faceExtractionLimiter, asyncHandler(extractDeviceFace));
 
-deviceRouter.use(authenticate);
+deviceRouter.use(authenticate, authorize('ADMIN'));
 
 deviceRouter.get('/', asyncHandler(controller.list));
-deviceRouter.get('/:id/mode', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.getMode));
+deviceRouter.get('/:id/mode', authorize('ADMIN'), asyncHandler(controller.getMode));
 deviceRouter.get('/:id', asyncHandler(controller.getById));
 deviceRouter.get('/:id/mode', asyncHandler(controller.getMode));
 deviceRouter.get('/:id/settings', asyncHandler(controller.getSettings));
@@ -30,4 +30,4 @@ deviceRouter.post('/:id/actions/bluetooth-disconnect', authorize('ADMIN', 'MANAG
 deviceRouter.post('/', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.create));
 deviceRouter.put('/:id', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.update));
 deviceRouter.delete('/:id', authorize('ADMIN'), asyncHandler(controller.remove));
-deviceRouter.patch('/:id/mode', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.setMode));
+deviceRouter.patch('/:id/mode', authorize('ADMIN'), asyncHandler(controller.setMode));

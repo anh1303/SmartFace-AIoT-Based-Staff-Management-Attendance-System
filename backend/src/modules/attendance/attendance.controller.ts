@@ -1,3 +1,4 @@
+import { getEmployeeScope, assertCanManageEmployee } from '../employees/public.js';
 import { workDateSchema } from '../../common/date.schema.js';
 import { assertDeviceWebhook } from '../../common/device-auth.js';
 import { Request, Response } from 'express';
@@ -8,6 +9,7 @@ import {
   adjustAttendanceSchema,
   checkOutSchema,
   aggregateAttendanceSchema,
+  devSimulateFaceScanSchema,
 } from './attendance.dto.js';
 
 export const tbWebhook = async (req: Request, res: Response) => {
@@ -30,21 +32,27 @@ export const list = async (req: Request, res: Response) => {
   successResponse(res, await service.list(query, req.user));
 };
 
-export const statistics = async (_req: Request, res: Response) => {
-  successResponse(res, await service.statistics());
+export const statistics = async (req: Request, res: Response) => {
+  successResponse(res, await service.statistics(req.user));
 };
 
 export const checkIn = async (req: Request, res: Response) => {
   const body = checkInSchema.parse(req.body);
-  const result = await service.checkIn(body, req.user, { eventId: body.event_id });
+  const result = await service.checkIn(body, req.user, { eventId: body.event_id, reason: body.reason });
   successResponse(res, result, 'Check-in recorded', 201);
 };
 
 export const checkOut = async (req: Request, res: Response) => {
   const body = checkOutSchema.parse(req.body);
   const targetEmployeeId = body.employeeId || (body as any).employee_id;
-  const result = await service.checkOut(targetEmployeeId, body.device_info, req.user, { eventId: body.event_id });
+  const result = await service.checkOut(targetEmployeeId, body.device_info, req.user, { eventId: body.event_id, reason: body.reason });
   successResponse(res, result, 'Check-out recorded', 201);
+};
+
+export const devSimulateFace = async (req: Request, res: Response) => {
+  const body = devSimulateFaceScanSchema.parse(req.body);
+  const result = await service.devSimulateFaceScan(body, req.user);
+  successResponse(res, result, 'Đã giả lập quét mặt thành công (Dev Mode)', 201);
 };
 
 export const getDailySummaries = async (req: Request, res: Response) => {
@@ -54,10 +62,14 @@ export const getDailySummaries = async (req: Request, res: Response) => {
 
 export const aggregate = async (req: Request, res: Response) => {
   const body = aggregateAttendanceSchema.parse(req.body);
+  if (body.employeeId) await assertCanManageEmployee(req.user, body.employeeId);
+  const scope = await getEmployeeScope(req.user, 'manage');
   const result = await service.aggregateDailyAttendance(
     body.month,
     body.year,
-    body.employeeId
+    body.employeeId,
+    undefined,
+    scope
   );
   successResponse(res, result, 'Aggregated attendance successfully', 201);
 };
@@ -68,8 +80,8 @@ export const adjust = async (req: Request, res: Response) => {
   successResponse(res, result, 'Attendance adjusted');
 };
 
-export const getLocks = async (_req: Request, res: Response) => {
-  successResponse(res, await service.getLocks());
+export const getLocks = async (req: Request, res: Response) => {
+  successResponse(res, await service.getLocks(req.user));
 };
 
 export const lock = async (req: Request, res: Response) => {
@@ -77,7 +89,7 @@ export const lock = async (req: Request, res: Response) => {
   if (!dateStr) {
     return res.status(400).json({ success: false, message: 'Date is required' });
   }
-  const result = await service.toggleLock(dateStr, true, req.user?.id);
+  const result = await service.toggleLock(dateStr, true, req.user?.id, req.user?.role);
   successResponse(res, result, 'Đã khóa chốt dữ liệu chấm công thành công');
 };
 
@@ -86,6 +98,19 @@ export const unlock = async (req: Request, res: Response) => {
   if (!dateStr) {
     return res.status(400).json({ success: false, message: 'Date is required' });
   }
-  const result = await service.toggleLock(dateStr, false, req.user?.id);
+  const result = await service.toggleLock(dateStr, false, req.user?.id, req.user?.role);
   successResponse(res, result, 'Đã mở khóa dữ liệu chấm công thành công');
 };
+
+export const unlockEmployee = async (req: Request, res: Response) => {
+  const { employeeId, date, reason } = req.body;
+  if (!employeeId || !date) {
+    return res.status(400).json({ success: false, message: 'employeeId và date là bắt buộc' });
+  }
+  const result = await service.unlockEmployeeAttendance(
+    { employeeId, date, reason },
+    { id: req.user?.id, role: req.user?.role }
+  );
+  successResponse(res, result, result.message);
+};
+

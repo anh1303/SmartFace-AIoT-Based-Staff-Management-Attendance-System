@@ -29,7 +29,7 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
   const { role } = useAuth();
   return (
     <PageHeaderBanner
-      title="Bảng lương & xét duyệt"
+      title="Bảng lương"
       titleExtra={
         <div className="flex items-center gap-2 bg-white/80 dark:bg-[#0f1224] px-3 py-1.5 rounded-xl border border-blue-200/80 dark:border-[#272d5a] shadow-inner backdrop-blur-sm">
           <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />

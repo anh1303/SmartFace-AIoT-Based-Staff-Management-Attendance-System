@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useApp } from '../../../context/AppContext';
-import { Employee, PayrollRecord } from '../../../types';
-import { calcPayrollAmount } from '../../../utils/payrollUtils';
+import { Employee } from '../../../types';
 
 export interface UseEmployeePayrollDetailOptions {
   currentEmp: Employee | null;
@@ -9,77 +8,34 @@ export interface UseEmployeePayrollDetailOptions {
   lateCount?: number;
 }
 
-/**
- * Feature Hook: Quản lý chi tiết lịch sử bảng lương, kỳ hiện tại và tính toán thu nhập nhân viên.
- */
-export function useEmployeePayrollDetail(options: UseEmployeePayrollDetailOptions) {
-  const { currentEmp, workDays = 0, lateCount = 0 } = options;
-  const { payroll, bonusPenalty } = useApp();
-
-  // 1. Employee Payroll Records
+export function useEmployeePayrollDetail({ currentEmp }: UseEmployeePayrollDetailOptions) {
+  const { payroll } = useApp();
   const employeePayrolls = useMemo(() => {
     if (!currentEmp) return [];
     return payroll
-      .filter((p) => p.employee_id === currentEmp.employee_id || p.employee_id === currentEmp.id)
-      .sort((a, b) => {
-        const periodA = a.period || a.payroll_period || '';
-        const periodB = b.period || b.payroll_period || '';
-        return periodB.localeCompare(periodA);
-      });
+      .filter(p => p.employee_id === currentEmp.employee_id || p.employee_id === currentEmp.id)
+      .sort((a, b) => (b.period || b.payroll_period || '').localeCompare(a.period || a.payroll_period || ''));
   }, [payroll, currentEmp]);
-
-  // 2. Current Month Payroll Estimation
-  const currentYear = new Date().getFullYear();
-  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-  const currentPeriodKey = `${currentYear}-${currentMonth}`;
-
-  const currentMonthPayroll = useMemo(() => {
-    return employeePayrolls.find((p) => (p.period || p.payroll_period) === currentPeriodKey) || employeePayrolls[0] || null;
-  }, [employeePayrolls, currentPeriodKey]);
-
-  // Dùng đơn giá snapshot của phiếu trong preview nếu có, thay vì lấy cấu hình mới áp lên phiếu cũ
-  const hourlyRate = currentMonthPayroll?.hourly_rate !== undefined && currentMonthPayroll?.hourly_rate !== null
-    ? Number(currentMonthPayroll.hourly_rate)
-    : (currentEmp?.hourly_rate || 0);
-
-  const standardHours = currentMonthPayroll?.total_working_hours ?? currentMonthPayroll?.working_hours ?? (workDays * 8 || 0);
-  const overtimeHours = currentMonthPayroll?.total_overtime ?? 0;
-  const lateEarlyHours = currentMonthPayroll?.total_late_early ?? (lateCount * 0.5);
-  const allowance = currentMonthPayroll?.allowance ?? 0;
-
-  const otRate = currentMonthPayroll?.overtime_rate !== undefined && currentMonthPayroll?.overtime_rate !== null
-    ? Number(currentMonthPayroll.overtime_rate)
-    : (bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000);
-
-  const penaltyRate = currentMonthPayroll?.late_penalty_rate !== undefined && currentMonthPayroll?.late_penalty_rate !== null
-    ? Number(currentMonthPayroll.late_penalty_rate)
-    : (bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000);
-
-  const otAmount = calcPayrollAmount(overtimeHours, otRate, hourlyRate);
-  const penaltyAmount = calcPayrollAmount(lateEarlyHours, penaltyRate, hourlyRate) + (currentMonthPayroll?.total_absence_penalty || 0);
-
-  const baseSalary = standardHours * hourlyRate;
-  const currentNetSalary = currentMonthPayroll?.net_salary !== undefined
-    ? Number(currentMonthPayroll.net_salary)
-    : Math.max(0, Math.round(baseSalary + otAmount - penaltyAmount + allowance));
-
-  const pastPayrolls = employeePayrolls;
+  const today = new Date();
+  const currentPeriodKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthPayroll = employeePayrolls.find(p => (p.period || p.payroll_period) === currentPeriodKey) ?? null;
+  const breakdown = currentMonthPayroll?.breakdown;
 
   return {
     employeePayrolls,
     currentMonthPayroll,
-    hourlyRate,
-    standardHours,
-    overtimeHours,
-    lateEarlyHours,
-    allowance,
-    currentNetSalary,
-    pastPayrolls,
+    hourlyRate: Number(currentMonthPayroll?.hourly_rate ?? currentEmp?.hourly_rate ?? 0),
+    standardHours: currentMonthPayroll?.total_working_hours ?? currentMonthPayroll?.working_hours ?? 0,
+    overtimeHours: currentMonthPayroll?.total_overtime ?? 0,
+    lateEarlyHours: currentMonthPayroll?.total_late_early ?? 0,
+    allowance: currentMonthPayroll?.allowance ?? 0,
+    currentNetSalary: currentMonthPayroll ? Number(currentMonthPayroll.net_salary) : null,
+    pastPayrolls: employeePayrolls,
     currentPeriodKey,
-    baseSalary,
-    otAmount,
-    penaltyAmount,
-    otRate,
-    penaltyRate,
+    baseSalary: breakdown?.base_salary ?? null,
+    otAmount: breakdown?.overtime_pay ?? null,
+    penaltyAmount: breakdown ? breakdown.late_early_deduction + breakdown.absence_deduction : null,
+    otRate: Number(currentMonthPayroll?.overtime_rate ?? 0),
+    penaltyRate: Number(currentMonthPayroll?.late_penalty_rate ?? 0),
   };
 }

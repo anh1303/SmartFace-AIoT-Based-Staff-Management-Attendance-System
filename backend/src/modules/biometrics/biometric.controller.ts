@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
-import { assertCanAccessEmployeeDetail } from '../employees/index.js';
+import { assertCanAccessEmployeeDetail } from '../employees/public.js';
 import * as service from './biometric.service.js';
 import { enrollImagesSchema } from './biometric.dto.js';
 
@@ -27,7 +27,7 @@ export const enrollImages = async (req: Request, res: Response) => {
 
 export const deactivate = async (req: Request, res: Response) => {
   const employeeId = req.params.employeeId as string;
-  await service.deactivate(employeeId);
+  await service.deactivate(employeeId, req.user);
   successResponse(res, null, 'Biometric profile deactivated');
 };
 

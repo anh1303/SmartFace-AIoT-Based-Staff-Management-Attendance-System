@@ -7,9 +7,10 @@ export interface DeviceInfo {
   status: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
 }
 
-export function useDevices() {
+export function useDevices(enabled = true) {
   const query = useQuery<DeviceInfo[]>({
     queryKey: ['devices'],
+    enabled,
     queryFn: async () => {
       const res = await apiFetch('/api/devices');
       if (res && res.success && Array.isArray(res.data)) {

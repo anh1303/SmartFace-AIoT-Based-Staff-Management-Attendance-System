@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchShiftsApi, assignShiftApi } from '../../../api/shiftApi';
+import { fetchShiftsApi, assignShiftApi } from '../api/shiftApi';
 import { WorkShift } from '../../../types';
 
 

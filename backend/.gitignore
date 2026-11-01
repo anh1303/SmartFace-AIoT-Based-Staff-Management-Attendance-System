@@ -51,3 +51,4 @@ tmp/
 # Keep business-policy regression tests with this module.
 !validation/
 !validation/*.test.ts
+!validation/**/*.test.ts

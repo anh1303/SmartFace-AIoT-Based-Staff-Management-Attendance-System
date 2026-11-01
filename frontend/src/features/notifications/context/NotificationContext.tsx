@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { api } from '../../../api/client';
 import {
   NotificationItem,
   NotificationType,
@@ -53,6 +54,29 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const [isOpen, setIsOpen] = useState(false);
   const [hasNewAlert, setHasNewAlert] = useState(false);
+
+  useEffect(() => {
+    let disposed = false;
+    let lastSession: string | null = null;
+    const poll = async () => {
+      const session = sessionStorage.getItem('userSession') || localStorage.getItem('userSession');
+      if (session !== lastSession) {
+        lastSession = session;
+        setNotifications(prev => prev.filter(item => !item.id.startsWith('server_')));
+      }
+      if (!session) return;
+      try {
+        const response = await api.get<NotificationItem[]>('/notifications');
+        if (disposed || session !== (sessionStorage.getItem('userSession') || localStorage.getItem('userSession'))) return;
+        if (Array.isArray(response.data)) {
+          setNotifications(prev => [...response.data!, ...prev.filter(item => !item.id.startsWith('server_'))].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, MAX_STORED_NOTIFICATIONS));
+        }
+      } catch { /* Keep local notifications if the server is temporarily unavailable. */ }
+    };
+    void poll();
+    const timer = window.setInterval(() => void poll(), 5000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, []);
 
   // Sync to sessionStorage (chỉ lưu trong phiên hiện tại)
   useEffect(() => {
@@ -116,11 +140,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Remove single notification
   const removeNotification = useCallback((id: string) => {
+    if (id.startsWith('server_')) void api.patch(`/notifications/${id.slice(7)}`, { action: 'delete' }).catch(() => {});
     setNotifications((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
   // Clear all (xóa sạch cả state và storage)
-  const clearAll = useCallback(() => {
+  const clearAll = useCallback((localOnly = false) => {
+    if (!localOnly) void api.patch('/notifications', { action: 'delete' }).catch(() => {});
     setNotifications([]);
     try {
       sessionStorage.removeItem(NOTIFICATIONS_STORAGE_KEY);
@@ -134,6 +160,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Mark all as read
   const markAllAsRead = useCallback(() => {
+    void api.patch('/notifications', { action: 'read' }).catch(() => {});
     setNotifications((prev) =>
       prev.map((item) => (item.read ? item : { ...item, read: true }))
     );
@@ -141,6 +168,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Mark single as read
   const markAsRead = useCallback((id: string) => {
+    if (id.startsWith('server_')) void api.patch(`/notifications/${id.slice(7)}`, { action: 'read' }).catch(() => {});
     setNotifications((prev) =>
       prev.map((item) => (item.id === id ? { ...item, read: true } : item))
     );

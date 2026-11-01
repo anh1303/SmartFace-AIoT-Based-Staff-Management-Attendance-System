@@ -1,7 +1,7 @@
 /** Per-checkout evidence. Daily half-shift wages are credited once, at the
  * checkout that first crosses the half-shift threshold, never once per pair. */
 export function annotatePairCredits<T extends { start: string; end: string }>(pairs: T[], context: {
-  start: string; end: string; scheduledSeconds: number; workingHours: number; candidateHours: number; off: boolean
+  start: string; end: string; scheduledSeconds: number; workingHours: number; candidateHours: number; off: boolean; requiredNumerator?: number; requiredDenominator?: number
 }) {
   let cumulative = 0
   let credited = false
@@ -11,8 +11,10 @@ export function annotatePairCredits<T extends { start: string; end: string }>(pa
     const actual = !context.off && context.scheduledSeconds > 0 ? Math.max(0, (Math.min(to, +new Date(context.end)) - Math.max(from, +new Date(context.start))) / 1000) : 0
     const overtime = !context.off && context.scheduledSeconds > 0 ? Math.max(0, (to - Math.max(from, +new Date(context.end))) / 1000) : 0
     cumulative += actual
-    const creditNow = eligible && !credited && cumulative >= context.scheduledSeconds / 2
-    const creditReason = context.off ? 'OFF' : context.scheduledSeconds <= 0 ? 'NO_SHIFT' : !eligible ? 'UNDER_HALF_SHIFT' : creditNow ? 'HALF_SHIFT_REACHED' : credited ? 'FULL_SHIFT_ALREADY_CREDITED' : 'HALF_SHIFT_NOT_YET_REACHED'
+    const numerator = context.requiredNumerator ?? 1, denominator = context.requiredDenominator ?? 2
+    const legacy = numerator === 1 && denominator === 2
+    const creditNow = eligible && !credited && cumulative * denominator >= context.scheduledSeconds * numerator
+    const creditReason = context.off ? 'OFF' : context.scheduledSeconds <= 0 ? 'NO_SHIFT' : !eligible ? legacy ? 'UNDER_HALF_SHIFT' : 'UNDER_MINIMUM_SHIFT' : creditNow ? legacy ? 'HALF_SHIFT_REACHED' : 'MINIMUM_SHIFT_REACHED' : credited ? 'FULL_SHIFT_ALREADY_CREDITED' : legacy ? 'HALF_SHIFT_NOT_YET_REACHED' : 'MINIMUM_SHIFT_NOT_YET_REACHED'
     if (creditNow) credited = true
     return { ...pair,
       actual_in_shift_seconds: actual, actual_overtime_seconds: overtime,
@@ -34,5 +36,6 @@ export function projectAttendanceDetails(value: unknown, workingHours: number, c
   return { ...details, pairs: annotatePairCredits(details.pairs, {
     start: details.scheduledStart, end: details.scheduledEnd,
     scheduledSeconds: Number(details.scheduledShiftSeconds || 0), workingHours, candidateHours, off: details.off === true,
-  }), details_version: 2 }
+    requiredNumerator: Number(details.minimumShiftNumerator || 1), requiredDenominator: Number(details.minimumShiftDenominator || 2),
+  }), details_version: 3 }
 }

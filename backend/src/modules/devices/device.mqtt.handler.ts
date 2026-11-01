@@ -3,7 +3,6 @@ import { getMqttClient } from '../../config/mqtt.js'
 import { env } from '../../config/env.js'
 import { eventBus } from '../../common/event-bus.js'
 import * as deviceService from './device.service.js'
-import * as attendance from '../attendance/attendance.service.js'
 import { logger } from '../../common/logger.js'
 
 const mqttSecLogger = logger.child('MQTT:Security')
@@ -56,8 +55,6 @@ export function registerDeviceMqttHandlers() {
 
   // Lắng nghe trạng thái thiết bị
   client.subscribe('attendance/devices/+/status')
-  // Lắng nghe sự kiện check-in từ thiết bị IoT
-  client.subscribe('attendance/devices/+/check-in')
 
   client.on('message', async (topic, buffer) => {
     try {
@@ -67,30 +64,11 @@ export function registerDeviceMqttHandlers() {
       const event = parts[3]
 
       if (event === 'status') {
-        // Cập nhật trạng thái thiết bị (in-memory)
-        const device = deviceService.updateStatus(deviceId, payload.status ?? 'OFFLINE')
+        // Cập nhật trạng thái thiết bị (database)
+        const device = await deviceService.updateStatus(deviceId, payload.status ?? 'OFFLINE')
         if (device) eventBus.publish('device:status-changed', { deviceId, status: payload.status ?? 'OFFLINE', details: device })
       }
 
-      if (event === 'check-in') {
-        const { employeeId, timestamp, signature } = payload
-
-        // Xác thực bảo mật chữ ký HMAC-SHA256 & Timestamp từ MQTT_DEVICE_SECRET
-        if (signature || env.NODE_ENV === 'production') {
-          const isValid = verifyMqttDeviceSignature(deviceId, employeeId, timestamp, signature)
-          if (!isValid) {
-            mqttSecLogger.error(`Gói tin check-in từ thiết bị '${deviceId}' bị TỪ CHỐI do chữ ký HMAC-SHA256 hoặc timestamp không hợp lệ!`)
-            return
-          }
-        }
-
-        // Nhận check-in từ thiết bị IoT (camera nhận diện khuôn mặt). checkIn đã tự động publish event lên eventBus.
-        await attendance.checkIn({
-          employeeId,
-          device_info: `device:${deviceId}`,
-          method: 'FACE',
-        })
-      }
     } catch (error) {
       mqttHandlerLogger.error('MQTT message rejected:', error)
     }

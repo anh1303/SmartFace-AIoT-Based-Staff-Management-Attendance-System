@@ -6,10 +6,8 @@ import { env } from './config/env.js'
 import { prisma } from './config/database.js'
 import { connectMqtt, disconnectMqtt } from './config/mqtt.js'
 import { socketAuthMiddleware } from './sockets/socket.auth.js'
-import { initializeAttendanceGateway } from './modules/attendance/attendance.gateway.js'
-import { initializeDeviceGateway } from './modules/devices/device.gateway.js'
-import { registerDeviceMqttHandlers } from './modules/devices/device.mqtt.handler.js'
-import { startAttendanceCron, stopAttendanceCron } from './modules/attendance/attendance.cron.js'
+import { initializeAttendanceGateway, startAttendanceCron, stopAttendanceCron } from './modules/attendance/index.js'
+import { initializeDeviceGateway, registerDeviceMqttHandlers } from './modules/devices/index.js'
 import { logger } from './common/logger.js'
 
 const serverLogger = logger.child('Server')

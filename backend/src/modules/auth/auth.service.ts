@@ -6,9 +6,9 @@ import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
 import { AppError } from '../../common/AppError.js'
 import { USER_ROLES } from '../../common/constants.js'
-import { generateUniqueEmployeeCode } from '../../common/utils.js'
-import { logAction } from '../audit-logs/audit.service.js'
-import { createEmployee, findEmployeeByEmail } from '../employees/index.js'
+import { generateUniqueEmployeeCode, findEmployeeByEmail } from '../employees/employee.code.js'
+import { createEmployee, findDepartmentByIdOrCode, findPositionByName } from '../employees/public.js'
+import { logAction } from '../audit-logs/public.js'
 import type { z } from 'zod'
 import type { loginSchema, registerSchema } from './auth.dto.js'
 
@@ -51,10 +51,10 @@ function safeUser(user: {
   }
 }
 
-const tokenFor = (user: ReturnType<typeof safeUser>) => {
+const tokenFor = (user: ReturnType<typeof safeUser>, tokenVersion: number = 1) => {
   // Profile images belong in API responses; embedding them can exceed browser cookie limits.
   const { avatar: _avatar, ...claims } = user
-  return jwt.sign(claims, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] })
+  return jwt.sign({ ...claims, tv: tokenVersion }, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] })
 }
 
 export async function login(input: z.infer<typeof loginSchema>) {
@@ -107,8 +107,10 @@ export async function login(input: z.infer<typeof loginSchema>) {
     }
   }
 
+  const profileData = (user.profile && typeof user.profile === 'object') ? (user.profile as Record<string, unknown>) : {}
+  const currentTv = typeof profileData.token_version === 'number' ? profileData.token_version : 1
   const safe = safeUser(user)
-  return { user: safe, accessToken: tokenFor(safe) }
+  return { user: safe, accessToken: tokenFor(safe, currentTv) }
 }
 
 export async function me(userId: string) {
@@ -147,10 +149,7 @@ export async function register(input: z.infer<typeof registerSchema>) {
   const rawDeptId = input.departmentId ?? input.department_id
   let deptId: number | null = null
   if (rawDeptId !== undefined && rawDeptId !== null && rawDeptId !== '') {
-    const num = Number(rawDeptId)
-    const dept = isNaN(num)
-      ? await prisma.department.findFirst({ where: { department_code: { equals: String(rawDeptId), mode: 'insensitive' } } })
-      : await prisma.department.findUnique({ where: { id: num } })
+    const dept = await findDepartmentByIdOrCode(rawDeptId)
     if (!dept) {
       throw new AppError(400, `Chức vụ / Phòng ban '${rawDeptId}' không tồn tại trong hệ thống`)
     }
@@ -160,9 +159,7 @@ export async function register(input: z.infer<typeof registerSchema>) {
   // 3. Resolve positionId if input.position provided
   let posId: number | null = null
   if (input.position) {
-    const foundPos = await prisma.position.findFirst({
-      where: { name: { equals: input.position.trim(), mode: 'insensitive' } },
-    })
+    const foundPos = await findPositionByName(input.position)
     if (foundPos) {
       posId = foundPos.id
       if (!deptId) deptId = foundPos.departmentId
@@ -173,17 +170,13 @@ export async function register(input: z.infer<typeof registerSchema>) {
   const finalCode = await generateUniqueEmployeeCode()
 
   return prisma.$transaction(async (tx) => {
-    // Gọi hàm Public createEmployee từ employees module thay vì tx.employee.create
-    const employee = await createEmployee(
-      {
+    const employee = await createEmployee({
         employee_code: finalCode,
         full_name: input.name,
         email: input.email,
         positionId: posId,
         departmentId: deptId,
-      },
-      tx
-    )
+      }, tx)
 
     const user = await tx.user.create({
       data: {
@@ -235,8 +228,28 @@ export async function findAuthUserByUsername(username: string, tx?: Prisma.Trans
 /**
  * Public Module API: Tìm User theo ID (hỗ trợ transaction)
  */
-export async function findAuthUserById(userId: string, tx?: Prisma.TransactionClient) {
+export async function findAuthUserById(
+  userId: string,
+  options: { includeRoles: true },
+  tx?: Prisma.TransactionClient
+): Promise<(Prisma.UserGetPayload<{ include: { roles: true } }>) | null>
+export async function findAuthUserById(
+  userId: string,
+  options?: { includeRoles?: boolean },
+  tx?: Prisma.TransactionClient
+): Promise<(Prisma.UserGetPayload<{ include: { roles?: boolean } }>) | null>
+export async function findAuthUserById(
+  userId: string,
+  options?: { includeRoles?: boolean },
+  tx?: Prisma.TransactionClient
+) {
   const client = tx ?? prisma
+  if (options?.includeRoles) {
+    return client.user.findUnique({
+      where: { id: userId },
+      include: { roles: true },
+    })
+  }
   return client.user.findUnique({ where: { id: userId } })
 }
 
@@ -264,11 +277,90 @@ export async function updateAuthUser(
   data: Prisma.UserUpdateInput,
   tx?: Prisma.TransactionClient
 ) {
-  const client = tx ?? prisma
-  return client.user.update({
-    where: { id: userId },
-    data,
-  })
+  const run = async (t: Prisma.TransactionClient) => {
+    if (typeof (t as any).$executeRaw === 'function') {
+      await (t as any).$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'user-auth:' + userId}))`
+    }
+    if (data.passwordHash) {
+      const existing = await t.user.findUnique({ where: { id: userId }, select: { profile: true } })
+      const p = (existing?.profile && typeof existing.profile === 'object') ? (existing.profile as Record<string, unknown>) : {}
+      const tv = (typeof p.token_version === 'number' ? p.token_version : 1) + 1
+      data.profile = {
+        ...p,
+        token_version: tv,
+        password_changed_at: new Date().toISOString(),
+      } as Prisma.InputJsonValue
+    }
+    return t.user.update({
+      where: { id: userId },
+      data,
+    })
+  }
+  if (tx) return run(tx)
+  return prisma.$transaction(run)
+}
+
+/**
+ * Public Module API: Xác thực token và lấy thông tin phiên đang hoạt động từ CSDL
+ */
+export async function verifyAndLoadActiveUser(token: string) {
+  const decoded = jwt.verify(token, env.JWT_SECRET) as {
+    id?: string
+    role?: string
+    tv?: number
+    iat?: number
+  }
+
+  if (!decoded?.id) {
+    throw new AppError(401, 'Invalid token payload')
+  }
+
+  let user: any = null
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      include: {
+        roles: true,
+        employees: {
+          include: {
+            department: true,
+            position: true,
+          },
+        },
+      },
+    })
+  } catch {
+    throw new AppError(401, 'Invalid user ID in token')
+  }
+
+  if (!user || !user.is_active) {
+    throw new AppError(401, 'Tài khoản người dùng đã bị khóa hoặc không tồn tại')
+  }
+
+  if (user.employees) {
+    if (user.employees.status === 'TERMINATED' || user.employees.status === 'INACTIVE') {
+      throw new AppError(401, 'Tài khoản nhân viên không còn hoạt động')
+    }
+  }
+
+  const profile = (user.profile && typeof user.profile === 'object') ? (user.profile as Record<string, unknown>) : {}
+  const currentTv = typeof profile.token_version === 'number' ? profile.token_version : 1
+  const tokenTv = typeof decoded.tv === 'number' ? decoded.tv : 1
+  if (tokenTv < currentTv) {
+    throw new AppError(401, 'Phiên đăng nhập đã hết hạn hoặc mật khẩu đã thay đổi. Vui lòng đăng nhập lại.')
+  }
+
+  if (profile.password_changed_at && decoded.iat) {
+    const pwdTime = new Date(profile.password_changed_at as string).getTime()
+    // 1000ms grace window for clock skew between iat (seconds) and Date ISO
+    if (decoded.iat * 1000 < pwdTime - 1000) {
+      throw new AppError(401, 'Mật khẩu đã thay đổi. Vui lòng đăng nhập lại.')
+    }
+  }
+
+  const safe = safeUser(user)
+  const { avatar: _avatar, ...authUser } = safe
+  return authUser
 }
 
 /**
@@ -301,3 +393,77 @@ export async function deleteAuthUser(userId: string, tx?: Prisma.TransactionClie
     where: { id: userId },
   })
 }
+
+/**
+ * Public Module API: Lấy ID của các Admin đang hoạt động (hỗ trợ transaction)
+ */
+export async function findActiveAdminUserIds(tx?: Prisma.TransactionClient): Promise<string[]> {
+  const client = tx ?? prisma
+  const admins = await client.user.findMany({
+    where: { is_active: true, roles: { role_name: 'ADMIN' } },
+    select: { id: true },
+  })
+  return admins.map((a: { id: string }) => a.id)
+}
+
+/**
+ * Public Module API: Lấy ID của các Admin và Manager đang hoạt động (hỗ trợ transaction)
+ */
+export async function findActiveManagerAndAdminUserIds(tx?: Prisma.TransactionClient): Promise<string[]> {
+  const client = tx ?? prisma
+  const users = await client.user.findMany({
+    where: { is_active: true, roles: { role_name: { in: ['ADMIN', 'MANAGER'] } } },
+    select: { id: true },
+  })
+  return users.map((u: { id: string }) => u.id)
+}
+
+export async function findActiveManagerUserIdsByDepartment(
+  departmentId: number,
+  excludeEmployeeId?: string,
+  tx?: Prisma.TransactionClient
+): Promise<string[]> {
+  const client = tx ?? prisma
+  const managers = await client.user.findMany({
+    where: {
+      is_active: true,
+      roles: { role_name: 'MANAGER' },
+      employees: {
+        departmentId,
+        status: 'ACTIVE',
+        ...(excludeEmployeeId ? { id: { not: excludeEmployeeId } } : {}),
+      },
+    },
+    select: { id: true },
+  })
+  return managers.map(m => m.id)
+}
+
+export type ActiveAlertRecipient = {
+  id: string
+  role: string
+  departmentId?: number | null
+  status?: string | null
+}
+
+/**
+ * Public Module API: Lấy danh sách người nhận cảnh báo hệ thống (Admin & Manager)
+ */
+export async function findActiveAlertRecipients(tx?: Prisma.TransactionClient): Promise<ActiveAlertRecipient[]> {
+  const client = tx ?? prisma
+  const users = await client.user.findMany({
+    where: { is_active: true, roles: { role_name: { in: ['ADMIN', 'MANAGER'] } } },
+    select: {
+      id: true,
+      roles: { select: { role_name: true } },
+      employees: { select: { departmentId: true, status: true } },
+    },
+  })
+  return users.map(u => ({
+    id: u.id,
+    role: u.roles.role_name,
+    departmentId: u.employees?.departmentId ?? null,
+    status: u.employees?.status ?? null,
+  }))
+}
+

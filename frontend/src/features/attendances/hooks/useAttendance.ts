@@ -2,7 +2,7 @@ import { useMemo, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from '../../../context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchAttendanceApi, addAttendanceApi, FetchAttendanceParams } from '../../../api/attendanceApi';
+import { fetchAttendanceApi, addAttendanceApi, FetchAttendanceParams } from '../api/attendanceApi';
 import { AttendanceRecord } from '../../../types';
 import { useToast } from '../../../context/ToastContext';
 
@@ -67,6 +67,7 @@ export function useAttendance(params?: FetchAttendanceParams) {
     attendance: query.data || [],
     isLoading: query.isLoading,
     isError: query.isError,
+    isTruncated: Boolean((query.data as any)?.isTruncated),
     refetchAttendance: query.refetch,
     addAttendanceRecord: (record: Omit<AttendanceRecord, 'attendance_id'>) => addAttendanceMutation.mutate(record),
   };

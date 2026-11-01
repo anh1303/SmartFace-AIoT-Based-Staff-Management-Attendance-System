@@ -1,5 +1,7 @@
 # SmartFace — tích hợp UI, hồ sơ và ca tùy chỉnh
 
+**Cập nhật 30/10/2026:** môi trường test PostgreSQL bằng Docker được gỡ; các test mới dùng database tạm trên Neon testing qua `npm run test:neon`. Phần bên dưới ghi lại môi trường tại ngày kiểm chứng ban đầu.
+
 Ngày kiểm chứng: 28/10/2026.
 
 ## Phạm vi

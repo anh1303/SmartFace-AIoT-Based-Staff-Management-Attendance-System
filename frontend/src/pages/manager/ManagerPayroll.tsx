@@ -1,11 +1,10 @@
-import { AdjustmentReviewPanel } from '../../features/payrolls/components/AdjustmentReviewPanel';
 import React, { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionUtils';
 import { PayrollRecord } from '../../types';
 import { logger } from '../../utils/logger';
+import { nextPayrollPolicyPeriod } from '../../utils/payrollUtils';
 import { useDepartmentPositions } from '@/features/employees';
 import {
   PayrollHeader,
@@ -17,17 +16,24 @@ import {
   PolicyFormData,
   PayrollFinalizeModal,
   PayrollUnlockModal,
+  EarlySettlementModal,
+  buildPayrollItemUpdates,
+  earlySettlementPayrollApi,
+  fetchBonusPenaltyApi,
+  payrollAttendanceTotals,
 } from '@/features/payrolls';
+import { useAttendanceSummaries } from '@/features/attendances';
+import { useShiftContext } from '../../context/ShiftContext';
+import { formatVNDateISO } from '../../utils/dateUtils';
 
 const payrollLogger = logger.child('ManagerPayroll');
 
 export const ManagerPayroll: React.FC = () => {
   const { role, currentUser } = useAuth();
-  const [viewParams,setViewParams]=useSearchParams();
-  const view=viewParams.get('payrollTab')||'records';
-  const selectView=(value:string)=>setViewParams(p=>{p.set('payrollTab',value);return p;});
   const {
     payroll,
+    isLoadingPayroll,
+    payrollError,
     bonusPenalty,
     selectedPeriod,
     setSelectedPeriod,
@@ -41,6 +47,15 @@ export const ManagerPayroll: React.FC = () => {
   } = useApp();
 
   const isManager = role === 'manager';
+  const shifts = useShiftContext();
+  const monthEnd = new Date(Date.UTC(Number(selectedPeriod.slice(0, 4)), Number(selectedPeriod.slice(5, 7)), 0)).getUTCDate();
+  const attendanceSummary = useAttendanceSummaries(`${selectedPeriod}-01`, `${selectedPeriod}-${String(monthEnd).padStart(2, '0')}`);
+  const attendanceTotals = useMemo(() => payrollAttendanceTotals(attendanceSummary.summaries, shifts.workShifts, selectedPeriod), [attendanceSummary.summaries, shifts.workShifts, selectedPeriod]);
+  const unprocessedEmployeeIds = useMemo(() => {
+    const today = formatVNDateISO(new Date());
+    const summarized = new Set(attendanceSummary.summaries.flatMap(s => [`${s.employee_id}_${s.date}`, `${s.employee_uuid}_${s.date}`]));
+    return new Set(shifts.workShifts.filter(s => s.date.startsWith(selectedPeriod) && s.date < today && s.shift_type !== 'OFF' && !summarized.has(`${s.employee_id}_${s.date}`)).map(s => s.employee_id));
+  }, [attendanceSummary.summaries, shifts.workShifts, selectedPeriod]);
   const managerDept = currentUser?.department;
 
   const [confirmFinalizeOpen, setConfirmFinalizeOpen] = useState(false);
@@ -74,24 +89,33 @@ export const ManagerPayroll: React.FC = () => {
   // Modal state for Bonus Penalty Policy
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
   const [policyData, setPolicyData] = useState<PolicyFormData>({
-    overtime_rate: 100000,
-    late_early_penalty: 50000,
-    absence_penalty_rate: 0.25,
+    overtime_rate: 2.0,
+    late_early_penalty: 1.5,
+    absence_penalty_rate: 2.0,
+    effective_period: nextPayrollPolicyPeriod(),
     description: '',
   });
 
-  const handleOpenPolicyModal = () => {
+  const handleOpenPolicyModal = async () => {
     if (role !== 'admin') {
       showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error');
       return;
     }
-    setPolicyData({
-      overtime_rate: bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000,
-      late_early_penalty: bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000,
-      absence_penalty_rate: bonusPenalty?.absence_penalty_rate ?? 0.25,
-      description: bonusPenalty?.description || '',
-    });
-    setIsPolicyModalOpen(true);
+    try {
+      const effectivePeriod = nextPayrollPolicyPeriod();
+      const base = await fetchBonusPenaltyApi(effectivePeriod);
+      if (!base) throw new Error('Chưa xác định chính sách cho kỳ hiệu lực');
+      setPolicyData({
+        overtime_rate: Number(base.overtime_rate),
+        late_early_penalty: Number(base.late_early_penalty),
+        absence_penalty_rate: Number(base.absence_penalty_rate),
+        description: base.description || '',
+        effective_period: effectivePeriod,
+      });
+      setIsPolicyModalOpen(true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không tải được chính sách', 'error');
+    }
   };
 
   const handleSavePolicy = async (e: React.FormEvent) => {
@@ -108,6 +132,7 @@ export const ManagerPayroll: React.FC = () => {
   // Modal State for Editing a Payroll line item
   const [editingItem, setEditingItem] = useState<EditingPayrollItem | null>(null);
   const [isSavingItem, setIsSavingItem] = useState(false);
+  const [earlySettlementRecord, setEarlySettlementRecord] = useState<PayrollRecord | null>(null);
 
   // Dynamic periods generated from payroll records
   const availablePeriods = Array.from(
@@ -148,7 +173,7 @@ export const ManagerPayroll: React.FC = () => {
         if (emp && isAnotherManager(emp, currentUser)) {
           return false;
         }
-      }
+      } else return false;
     }
     return true;
   });
@@ -185,8 +210,8 @@ export const ManagerPayroll: React.FC = () => {
     return true;
   });
 
-  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 100000;
-  const lateRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 50000;
+  const otRate = bonusPenalty ? Number(bonusPenalty.overtime_rate) : 2;
+  const lateRate = bonusPenalty ? Number(bonusPenalty.late_early_penalty) : 1.5;
 
   const handleOpenEdit = (record: PayrollRecord) => {
     if (record.status !== 'PENDING') {
@@ -215,12 +240,8 @@ export const ManagerPayroll: React.FC = () => {
     setEditingItem({
       record,
       empName: emp?.full_name || record.employee_name || record.employee_id,
-      hourly_rate: record.hourly_rate ?? 0,
-      working_hours: record.total_working_hours ?? record.working_hours ?? 0,
-      total_overtime: record.total_overtime ?? 0,
-      total_late_early: record.total_late_early ?? 0,
       allowance: record.allowance ?? 0,
-      reason: record.reason || '',
+      reason: '',
     });
   };
 
@@ -254,14 +275,7 @@ export const ManagerPayroll: React.FC = () => {
 
     try {
       setIsSavingItem(true);
-      await updatePayrollItem(editingItem.record.payroll_id, {
-        hourly_rate: editingItem.hourly_rate,
-        working_hours: editingItem.working_hours,
-        total_overtime: editingItem.total_overtime,
-        total_late_early: editingItem.total_late_early,
-        allowance: editingItem.allowance,
-        reason: editingItem.reason,
-      });
+      await updatePayrollItem(editingItem.record.payroll_id, buildPayrollItemUpdates(editingItem));
 
       showToast(`Đã lưu thay đổi bảng lương cho ${editingItem.empName}!`, 'success');
       setEditingItem(null);
@@ -276,6 +290,24 @@ export const ManagerPayroll: React.FC = () => {
   const handleFinalizeConfirm = () => {
     finalizePayrollPeriod(selectedPeriod);
     setConfirmFinalizeOpen(false);
+  };
+
+  const handleEarlySettlementConfirm = async (cutoffDate: string, reason: string) => {
+    if (!earlySettlementRecord) return;
+    try {
+      await earlySettlementPayrollApi({
+        employeeId: earlySettlementRecord.employee_id,
+        period: selectedPeriod,
+        cutoffDate,
+        reason,
+      });
+      showToast(`Đã quyết toán sớm bảng lương cho nhân viên ${earlySettlementRecord.employee_name || earlySettlementRecord.employee_id}!`, 'success');
+      setEarlySettlementRecord(null);
+      await generatePayroll(selectedPeriod);
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi quyết toán sớm', 'error');
+      throw err;
+    }
   };
 
   const handleUnlockConfirm = () => {
@@ -362,6 +394,8 @@ export const ManagerPayroll: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {payrollError && <p className="sf-feedback error" role="alert">Không thể tải bảng lương: {payrollError.message}</p>}
+      {isLoadingPayroll && <p role="status">Đang tải bảng lương…</p>}
       {/* Bento Top Header */}
       <PayrollHeader
         selectedPeriod={selectedPeriod}
@@ -384,13 +418,9 @@ export const ManagerPayroll: React.FC = () => {
         onOpenPolicyModal={handleOpenPolicyModal}
       />
 
-      <div role="tablist" aria-label="Nội dung bảng lương" className="sf-tabs" onKeyDown={e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const next=e.key==='Home'?'records':e.key==='End'?'reviews':view==='reviews'?'records':'reviews';selectView(next);document.getElementById(next==='reviews'?'payroll-reviews-tab':'payroll-records-tab')?.focus();}}}>
-        <button role="tab" tabIndex={view!=='reviews'?0:-1} id="payroll-records-tab" aria-controls="payroll-records-panel" aria-selected={view!=='reviews'} className="sf-tab" onClick={()=>selectView('records')}>Phiếu lương & phụ cấp</button>
-        <button role="tab" tabIndex={view==='reviews'?0:-1} id="payroll-reviews-tab" aria-controls="payroll-reviews-panel" aria-selected={view==='reviews'} className="sf-tab" onClick={()=>selectView('reviews')}>Xét duyệt OT & khoản phạt</button>
-      </div>
-      {view==='reviews' && <div role="tabpanel" id="payroll-reviews-panel" aria-labelledby="payroll-reviews-tab"><AdjustmentReviewPanel period={selectedPeriod} /></div>}
-      <div hidden={view==='reviews'} role="tabpanel" id="payroll-records-panel" aria-labelledby="payroll-records-tab">
-      <p className="text-sm text-slate-500 mb-4">Mở chi tiết để đối soát phiếu lương. Phụ cấp được sửa cùng phiếu đang chờ duyệt; OT và phạt được quyết định riêng theo ngày.</p>
+      <div>
+      {attendanceSummary.isError && <p className="sf-feedback error mb-4" role="alert">Không tải được dữ liệu chấm công để tính số ca nghỉ. <button type="button" className="underline" onClick={() => attendanceSummary.refetch()}>Thử lại</button></p>}
+      {shifts.isError && <p className="sf-feedback error mb-4" role="alert">Không tải được lịch ca để tính số ca nghỉ. <button type="button" className="underline" onClick={shifts.refetchShifts}>Thử lại</button></p>}
 
       {/* Bento Table with Search & Position Filter */}
       <PayrollTable
@@ -415,6 +445,10 @@ export const ManagerPayroll: React.FC = () => {
         positionOptions={positionOptions}
         isFinalized={isFinalized}
         onOpenEdit={handleOpenEdit}
+        onOpenEarlySettlement={(record) => setEarlySettlementRecord(record)}
+        attendanceTotals={attendanceTotals}
+        unprocessedEmployeeIds={unprocessedEmployeeIds}
+        attendanceUnavailable={attendanceSummary.isLoading || attendanceSummary.isError || shifts.isLoading || shifts.isError}
       />
 
       </div>
@@ -425,6 +459,7 @@ export const ManagerPayroll: React.FC = () => {
         onClose={() => setEditingItem(null)}
         onChangeEditingItem={setEditingItem}
         onConfirmSave={handleConfirmEditSave}
+        absenceLabel={attendanceSummary.isLoading || attendanceSummary.isError || shifts.isLoading || shifts.isError ? '—' : editingItem && unprocessedEmployeeIds.has(editingItem.record.employee_id) ? 'Chưa tổng hợp' : `${editingItem ? attendanceTotals.get(editingItem.record.employee_id) ?? 0 : 0} ca`}
         otRate={otRate}
         lateRate={lateRate}
         selectedPeriod={selectedPeriod}
@@ -456,6 +491,21 @@ export const ManagerPayroll: React.FC = () => {
         policyData={policyData}
         onChangePolicyData={setPolicyData}
         onSavePolicy={handleSavePolicy}
+      />
+
+      {/* Modal: Early Settlement for offboarding employee */}
+      <EarlySettlementModal
+        isOpen={Boolean(earlySettlementRecord)}
+        onClose={() => setEarlySettlementRecord(null)}
+        selectedPeriod={selectedPeriod}
+        record={earlySettlementRecord}
+        employeeName={
+          employees.find((e) => e.employee_id === earlySettlementRecord?.employee_id)?.full_name ||
+          earlySettlementRecord?.employee_name ||
+          earlySettlementRecord?.employee_id ||
+          ''
+        }
+        onConfirm={handleEarlySettlementConfirm}
       />
     </div>
   );

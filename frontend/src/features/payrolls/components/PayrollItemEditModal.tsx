@@ -1,8 +1,62 @@
-import React from 'react';
-import {Modal} from '../../../components/common/Modal';
-import {Check,ArrowRight} from 'lucide-react';
-import {PayrollRecord} from '../../../types';
-import {calcPayrollAmount} from '../../../utils/payrollUtils';
-export interface EditingPayrollItem {record:PayrollRecord;empName:string;hourly_rate:number;working_hours:number;total_overtime:number;total_late_early:number;allowance:number;reason:string;}
-interface PayrollItemEditModalProps {editingItem:EditingPayrollItem|null;onClose:()=>void;onChangeEditingItem:(item:EditingPayrollItem)=>void;onConfirmSave:(e:React.FormEvent)=>void;otRate:number;lateRate:number;selectedPeriod:string;isSubmitting?:boolean;}
-export const PayrollItemEditModal:React.FC<PayrollItemEditModalProps>=({editingItem:item,onClose,onChangeEditingItem:change,onConfirmSave,otRate,lateRate,selectedPeriod,isSubmitting=false})=>{if(!item)return null;const record=item.record;const ot=calcPayrollAmount(item.total_overtime,Number(record.overtime_rate??otRate),item.hourly_rate);const late=calcPayrollAmount(item.total_late_early,Number(record.late_early_penalty??record.late_penalty_rate??lateRate),item.hourly_rate);const base=item.hourly_rate*item.working_hours;const absence=record.total_absence_penalty||0;const net=Math.max(0,Math.round(base+ot-late-absence+item.allowance));const money=(n:number)=>`${n.toLocaleString('vi-VN')} ₫`;return <Modal isOpen onClose={()=>{if(!isSubmitting)onClose();}} title="Điều chỉnh phiếu lương & phụ cấp" subtitle={`${item.empName} · ${record.employee_id} · Kỳ ${selectedPeriod}`} maxWidth="2xl"><form onSubmit={onConfirmSave} className="space-y-4"><p className="text-sm text-slate-500">Phụ cấp được sửa trên phiếu chờ duyệt. OT và phạt được xét duyệt riêng theo ngày.</p><label className="sf-field">Phụ cấp (VNĐ):<input className="sf-input text-lg font-semibold" type="number" step={50000} min={0} value={item.allowance} disabled={isSubmitting} onChange={e=>change({...item,allowance:Number(e.target.value)})}/></label><div className="flex flex-wrap justify-between items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-lg p-3"><div><p className="sf-secondary">Hiện tại</p><strong>{money(record.allowance||0)}</strong></div><ArrowRight size={17} className="text-slate-400"/><div><p className="sf-secondary">Sau điều chỉnh</p><strong className="text-blue-700">{money(item.allowance)}</strong></div><div><p className="sf-secondary">Chênh lệch</p><strong>{money(item.allowance-(record.allowance||0))}</strong></div></div><label className="sf-field">Lý do điều chỉnh (lưu cùng phiếu lương):<textarea className="sf-input" required minLength={3} maxLength={2000} rows={2} value={item.reason||''} disabled={isSubmitting} onChange={e=>change({...item,reason:e.target.value})} placeholder="Nêu lý do để lưu vết điều chỉnh…"/></label><details className="sf-panel p-3"><summary className="font-medium text-sm">Đơn giá & giờ công · Điều chỉnh nâng cao</summary><div className="grid sm:grid-cols-2 gap-3 mt-4"><label className="sf-field">Lương theo giờ (VNĐ/h):<input className="sf-input" type="number" step={1000} min={0} required value={item.hourly_rate} disabled={isSubmitting} onChange={e=>change({...item,hourly_rate:Number(e.target.value)})}/></label><label className="sf-field">Tổng số giờ làm việc (h):<input className="sf-input" type="number" step={.5} min={0} required value={item.working_hours} disabled={isSubmitting} onChange={e=>change({...item,working_hours:Number(e.target.value)})}/></label></div></details><div className="text-sm space-y-2"><div className="flex flex-wrap justify-between gap-2 text-slate-500"><span>Lương theo công</span><span className="sf-money">{money(base)}</span></div><div className="flex flex-wrap justify-between gap-2 text-slate-500"><span>OT đã duyệt · {item.total_overtime} giờ</span><span className="sf-money">+{money(ot)}</span></div><div className="flex flex-wrap justify-between gap-2 text-slate-500"><span>Phạt trễ / sớm · {item.total_late_early} giờ</span><span className="sf-money">−{money(late)}</span></div><div className="flex flex-wrap justify-between gap-2 text-slate-500"><span>Phạt vắng đã duyệt</span><span className="sf-money">−{money(absence)}</span></div><div className="flex flex-wrap justify-between gap-2 font-semibold pt-3 border-t border-slate-200"><span>Thực lĩnh dự kiến</span><span className="sf-money text-lg text-blue-700">{money(net)}</span></div></div><div className="sf-footer"><button type="button" disabled={isSubmitting} className="sf-button" onClick={onClose}>Hủy bỏ</button><button className="sf-button primary" disabled={isSubmitting}><Check size={16}/>{isSubmitting?'Đang lưu thay đổi…':'Xác nhận cập nhật bảng lương'}</button></div></form></Modal>;};
+import React, { useEffect, useState } from 'react';
+import { Modal } from '../../../components/common/Modal';
+import { Check } from 'lucide-react';
+import { PayrollRecord } from '../../../types';
+import type { PayrollItemUpdates } from '../api/payrollApi';
+
+export interface EditingPayrollItem {
+  record: PayrollRecord;
+  empName: string;
+  allowance: number;
+  reason: string;
+}
+
+export function buildPayrollItemUpdates(item: EditingPayrollItem): PayrollItemUpdates {
+  const reason = item.reason.trim();
+  if (reason.length < 3) throw new Error('Lý do điều chỉnh cần ít nhất 3 ký tự.');
+  const record = item.record;
+  const updates: PayrollItemUpdates = { allowance: item.allowance, reason, updated_at: record.updated_at };
+  return updates;
+}
+
+interface PayrollItemEditModalProps {
+  editingItem: EditingPayrollItem | null;
+  onClose: () => void;
+  onChangeEditingItem: (item: EditingPayrollItem) => void;
+  onConfirmSave: (e: React.FormEvent) => void;
+  otRate: number;
+  lateRate: number;
+  selectedPeriod: string;
+  absenceLabel: string;
+  isSubmitting?: boolean;
+}
+
+export const PayrollItemEditModal: React.FC<PayrollItemEditModalProps> = ({ editingItem: item, onClose, onChangeEditingItem: change, onConfirmSave, selectedPeriod, absenceLabel, isSubmitting = false }) => {
+  const [allowanceInput, setAllowanceInput] = useState('');
+  useEffect(() => {
+    setAllowanceInput(item ? String(item.allowance) : '');
+  }, [item?.record.payroll_id]);
+  if (!item) return null;
+  const record = item.record;
+  const breakdown = record.breakdown;
+  const estimatedNet = breakdown
+    ? Math.max(0, Math.round(breakdown.base_salary + breakdown.overtime_pay - breakdown.late_early_deduction - breakdown.absence_deduction + item.allowance))
+    : record.net_salary > 0 || item.allowance === record.allowance
+      ? Math.max(0, record.net_salary + item.allowance - (record.allowance ?? 0))
+      : null;
+  return <Modal isOpen onClose={() => { if (!isSubmitting) onClose(); }} title="Điều chỉnh phụ cấp" subtitle={`${item.empName} · ${record.employee_id} · Kỳ ${selectedPeriod}`} maxWidth="2xl">
+    <form onSubmit={onConfirmSave} className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label className="sf-field">Lương theo giờ<input className="sf-input" value={`${record.hourly_rate.toLocaleString('vi-VN')} ₫`} readOnly /></label>
+        <label className="sf-field">Tổng giờ làm<input className="sf-input" value={`${record.total_working_hours ?? record.working_hours ?? 0} giờ`} readOnly /></label>
+        <label className="sf-field">Tăng ca<input className="sf-input" value={`${record.total_overtime ?? 0} giờ`} readOnly /></label>
+        <label className="sf-field">Đi trễ / Về sớm<input className="sf-input" value={`${record.total_late_early ?? 0} giờ`} readOnly /></label>
+        <label className="sf-field">Nghỉ làm không lý do<input className="sf-input" value={absenceLabel} readOnly /></label>
+      </div>
+      <label className="sf-field">Phụ cấp<div className="relative"><input className="sf-input text-lg font-semibold pr-10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="number" step={50000} min={0} required value={allowanceInput} disabled={isSubmitting} onChange={e => { setAllowanceInput(e.target.value); if (e.target.value !== '') change({ ...item, allowance: Number(e.target.value) }); }}/><span aria-hidden="true" className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 pointer-events-none">đ</span></div></label>
+      <label className="sf-field">Thực lĩnh dự kiến sau điều chỉnh<input className="sf-input font-semibold" value={allowanceInput === '' ? '—' : estimatedNet == null ? 'Chưa đủ dữ liệu để tính' : `${estimatedNet.toLocaleString('vi-VN')} ₫`} readOnly /></label>
+      <label className="sf-field">Lý do điều chỉnh:<textarea className="sf-input" required minLength={3} maxLength={2000} rows={2} value={item.reason} disabled={isSubmitting} onChange={e => change({ ...item, reason: e.target.value })} placeholder="Nêu lý do để lưu vết điều chỉnh…"/></label>
+      <div className="sf-footer"><button type="button" disabled={isSubmitting} className="sf-button" onClick={onClose}>Hủy bỏ</button><button className="sf-button primary" disabled={isSubmitting}><Check size={16}/>{isSubmitting ? 'Đang lưu thay đổi…' : 'Xác nhận cập nhật bảng lương'}</button></div>
+    </form>
+  </Modal>;
+};

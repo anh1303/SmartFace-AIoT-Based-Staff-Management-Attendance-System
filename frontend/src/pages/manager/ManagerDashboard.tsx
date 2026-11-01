@@ -27,9 +27,13 @@ import {
 import { AttendanceRecord } from '../../types';
 
 export const ManagerDashboard: React.FC = () => {
-  const { employees, attendance, workShifts } = useApp();
+  const { employees, attendance, workShifts, role, currentUser } = useApp();
   const { isDark } = useTheme();
   const navigate = useNavigate();
+
+  const isAdmin = role === 'admin' || currentUser?.role === 'admin' || currentUser?.role_name?.toUpperCase() === 'ADMIN';
+  const isManager = !isAdmin && (role === 'manager' || currentUser?.role === 'manager' || currentUser?.role_name?.toUpperCase() === 'MANAGER' || Boolean(currentUser?.is_manager));
+  const managerDept = currentUser?.department;
 
   const todayStr = getTodayVNString();
   const now = new Date();
@@ -257,6 +261,46 @@ export const ManagerDashboard: React.FC = () => {
         color: colors[idx % colors.length],
       }));
   }, [employees, scheduledEmpIds]);
+
+  const dashboardEmployees = useMemo(() => {
+    if (isManager && managerDept) {
+      const deptEmps = employees.filter(
+        e => e.department && e.department.toLowerCase() === managerDept.toLowerCase()
+      );
+      if (deptEmps.length > 0) return deptEmps;
+    }
+    return employees;
+  }, [employees, isManager, managerDept]);
+
+  const empTodayShiftMap = useMemo(() => {
+    const map = new Map<string, { name: string; timeRange: string }>();
+    todayShifts.forEach(s => {
+      if (!map.has(s.employee_id)) {
+        const name = s.shift_type === 'MORNING'
+          ? 'Ca sáng'
+          : s.shift_type === 'AFTERNOON'
+            ? 'Ca chiều'
+            : s.shift_type === 'OFFICE_HOURS'
+              ? 'Ca HC'
+              : 'Ca làm';
+        map.set(s.employee_id, {
+          name,
+          timeRange: `${s.start_time} - ${s.end_time}`,
+        });
+      }
+    });
+    return map;
+  }, [todayShifts]);
+
+  const sortedDashboardEmployees = useMemo(() => {
+    return [...dashboardEmployees].sort((a, b) => {
+      const aHasShift = scheduledEmpIds.has(a.employee_id);
+      const bHasShift = scheduledEmpIds.has(b.employee_id);
+      if (aHasShift && !bHasShift) return -1;
+      if (!aHasShift && bHasShift) return 1;
+      return (a.full_name || '').localeCompare(b.full_name || '', 'vi');
+    });
+  }, [dashboardEmployees, scheduledEmpIds]);
 
   const chronologicalTodayPunches = useMemo(() => {
     return [...todayPunches].sort((a, b) => {
@@ -552,36 +596,115 @@ export const ManagerDashboard: React.FC = () => {
               <h3 className="font-bold text-slate-900 dark:text-white text-sm">
                 Nhân viên
               </h3>
-            </div>
-
-            <div className="space-y-3 max-h-[195px] overflow-y-auto pr-1">
-              {departmentStats.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">Chưa có dữ liệu phòng ban hôm nay</p>
-              ) : (
-                departmentStats.map((dept, i) => (
-                  <div key={i} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-medium">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: dept.color }}></span>
-                        {dept.name}
-                      </span>
-                      <span className="font-mono text-slate-600 dark:text-slate-400 font-semibold">
-                        {dept.scheduled}/{dept.total}
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-[#1f244a] overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${dept.pct}%`,
-                          backgroundColor: dept.color,
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                ))
+              {!isAdmin && (
+                <span className="ml-auto text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                  {sortedDashboardEmployees.filter(e => scheduledEmpIds.has(e.employee_id)).length}/{sortedDashboardEmployees.length} có ca
+                </span>
               )}
             </div>
+
+            {isAdmin ? (
+              <div className="space-y-3 max-h-[195px] overflow-y-auto pr-1">
+                {departmentStats.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-4 text-center">Chưa có dữ liệu phòng ban hôm nay</p>
+                ) : (
+                  departmentStats.map((dept, i) => (
+                    <div key={i} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-medium">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: dept.color }}></span>
+                          {dept.name}
+                        </span>
+                        <span className="font-mono text-slate-600 dark:text-slate-400 font-semibold">
+                          {dept.scheduled}/{dept.total}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-[#1f244a] overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${dept.pct}%`,
+                            backgroundColor: dept.color,
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-[245px] overflow-y-auto pr-1">
+                {sortedDashboardEmployees.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-4 text-center">Chưa có dữ liệu nhân viên</p>
+                ) : (
+                  sortedDashboardEmployees.map((emp) => {
+                    const hasShift = scheduledEmpIds.has(emp.employee_id);
+                    const shiftInfo = empTodayShiftMap.get(emp.employee_id);
+                    const initials = (emp.full_name || emp.employee_id)
+                      .split(' ')
+                      .map((w: string) => w[0])
+                      .slice(-2)
+                      .join('');
+
+                    return (
+                      <div
+                        key={emp.employee_id}
+                        className={`flex items-center justify-between p-2 rounded-xl transition-colors ${
+                          hasShift
+                            ? 'bg-slate-50/80 dark:bg-[#181c38]/60 border border-slate-200/50 dark:border-[#22274d]'
+                            : 'bg-transparent border border-transparent opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className={`w-8 h-8 rounded-full ${
+                              hasShift
+                                ? 'bg-blue-100 dark:bg-[#1f254b] text-blue-700 dark:text-blue-300'
+                                : 'bg-slate-100 dark:bg-[#161a33] text-slate-400 dark:text-slate-500'
+                            } font-bold flex items-center justify-center text-xs shrink-0 overflow-hidden`}
+                          >
+                            {emp.avatar ? (
+                              <img
+                                src={emp.avatar}
+                                alt={emp.full_name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              initials
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p
+                              className={`text-xs truncate ${
+                                hasShift
+                                  ? 'font-bold text-slate-900 dark:text-white'
+                                  : 'font-normal text-slate-400 dark:text-slate-500'
+                              }`}
+                            >
+                              {emp.full_name}
+                            </p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate">
+                              {emp.employee_id}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="shrink-0 ml-2">
+                          {hasShift ? (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              {shiftInfo?.name || 'Có ca'}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#1a1f3d] text-slate-400 dark:text-slate-500">
+                              Nghỉ ca
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

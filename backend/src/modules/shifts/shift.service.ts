@@ -67,6 +67,12 @@ function parseTimeStringToDate(timeStr?: string, fallbackStr: string = '08:00'):
   return new Date(`1970-01-01T${hh}:${mm}:${ss}.000Z`)
 }
 
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 export interface RawShift {
   id: string | bigint
   work_date: Date | string
@@ -207,12 +213,25 @@ export async function assignOrUpdate(data: {
   }
 
   const shiftRecord = await prisma.$transaction(async tx => {
-    const shiftPeriod = data.date.slice(0, 7)
-    // Khóa theo thứ tự nhất quán toàn hệ thống: Kỳ lương trước, rồi đến nhân viên
+    const prevDateStr = addDays(data.date, -1)
+    const nextDateStr = addDays(data.date, 1)
+    const candidateDates = [prevDateStr, data.date, nextDateStr]
+
+    // Khóa theo thứ tự nhất quán toàn hệ thống để chống bế tắc (deadlock):
+    // 1. Tất cả các kỳ lương liên quan theo thứ tự tăng dần
+    // 2. Nhân viên
+    // 3. Tất cả các ngày công liên quan theo thứ tự tăng dần
+    const periods = Array.from(new Set(candidateDates.map(d => d.slice(0, 7)))).sort()
     if (typeof (tx as any).$executeRaw === 'function') {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${payrollPeriodLockKey(shiftPeriod)}))`
+      for (const p of periods) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${payrollPeriodLockKey(p)}))`
+      }
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${employeeLockKey(emp.id)}))`
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${data.date}`}))`
+      const sortedDates = [...candidateDates].sort()
+      for (const d of sortedDates) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${d}`}))`
+      }
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`shift-type:${standardConfig.code}`}))`
     }
 
     // Đọc lại trạng thái nhân viên bên trong transaction sau khi đã có lock
@@ -227,10 +246,52 @@ export async function assignOrUpdate(data: {
       throw new AppError(400, `Không thể phân ca làm việc cho nhân viên có trạng thái '${freshEmp?.status || 'UNKNOWN'}'!`)
     }
 
-    await assertEditableDay(tx, data.date, emp.id)
     await assertCanManageEmployee({ id: actorUserId, role: actorRole }, emp.id, tx)
-    if (typeof (tx as any).$executeRaw === 'function') {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`shift-type:${standardConfig.code}`}))`
+
+    const existingShift = await tx.employee_shifts.findFirst({
+      where: {
+        employee_id: emp.id,
+        work_date,
+      },
+      include: { work_shifts: true },
+    })
+
+    const existingPrevShift = await tx.employee_shifts.findFirst({
+      where: { employee_id: emp.id, work_date: new Date(`${prevDateStr}T00:00:00.000Z`) },
+      include: { work_shifts: true },
+    })
+
+    const existingNextShift = await tx.employee_shifts.findFirst({
+      where: { employee_id: emp.id, work_date: new Date(`${nextDateStr}T00:00:00.000Z`) },
+      include: { work_shifts: true },
+    })
+
+    const isPrevOvernight = existingPrevShift
+      ? (existingPrevShift.end_time ?? existingPrevShift.work_shifts?.end_time) <= (existingPrevShift.start_time ?? existingPrevShift.work_shifts?.start_time)
+      : false
+    const existingStartStr = existingShift ? formatTimeHHMM(existingShift.start_time ?? existingShift.work_shifts?.start_time, '08:00') : '08:00'
+    const newStartStr = formatTimeHHMM(startTimeDate, '08:00')
+    const isEarlyStart = standardConfig.code !== 'OFF' && (existingStartStr <= '04:00' || newStartStr <= '04:00')
+    const isPrevAffected = isPrevOvernight || isEarlyStart
+
+    const isExistingOvernight = existingShift
+      ? (existingShift.end_time ?? existingShift.work_shifts?.end_time) <= (existingShift.start_time ?? existingShift.work_shifts?.start_time)
+      : false
+    const isNewOvernight = standardConfig.code !== 'OFF' && formatTimeHHMM(endTimeDate, '17:00') <= formatTimeHHMM(startTimeDate, '08:00')
+    const isNextEarlyStart = existingNextShift
+      ? formatTimeHHMM(existingNextShift.start_time ?? existingNextShift.work_shifts?.start_time, '08:00') <= '04:00'
+      : false
+    const isNextAffected = isExistingOvernight || isNewOvernight || isNextEarlyStart
+
+    const affectedDates = [
+      ...(isPrevAffected ? [prevDateStr] : []),
+      data.date,
+      ...(isNextAffected ? [nextDateStr] : []),
+    ]
+
+    // 1. Kiểm tra trạng thái khóa và kỳ lương của TẤT CẢ các ngày thực sự bị ảnh hưởng TRƯỚC KHI thực hiện bất kỳ thay đổi nào
+    for (const d of affectedDates) {
+      await assertEditableDay(tx, d, emp.id)
     }
 
     const shiftNameMatches: string[] = [standardConfig.name]
@@ -253,12 +314,50 @@ export async function assignOrUpdate(data: {
       })
     }
 
-    const existingShift = await tx.employee_shifts.findFirst({
-      where: {
-        employee_id: emp.id,
-        work_date,
-      },
-    })
+    // 2. Kiểm tra chồng lấn thời gian với ca liền kề (Issue 3)
+    if (standardConfig.code !== 'OFF') {
+      const newStart = new Date(`${data.date}T${formatTimeHHMM(startTimeDate, '08:00')}:00+07:00`)
+      let newEnd = new Date(`${data.date}T${formatTimeHHMM(endTimeDate, '17:00')}:00+07:00`)
+      if (+newEnd <= +newStart) {
+        newEnd.setUTCDate(newEnd.getUTCDate() + 1)
+      }
+
+      const candidateDates = [
+        new Date(`${prevDateStr}T00:00:00.000Z`),
+        new Date(`${data.date}T00:00:00.000Z`),
+        new Date(`${nextDateStr}T00:00:00.000Z`),
+      ]
+
+      const nearbyShifts = typeof tx.employee_shifts.findMany === 'function'
+        ? await tx.employee_shifts.findMany({
+            where: {
+              employee_id: emp.id,
+              work_date: { in: candidateDates },
+              ...(existingShift ? { id: { not: existingShift.id } } : {}),
+            },
+            include: { work_shifts: true },
+          })
+        : []
+
+      for (const adj of nearbyShifts) {
+        if (adj.shift_type === 'OFF') continue
+        const adjDateStr = adj.work_date.toISOString().slice(0, 10)
+        const adjStartRaw = adj.start_time ?? adj.work_shifts?.start_time
+        const adjEndRaw = adj.end_time ?? adj.work_shifts?.end_time
+        const adjStart = new Date(`${adjDateStr}T${formatTimeHHMM(adjStartRaw, '08:00')}:00+07:00`)
+        let adjEnd = new Date(`${adjDateStr}T${formatTimeHHMM(adjEndRaw, '17:00')}:00+07:00`)
+        if (+adjEnd <= +adjStart) {
+          adjEnd.setUTCDate(adjEnd.getUTCDate() + 1)
+        }
+
+        const overlapMs = Math.min(+newEnd, +adjEnd) - Math.max(+newStart, +adjStart)
+        if (overlapMs > 0) {
+          throw AppError.badRequest(
+            `Ca làm việc bị chồng lấn thời gian với ca ngày ${adjDateStr} (${formatTimeHHMM(adjStartRaw, '08:00')} - ${formatTimeHHMM(adjEndRaw, '17:00')})`
+          )
+        }
+      }
+    }
 
     let shiftRecord
     if (existingShift) {
@@ -298,7 +397,6 @@ export async function assignOrUpdate(data: {
       })
     }
 
-    await invalidateDailySummaryForShiftChange(emp.id, work_date, tx)
     await tx.auditLog.create({ data: {
       userId: actorUserId,
       action: existingShift ? 'UPDATE_SHIFT' : 'ASSIGN_SHIFT',
@@ -322,7 +420,13 @@ export async function assignOrUpdate(data: {
       },
     } })
 
-    await aggregateDailyAttendance(Number(data.date.slice(5, 7)), Number(data.date.slice(0, 4)), emp.id, data.date, undefined, tx)
+    // 3. Invalidate và tổng hợp lại cho tất cả các ngày liền kề bị ảnh hưởng (Issue 4)
+    for (const d of affectedDates) {
+      const dDate = new Date(`${d}T00:00:00Z`)
+      await invalidateDailySummaryForShiftChange(emp.id, dDate, tx)
+      await aggregateDailyAttendance(Number(d.slice(5, 7)), Number(d.slice(0, 4)), emp.id, d, undefined, tx)
+    }
+
     return shiftRecord
   }, { maxWait: 20000, timeout: 60000 })
   return formatShift(shiftRecord)

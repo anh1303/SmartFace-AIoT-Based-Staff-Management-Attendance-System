@@ -23,7 +23,8 @@ import {
   findPeriodPayrolls,
   payrollOverrides,
 } from '../payroll/public.js'
-import { attendanceWorkDate, calculateDay, prepareAttendance, vnDay, MAX_PAIR_MS, roundHours, hasLegacyOvernightBounds } from './attendance.policy.js'
+import { attendanceWorkDate, resolvePairWorkDate, calculateDay, prepareAttendance, vnDay, MAX_PAIR_MS, roundHours, hasLegacyOvernightBounds, ATTENDANCE_POLICY_VERSION } from './attendance.policy.js'
+import { isAttendanceDateLocked } from './attendance.lock.js'
 import { prisma } from '../../config/database.js'
 import {
   assertCanManageEmployee,
@@ -464,8 +465,10 @@ async function recordAttendance(
     const eventDay = new Date(`${vnDay(eventTime)}T00:00:00Z`)
     const nearShifts = await getEmployeeNearShifts(employee.id, eventDay, MAX_PAIR_MS, tx)
     const schedule = nearShifts.map(s => ({ ...s, start_time: s.start_time ?? s.work_shifts.start_time, end_time: s.end_time ?? s.work_shifts.end_time }))
-    const date = type === 'CHECK_OUT' && previous?.type === 'CHECK_IN' && +eventTime - +previous.event_time <= MAX_PAIR_MS
-      ? attendanceWorkDate(previous.event_time, schedule) : attendanceWorkDate(eventTime, schedule)
+    const isPairing = type === 'CHECK_OUT' && previous?.type === 'CHECK_IN' && +eventTime - +previous.event_time <= MAX_PAIR_MS
+    const pairDate = isPairing ? resolvePairWorkDate(previous.event_time, eventTime, schedule) : null
+    const date = pairDate ?? attendanceWorkDate(eventTime, schedule)
+    const previousCheckInDate = isPairing ? attendanceWorkDate(previous.event_time, schedule) : null
     const closedPeriod = await isPayrollPeriodClosed(date.slice(0, 7), employee.id, tx)
     const lockedDay = await tx.attendance_locks.findUnique({ where: { work_date: new Date(`${date}T00:00:00Z`) } })
     const existingDaySummary = tx.daily_attendance_summary?.findUnique
@@ -532,8 +535,13 @@ async function recordAttendance(
         },
       })
     }
-    const previousDay = previous && +eventTime - +previous.event_time <= MAX_PAIR_MS ? attendanceWorkDate(previous.event_time, schedule) : null
-    const affected = isBlocked ? [] : [...new Set([date, vnDay(eventTime), ...(previousDay ? [previousDay] : [])])]
+    if (!isBlocked && isPairing && previous && previousCheckInDate && previousCheckInDate !== date) {
+      await tx.attendance_logs.update({
+        where: { id: previous.id },
+        data: { work_date: new Date(`${date}T00:00:00Z`) },
+      })
+    }
+    const affected = isBlocked ? [] : [...new Set([date, vnDay(eventTime), ...(previousCheckInDate ? [previousCheckInDate] : [])])]
     for (const day of affected) {
       const closed = await isPayrollPeriodClosed(day.slice(0, 7), employee.id, tx)
       const work_date = new Date(`${day}T00:00:00Z`)
@@ -819,9 +827,46 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
           continue
         }
 
-        const hasCheckIn = Boolean(day.first_check_in)
-        const hasCheckOut = Boolean(day.last_check_out)
-        const isMissingScans = (hasCheckIn && !hasCheckOut) || (!hasCheckIn && hasCheckOut)
+        const hasValidPairs = Array.isArray(details.pairs) && details.pairs.length > 0
+        const hasCheckIn = Boolean(day.first_check_in) || hasValidPairs
+        const hasCheckOut = Boolean(day.last_check_out) || hasValidPairs
+        const hasAnyEvents = Boolean((Array.isArray(details.events) && details.events.length > 0) || hasCheckIn || hasCheckOut)
+        const isTrueAbsent = day.attendance_status === 'ABSENT' || Boolean(details.absenceCandidate) || !hasAnyEvents
+
+        if (isTrueAbsent) {
+          // VẮNG MẶT HOÀN TOÀN: Giữ nguyên ABSENT, không đổi thành INCOMPLETE
+          const updated = await tx.daily_attendance_summary.update({
+            where: { id: day.id },
+            data: {
+              attendance_status: 'ABSENT',
+              total_working_hours: 0,
+              overtime: 0,
+              overtime_candidate_hours: 0,
+              overtime_status: 'NONE',
+              late_early: 0,
+              late_early_seconds: 0,
+              regular_seconds: 0,
+              overtime_seconds: 0,
+              review_status: 'APPROVED',
+              approval_source: 'MANUAL',
+              approved_by: actorUserId || 'ADMIN',
+              approved_at: new Date(),
+              approval_reason: day.approval_reason || 'Chốt thủ công: vắng mặt không lý do',
+              pre_approval_snapshot: snapshot,
+              requires_review: false,
+              calculation_details: { ...details, absenceCandidate: true },
+              reopened_at: null,
+              reopened_by: null,
+            },
+          })
+          const wageProfile = await findEmployeeWageProfile(day.employee_id, tx)
+          const wageSnapshot = await getPayrollWageSnapshot(day.employee_id, dateStr.slice(0, 7), tx)
+          const rate = sourceHourlyRate(wageProfile || day.employees, dateStr.slice(0, 7), wageSnapshot?.hourly_rate, Boolean(payrollOverrides(wageSnapshot).fields.hourly_rate))
+          await syncDayAdjustments(tx, updated, rate, adjustmentPolicy?.absence_penalty_rate ?? null)
+          continue
+        }
+
+        const isMissingScans = !hasValidPairs && ((hasCheckIn && !hasCheckOut) || (!hasCheckIn && hasCheckOut))
         const reviewReasons = (day.review_reason || '').split(',').filter(Boolean)
         const isUnderMinShift = reviewReasons.some((r: string) => ['UNDER_MINIMUM_SHIFT', 'UNDER_HALF_SHIFT'].includes(r))
         const hasFatalScanError = isMissingScans || reviewReasons.some((r: string) => ['MISSING_CHECK_OUT', 'NO_VALID_PAIR', 'INVALID_PAIR', 'FLAGGED_EVENT', 'UNPAIRED_CHECK_OUT'].includes(r))
@@ -1275,8 +1320,9 @@ export async function autoCloseDueAttendance(asOf = new Date()) {
           where: { id: summary.id },
           include: { employees: true },
         })
-        // Tự chốt bỏ qua các ngày đã APPROVED hoặc đang được Quản lý chủ động mở khóa (reopened_at !== null)
-        if (!freshSummary || freshSummary.review_status === 'APPROVED' || (freshSummary as any).reopened_at !== null) {
+        // Tự chốt bỏ qua các ngày đã APPROVED hoặc đang được Quản lý chủ động mở khóa (reopened_at !== null và không phải do ca làm việc đổi)
+        const isManagerReopened = Boolean((freshSummary as any).reopened_at !== null && (freshSummary as any).reopened_by !== 'SHIFT_CHANGED')
+        if (!freshSummary || freshSummary.review_status === 'APPROVED' || isManagerReopened) {
           continue
         }
 
@@ -1292,7 +1338,8 @@ export async function autoCloseDueAttendance(asOf = new Date()) {
         if (sourceChanged) {
           await aggregateDailyAttendance(Number(dateStr.slice(5, 7)), Number(dateStr.slice(0, 4)), freshSummary.employee_id, dateStr, undefined, tx)
           freshSummary = await tx.daily_attendance_summary.findUnique({ where: { id: summary.id }, include: { employees: true } })
-          if (!freshSummary || freshSummary.review_status === 'APPROVED' || freshSummary.reopened_at !== null || !freshSummary.policy_version || freshSummary.review_reason === 'SOURCE_CHANGED') continue
+          const isManagerReopenedAfterAgg = Boolean((freshSummary as any)?.reopened_at !== null && (freshSummary as any)?.reopened_by !== 'SHIFT_CHANGED')
+          if (!freshSummary || freshSummary.review_status === 'APPROVED' || isManagerReopenedAfterAgg || !freshSummary.policy_version || freshSummary.review_reason === 'SOURCE_CHANGED') continue
         }
 
         const isPastDay = dateStr < todayVN
@@ -1338,16 +1385,58 @@ export async function autoCloseDueAttendance(asOf = new Date()) {
 
         if (!scheduledEnd || !otCutoff) continue
 
-        const hasCheckOut = Boolean(freshSummary.last_check_out)
+        const hasValidPairs = Array.isArray(details.pairs) && details.pairs.length > 0
+        const hasCheckIn = Boolean(freshSummary.first_check_in) || hasValidPairs
+        const hasCheckOut = Boolean(freshSummary.last_check_out) || hasValidPairs
         const shiftEnded = +asOf >= +scheduledEnd
         const otExpired = +asOf >= +otCutoff
 
         // Hôm nay: giữ NONE hoặc PENDING, không tự chuyển APPROVED
         if (!isPastDay) continue
 
+        const hasAnyEvents = Boolean((Array.isArray(details.events) && details.events.length > 0) || hasCheckIn || hasCheckOut)
+        const isTrueAbsent = freshSummary.attendance_status === 'ABSENT' || Boolean(details.absenceCandidate) || !hasAnyEvents
+
+        if (isTrueAbsent && shiftEnded) {
+          // VẮNG MẶT HOÀN TOÀN: Giữ nguyên ABSENT, 0 công, 0 OT, 0 trễ/sớm, áp dụng phạt vắng
+          const snapshot = (freshSummary as any).reopened_at || !(freshSummary as any).pre_approval_snapshot
+            ? baseSnapshot
+            : (freshSummary as any).pre_approval_snapshot
+
+          const updated = await tx.daily_attendance_summary.update({
+            where: { id: freshSummary.id },
+            data: {
+              attendance_status: 'ABSENT',
+              total_working_hours: 0,
+              overtime: 0,
+              overtime_candidate_hours: 0,
+              overtime_status: 'NONE',
+              late_early: 0,
+              late_early_seconds: 0,
+              regular_seconds: 0,
+              overtime_seconds: 0,
+              review_status: 'APPROVED',
+              approval_source: 'AUTO',
+              approved_at: asOf,
+              approved_by: 'SYSTEM_AUTO',
+              approval_reason: 'Tự động chốt: vắng mặt không lý do',
+              pre_approval_snapshot: snapshot,
+              requires_review: false,
+              calculation_details: { ...details, absenceCandidate: true },
+              reopened_at: null,
+              reopened_by: null,
+            },
+          })
+          const rate = sourceHourlyRate(freshSummary.employees, period, wageSnapshot?.hourly_rate, Boolean(payrollOverrides(wageSnapshot).fields.hourly_rate))
+          await syncDayAdjustments(tx, updated, rate, adjustmentPolicy?.absence_penalty_rate ?? null, sourceChanged ? undefined : adjustmentBatch)
+          closedCount++
+          continue
+        }
+
+        const isMissingScans = !hasValidPairs && ((hasCheckIn && !hasCheckOut) || (!hasCheckIn && hasCheckOut))
         const reviewReasons = (freshSummary.review_reason || '').split(',').filter(Boolean)
         const isUnderMinShift = reviewReasons.some((r: string) => ['UNDER_MINIMUM_SHIFT', 'UNDER_HALF_SHIFT'].includes(r))
-        const hasFatalScanError = !hasCheckOut || reviewReasons.some((r: string) => ['MISSING_CHECK_OUT', 'NO_VALID_PAIR', 'INVALID_PAIR', 'FLAGGED_EVENT', 'UNPAIRED_CHECK_OUT'].includes(r))
+        const hasFatalScanError = isMissingScans || reviewReasons.some((r: string) => ['MISSING_CHECK_OUT', 'NO_VALID_PAIR', 'INVALID_PAIR', 'FLAGGED_EVENT', 'UNPAIRED_CHECK_OUT'].includes(r))
         const isRealIncompleteOrError = Boolean(
           (!isUnderMinShift && freshSummary.attendance_status === 'INCOMPLETE') ||
           hasFatalScanError ||
@@ -1439,6 +1528,98 @@ export async function autoCloseDueAttendance(asOf = new Date()) {
   }
 
   return { closedCount, absentConvertedCount }
+}
+
+/**
+ * Rà soát và đối chiếu các ngày công có nguy cơ bị ảnh hưởng bởi phiên bản chính sách mới.
+ * - Phát hiện các ngày có chênh lệch giữa chính sách đã duyệt và chính sách mới (v7).
+ * - Nếu kỳ lương đã chốt/thanh toán: Trả về danh sách cảnh báo để quản lý lập phiếu điều chỉnh có kiểm soát, TUYỆT ĐỐI không tự ý sửa lịch sử lương.
+ * - Nếu kỳ lương còn mở và ngày chưa khóa: Cho phép tùy chọn tự động mở lại để tổng hợp lại an toàn.
+ */
+export async function auditAttendancePolicyDiscrepancies(
+  period: string,
+  autoReopenOpenPeriods = false
+) {
+  const [yearStr, monthStr] = period.split('-')
+  const year = parseInt(yearStr, 10)
+  const month = parseInt(monthStr, 10)
+  const startDate = new Date(Date.UTC(year, month - 1, 1))
+  const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
+
+  const summaries = await prisma.daily_attendance_summary.findMany({
+    where: {
+      work_date: { gte: startDate, lte: endDate },
+    },
+    include: { employees: true },
+  })
+
+  const results: Array<{
+    id: bigint
+    employee_code: string
+    employee_name: string
+    date: string
+    status: string
+    review_status: string
+    current_hours: number
+    is_payroll_closed: boolean
+    is_day_locked: boolean
+    has_discrepancy: boolean
+    reason: string
+    action_taken: 'NONE' | 'REOPENED_FOR_RECALCULATION' | 'MANUAL_PAYROLL_ADJUSTMENT_REQUIRED'
+  }> = []
+
+  for (const s of summaries) {
+    const dateStr = vnDay(s.work_date)
+    const isClosed = await isPayrollPeriodClosed(period, s.employee_id)
+    const isLocked = await isAttendanceDateLocked(s.work_date)
+    const details = (s.calculation_details || {}) as Record<string, any>
+    const pairs = Array.isArray(details.pairs) ? details.pairs : []
+
+    const hadEarlyArrivalNullCheckIn = pairs.length > 0 && !s.first_check_in
+    const hadIncompleteDueToMissingScan = s.attendance_status === 'INCOMPLETE' && pairs.length > 0
+    const hasDiscrepancy = hadEarlyArrivalNullCheckIn || hadIncompleteDueToMissingScan || s.policy_version !== ATTENDANCE_POLICY_VERSION
+
+    if (hasDiscrepancy) {
+      let actionTaken: 'NONE' | 'REOPENED_FOR_RECALCULATION' | 'MANUAL_PAYROLL_ADJUSTMENT_REQUIRED' = 'NONE'
+      if (isClosed) {
+        actionTaken = 'MANUAL_PAYROLL_ADJUSTMENT_REQUIRED'
+      } else if (autoReopenOpenPeriods && !isLocked) {
+        await prisma.daily_attendance_summary.update({
+          where: { id: s.id },
+          data: {
+            requires_review: true,
+            review_reason: 'POLICY_V7_MIGRATION',
+            review_status: 'PENDING',
+            reopened_at: new Date(),
+            reopened_by: 'POLICY_V7_MIGRATION',
+          },
+        })
+        await aggregateDailyAttendance(month, year, s.employee_id, dateStr)
+        actionTaken = 'REOPENED_FOR_RECALCULATION'
+      }
+
+      results.push({
+        id: s.id,
+        employee_code: s.employees.employee_code,
+        employee_name: s.employees.full_name,
+        date: dateStr,
+        status: s.attendance_status,
+        review_status: s.review_status,
+        current_hours: Number(s.total_working_hours),
+        is_payroll_closed: isClosed,
+        is_day_locked: isLocked,
+        has_discrepancy: true,
+        reason: hadEarlyArrivalNullCheckIn
+          ? 'Ca đến sớm có cặp quét hợp lệ nhưng first_check_in bị null theo v6'
+          : hadIncompleteDueToMissingScan
+            ? 'Ca có cặp quét hợp lệ bị chốt INCOMPLETE nhầm'
+            : `Chính sách lưu (${s.policy_version}) khác chính sách hiện hành (${ATTENDANCE_POLICY_VERSION})`,
+        action_taken: actionTaken,
+      })
+    }
+  }
+
+  return results
 }
 
 /**

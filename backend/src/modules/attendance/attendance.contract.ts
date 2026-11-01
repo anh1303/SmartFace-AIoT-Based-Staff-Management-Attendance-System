@@ -227,6 +227,22 @@ export async function invalidateDailySummaryForShiftChange(
   tx?: Prisma.TransactionClient
 ): Promise<void> {
   const client = tx || prisma
+  if (!client.daily_attendance_summary) return
+
+  let isApproved = true
+  let existingReopenedAt: Date | null = null
+  let existingReopenedBy: string | null = null
+
+  if (typeof client.daily_attendance_summary.findFirst === 'function') {
+    const existing = await client.daily_attendance_summary.findFirst({
+      where: { employee_id: employeeId, work_date: workDate },
+    })
+    if (!existing) return
+    isApproved = existing.review_status === 'APPROVED'
+    existingReopenedAt = (existing as any).reopened_at ?? null
+    existingReopenedBy = (existing as any).reopened_by ?? null
+  }
+
   await client.daily_attendance_summary.updateMany({
     where: { employee_id: employeeId, work_date: workDate },
     data: {
@@ -236,19 +252,21 @@ export async function invalidateDailySummaryForShiftChange(
       review_status: 'PENDING',
       approved_by: null,
       approved_at: null,
-      reopened_at: new Date(),
-      reopened_by: 'SHIFT_CHANGED',
+      reopened_at: isApproved ? new Date() : existingReopenedAt,
+      reopened_by: isApproved ? 'SHIFT_CHANGED' : existingReopenedBy,
       pre_approval_snapshot: Prisma.DbNull,
     },
   })
-  await client.attendanceAdjustment.updateMany({
-    where: { employee_id: employeeId, work_date: workDate, status: 'APPROVED' },
-    data: {
-      status: 'PENDING',
-      reviewed_by: null,
-      reviewed_at: null,
-    },
-  })
+  if (isApproved && client.attendanceAdjustment?.updateMany) {
+    await client.attendanceAdjustment.updateMany({
+      where: { employee_id: employeeId, work_date: workDate, status: 'APPROVED' },
+      data: {
+        status: 'PENDING',
+        reviewed_by: null,
+        reviewed_at: null,
+      },
+    })
+  }
 }
 
 /**

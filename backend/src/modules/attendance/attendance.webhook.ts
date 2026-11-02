@@ -4,6 +4,7 @@ import { eventBus } from '../../common/event-bus.js'
 import { observeRecognition } from './recognition-confirmation.js'
 import { findBestFaceMatch } from '../biometrics/public.js'
 import { claimAlert } from './attendance.alert-dedup.js'
+import { vnDay } from './attendance.policy.js'
 
 export interface ThingsBoardWebhookPayload {
   device_id?: string
@@ -20,7 +21,8 @@ export interface ThingsBoardWebhookPayload {
 
 export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload, actions: { checkIn: typeof import('./attendance.service.js').checkIn; checkOut: typeof import('./attendance.service.js').checkOut }) {
   const { device_id, mode, antispoof_score } = data
-  if (!device_id || !['CHECK_IN', 'CHECK_OUT'].includes(mode || '')) throw AppError.badRequest('device_id/mode không hợp lệ')
+  const normalizedRequestedMode = (mode || 'AUTO').toUpperCase()
+  if (!device_id || !['CHECK_IN', 'CHECK_OUT', 'AUTO'].includes(normalizedRequestedMode)) throw AppError.badRequest('device_id/mode không hợp lệ')
   if (typeof antispoof_score !== 'number' || !Number.isFinite(antispoof_score) || antispoof_score < 0 || antispoof_score > 1) throw AppError.badRequest('Cần điểm liveness hợp lệ')
   if (!data.event_id || !/^[a-zA-Z0-9_-]{8,120}$/.test(data.event_id)) throw AppError.badRequest('Cần event_id duy nhất cho lượt ghi nhận')
   const capturedAt = Number(data.client_timestamp)
@@ -29,7 +31,7 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
   // Anti-spoofing check
   if (typeof antispoof_score === 'number' && antispoof_score < 0.5) {
     if (typeof data.recognition_id === 'string' && /^[a-zA-Z0-9_-]{8,120}$/.test(data.recognition_id)) {
-      observeRecognition(device_id, `${mode}:${data.event_id}`, data.recognition_id, null)
+      observeRecognition(device_id, `${normalizedRequestedMode}:${data.event_id}`, data.recognition_id, null)
     }
     if (await claimAlert('spoof', device_id, data.event_id)) {
       eventBus.publish('attendance:spoof-blocked', {
@@ -104,7 +106,7 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
   const bestMatch = await findBestFaceMatch(vecLiteral)
 
   if (!bestMatch || bestMatch.similarity < MATCH_THRESHOLD) {
-    if (isConfirmation) observeRecognition(device_id, `${mode}:${data.event_id}`, data.recognition_id!, null)
+    if (isConfirmation) observeRecognition(device_id, `${normalizedRequestedMode}:${data.event_id}`, data.recognition_id!, null)
     const bestSim = bestMatch ? Number(bestMatch.similarity.toFixed(4)) : 0
     if (await claimAlert('unknown', device_id, data.event_id)) {
       eventBus.publish('attendance:unknown', {
@@ -125,19 +127,44 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
   }
 
   const match = bestMatch
-  const normalizedMode = (mode || 'CHECK_IN').toUpperCase()
-  const isCheckOut = normalizedMode === 'CHECK_OUT'
+
+  // Logic 1: Tự động phân định CHECK_IN / CHECK_OUT nếu mode = AUTO (hoặc không truyền)
+  let resolvedMode: 'CHECK_IN' | 'CHECK_OUT' = 'CHECK_IN'
+  if (normalizedRequestedMode === 'AUTO') {
+    const startOfDay = new Date(`${vnDay(new Date())}T00:00:00+07:00`)
+    const lastLog = await prisma.attendance_logs.findFirst({
+      where: {
+        employee_id: match.emp_id,
+        status: 'VALID',
+        event_time: { gte: startOfDay },
+      },
+      orderBy: { event_time: 'desc' },
+    })
+
+    resolvedMode = (!lastLog || lastLog.type === 'CHECK_OUT') ? 'CHECK_IN' : 'CHECK_OUT'
+
+    // Cooldown chống quét nhầm: Nếu vừa CHECK_IN trong vòng ATTENDANCE_COOLDOWN_SECONDS
+    const cooldownMs = (Number(process.env.ATTENDANCE_COOLDOWN_SECONDS) || 60) * 1000
+    const nowMs = Date.now()
+    if (lastLog && lastLog.type === 'CHECK_IN' && (nowMs - new Date(lastLog.event_time).getTime()) < cooldownMs) {
+      resolvedMode = 'CHECK_IN'
+    }
+  } else {
+    resolvedMode = normalizedRequestedMode === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN'
+  }
+
+  const isCheckOut = resolvedMode === 'CHECK_OUT'
 
   if (isConfirmation) {
-    const confirmation = observeRecognition(device_id, `${mode}:${data.event_id}`, data.recognition_id!, match.emp_id)
+    const confirmation = observeRecognition(device_id, `${resolvedMode}:${data.event_id}`, data.recognition_id!, match.emp_id)
     if (data.event_kind === 'VERIFY_ONLY' || !confirmation.ready || data.expected_employee_id !== match.emp_id) {
       return {
         success: true, matched: true, verification_only: true, event_id: data.event_id,
-        mode: normalizedMode, recognition_id: data.recognition_id,
+        mode: resolvedMode, recognition_id: data.recognition_id,
         confirmation_count: confirmation.count, confirmation_required: confirmation.required,
         employee: {id: match.emp_id, employee_code: match.employee_code, full_name: match.full_name, avatar_url: match.avatar_url},
         similarity: Number(match.similarity.toFixed(4)),
-        message: `Xác minh ${normalizedMode} ${Math.min(confirmation.count, confirmation.required)}/${confirmation.required}; chưa ghi điểm danh`,
+        message: `Xác minh ${resolvedMode} ${Math.min(confirmation.count, confirmation.required)}/${confirmation.required}; chưa ghi điểm danh`,
       }
     }
   }
@@ -167,7 +194,7 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
         door_open: false,
         matched: true,
         event_id: data.event_id,
-        mode: normalizedMode,
+        mode: resolvedMode,
         employee: {
           id: match.emp_id,
           employee_code: match.employee_code,
@@ -189,7 +216,7 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
       door_open: true,
       matched: true,
       event_id: data.event_id,
-      mode: normalizedMode,
+      mode: resolvedMode,
       employee: {
         id: match.emp_id,
         employee_code: match.employee_code,
@@ -207,7 +234,7 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
       door_open: false,
       matched: true,
       event_id: data.event_id,
-      mode: normalizedMode,
+      mode: resolvedMode,
       employee: {
         id: match.emp_id,
         employee_code: match.employee_code,

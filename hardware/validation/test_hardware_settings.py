@@ -20,6 +20,7 @@ from hardware.peripherals import (
     get_hardware_telemetry,
     AudioManager,
     UltrasonicSensor,
+    ServoController,
 )
 from hardware.iot import ThingsBoardClient
 
@@ -193,6 +194,56 @@ class HardwareSettingsTests(unittest.TestCase):
         self.assertFalse(self.tb.stream_enabled)
         self.assertEqual(updated["volume"], 85)
         self.assertTrue(updated["is_muted"])
+
+    def test_servo_controller_angles_and_detach(self):
+        """Kiểm tra điều khiển góc Servo (90/0/180) và cơ chế ngắt PWM (servo.angle=None) chống giật"""
+        servo = ServoController(pin=18, enabled=True)
+        # 1. Trạng thái sau khởi tạo: đóng (90°) và ngắt xung để chống giật
+        self.assertEqual(servo.door_state, "CLOSED")
+        self.assertIsNone(servo.current_angle)
+
+        # 2. Quay góc 0° (Check-in)
+        servo.set_angle(0)
+        self.assertEqual(servo.door_state, "OPEN_IN")
+        self.assertEqual(servo.current_angle, 0.0)
+
+        # 3. Quay góc 180° (Check-out)
+        servo.set_angle(180)
+        self.assertEqual(servo.door_state, "OPEN_OUT")
+        self.assertEqual(servo.current_angle, 180.0)
+
+        # 4. Đóng cửa về 90°
+        servo.set_angle(90)
+        self.assertEqual(servo.door_state, "CLOSED")
+        self.assertEqual(servo.current_angle, 90.0)
+
+        # 5. Ngắt xung PWM chống giật
+        servo.set_angle(None)
+        self.assertEqual(servo.door_state, "CLOSED")
+        self.assertIsNone(servo.current_angle)
+
+    def test_ultrasonic_wake_presence_50cm(self):
+        """Kiểm tra cảm biến siêu âm nhận diện hiện diện kích hoạt ở ngưỡng 50cm"""
+        sensor = UltrasonicSensor(enabled=True, trigger_distance=50.0, debounce_duration=0.5, name="PRESENCE_50")
+
+        # 1. Ban đầu chưa có người
+        self.assertFalse(sensor.is_person_present())
+
+        # 2. Người đứng ở 45cm (<= 50cm) tại t=0s -> chưa đủ debounce 0.5s nên False
+        sensor.set_mock_distance(45.0, now=10.0)
+        self.assertFalse(sensor.is_person_present())
+
+        # 3. Duy trì 45cm đến t=10.6s (đã qua 0.6s >= 0.5s) -> Chính thức chuyển thành True
+        sensor.set_mock_distance(45.0, now=10.6)
+        self.assertTrue(sensor.is_person_present())
+
+        # 4. Người bước qua (65cm > 50cm) tại t=15.0s -> chưa đủ debounce nên vẫn True
+        sensor.set_mock_distance(65.0, now=15.0)
+        self.assertTrue(sensor.is_person_present())
+
+        # 5. Duy trì 65cm đến t=15.6s (đã qua 0.6s >= 0.5s) -> Chuyển về False (người đã đi qua)
+        sensor.set_mock_distance(65.0, now=15.6)
+        self.assertFalse(sensor.is_person_present())
 
 
 if __name__ == "__main__":

@@ -84,7 +84,7 @@ class ThingsBoardClient:
     def set_mode(self, mode, version=None):
         if mode in (None, '', 'NONE', 'IDLE', 'OFF'):
             mode = 'OFF'
-        if mode not in ('CHECK_IN', 'CHECK_OUT', 'OFF'):
+        if mode not in ('CHECK_IN', 'CHECK_OUT', 'OFF', 'AUTO'):
             return False
         supplied_version = version
         version = int(version) if version is not None else max(int(time.time() * 1000), self._mode_version + 1)
@@ -368,7 +368,7 @@ class ThingsBoardClient:
 
     def send_scan_rpc(self, embedding, fas_score: float, mode: str, on_result=None,
                       event_id=None, captured_at=None, event_kind=None, recognition_id=None, expected_employee_id=None) -> int:
-        if not self.connected or not self.client or mode not in ('CHECK_IN', 'CHECK_OUT'):
+        if not self.connected or not self.client or mode not in ('CHECK_IN', 'CHECK_OUT', 'AUTO'):
             return -1
         import numpy as np
         if not math.isfinite(float(fas_score)) or not 0 <= float(fas_score) <= 1:

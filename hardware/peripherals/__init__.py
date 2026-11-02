@@ -4,6 +4,7 @@ Module peripherals: Chứa các driver và dịch vụ giao tiếp phần cứng
 
 from .ultrasonic_sensor import UltrasonicSensor
 from .audio_manager import AudioManager
+from .servo_controller import ServoController
 from .system_telemetry import (
     get_cpu_temperature,
     get_ram_usage,
@@ -17,6 +18,7 @@ from .system_telemetry import (
 __all__ = [
     "UltrasonicSensor",
     "AudioManager",
+    "ServoController",
     "get_cpu_temperature",
     "get_ram_usage",
     "get_disk_usage",

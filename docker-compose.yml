@@ -26,6 +26,7 @@ services:
     env_file: ./backend/.env
     environment:
       DATABASE_URL: ${PBL6_DOCKER_DATABASE_URL:-postgresql://postgres:${PBL6_POSTGRES_PASSWORD}@postgres:5432/PBL6?schema=public}
+      DIRECT_URL: ${PBL6_DOCKER_DATABASE_URL:-postgresql://postgres:${PBL6_POSTGRES_PASSWORD}@postgres:5432/PBL6?schema=public}
     command: ["npm", "run", "prisma:migrate"]
     depends_on:
       postgres:
@@ -79,6 +80,7 @@ services:
       NODE_ENV: ${PBL6_NODE_ENV:-development}
       PORT: 3000
       DATABASE_URL: ${PBL6_DOCKER_DATABASE_URL:-postgresql://postgres:${PBL6_POSTGRES_PASSWORD}@postgres:5432/PBL6?schema=public}
+      DIRECT_URL: ${PBL6_DOCKER_DATABASE_URL:-postgresql://postgres:${PBL6_POSTGRES_PASSWORD}@postgres:5432/PBL6?schema=public}
       FACE_AUTH_URL: http://face-auth:5000
       FACE_AUTH_MODEL_VERSION: ${PBL6_FACE_MODEL_PACK:-buffalo_s}
       MQTT_URL: mqtt://mqtt:1883

@@ -1,0 +1,1802 @@
+{
+  "source": "Neon PBL6 selected by backend/.env DIRECT_URL; credentials omitted",
+  "mode": "SELECT only; each query in READ ONLY transaction",
+  "code_head": "0e3f27f0f9cc3f91eced029e3349734bd9c72a00",
+  "snapshot": {
+    "identity": [
+      {
+        "db": "PBL6",
+        "read_only": "on",
+        "db_time": "2026-11-02 09:10:29.612835+00"
+      }
+    ],
+    "counts": [
+      {
+        "entity": "employees",
+        "rows": 23
+      },
+      {
+        "entity": "users",
+        "rows": 24
+      },
+      {
+        "entity": "departments",
+        "rows": 6
+      },
+      {
+        "entity": "positions",
+        "rows": 18
+      },
+      {
+        "entity": "face_embeddings",
+        "rows": 14
+      },
+      {
+        "entity": "devices",
+        "rows": 4
+      },
+      {
+        "entity": "audit_logs",
+        "rows": 1404
+      },
+      {
+        "entity": "system_notifications",
+        "rows": 496
+      }
+    ],
+    "full_counts": [
+      {
+        "entity": "attendance_logs",
+        "rows": 2183
+      },
+      {
+        "entity": "employee_shifts",
+        "rows": 1848
+      },
+      {
+        "entity": "daily_attendance_summary",
+        "rows": 1739
+      },
+      {
+        "entity": "attendance_adjustments",
+        "rows": 482
+      },
+      {
+        "entity": "payroll_records",
+        "rows": 81
+      },
+      {
+        "entity": "attendance_locks",
+        "rows": 61
+      },
+      {
+        "entity": "attendance_aggregation_state",
+        "rows": 2
+      },
+      {
+        "entity": "attendance_alert_checkpoints",
+        "rows": 1
+      },
+      {
+        "entity": "bonus_penalty",
+        "rows": 2
+      },
+      {
+        "entity": "shift_templates",
+        "rows": 0
+      },
+      {
+        "entity": "work_shifts",
+        "rows": 9
+      },
+      {
+        "entity": "payroll_rate_repair_archive",
+        "rows": 76
+      },
+      {
+        "entity": "solution_inquiries",
+        "rows": 0
+      },
+      {
+        "entity": "webhook_alert_dedup",
+        "rows": 0
+      },
+      {
+        "entity": "_prisma_migrations",
+        "rows": 21
+      },
+      {
+        "entity": "roles",
+        "rows": 3
+      }
+    ],
+    "employees": [
+      {
+        "employee_code": "NV-001",
+        "full_name": "Trần Thị Mai",
+        "status": "ACTIVE",
+        "hourly_rate": "160000",
+        "created": "2024-01-15",
+        "department": "Nhân sự",
+        "position": "Trưởng phòng Nhân sự",
+        "level": "MANAGER",
+        "username": "NV-001",
+        "role_name": "MANAGER"
+      },
+      {
+        "employee_code": "NV-002",
+        "full_name": "Lê Thu Trang",
+        "status": "ACTIVE",
+        "hourly_rate": "110000",
+        "created": "2024-03-10",
+        "department": "Nhân sự",
+        "position": "Chuyên viên Tuyển dụng",
+        "level": "EMPLOYEE",
+        "username": "NV-002",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-003",
+        "full_name": "Đỗ Văn Hùng",
+        "status": "ACTIVE",
+        "hourly_rate": "115000",
+        "created": "2024-04-01",
+        "department": "Nhân sự",
+        "position": "Chuyên viên C&B",
+        "level": "EMPLOYEE",
+        "username": "NV-003",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-004",
+        "full_name": "Nguyễn Thị Hương",
+        "status": "ACTIVE",
+        "hourly_rate": "170000",
+        "created": "2023-10-15",
+        "department": "Kế toán",
+        "position": "Kế toán trưởng",
+        "level": "MANAGER",
+        "username": "NV-004",
+        "role_name": "MANAGER"
+      },
+      {
+        "employee_code": "NV-005",
+        "full_name": "Phạm Minh Tuấn",
+        "status": "ACTIVE",
+        "hourly_rate": "120000",
+        "created": "2024-02-15",
+        "department": "Kế toán",
+        "position": "Kế toán tổng hợp",
+        "level": "EMPLOYEE",
+        "username": "NV-005",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-006",
+        "full_name": "Hoàng Bích Ngọc",
+        "status": "ACTIVE",
+        "hourly_rate": "110000",
+        "created": "2024-05-10",
+        "department": "Kế toán",
+        "position": "Kế toán tiền lương",
+        "level": "EMPLOYEE",
+        "username": "NV-006",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-007",
+        "full_name": "Vũ Hải Đăng",
+        "status": "ACTIVE",
+        "hourly_rate": "180000",
+        "created": "2023-11-20",
+        "department": "Kinh doanh",
+        "position": "Trưởng phòng Kinh doanh",
+        "level": "MANAGER",
+        "username": "NV-007",
+        "role_name": "MANAGER"
+      },
+      {
+        "employee_code": "NV-008",
+        "full_name": "Đặng Quỳnh Chi",
+        "status": "ACTIVE",
+        "hourly_rate": "130000",
+        "created": "2024-02-01",
+        "department": "Kinh doanh",
+        "position": "Chuyên viên Quản lý khách hàng",
+        "level": "EMPLOYEE",
+        "username": "NV-008",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-009",
+        "full_name": "Bùi Quốc Bảo",
+        "status": "ACTIVE",
+        "hourly_rate": "100000",
+        "created": "2024-06-01",
+        "department": "Kinh doanh",
+        "position": "Đại diện Kinh doanh",
+        "level": "EMPLOYEE",
+        "username": "NV-009",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-010",
+        "full_name": "Trịnh Đình Khôi",
+        "status": "ACTIVE",
+        "hourly_rate": "165000",
+        "created": "2023-12-01",
+        "department": "Marketing",
+        "position": "Trưởng phòng Marketing",
+        "level": "MANAGER",
+        "username": "NV-010",
+        "role_name": "MANAGER"
+      },
+      {
+        "employee_code": "NV-011",
+        "full_name": "Ngô Phương Linh",
+        "status": "ACTIVE",
+        "hourly_rate": "105000",
+        "created": "2024-03-20",
+        "department": "Marketing",
+        "position": "Chuyên viên Nội dung",
+        "level": "EMPLOYEE",
+        "username": "NV-011",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-012",
+        "full_name": "Dương Quang Huy",
+        "status": "ACTIVE",
+        "hourly_rate": "120000",
+        "created": "2024-04-15",
+        "department": "Marketing",
+        "position": "Chuyên viên Digital Marketing",
+        "level": "EMPLOYEE",
+        "username": "NV-012",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-013",
+        "full_name": "Nguyễn Văn A",
+        "status": "ACTIVE",
+        "hourly_rate": "190000",
+        "created": "2023-09-01",
+        "department": "IT",
+        "position": "Trưởng phòng CNTT",
+        "level": "MANAGER",
+        "username": "NV-013",
+        "role_name": "MANAGER"
+      },
+      {
+        "employee_code": "NV-014",
+        "full_name": "Lê Hoàng Phúc",
+        "status": "ACTIVE",
+        "hourly_rate": "140000",
+        "created": "2024-01-10",
+        "department": "IT",
+        "position": "Kỹ sư Phần mềm",
+        "level": "EMPLOYEE",
+        "username": "NV-014",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-015",
+        "full_name": "Trần Thu Thảo",
+        "status": "ACTIVE",
+        "hourly_rate": "135000",
+        "created": "2024-02-25",
+        "department": "IT",
+        "position": "Kỹ sư Hệ thống & AIoT",
+        "level": "EMPLOYEE",
+        "username": "NV-015",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-016",
+        "full_name": "Phan Thanh Bình",
+        "status": "ACTIVE",
+        "hourly_rate": "150000",
+        "created": "2024-01-05",
+        "department": "CSKH",
+        "position": "Trưởng phòng CSKH",
+        "level": "MANAGER",
+        "username": "NV-016",
+        "role_name": "MANAGER"
+      },
+      {
+        "employee_code": "NV-017",
+        "full_name": "Lý Diệu Anh",
+        "status": "ACTIVE",
+        "hourly_rate": "95000",
+        "created": "2024-04-10",
+        "department": "CSKH",
+        "position": "Chuyên viên Hỗ trợ khách hàng",
+        "level": "EMPLOYEE",
+        "username": "NV-017",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-018",
+        "full_name": "Hà Quốc Việt",
+        "status": "ACTIVE",
+        "hourly_rate": "90000",
+        "created": "2024-05-01",
+        "department": "CSKH",
+        "position": "Chuyên viên Trực tổng đài",
+        "level": "EMPLOYEE",
+        "username": "NV-018",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-019",
+        "full_name": "Nguyễn Quang Anh",
+        "status": "ACTIVE",
+        "hourly_rate": "50000",
+        "created": "2026-10-19",
+        "department": "Nhân sự",
+        "position": "Chuyên viên C&B",
+        "level": "EMPLOYEE",
+        "username": "NV-019",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-020",
+        "full_name": "Nguyễn Văn Giáp",
+        "status": "ACTIVE",
+        "hourly_rate": "50000",
+        "created": "2026-10-25",
+        "department": "Nhân sự",
+        "position": "Trưởng phòng Nhân sự",
+        "level": "MANAGER",
+        "username": "NV-020",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-021",
+        "full_name": "Nguyễn Quang Lâm",
+        "status": "ACTIVE",
+        "hourly_rate": "80000",
+        "created": "2026-10-29",
+        "department": "Kinh doanh",
+        "position": "Chuyên viên Quản lý khách hàng",
+        "level": "EMPLOYEE",
+        "username": "NV-021",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "NV-022",
+        "full_name": "Nguyễn Thị Quỳnh Trang",
+        "status": "ACTIVE",
+        "hourly_rate": "65000",
+        "created": "2026-11-02",
+        "department": "Nhân sự",
+        "position": "Chuyên viên Tuyển dụng",
+        "level": "EMPLOYEE",
+        "username": "trang.ntq",
+        "role_name": "EMPLOYEE"
+      },
+      {
+        "employee_code": "TEST-610fc4f4",
+        "full_name": "ngovanloc",
+        "status": "ACTIVE",
+        "hourly_rate": "41000",
+        "created": "2026-10-21",
+        "department": "Marketing",
+        "position": "Kỹ sư Hệ thống & AIoT",
+        "level": "EMPLOYEE",
+        "username": "TEST-610fc4f4",
+        "role_name": "EMPLOYEE"
+      }
+    ],
+    "policies": [
+      {
+        "id": 6,
+        "effective_period": "2026-08",
+        "overtime_rate": "2.0000",
+        "late_early_penalty": "1.5000",
+        "absence_penalty_rate": "2.0000",
+        "description": "Chính sách hệ số: OT 2.0x, phạt trễ/sớm 1.5x, phạt vắng 2.0x"
+      },
+      {
+        "id": 7,
+        "effective_period": "2026-10",
+        "overtime_rate": "2.0000",
+        "late_early_penalty": "1.5000",
+        "absence_penalty_rate": "2.0000",
+        "description": "Multiplier baseline; historical policies require verification"
+      }
+    ],
+    "shifts": [
+      {
+        "id": 18,
+        "shift_name": "Full time",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00"
+      },
+      {
+        "id": 19,
+        "shift_name": "Part time: Ca sáng",
+        "start_time": "08:00:00",
+        "end_time": "12:00:00"
+      },
+      {
+        "id": 20,
+        "shift_name": "Part time: Ca chiều",
+        "start_time": "13:00:00",
+        "end_time": "17:00:00"
+      },
+      {
+        "id": 21,
+        "shift_name": "Nghỉ ca",
+        "start_time": "00:00:00",
+        "end_time": "00:00:00"
+      },
+      {
+        "id": 22,
+        "shift_name": "Ca Hành Chính",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00"
+      },
+      {
+        "id": 23,
+        "shift_name": "Ca khác",
+        "start_time": "22:00:00",
+        "end_time": "06:00:00"
+      },
+      {
+        "id": 24,
+        "shift_name": "Ca Sáng",
+        "start_time": "08:00:00",
+        "end_time": "12:00:00"
+      },
+      {
+        "id": 25,
+        "shift_name": "Ca Chiều",
+        "start_time": "13:00:00",
+        "end_time": "17:00:00"
+      },
+      {
+        "id": 26,
+        "shift_name": "Ca Đêm",
+        "start_time": "22:00:00",
+        "end_time": "06:00:00"
+      }
+    ],
+    "templates": [],
+    "months_logs": [
+      {
+        "period": "2026-08",
+        "rows": 667,
+        "employees": 18,
+        "earliest": "2026-08-03 00:48:06+00",
+        "latest": "2026-08-31 10:14:56+00"
+      },
+      {
+        "period": "2026-09",
+        "rows": 732,
+        "employees": 18,
+        "earliest": "2026-09-01 00:48:33+00",
+        "latest": "2026-09-30 10:13:05+00"
+      },
+      {
+        "period": "2026-10",
+        "rows": 733,
+        "employees": 22,
+        "earliest": "2026-10-01 00:48:33+00",
+        "latest": "2026-10-30 12:15:47+00"
+      },
+      {
+        "period": "2026-11",
+        "rows": 51,
+        "employees": 3,
+        "earliest": "2026-11-01 01:00:00+00",
+        "latest": "2026-11-25 23:05:00+00"
+      }
+    ],
+    "months_shifts": [
+      {
+        "period": "2026-08",
+        "shift_type": "OFF",
+        "rows": 180,
+        "employees": 18,
+        "earliest": "2026-08-01",
+        "latest": "2026-08-30"
+      },
+      {
+        "period": "2026-08",
+        "shift_type": "OFFICE_HOURS",
+        "rows": 378,
+        "employees": 18,
+        "earliest": "2026-08-03",
+        "latest": "2026-08-31"
+      },
+      {
+        "period": "2026-09",
+        "shift_type": "OFF",
+        "rows": 144,
+        "employees": 18,
+        "earliest": "2026-09-05",
+        "latest": "2026-09-27"
+      },
+      {
+        "period": "2026-09",
+        "shift_type": "OFFICE_HOURS",
+        "rows": 396,
+        "employees": 18,
+        "earliest": "2026-09-01",
+        "latest": "2026-09-30"
+      },
+      {
+        "period": "2026-10",
+        "shift_type": "NIGHT_SHIFT",
+        "rows": 1,
+        "employees": 1,
+        "earliest": "2026-10-21",
+        "latest": "2026-10-21"
+      },
+      {
+        "period": "2026-10",
+        "shift_type": "OFF",
+        "rows": 172,
+        "employees": 22,
+        "earliest": "2026-10-03",
+        "latest": "2026-10-31"
+      },
+      {
+        "period": "2026-10",
+        "shift_type": "OFFICE_HOURS",
+        "rows": 420,
+        "employees": 22,
+        "earliest": "2026-10-01",
+        "latest": "2026-10-30"
+      },
+      {
+        "period": "2026-11",
+        "shift_type": "AFTERNOON",
+        "rows": 5,
+        "employees": 1,
+        "earliest": "2026-11-04",
+        "latest": "2026-11-23"
+      },
+      {
+        "period": "2026-11",
+        "shift_type": "MORNING",
+        "rows": 6,
+        "employees": 2,
+        "earliest": "2026-11-01",
+        "latest": "2026-11-18"
+      },
+      {
+        "period": "2026-11",
+        "shift_type": "OFF",
+        "rows": 30,
+        "employees": 23,
+        "earliest": "2026-11-04",
+        "latest": "2026-11-29"
+      },
+      {
+        "period": "2026-11",
+        "shift_type": "OFFICE_HOURS",
+        "rows": 115,
+        "employees": 23,
+        "earliest": "2026-11-02",
+        "latest": "2026-11-24"
+      },
+      {
+        "period": "2026-11",
+        "shift_type": "OTHER",
+        "rows": 1,
+        "employees": 1,
+        "earliest": "2026-11-25",
+        "latest": "2026-11-25"
+      }
+    ],
+    "months_summaries": [
+      {
+        "period": "2026-08",
+        "attendance_status": "ABSENT",
+        "review_status": "APPROVED",
+        "rows": 60,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "attendance_status": "EARLY_LEAVE",
+        "review_status": "APPROVED",
+        "rows": 9,
+        "regular_hours": "81.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "attendance_status": "LATE",
+        "review_status": "APPROVED",
+        "rows": 38,
+        "regular_hours": "342.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "attendance_status": "LATE_AND_EARLY",
+        "review_status": "APPROVED",
+        "rows": 7,
+        "regular_hours": "63.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "attendance_status": "OFF",
+        "review_status": "APPROVED",
+        "rows": 180,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "attendance_status": "PRESENT",
+        "review_status": "APPROVED",
+        "rows": 264,
+        "regular_hours": "2376.00",
+        "ot_hours": "40.50"
+      },
+      {
+        "period": "2026-09",
+        "attendance_status": "ABSENT",
+        "review_status": "APPROVED",
+        "rows": 55,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "attendance_status": "EARLY_LEAVE",
+        "review_status": "APPROVED",
+        "rows": 3,
+        "regular_hours": "27.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "attendance_status": "LATE",
+        "review_status": "APPROVED",
+        "rows": 38,
+        "regular_hours": "342.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "attendance_status": "LATE_AND_EARLY",
+        "review_status": "APPROVED",
+        "rows": 4,
+        "regular_hours": "36.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "attendance_status": "OFF",
+        "review_status": "APPROVED",
+        "rows": 144,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "attendance_status": "PRESENT",
+        "review_status": "APPROVED",
+        "rows": 296,
+        "regular_hours": "2664.00",
+        "ot_hours": "49.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "ABSENT",
+        "review_status": "APPROVED",
+        "rows": 67,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "EARLY_LEAVE",
+        "review_status": "APPROVED",
+        "rows": 8,
+        "regular_hours": "72.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "LATE",
+        "review_status": "APPROVED",
+        "rows": 44,
+        "regular_hours": "396.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "LATE_AND_EARLY",
+        "review_status": "APPROVED",
+        "rows": 9,
+        "regular_hours": "81.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "OFF",
+        "review_status": "APPROVED",
+        "rows": 172,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "PRESENT",
+        "review_status": "APPROVED",
+        "rows": 293,
+        "regular_hours": "2637.00",
+        "ot_hours": "84.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "ABSENT",
+        "review_status": "NONE",
+        "rows": 1,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "EARLY_LEAVE",
+        "review_status": "PENDING",
+        "rows": 1,
+        "regular_hours": "4.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "APPROVED",
+        "rows": 1,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "NONE",
+        "rows": 1,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "PENDING",
+        "rows": 6,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "LATE",
+        "review_status": "PENDING",
+        "rows": 1,
+        "regular_hours": "4.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "LATE_AND_EARLY",
+        "review_status": "PENDING",
+        "rows": 1,
+        "regular_hours": "9.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "NO_SHIFT",
+        "review_status": "PENDING",
+        "rows": 1,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "OFF",
+        "review_status": "NONE",
+        "rows": 7,
+        "regular_hours": "0.00",
+        "ot_hours": "9.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "PRESENT",
+        "review_status": "NONE",
+        "rows": 7,
+        "regular_hours": "47.00",
+        "ot_hours": "1.50"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "PRESENT",
+        "review_status": "PENDING",
+        "rows": 1,
+        "regular_hours": "9.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "SCHEDULED",
+        "review_status": "NONE",
+        "rows": 20,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      }
+    ],
+    "months_adjustments": [
+      {
+        "period": "2026-08",
+        "kind": "ABSENCE",
+        "status": "APPROVED",
+        "rows": 60,
+        "hours": "540.00",
+        "amount": "143460000.00"
+      },
+      {
+        "period": "2026-08",
+        "kind": "LATE_EARLY",
+        "status": "APPROVED",
+        "rows": 54,
+        "hours": "48.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "kind": "OVERTIME",
+        "status": "APPROVED",
+        "rows": 36,
+        "hours": "40.50",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "kind": "OVERTIME",
+        "status": "VOID",
+        "rows": 4,
+        "hours": "0.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "kind": "ABSENCE",
+        "status": "APPROVED",
+        "rows": 55,
+        "hours": "495.00",
+        "amount": "133380000.00"
+      },
+      {
+        "period": "2026-09",
+        "kind": "LATE_EARLY",
+        "status": "APPROVED",
+        "rows": 45,
+        "hours": "40.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "kind": "OVERTIME",
+        "status": "APPROVED",
+        "rows": 38,
+        "hours": "49.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "kind": "OVERTIME",
+        "status": "VOID",
+        "rows": 4,
+        "hours": "0.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "kind": "ABSENCE",
+        "status": "APPROVED",
+        "rows": 67,
+        "hours": "598.00",
+        "amount": "155198000.00"
+      },
+      {
+        "period": "2026-10",
+        "kind": "LATE_EARLY",
+        "status": "APPROVED",
+        "rows": 61,
+        "hours": "52.50",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "kind": "OVERTIME",
+        "status": "APPROVED",
+        "rows": 52,
+        "hours": "84.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "kind": "LATE_EARLY",
+        "status": "VOID",
+        "rows": 1,
+        "hours": "0.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "kind": "OVERTIME",
+        "status": "APPROVED",
+        "rows": 3,
+        "hours": "12.00",
+        "amount": "1560000.00"
+      },
+      {
+        "period": "2026-11",
+        "kind": "OVERTIME",
+        "status": "PENDING",
+        "rows": 2,
+        "hours": "8.00",
+        "amount": "1040000.00"
+      }
+    ],
+    "payroll": [
+      {
+        "payroll_period": "2026-08",
+        "status": "FINALIZED",
+        "rows": 18,
+        "hours": "2862.00",
+        "ot": "40.50",
+        "late": "48.00",
+        "allowances": "27000000.00",
+        "net": "263490000.00"
+      },
+      {
+        "payroll_period": "2026-09",
+        "status": "FINALIZED",
+        "rows": 18,
+        "hours": "3069.00",
+        "ot": "49.00",
+        "late": "40.00",
+        "allowances": "27000000.00",
+        "net": "305780000.00"
+      },
+      {
+        "payroll_period": "2026-10",
+        "status": "FINALIZED",
+        "rows": 22,
+        "hours": "3186.00",
+        "ot": "84.00",
+        "late": "52.50",
+        "allowances": "33000000.00",
+        "net": "295721500.00"
+      },
+      {
+        "payroll_period": "2026-11",
+        "status": "PENDING",
+        "rows": 23,
+        "hours": "0.00",
+        "ot": "0.00",
+        "late": "2.00",
+        "allowances": "34500000.00",
+        "net": "34020000.00"
+      }
+    ],
+    "recent_days": [
+      {
+        "work_day": "2026-10-30",
+        "rows": 37,
+        "employees": 19
+      },
+      {
+        "work_day": "2026-11-01",
+        "rows": 4,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-02",
+        "rows": 10,
+        "employees": 2
+      },
+      {
+        "work_day": "2026-11-03",
+        "rows": 2,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-04",
+        "rows": 2,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-05",
+        "rows": 2,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-06",
+        "rows": 2,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-09",
+        "rows": 2,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-10",
+        "rows": 4,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-11",
+        "rows": 1,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-12",
+        "rows": 1,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-13",
+        "rows": 3,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-16",
+        "rows": 1,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-17",
+        "rows": 4,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-18",
+        "rows": 1,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-20",
+        "rows": 2,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-21",
+        "rows": 2,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-22",
+        "rows": 2,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-23",
+        "rows": 2,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-24",
+        "rows": 2,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-25",
+        "rows": 1,
+        "employees": 1
+      },
+      {
+        "work_day": "2026-11-26",
+        "rows": 1,
+        "employees": 1
+      }
+    ],
+    "locks": [
+      {
+        "period": "2026-08",
+        "is_locked": true,
+        "rows": 31,
+        "earliest": "2026-08-01",
+        "latest": "2026-08-31"
+      },
+      {
+        "period": "2026-09",
+        "is_locked": true,
+        "rows": 30,
+        "earliest": "2026-09-01",
+        "latest": "2026-09-30"
+      }
+    ],
+    "migrations": [
+      {
+        "migration_name": "20260924164121_init",
+        "finished_at": "2026-10-08 14:31:14.43387+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20260930143422_add_embedding_type_to_face_embeddings",
+        "finished_at": "2026-10-08 14:31:14.728399+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261001120000_rebuild_face_embeddings_contract",
+        "finished_at": "2026-10-08 14:31:15.018334+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261016130000_add_positions_and_update_departments",
+        "finished_at": "2026-10-16 13:00:27.901958+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261016132000_update_position_level_enum",
+        "finished_at": "2026-10-16 13:17:05.073581+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261019100000_attendance_policy_and_ot_review",
+        "finished_at": "2026-10-19 04:26:58.883002+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261026100000_daily_attendance_adjustments",
+        "finished_at": "2026-10-26 12:25:28.509674+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261026110000_employee_fingerprint_flag",
+        "finished_at": "2026-10-26 12:25:29.094715+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261028060000_account_profile",
+        "finished_at": "2026-10-28 09:02:18.279927+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261028070000_shift_templates",
+        "finished_at": "2026-10-28 09:02:19.309382+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261029090000_explicit_payroll_rate_units",
+        "finished_at": "2026-10-29 16:40:13.57206+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261029110000_monthly_hourly_rate_history",
+        "finished_at": "2026-10-29 16:40:13.933758+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261029120000_allow_overnight_shift_templates",
+        "finished_at": "2026-10-29 16:40:14.288392+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261030010000_remove_rate_kind_and_set_multipliers",
+        "finished_at": "2026-10-29 17:36:54.52683+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261030020000_preserve_payroll_history_and_version_policies",
+        "finished_at": "2026-10-30 10:22:29.381564+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261030030000_attendance_alerts",
+        "finished_at": "2026-10-30 12:15:40.716498+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261031010000_attendance_alert_checkpoint",
+        "finished_at": "2026-10-31 01:51:27.551836+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261031120000_daily_attendance_approval_model",
+        "finished_at": "2026-10-31 09:47:26.502416+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261031130000_add_review_status_check_constraint",
+        "finished_at": "2026-10-31 10:07:23.851506+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261031140000_add_reopened_fields_to_daily_summary",
+        "finished_at": "2026-10-31 11:19:23.799743+00",
+        "rolled_back_at": null
+      },
+      {
+        "migration_name": "20261101120000_webhook_alert_dedup",
+        "finished_at": "2026-11-01 08:24:47.4569+00",
+        "rolled_back_at": null
+      }
+    ],
+    "november_anomalies": [
+      {
+        "issue": "logs_after_nov02",
+        "rows": 37
+      },
+      {
+        "issue": "logs_after_now",
+        "rows": 38
+      },
+      {
+        "issue": "nov_summaries_after_nov02",
+        "rows": 25
+      },
+      {
+        "issue": "nov_shifts_after_nov02",
+        "rows": 134
+      },
+      {
+        "issue": "approved_adjustments_unapproved_day",
+        "rows": 3
+      },
+      {
+        "issue": "summaries_before_hire",
+        "rows": 1
+      },
+      {
+        "issue": "shifts_before_hire",
+        "rows": 1
+      }
+    ],
+    "november_samples": [
+      {
+        "employee_code": "NV-001",
+        "event_vn": "2026-11-01 08:00:00",
+        "type": "CHECK_IN",
+        "status": "VALID",
+        "work_date": "2026-11-01",
+        "shift_type": "MORNING",
+        "start_time": "08:00:00",
+        "end_time": "12:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "APPROVED"
+      },
+      {
+        "employee_code": "NV-001",
+        "event_vn": "2026-11-01 08:50:00",
+        "type": "CHECK_OUT",
+        "status": "VALID",
+        "work_date": "2026-11-01",
+        "shift_type": "MORNING",
+        "start_time": "08:00:00",
+        "end_time": "12:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "APPROVED"
+      },
+      {
+        "employee_code": "NV-001",
+        "event_vn": "2026-11-01 09:00:00",
+        "type": "CHECK_IN",
+        "status": "VALID",
+        "work_date": "2026-11-01",
+        "shift_type": "MORNING",
+        "start_time": "08:00:00",
+        "end_time": "12:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "APPROVED"
+      },
+      {
+        "employee_code": "NV-001",
+        "event_vn": "2026-11-01 10:00:00",
+        "type": "CHECK_OUT",
+        "status": "VALID",
+        "work_date": "2026-11-01",
+        "shift_type": "MORNING",
+        "start_time": "08:00:00",
+        "end_time": "12:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "APPROVED"
+      },
+      {
+        "employee_code": "NV-022",
+        "event_vn": "2026-11-02 07:55:00",
+        "type": "CHECK_IN",
+        "status": "VALID",
+        "work_date": "2026-11-02",
+        "shift_type": "OFFICE_HOURS",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "attendance_status": "PRESENT",
+        "review_status": "NONE"
+      },
+      {
+        "employee_code": "NV-022",
+        "event_vn": "2026-11-02 17:05:00",
+        "type": "CHECK_OUT",
+        "status": "VALID",
+        "work_date": "2026-11-02",
+        "shift_type": "OFFICE_HOURS",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "attendance_status": "PRESENT",
+        "review_status": "NONE"
+      },
+      {
+        "employee_code": "TEST-610fc4f4",
+        "event_vn": "2026-11-02 15:48:49",
+        "type": "CHECK_IN",
+        "status": "VALID",
+        "work_date": "2026-11-02",
+        "shift_type": "OFFICE_HOURS",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "NONE"
+      },
+      {
+        "employee_code": "TEST-610fc4f4",
+        "event_vn": "2026-11-02 15:49:19",
+        "type": "CHECK_OUT",
+        "status": "VALID",
+        "work_date": "2026-11-02",
+        "shift_type": "OFFICE_HOURS",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "NONE"
+      },
+      {
+        "employee_code": "TEST-610fc4f4",
+        "event_vn": "2026-11-02 15:52:37",
+        "type": "CHECK_IN",
+        "status": "VALID",
+        "work_date": "2026-11-02",
+        "shift_type": "OFFICE_HOURS",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "NONE"
+      },
+      {
+        "employee_code": "TEST-610fc4f4",
+        "event_vn": "2026-11-02 15:52:49",
+        "type": "CHECK_OUT",
+        "status": "VALID",
+        "work_date": "2026-11-02",
+        "shift_type": "OFFICE_HOURS",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "NONE"
+      },
+      {
+        "employee_code": "TEST-610fc4f4",
+        "event_vn": "2026-11-02 16:08:22",
+        "type": "CHECK_IN",
+        "status": "VALID",
+        "work_date": "2026-11-02",
+        "shift_type": "OFFICE_HOURS",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "NONE"
+      },
+      {
+        "employee_code": "TEST-610fc4f4",
+        "event_vn": "2026-11-02 16:08:30",
+        "type": "CHECK_IN",
+        "status": "VALID",
+        "work_date": "2026-11-02",
+        "shift_type": "OFFICE_HOURS",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "NONE"
+      },
+      {
+        "employee_code": "TEST-610fc4f4",
+        "event_vn": "2026-11-02 16:08:38",
+        "type": "CHECK_IN",
+        "status": "VALID",
+        "work_date": "2026-11-02",
+        "shift_type": "OFFICE_HOURS",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "NONE"
+      },
+      {
+        "employee_code": "TEST-610fc4f4",
+        "event_vn": "2026-11-02 16:09:01",
+        "type": "CHECK_IN",
+        "status": "VALID",
+        "work_date": "2026-11-02",
+        "shift_type": "OFFICE_HOURS",
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "NONE"
+      }
+    ],
+    "month_employee_coverage": [
+      {
+        "period": "2026-09",
+        "employee_code": "NV-001",
+        "days": 30,
+        "hours": "171.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-002",
+        "days": 30,
+        "hours": "180.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-003",
+        "days": 30,
+        "hours": "162.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-004",
+        "days": 30,
+        "hours": "162.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-005",
+        "days": 30,
+        "hours": "180.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-006",
+        "days": 30,
+        "hours": "180.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-007",
+        "days": 30,
+        "hours": "162.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-008",
+        "days": 30,
+        "hours": "180.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-009",
+        "days": 30,
+        "hours": "162.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-010",
+        "days": 30,
+        "hours": "153.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-011",
+        "days": 30,
+        "hours": "126.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-012",
+        "days": 30,
+        "hours": "180.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-013",
+        "days": 30,
+        "hours": "171.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-014",
+        "days": 30,
+        "hours": "180.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-015",
+        "days": 30,
+        "hours": "171.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-016",
+        "days": 30,
+        "hours": "180.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-017",
+        "days": 30,
+        "hours": "198.00"
+      },
+      {
+        "period": "2026-09",
+        "employee_code": "NV-018",
+        "days": 30,
+        "hours": "171.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-001",
+        "days": 31,
+        "hours": "162.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-002",
+        "days": 31,
+        "hours": "144.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-003",
+        "days": 31,
+        "hours": "153.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-004",
+        "days": 31,
+        "hours": "144.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-005",
+        "days": 31,
+        "hours": "162.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-006",
+        "days": 31,
+        "hours": "171.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-007",
+        "days": 31,
+        "hours": "153.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-008",
+        "days": 31,
+        "hours": "162.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-009",
+        "days": 31,
+        "hours": "180.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-010",
+        "days": 31,
+        "hours": "153.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-011",
+        "days": 31,
+        "hours": "162.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-012",
+        "days": 31,
+        "hours": "180.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-013",
+        "days": 31,
+        "hours": "189.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-014",
+        "days": 31,
+        "hours": "198.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-015",
+        "days": 31,
+        "hours": "171.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-016",
+        "days": 31,
+        "hours": "162.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-017",
+        "days": 31,
+        "hours": "180.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-018",
+        "days": 31,
+        "hours": "171.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-019",
+        "days": 13,
+        "hours": "81.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-020",
+        "days": 7,
+        "hours": "36.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "NV-021",
+        "days": 4,
+        "hours": "9.00"
+      },
+      {
+        "period": "2026-10",
+        "employee_code": "TEST-610fc4f4",
+        "days": 11,
+        "hours": "63.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-001",
+        "days": 2,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-002",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-003",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-004",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-005",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-006",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-007",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-008",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-009",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-010",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-011",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-012",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-013",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-014",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-015",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-016",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-017",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-018",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-019",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-020",
+        "days": 1,
+        "hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "NV-022",
+        "days": 26,
+        "hours": "73.00"
+      },
+      {
+        "period": "2026-11",
+        "employee_code": "TEST-610fc4f4",
+        "days": 1,
+        "hours": "0.00"
+      }
+    ]
+  }
+}

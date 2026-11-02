@@ -1,3 +1,4 @@
+import { attendanceWorkDate, shiftBounds } from './attendance.policy.js'
 import { getEmployeeShiftsForDateRange } from '../shifts/public.js'
 import { formatVNDateISO } from '../../common/utils.js'
 import { ATTENDANCE_METHOD, ATTENDANCE_LOG_STATUS, ATTENDANCE_PUNCTUALITY, type AttendanceMethod, type AttendanceLogStatus, type AttendancePunctuality } from '../../common/constants.js'
@@ -63,43 +64,23 @@ export function determinePunctuality(
   employeeShifts?: Array<{ work_date: Date | string; start_time?: string | Date | null; end_time?: string | Date | null; shift_type?: string | null }> | null
 ): AttendancePunctuality {
   const eventDate = new Date(eventTime)
-  const vnDateStr = eventDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
-
-  // Tìm ca làm việc được phân công cho nhân viên vào ngày này
-  const shift = employeeShifts?.find(s => {
-    const shiftDateStr = formatVNDateISO(s.work_date)
-    return shiftDateStr === vnDateStr
-  })
-
-  // Không có ca, hoặc ca nghỉ OFF, hoặc chưa có giờ bắt đầu/kết thúc ca -> UNRECORDED
+  const workDate = attendanceWorkDate(eventDate, employeeShifts || [])
+  const shift = employeeShifts?.find(s => formatVNDateISO(s.work_date) === workDate)
   if (!shift || shift.shift_type === 'OFF' || !shift.start_time || !shift.end_time) {
     return ATTENDANCE_PUNCTUALITY.UNRECORDED
   }
-
-  const shiftStartStr = extractTimeString(shift.start_time, '08:00')
-  const shiftEndStr = extractTimeString(shift.end_time, '17:30')
-
-  const [sH, sM] = shiftStartStr.split(':').map(n => parseInt(n, 10) || 0)
-  const [eH, eM] = shiftEndStr.split(':').map(n => parseInt(n, 10) || 0)
-  const shiftStartSec = sH * 3600 + (sM || 0) * 60
-  const shiftEndSec = eH * 3600 + (eM || 0) * 60
-
-  const vnTimeParts = eventDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }).split(':')
-  const eventHour = parseInt(vnTimeParts[0] || '0', 10)
-  const eventMinute = parseInt(vnTimeParts[1] || '0', 10)
-  const eventSecond = parseInt(vnTimeParts[2] || '0', 10)
-  const eventTotalSec = eventHour * 3600 + eventMinute * 60 + eventSecond
+  const { start, end } = shiftBounds(workDate, shift)
 
   const GRACE_PERIOD_SECONDS = 15 * 60 // 15 phút ân hạn (grace period)
 
   if (type === 'CHECK_IN') {
-    return eventTotalSec > (shiftStartSec + GRACE_PERIOD_SECONDS)
+    return +eventDate > +start + GRACE_PERIOD_SECONDS * 1000
       ? ATTENDANCE_PUNCTUALITY.LATE
       : ATTENDANCE_PUNCTUALITY.ON_TIME
   }
 
   if (type === 'CHECK_OUT') {
-    return eventTotalSec < shiftEndSec
+    return +eventDate < +end
       ? ATTENDANCE_PUNCTUALITY.EARLY_LEAVE
       : ATTENDANCE_PUNCTUALITY.ON_TIME
   }
@@ -160,7 +141,7 @@ export async function formatAttendanceRecords(logs: RawAttendanceLogDb[]) {
   const dates = logs.map(log => formatVNDateISO(log.event_time)).sort()
   const employeeIds = [...new Set(logs.map(log => log.employee_id))]
   const shifts = await getEmployeeShiftsForDateRange(
-    { gte: new Date(`${dates[0]}T00:00:00Z`), lte: new Date(`${dates[dates.length - 1]}T00:00:00Z`) },
+    { gte: new Date(+new Date(`${dates[0]}T00:00:00Z`) - 86400000), lte: new Date(`${dates[dates.length - 1]}T00:00:00Z`) },
     employeeIds
   )
   const shiftsByEmployee = new Map<string, typeof shifts>()

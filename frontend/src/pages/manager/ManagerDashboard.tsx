@@ -72,7 +72,12 @@ export const ManagerDashboard: React.FC = () => {
     return attendance.filter(a => formatVNDateISO(a.timestamp) === todayStr);
   }, [attendance, todayStr]);
   const todayCheckIns = useMemo(() => {
-    return todayPunches.filter(a => a.type === 'CHECK_IN');
+    // One first valid arrival per employee; returning from a break is not a new arrival.
+    const first = new Map<string, AttendanceRecord>();
+    [...todayPunches].sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp))
+      .filter(a => a.type === 'CHECK_IN' && (a.raw_status || a.status) === 'VALID')
+      .forEach(a => { if (!first.has(a.employee_id)) first.set(a.employee_id, a); });
+    return [...first.values()];
   }, [todayPunches]);
 
   const todayCheckOuts = useMemo(() => {

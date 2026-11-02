@@ -1,0 +1,588 @@
+[
+  {
+    "name": "payroll",
+    "data": [
+      {
+        "payroll_period": "2026-08",
+        "status": "FINALIZED",
+        "rows": 18,
+        "hours": "2862.00",
+        "ot": "40.50",
+        "late": "48.00",
+        "allowances": "27000000.00",
+        "net": "263490000.00"
+      },
+      {
+        "payroll_period": "2026-09",
+        "status": "FINALIZED",
+        "rows": 18,
+        "hours": "3456.00",
+        "ot": "42.00",
+        "late": "23.00",
+        "allowances": "27000000.00",
+        "net": "464377500.00"
+      },
+      {
+        "payroll_period": "2026-10",
+        "status": "PENDING",
+        "rows": 22,
+        "hours": "3580.00",
+        "ot": "55.00",
+        "late": "66.50",
+        "allowances": "33000000.00",
+        "net": "470771000.00"
+      },
+      {
+        "payroll_period": "2026-11",
+        "status": "PENDING",
+        "rows": 24,
+        "hours": "16.00",
+        "ot": "0.00",
+        "late": "0.50",
+        "allowances": "36000000.00",
+        "net": "37402500.00"
+      }
+    ]
+  },
+  {
+    "name": "november_anomalies",
+    "data": [
+      {
+        "issue": "logs_after_nov02",
+        "rows": 0
+      },
+      {
+        "issue": "logs_after_now",
+        "rows": 0
+      },
+      {
+        "issue": "nov_summaries_after_nov02",
+        "rows": 0
+      },
+      {
+        "issue": "nov_shifts_after_nov02",
+        "rows": 0
+      },
+      {
+        "issue": "approved_adjustments_unapproved_day",
+        "rows": 0
+      },
+      {
+        "issue": "summaries_before_hire",
+        "rows": 0
+      },
+      {
+        "issue": "shifts_before_hire",
+        "rows": 0
+      }
+    ]
+  },
+  {
+    "name": "months_summaries",
+    "data": [
+      {
+        "period": "2026-08",
+        "attendance_status": "ABSENT",
+        "review_status": "APPROVED",
+        "rows": 60,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "attendance_status": "EARLY_LEAVE",
+        "review_status": "APPROVED",
+        "rows": 9,
+        "regular_hours": "81.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "attendance_status": "LATE",
+        "review_status": "APPROVED",
+        "rows": 38,
+        "regular_hours": "342.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "attendance_status": "LATE_AND_EARLY",
+        "review_status": "APPROVED",
+        "rows": 7,
+        "regular_hours": "63.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "attendance_status": "OFF",
+        "review_status": "APPROVED",
+        "rows": 180,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "attendance_status": "PRESENT",
+        "review_status": "APPROVED",
+        "rows": 264,
+        "regular_hours": "2376.00",
+        "ot_hours": "40.50"
+      },
+      {
+        "period": "2026-09",
+        "attendance_status": "ABSENT",
+        "review_status": "APPROVED",
+        "rows": 12,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "attendance_status": "EARLY_LEAVE",
+        "review_status": "APPROVED",
+        "rows": 22,
+        "regular_hours": "198.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "attendance_status": "LATE",
+        "review_status": "APPROVED",
+        "rows": 24,
+        "regular_hours": "216.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "attendance_status": "OFF",
+        "review_status": "APPROVED",
+        "rows": 144,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "attendance_status": "PRESENT",
+        "review_status": "APPROVED",
+        "rows": 338,
+        "regular_hours": "3042.00",
+        "ot_hours": "42.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "ABSENT",
+        "review_status": "APPROVED",
+        "rows": 13,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "EARLY_LEAVE",
+        "review_status": "APPROVED",
+        "rows": 14,
+        "regular_hours": "126.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "APPROVED",
+        "rows": 4,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "LATE",
+        "review_status": "APPROVED",
+        "rows": 38,
+        "regular_hours": "342.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "LATE",
+        "review_status": "PENDING",
+        "rows": 1,
+        "regular_hours": "9.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "LATE_AND_EARLY",
+        "review_status": "APPROVED",
+        "rows": 1,
+        "regular_hours": "9.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "NO_SHIFT",
+        "review_status": "APPROVED",
+        "rows": 1,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "OFF",
+        "review_status": "APPROVED",
+        "rows": 171,
+        "regular_hours": "0.00",
+        "ot_hours": "5.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "PRESENT",
+        "review_status": "APPROVED",
+        "rows": 347,
+        "regular_hours": "3103.00",
+        "ot_hours": "50.00"
+      },
+      {
+        "period": "2026-10",
+        "attendance_status": "PRESENT",
+        "review_status": "PENDING",
+        "rows": 2,
+        "regular_hours": "18.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "ABSENT",
+        "review_status": "PENDING",
+        "rows": 1,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "INCOMPLETE",
+        "review_status": "PENDING",
+        "rows": 19,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "LATE",
+        "review_status": "APPROVED",
+        "rows": 1,
+        "regular_hours": "4.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "OFF",
+        "review_status": "APPROVED",
+        "rows": 20,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "OFF",
+        "review_status": "NONE",
+        "rows": 1,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "OFF",
+        "review_status": "PENDING",
+        "rows": 1,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "PRESENT",
+        "review_status": "APPROVED",
+        "rows": 2,
+        "regular_hours": "12.00",
+        "ot_hours": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "attendance_status": "SCHEDULED",
+        "review_status": "NONE",
+        "rows": 1,
+        "regular_hours": "0.00",
+        "ot_hours": "0.00"
+      }
+    ]
+  },
+  {
+    "name": "months_adjustments",
+    "data": [
+      {
+        "period": "2026-08",
+        "kind": "ABSENCE",
+        "status": "APPROVED",
+        "rows": 60,
+        "hours": "540.00",
+        "amount": "143460000.00"
+      },
+      {
+        "period": "2026-08",
+        "kind": "LATE_EARLY",
+        "status": "APPROVED",
+        "rows": 54,
+        "hours": "48.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "kind": "OVERTIME",
+        "status": "APPROVED",
+        "rows": 36,
+        "hours": "40.50",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-08",
+        "kind": "OVERTIME",
+        "status": "VOID",
+        "rows": 4,
+        "hours": "0.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "kind": "ABSENCE",
+        "status": "APPROVED",
+        "rows": 12,
+        "hours": "108.00",
+        "amount": "27810000.00"
+      },
+      {
+        "period": "2026-09",
+        "kind": "LATE_EARLY",
+        "status": "APPROVED",
+        "rows": 46,
+        "hours": "23.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-09",
+        "kind": "OVERTIME",
+        "status": "APPROVED",
+        "rows": 28,
+        "hours": "42.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "kind": "ABSENCE",
+        "status": "APPROVED",
+        "rows": 13,
+        "hours": "117.00",
+        "amount": "23886000.00"
+      },
+      {
+        "period": "2026-10",
+        "kind": "LATE_EARLY",
+        "status": "APPROVED",
+        "rows": 56,
+        "hours": "66.50",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "kind": "LATE_EARLY",
+        "status": "PENDING",
+        "rows": 1,
+        "hours": "0.50",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "kind": "OVERTIME",
+        "status": "APPROVED",
+        "rows": 34,
+        "hours": "55.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-10",
+        "kind": "OVERTIME",
+        "status": "PENDING",
+        "rows": 2,
+        "hours": "3.00",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "kind": "ABSENCE",
+        "status": "PENDING",
+        "rows": 1,
+        "hours": "4.00",
+        "amount": "840000.00"
+      },
+      {
+        "period": "2026-11",
+        "kind": "LATE_EARLY",
+        "status": "APPROVED",
+        "rows": 1,
+        "hours": "0.50",
+        "amount": "0.00"
+      },
+      {
+        "period": "2026-11",
+        "kind": "LATE_EARLY",
+        "status": "PENDING",
+        "rows": 1,
+        "hours": "1.00",
+        "amount": "0.00"
+      }
+    ]
+  },
+  {
+    "name": "months_shifts",
+    "data": [
+      {
+        "period": "2026-08",
+        "shift_type": "OFF",
+        "rows": 180,
+        "employees": 18,
+        "earliest": "2026-08-01",
+        "latest": "2026-08-30"
+      },
+      {
+        "period": "2026-08",
+        "shift_type": "OFFICE_HOURS",
+        "rows": 378,
+        "employees": 18,
+        "earliest": "2026-08-03",
+        "latest": "2026-08-31"
+      },
+      {
+        "period": "2026-09",
+        "shift_type": "OFF",
+        "rows": 144,
+        "employees": 18,
+        "earliest": "2026-09-05",
+        "latest": "2026-09-27"
+      },
+      {
+        "period": "2026-09",
+        "shift_type": "OFFICE_HOURS",
+        "rows": 396,
+        "employees": 18,
+        "earliest": "2026-09-01",
+        "latest": "2026-09-30"
+      },
+      {
+        "period": "2026-10",
+        "shift_type": "AFTERNOON",
+        "rows": 1,
+        "employees": 1,
+        "earliest": "2026-10-21",
+        "latest": "2026-10-21"
+      },
+      {
+        "period": "2026-10",
+        "shift_type": "MORNING",
+        "rows": 1,
+        "employees": 1,
+        "earliest": "2026-10-21",
+        "latest": "2026-10-21"
+      },
+      {
+        "period": "2026-10",
+        "shift_type": "OFF",
+        "rows": 171,
+        "employees": 22,
+        "earliest": "2026-10-03",
+        "latest": "2026-10-31"
+      },
+      {
+        "period": "2026-10",
+        "shift_type": "OFFICE_HOURS",
+        "rows": 417,
+        "employees": 22,
+        "earliest": "2026-10-01",
+        "latest": "2026-10-30"
+      },
+      {
+        "period": "2026-10",
+        "shift_type": "OTHER",
+        "rows": 1,
+        "employees": 1,
+        "earliest": "2026-10-31",
+        "latest": "2026-10-31"
+      },
+      {
+        "period": "2026-11",
+        "shift_type": "MORNING",
+        "rows": 4,
+        "employees": 4,
+        "earliest": "2026-11-02",
+        "latest": "2026-11-02"
+      },
+      {
+        "period": "2026-11",
+        "shift_type": "OFF",
+        "rows": 22,
+        "employees": 22,
+        "earliest": "2026-11-01",
+        "latest": "2026-11-02"
+      },
+      {
+        "period": "2026-11",
+        "shift_type": "OFFICE_HOURS",
+        "rows": 19,
+        "employees": 19,
+        "earliest": "2026-11-02",
+        "latest": "2026-11-02"
+      },
+      {
+        "period": "2026-11",
+        "shift_type": "OTHER",
+        "rows": 1,
+        "employees": 1,
+        "earliest": "2026-11-01",
+        "latest": "2026-11-01"
+      }
+    ]
+  },
+  {
+    "name": "counts",
+    "data": [
+      {
+        "entity": "employees",
+        "rows": 24
+      },
+      {
+        "entity": "users",
+        "rows": 25
+      },
+      {
+        "entity": "departments",
+        "rows": 6
+      },
+      {
+        "entity": "positions",
+        "rows": 18
+      },
+      {
+        "entity": "face_embeddings",
+        "rows": 17
+      },
+      {
+        "entity": "devices",
+        "rows": 4
+      },
+      {
+        "entity": "audit_logs",
+        "rows": 1425
+      },
+      {
+        "entity": "system_notifications",
+        "rows": 494
+      }
+    ]
+  }
+]

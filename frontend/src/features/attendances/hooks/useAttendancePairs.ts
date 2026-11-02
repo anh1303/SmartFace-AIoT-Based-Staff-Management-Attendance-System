@@ -497,6 +497,7 @@ export function useAttendancePairs(
 
       const isCheckInFace = checkInLog?.method === 'FACE';
       const isCheckOutFace = checkOutLog?.method === 'FACE';
+      const inPunc = ['LATE', 'LATE_AND_EARLY'].includes(summary?.status) ? 'LATE' : checkInLog?.punctuality || 'ON_TIME';
 
       const checkInRow: AttendanceEventItem = {
         id: `${emp.employee_id}-${shiftDate}-in`,
@@ -510,18 +511,18 @@ export function useAttendancePairs(
         status: isNoShift
           ? 'UNRECORDED'
           : checkInLog
-            ? (['LATE', 'LATE_AND_EARLY'].includes(summary?.status)
+            ? (inPunc === 'LATE'
                 ? 'LATE'
-                : checkInLog.punctuality === 'UNRECORDED'
+                : inPunc === 'UNRECORDED'
                   ? 'UNRECORDED'
                   : 'ON_TIME')
             : 'UNRECORDED',
         statusText: isNoShift
           ? (checkInLog ? 'UNRECORDED' : '--')
           : checkInLog
-            ? (['LATE', 'LATE_AND_EARLY'].includes(summary?.status)
+            ? (inPunc === 'LATE'
                 ? 'Đi muộn'
-                : checkInLog.punctuality === 'UNRECORDED'
+                : inPunc === 'UNRECORDED'
                   ? 'UNRECORDED'
                   : 'Đúng giờ')
             : '--',

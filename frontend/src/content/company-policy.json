@@ -137,7 +137,7 @@
             ],
             [
               "Dưới hai phần ba độ dài ca",
-              "Không tự ghi công thường, tăng ca hoặc giờ phạt trễ/sớm. Cần xác minh; không tự coi là vắng hoàn toàn."
+              "Không ghi công thường hoặc tăng ca. Từ 29/10/2026 vẫn ghi nhận giờ đi trễ/về sớm thực tế để xét phạt; cần xác minh và không tự coi là vắng hoàn toàn."
             ]
           ]
         },
@@ -279,15 +279,15 @@
         },
         {
           "type": "paragraph",
-          "text": "Mỗi khoản tăng ca được xem xét riêng cho đúng nhân viên và ngày làm việc. Chỉ giờ đã duyệt mới được cộng tiền lương. Khoản chờ duyệt chưa được trả và sẽ ngăn chốt kỳ."
+          "text": "Tăng ca và khoản phạt được xử lý cùng quyết định duyệt ngày công của từng nhân viên. Chỉ ngày công và khoản tương ứng đã duyệt mới được tính lương. Ngày hoặc khoản còn chờ duyệt sẽ ngăn chốt kỳ."
         },
         {
           "type": "paragraph",
-          "text": "Khi cần sửa số giờ đề xuất để xử lý thiếu lượt quét hoặc sự cố, người có quyền phải nêu lý do. Việc sửa đề xuất không thay thế bước phê duyệt. Ghi chú cho một quyết định duyệt hoặc không duyệt thông thường là tùy chọn."
+          "text": "Người có quyền dùng Xét duyệt trên bảng chấm công, nhập giờ trễ/sớm và OT được chấp nhận, bắt buộc nêu lý do rồi lưu. Thao tác này duyệt ngày công và đồng bộ các khoản tương ứng."
         },
         {
           "type": "paragraph",
-          "text": "Nếu lượt quét hoặc ca làm dùng làm căn cứ thay đổi, khoản liên quan phải được xét lại. Đưa đề xuất về 0 nghĩa là khoản không còn phát sinh; khác với việc không duyệt một khoản vẫn còn phát sinh."
+          "text": "Nếu lượt quét hoặc ca làm thay đổi, cần đối chiếu và xét duyệt lại. Đặt giờ phạt hoặc OT bằng 0 sẽ vô hiệu khoản tương ứng (VOID). Muốn sửa quyết định đã duyệt, mở khóa ngày công trước."
         }
       ]
     },
@@ -301,14 +301,14 @@
         },
         {
           "type": "paragraph",
-          "text": "Khi ngày làm việc đã đạt điều kiện 2/3 ca, giờ trễ được tính từ giờ bắt đầu ca đến lượt vào đầu tiên trong các cặp hợp lệ; giờ về sớm được tính từ lượt ra cuối cùng có ghép cặp đến giờ kết thúc ca. Cộng hai phần này rồi áp dụng quy tắc làm tròn."
+          "text": "Từ 29/10/2026, kể cả khi chưa đủ 2/3 ca nhưng có cặp vào–ra hợp lệ, giờ trễ được tính từ giờ bắt đầu ca đến lượt vào đầu tiên trong các cặp hợp lệ; giờ về sớm được tính từ lượt ra cuối cùng có ghép cặp đến giờ kết thúc ca. Cộng hai phần này rồi áp dụng quy tắc làm tròn."
         },
         {
           "type": "list",
           "items": [
             "Đến sau giờ bắt đầu ca trên 15 phút được hiển thị là đi trễ. Nhãn đi trễ không đồng nghĩa đã có tiền phạt.",
             "Trễ 20 phút có nhãn đi trễ nhưng giờ phạt sau làm tròn là 0. Trễ 30 phút đề xuất 0,5 giờ.",
-            "Trễ 20 phút và về sớm 20 phút đề xuất tổng 0,5 giờ. Các ví dụ chỉ áp dụng khi đã đạt 2/3 ca.",
+            "Trễ 20 phút và về sớm 20 phút đề xuất tổng 0,5 giờ. Trước 29/10/2026, giờ trễ/sớm chỉ phát sinh khi đủ ngưỡng nửa ca.",
             "Khoảng ra ngoài rồi quay lại giữa ca không bị tính thành khoản phạt. Khoản trễ/sớm chỉ khấu trừ khi được duyệt."
           ]
         },
@@ -326,11 +326,11 @@
         },
         {
           "type": "paragraph",
-          "text": "Ví dụ ca 8 giờ, lương 100.000₫/giờ, hệ số mặc định 2 lần: khoản phạt vắng đề xuất là 1.600.000₫. Khoản này vẫn phải được duyệt riêng; chưa duyệt hoặc không duyệt thì chưa khấu trừ."
+          "text": "Ví dụ ca 8 giờ, lương 100.000₫/giờ, hệ số mặc định 2 lần: khoản phạt vắng đề xuất là 1.600.000₫. Khoản này chỉ khấu trừ khi ngày công tương ứng được duyệt."
         },
         {
           "type": "paragraph",
-          "text": "Nghỉ có phép được xem xét bằng quyết định không duyệt khoản phạt và có thể ghi chú lý do. Có lượt quét thiếu, không hợp lệ hoặc làm dưới 2/3 ca thì cần xác minh, không tự áp phạt vắng."
+          "text": "Giao diện hiện chưa có quy trình xin phép hoặc miễn riêng khoản phạt vắng. Ca OFF được phân lịch không chịu phạt vắng. Thiếu lượt hoặc có lượt không hợp lệ cần xác minh; khi tự chốt có thể bị tính giờ trễ/sớm bằng cả ca, không phải khoản phạt vắng. Có cặp hợp lệ nhưng dưới 2/3 ca được ghi nhận giờ trễ/sớm thực tế."
         }
       ]
     },

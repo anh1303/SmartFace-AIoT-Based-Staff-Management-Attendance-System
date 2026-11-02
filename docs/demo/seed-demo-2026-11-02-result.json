@@ -1,0 +1,510 @@
+{
+  "seededAt": "2026-11-02T09:37:21.913Z",
+  "protectedRecordsUnchanged": true,
+  "protectedFingerprints": {
+    "employees": [
+      {
+        "n": 24,
+        "hash": "cf2e58b43e3ef1eb7d847fc0a547e2c9"
+      }
+    ],
+    "users": [
+      {
+        "n": 25,
+        "hash": "18dae32c3c2ae425e5f60e003f6dd106"
+      }
+    ],
+    "departments": [
+      {
+        "n": 6,
+        "hash": "d47fe1e421ebab2a38bfa9a838390526"
+      }
+    ],
+    "positions": [
+      {
+        "n": 18,
+        "hash": "cfbe7c2821e9c02bc98f4bd8aa061b8f"
+      }
+    ],
+    "face_embeddings": [
+      {
+        "n": 17,
+        "hash": "f56932682b7462b4a74f82c35bff8b3e"
+      }
+    ],
+    "devices": [
+      {
+        "n": 4,
+        "hash": "1489728e858860d2c447dcefd7b0436c"
+      }
+    ],
+    "bonus_penalty": [
+      {
+        "n": 2,
+        "hash": "fef7ecb3f1b40fcee7cb2b823dadf6a6"
+      }
+    ],
+    "attendance_logs": [
+      {
+        "n": 667,
+        "hash": "263f58909e2ad40735f6b1c2f0eb8340"
+      }
+    ],
+    "daily_attendance_summary": [
+      {
+        "n": 558,
+        "hash": "41cfaeb16c282050eb1b54e2615d5732"
+      }
+    ],
+    "employee_shifts": [
+      {
+        "n": 558,
+        "hash": "6572875e95ebc4135525890245b4bee1"
+      }
+    ],
+    "attendance_adjustments": [
+      {
+        "n": 154,
+        "hash": "1001722d7a5129d2484834187d59b9a5"
+      }
+    ],
+    "attendance_locks": [
+      {
+        "n": 31,
+        "hash": "a6a5e7cb4a36bcb3eb8a3c43bdc1fcd6"
+      }
+    ],
+    "payroll_records": [
+      {
+        "n": 18,
+        "hash": "9d293852f7b434529f77a3a90da29fe7"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "code": "NV-002",
+      "day": "2026-10-05",
+      "title": "Đúng giờ",
+      "times": [
+        "07:55",
+        "17:00"
+      ]
+    },
+    {
+      "code": "NV-003",
+      "day": "2026-10-05",
+      "title": "Ân hạn đúng 15 phút",
+      "times": [
+        "08:15",
+        "17:00"
+      ]
+    },
+    {
+      "code": "NV-005",
+      "day": "2026-10-05",
+      "title": "Trễ 15 phút 1 giây, chưa đủ nửa giờ phạt",
+      "times": [
+        "08:15:01",
+        "17:00"
+      ]
+    },
+    {
+      "code": "NV-006",
+      "day": "2026-10-05",
+      "title": "Trễ 20 phút, phạt làm tròn 0",
+      "times": [
+        "08:20",
+        "17:00"
+      ]
+    },
+    {
+      "code": "NV-002",
+      "day": "2026-10-06",
+      "title": "Trễ 35 phút → 0,5 giờ phạt",
+      "times": [
+        "08:35",
+        "17:00"
+      ]
+    },
+    {
+      "code": "NV-003",
+      "day": "2026-10-06",
+      "title": "Về sớm 30 phút",
+      "times": [
+        "08:00",
+        "16:30"
+      ]
+    },
+    {
+      "code": "NV-005",
+      "day": "2026-10-06",
+      "title": "Trễ 40 phút và về sớm 40 phút",
+      "times": [
+        "08:40",
+        "16:20"
+      ]
+    },
+    {
+      "code": "NV-006",
+      "day": "2026-10-06",
+      "title": "Đến sớm không tự tính OT",
+      "times": [
+        "07:00",
+        "17:00"
+      ]
+    },
+    {
+      "code": "NV-008",
+      "day": "2026-10-07",
+      "title": "Ra ngoài 2 giờ, tổng 7 giờ thực tế, đủ ngưỡng",
+      "times": [
+        "08:00",
+        "10:00",
+        "12:00",
+        "17:00"
+      ]
+    },
+    {
+      "code": "NV-009",
+      "day": "2026-10-07",
+      "title": "Vào ra ba cặp",
+      "times": [
+        "08:00",
+        "09:00",
+        "10:00",
+        "12:00",
+        "13:00",
+        "17:00"
+      ]
+    },
+    {
+      "code": "NV-011",
+      "day": "2026-10-08",
+      "title": "OT đúng 30 phút không phát sinh khoản OT",
+      "times": [
+        "08:00",
+        "17:30"
+      ]
+    },
+    {
+      "code": "NV-012",
+      "day": "2026-10-08",
+      "title": "OT 30 phút 1 giây → 0,5 giờ",
+      "times": [
+        "08:00",
+        "17:30:01"
+      ]
+    },
+    {
+      "code": "NV-014",
+      "day": "2026-10-08",
+      "title": "OT 45 phút → 0,5 giờ",
+      "times": [
+        "08:00",
+        "17:45"
+      ]
+    },
+    {
+      "code": "NV-015",
+      "day": "2026-10-08",
+      "title": "OT 1,5 giờ",
+      "times": [
+        "08:00",
+        "18:30"
+      ]
+    },
+    {
+      "code": "NV-017",
+      "day": "2026-10-09",
+      "title": "OT 5 giờ chỉ duyệt tối đa 4 giờ",
+      "times": [
+        "08:00",
+        "22:00"
+      ]
+    },
+    {
+      "code": "NV-018",
+      "day": "2026-10-09",
+      "title": "Vắng mặt cả ca, phạt vắng theo hệ số 2",
+      "times": []
+    },
+    {
+      "code": "NV-002",
+      "day": "2026-10-12",
+      "title": "Quên check-out",
+      "times": [
+        "08:00"
+      ]
+    },
+    {
+      "code": "NV-003",
+      "day": "2026-10-12",
+      "title": "Quên check-in",
+      "times": [
+        "17:00"
+      ]
+    },
+    {
+      "code": "NV-005",
+      "day": "2026-10-13",
+      "title": "Hai IN liên tiếp: IN sau thay IN trước",
+      "times": [
+        "08:00",
+        "09:00",
+        "17:00"
+      ]
+    },
+    {
+      "code": "NV-006",
+      "day": "2026-10-13",
+      "title": "OUT dư không được tính OT",
+      "times": [
+        "08:00",
+        "17:00",
+        "19:00"
+      ]
+    },
+    {
+      "code": "NV-008",
+      "day": "2026-10-14",
+      "title": "Lượt bị đánh dấu làm gián đoạn cặp",
+      "times": [
+        "08:00",
+        "12:00",
+        "17:00"
+      ],
+      "flagged": true
+    },
+    {
+      "code": "NV-009",
+      "day": "2026-10-14",
+      "title": "Ca OFF không phạt vắng",
+      "times": [],
+      "shift": "OFF"
+    },
+    {
+      "code": "NV-011",
+      "day": "2026-10-17",
+      "title": "Làm ngày OFF 5 giờ, OT thủ công có thể vượt 4 giờ",
+      "times": [
+        "09:00",
+        "14:00"
+      ],
+      "shift": "OFF",
+      "manualOt": 5
+    },
+    {
+      "code": "NV-012",
+      "day": "2026-10-19",
+      "title": "Có quét nhưng chưa phân ca",
+      "times": [
+        "09:00",
+        "12:00"
+      ],
+      "shift": "NO_SHIFT"
+    },
+    {
+      "code": "NV-014",
+      "day": "2026-10-21",
+      "title": "Ca sáng 4 giờ",
+      "times": [
+        "08:00",
+        "12:00"
+      ],
+      "shift": "MORNING"
+    },
+    {
+      "code": "NV-015",
+      "day": "2026-10-21",
+      "title": "Ca chiều 4 giờ",
+      "times": [
+        "13:00",
+        "17:00"
+      ],
+      "shift": "AFTERNOON"
+    },
+    {
+      "code": "NV-014",
+      "day": "2026-10-28",
+      "title": "Chính sách cũ: 5/9 giờ đủ nửa ca",
+      "times": [
+        "08:00",
+        "13:00"
+      ]
+    },
+    {
+      "code": "NV-014",
+      "day": "2026-10-29",
+      "title": "Chính sách mới: 5/9 giờ không đủ 2/3 ca",
+      "times": [
+        "08:00",
+        "13:00"
+      ]
+    },
+    {
+      "code": "NV-017",
+      "day": "2026-10-29",
+      "title": "Thiếu 1 giây so với 2/3 ca",
+      "times": [
+        "08:00",
+        "13:59:59"
+      ]
+    },
+    {
+      "code": "NV-018",
+      "day": "2026-10-29",
+      "title": "Đúng 6/9 giờ đủ 2/3 ca",
+      "times": [
+        "08:00",
+        "14:00"
+      ]
+    },
+    {
+      "code": "NV-018",
+      "day": "2026-10-31",
+      "title": "Ca đêm qua tháng: 22h → 06h hôm sau",
+      "times": [
+        "22:00",
+        "+06:00"
+      ],
+      "shift": "OTHER"
+    },
+    {
+      "code": "NV-002",
+      "day": "2026-10-26",
+      "title": "CHỜ DUYỆT: miễn phạt trễ vì có lý do",
+      "times": [
+        "08:40",
+        "17:00"
+      ],
+      "pending": true
+    },
+    {
+      "code": "NV-003",
+      "day": "2026-10-26",
+      "title": "CHỜ DUYỆT: OT 1,5 giờ, có thể chỉ duyệt 1 giờ",
+      "times": [
+        "08:00",
+        "18:30"
+      ],
+      "pending": true
+    },
+    {
+      "code": "NV-005",
+      "day": "2026-10-27",
+      "title": "CHỜ DUYỆT: từ chối OT bằng cách đặt 0",
+      "times": [
+        "08:00",
+        "18:30"
+      ],
+      "pending": true
+    },
+    {
+      "code": "NV-006",
+      "day": "2026-10-27",
+      "title": "Đã duyệt phạt: mở khóa để sửa quyết định",
+      "times": [
+        "08:35",
+        "17:00"
+      ]
+    },
+    {
+      "code": "NV-017",
+      "day": "2026-11-01",
+      "title": "CHỜ DUYỆT: làm thêm ngày nghỉ 3 giờ",
+      "times": [
+        "09:00",
+        "12:00"
+      ],
+      "shift": "OFF",
+      "pending": true
+    },
+    {
+      "code": "NV-018",
+      "day": "2026-11-01",
+      "title": "Ca đêm 22h → 06h ngày 2",
+      "times": [
+        "22:00",
+        "+06:00"
+      ],
+      "shift": "OTHER"
+    },
+    {
+      "code": "NV-018",
+      "day": "2026-11-02",
+      "title": "Nghỉ sau ca đêm",
+      "times": [],
+      "shift": "OFF"
+    },
+    {
+      "code": "NV-002",
+      "day": "2026-11-02",
+      "title": "Dòng vào đầu ca: đúng giờ 08:15",
+      "times": [
+        "08:15"
+      ]
+    },
+    {
+      "code": "NV-003",
+      "day": "2026-11-02",
+      "title": "Dòng vào đầu ca: đi trễ 08:15:01",
+      "times": [
+        "08:15:01"
+      ]
+    },
+    {
+      "code": "NV-019",
+      "day": "2026-11-02",
+      "title": "Dòng vào đầu ca: đi trễ 08:30",
+      "times": [
+        "08:30"
+      ]
+    },
+    {
+      "code": "NV-008",
+      "day": "2026-11-02",
+      "title": "Ca sáng trễ 35 phút",
+      "times": [
+        "08:35",
+        "12:00"
+      ],
+      "shift": "MORNING"
+    },
+    {
+      "code": "NV-009",
+      "day": "2026-11-02",
+      "title": "Ca sáng thiếu 1 giây so với 2/3 ca",
+      "times": [
+        "08:00",
+        "10:39:59"
+      ],
+      "shift": "MORNING",
+      "pending": true
+    },
+    {
+      "code": "NV-011",
+      "day": "2026-11-02",
+      "title": "Ca sáng vắng mặt",
+      "times": [],
+      "shift": "MORNING",
+      "pending": true
+    },
+    {
+      "code": "NV-012",
+      "day": "2026-11-02",
+      "title": "Ca chưa kết thúc, chưa quét: chưa kết luận vắng",
+      "times": []
+    },
+    {
+      "code": "NV-022",
+      "day": "2026-11-02",
+      "title": "Nhân viên mới, chỉ có dữ liệu từ ngày tuyển",
+      "times": [
+        "07:55",
+        "12:00"
+      ],
+      "shift": "MORNING"
+    }
+  ]
+}

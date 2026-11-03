@@ -204,7 +204,7 @@ def parse_args():
 
 
 def main(args=None):
-    global current_mode
+    global current_mode, mode_generation
     if args is None:
         args = parse_args()
 
@@ -664,6 +664,9 @@ def main(args=None):
 
             if not was_awake and is_awake:
                 print(f"[PRESENCE] 👤 Phát hiện người đứng trước hệ thống (d = {dist_val}cm <= {ULTRASONIC_TRIGGER_DISTANCE}cm) -> BẬT AI AWAKE!")
+                if current_mode in (None, "", "OFF", "IDLE"):
+                    current_mode = "AUTO"
+                    mode_generation += 1
             elif was_awake and not is_awake:
                 print(f"[PRESENCE] 💤 Người đã rời đi (> {ULTRASONIC_TRIGGER_DISTANCE}cm trong >= {ULTRASONIC_DEBOUNCE_SECONDS}s) -> AI SLEEP!")
                 attendance_latch = False
@@ -805,7 +808,8 @@ def main(args=None):
                     # (B) Đánh giá trạng thái PAD đa frame
                     if track.pad_ready and track.is_spoof:
                         if not getattr(track, 'spoof_reported', False):
-                            track.spoof_reported = tb_client.send_spoof_event(liveness_score(track.last_pad_score, track.last_pad_threshold), current_mode)
+                            spoof_mode = current_mode if current_mode in ('CHECK_IN', 'CHECK_OUT', 'AUTO') else 'AUTO'
+                            track.spoof_reported = tb_client.send_spoof_event(liveness_score(track.last_pad_score, track.last_pad_threshold), spoof_mode)
                     elif track.pad_ready:
                         # Người thật (REAL)
 
@@ -955,11 +959,11 @@ def main(args=None):
 
             # ── 7. Vẽ Thanh Thông Tin & Banners Lên Video ────────────────────
             # Compact status; telemetry still carries FPS/distance for diagnostics.
-            if not is_awake or current_mode == "OFF":
-                banner_bg = (50, 50, 50)  # Xám sẫm khi cả 2 cảm biến đều tắt (IDLE/SLEEP)
-                banner_text = "IDLE (OFF) | DUA TAY VAO CAM BIEN (<20CM)"
+            if not is_awake:
+                banner_bg = (50, 50, 50)  # Xám sẫm khi AI đang ngủ (chờ người đến gần)
+                banner_text = f"IDLE (SLEEP) | TIEN VAO KHU VUC DIEM DANH (<={int(ULTRASONIC_TRIGGER_DISTANCE)}CM)"
             else:
-                banner_bg = (180, 100, 0) if current_mode == "CHECK_IN" else (0, 100, 200)
+                banner_bg = (0, 150, 100) if current_mode == "AUTO" else ((180, 100, 0) if current_mode == "CHECK_IN" else (0, 100, 200))
                 latch_str = "WAIT NEXT PERSON" if attendance_latch else "READY"
                 banner_text = f"{current_mode} | {latch_str}"
 

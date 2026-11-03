@@ -40,12 +40,47 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
     });
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    socket.on('connect', async () => {
       setIsConnected(true);
       console.log('[Socket.IO] Đã kết nối tới namespace /attendance');
       // Lấy lại dữ liệu công và summaries mới nhất sau khi reconnect
       queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
+
+      // Đồng bộ các sự kiện gần nhất hôm nay vào Live Event feed
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE || ''}/api/attendance?limit=5`, { credentials: 'include' });
+        if (res.ok) {
+          const json = await res.json();
+          const items = Array.isArray(json) ? json : (json.data || []);
+          if (Array.isArray(items) && items.length > 0) {
+            setLiveEvents(prev => {
+              const existingIds = new Set(prev.map(e => e.id));
+              const hydrated: LiveAttendanceEvent[] = items.slice(0, 5).map((record: any) => {
+                const recordId = String(record.id || record.attendance_id || `log-${record.event_time}`);
+                seenEventIdsRef.current.add(recordId);
+                const isCheckIn = record.type === 'CHECK_IN';
+                return {
+                  id: recordId,
+                  type: record.type,
+                  employeeCode: record.employees?.employee_code || record.employee_code || '',
+                  employeeName: record.employees?.full_name || record.employee_name || 'Nhân viên',
+                  avatarUrl: record.employees?.avatar_url || null,
+                  time: new Date(record.event_time || record.timestamp).toLocaleTimeString('vi-VN'),
+                  timestamp: record.event_time || record.timestamp,
+                  verificationScore: record.verification_score,
+                  similarity: record.verification_score,
+                  deviceId: record.device_info || 'PI4_FRONT_GATE',
+                  message: isCheckIn ? 'Điểm danh vào ca thành công' : 'Điểm danh tan ca thành công',
+                };
+              }).filter((e: LiveAttendanceEvent) => !existingIds.has(e.id));
+              return [...hydrated, ...prev].slice(0, 10);
+            });
+          }
+        }
+      } catch {
+        // bỏ qua lỗi fetch đồng bộ ngầm
+      }
     });
 
     socket.on('disconnect', () => {

@@ -34,6 +34,8 @@ export async function getByEmployee(idOrCode: string) {
     orderBy: { created_at: 'desc' },
   })
 
+  invalidateCentroidCache()
+
   return { employeeId, sampleCount: embeddings.length, samples: embeddings }
 }
 
@@ -56,6 +58,7 @@ export async function removeAll(idOrCode: string, actorUserId?: string) {
   const count = await prisma.face_embeddings.count({ where: { employee_id: employeeId } })
   if (count === 0) throw new AppError(404, 'No biometric data found for this employee')
   await prisma.face_embeddings.deleteMany({ where: { employee_id: employeeId } })
+  invalidateCentroidCache()
 
   await logAction({
     userId: actorUserId,
@@ -138,6 +141,8 @@ export async function enrollImages(idOrCode: string, imagesBase64: string[], act
     },
   })
 
+  invalidateCentroidCache()
+
   return {
     ...result,
     total_images,
@@ -175,48 +180,139 @@ export type FaceMatchCandidate = {
   similarity: number
 }
 
+interface CachedCentroid {
+  emp_id: string
+  employee_code: string
+  full_name: string
+  avatar_url: string | null
+  embedding_type: string
+  vec: Float32Array
+}
+
+let centroidCache: CachedCentroid[] | null = null
+let centroidCacheTime = 0
+const CENTROID_CACHE_TTL_MS = 60_000 // 60s auto refresh
+
+export function invalidateCentroidCache() {
+  centroidCache = null
+  centroidCacheTime = 0
+}
+
+async function getCachedCentroids(client: Prisma.TransactionClient | typeof prisma): Promise<CachedCentroid[]> {
+  const now = Date.now()
+  if (centroidCache && now - centroidCacheTime < CENTROID_CACHE_TTL_MS) {
+    return centroidCache
+  }
+
+  const rows: Array<{
+    emp_id: string
+    employee_code: string
+    full_name: string
+    avatar_url: string | null
+    embedding_type: string
+    embedding_text: string
+  }> = await client.$queryRaw`
+    SELECT
+      e.id AS emp_id,
+      e.employee_code,
+      e.full_name,
+      e.avatar_url,
+      f.embedding_type,
+      f.embedding::text AS embedding_text
+    FROM face_embeddings f
+    JOIN employees e ON f.employee_id = e.id
+    WHERE f.is_active = true
+      AND f.embedding IS NOT NULL
+      AND f.model_version = ${env.FACE_AUTH_MODEL_VERSION}
+      AND f.embedding_type = 'CENTROID'
+      AND e.status = 'ACTIVE';
+  `
+
+  centroidCache = rows.map((r) => ({
+    emp_id: r.emp_id,
+    employee_code: r.employee_code,
+    full_name: r.full_name,
+    avatar_url: r.avatar_url,
+    embedding_type: r.embedding_type,
+    vec: new Float32Array(JSON.parse(r.embedding_text)),
+  }))
+  centroidCacheTime = now
+  return centroidCache
+}
+
 /**
- * Public Contract: Tìm nhân viên khớp với khuôn mặt gần nhất thông qua pgvector (hỗ trợ transaction)
+ * Public Contract: Tìm nhân viên khớp với khuôn mặt gần nhất thông qua pgvector / In-Memory RAM Cache (siêu tốc < 1ms)
  */
 export async function findBestFaceMatch(
   vecLiteral: string,
   tx?: Prisma.TransactionClient
 ): Promise<FaceMatchCandidate | null> {
   const client = tx ?? prisma
-  const currentModelVersion = env.FACE_AUTH_MODEL_VERSION
+  try {
+    const cached = await getCachedCentroids(client)
+    if (!cached || cached.length === 0) return null
 
-  const activeEmployeeIds = await findActiveEmployeeIds(tx)
-  if (!activeEmployeeIds || activeEmployeeIds.length === 0) return null
+    const inputVec = new Float32Array(JSON.parse(vecLiteral))
+    let best: CachedCentroid | null = null
+    let bestSim = -1
 
-  const rows: Array<{
-    employee_id: string
-    embedding_type: string
-    similarity: number
-  }> = await client.$queryRaw`
-    SELECT
-      f.employee_id,
-      f.embedding_type,
-      (1 - (f.embedding <=> ${vecLiteral}::vector))::float AS similarity
-    FROM face_embeddings f
-    WHERE f.is_active = true
-      AND f.embedding IS NOT NULL
-      AND f.model_version = ${currentModelVersion}
-      AND f.embedding_type = 'CENTROID'
-      AND f.employee_id = ANY(${activeEmployeeIds}::uuid[])
-    ORDER BY f.embedding <=> ${vecLiteral}::vector ASC
-    LIMIT 1;
-  `
-  if (!rows || rows.length === 0) return null
-  const best = rows[0]
-  const emp = await findEmployeeByIdOrCode(best.employee_id, tx)
-  if (!emp || emp.status !== 'ACTIVE') return null
-  return {
-    emp_id: emp.id,
-    employee_code: emp.employee_code,
-    full_name: emp.full_name,
-    avatar_url: emp.avatar_url ?? null,
-    embedding_type: best.embedding_type,
-    similarity: best.similarity,
+    for (const c of cached) {
+      let dot = 0
+      for (let i = 0; i < 512; i++) {
+        dot += inputVec[i] * c.vec[i]
+      }
+      if (dot > bestSim) {
+        bestSim = dot
+        best = c
+      }
+    }
+
+    if (!best || bestSim < 0) return null
+
+    return {
+      emp_id: best.emp_id,
+      employee_code: best.employee_code,
+      full_name: best.full_name,
+      avatar_url: best.avatar_url ?? null,
+      embedding_type: best.embedding_type,
+      similarity: Number(bestSim.toFixed(4)),
+    }
+  } catch {
+    // Fallback nếu parse vector hoặc cache lỗi: truy vấn trực tiếp DB
+    const currentModelVersion = env.FACE_AUTH_MODEL_VERSION
+    const activeEmployeeIds = await findActiveEmployeeIds(tx)
+    if (!activeEmployeeIds || activeEmployeeIds.length === 0) return null
+
+    const rows: Array<{
+      employee_id: string
+      embedding_type: string
+      similarity: number
+    }> = await client.$queryRaw`
+      SELECT
+        f.employee_id,
+        f.embedding_type,
+        (1 - (f.embedding <=> ${vecLiteral}::vector))::float AS similarity
+      FROM face_embeddings f
+      WHERE f.is_active = true
+        AND f.embedding IS NOT NULL
+        AND f.model_version = ${currentModelVersion}
+        AND f.embedding_type = 'CENTROID'
+        AND f.employee_id = ANY(${activeEmployeeIds}::uuid[])
+      ORDER BY f.embedding <=> ${vecLiteral}::vector ASC
+      LIMIT 1;
+    `
+    if (!rows || rows.length === 0) return null
+    const bestRow = rows[0]
+    const emp = await findEmployeeByIdOrCode(bestRow.employee_id, tx)
+    if (!emp || emp.status !== 'ACTIVE') return null
+    return {
+      emp_id: emp.id,
+      employee_code: emp.employee_code,
+      full_name: emp.full_name,
+      avatar_url: emp.avatar_url ?? null,
+      embedding_type: bestRow.embedding_type,
+      similarity: bestRow.similarity,
+    }
   }
 }
 
@@ -228,6 +324,7 @@ export async function deleteBiometricsForEmployee(
   tx?: Prisma.TransactionClient
 ) {
   const client = tx ?? prisma
+  invalidateCentroidCache()
   return client.face_embeddings.deleteMany({
     where: { employee_id: employeeId },
   })

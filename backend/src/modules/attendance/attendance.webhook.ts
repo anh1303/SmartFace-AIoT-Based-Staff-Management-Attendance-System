@@ -21,7 +21,7 @@ export interface ThingsBoardWebhookPayload {
 
 export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload, actions: { checkIn: typeof import('./attendance.service.js').checkIn; checkOut: typeof import('./attendance.service.js').checkOut }) {
   const { device_id, mode, antispoof_score } = data
-  const normalizedRequestedMode = (mode || 'AUTO').toUpperCase()
+  const normalizedRequestedMode = (mode && mode !== 'OFF' && mode !== 'IDLE' ? mode : 'AUTO').toUpperCase()
   if (!device_id || !['CHECK_IN', 'CHECK_OUT', 'AUTO'].includes(normalizedRequestedMode)) throw AppError.badRequest('device_id/mode không hợp lệ')
   if (typeof antispoof_score !== 'number' || !Number.isFinite(antispoof_score) || antispoof_score < 0 || antispoof_score > 1) throw AppError.badRequest('Cần điểm liveness hợp lệ')
   if (!data.event_id || !/^[a-zA-Z0-9_-]{8,120}$/.test(data.event_id)) throw AppError.badRequest('Cần event_id duy nhất cho lượt ghi nhận')
@@ -141,14 +141,35 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
       orderBy: { event_time: 'desc' },
     })
 
-    resolvedMode = (!lastLog || lastLog.type === 'CHECK_OUT') ? 'CHECK_IN' : 'CHECK_OUT'
-
-    // Cooldown chống quét nhầm: Nếu vừa CHECK_IN trong vòng ATTENDANCE_COOLDOWN_SECONDS
+    // Cooldown chống quét nhầm: Nếu vừa điểm danh trong vòng ATTENDANCE_COOLDOWN_SECONDS
     const cooldownMs = (Number(process.env.ATTENDANCE_COOLDOWN_SECONDS) || 60) * 1000
     const nowMs = Date.now()
-    if (lastLog && lastLog.type === 'CHECK_IN' && (nowMs - new Date(lastLog.event_time).getTime()) < cooldownMs) {
-      resolvedMode = 'CHECK_IN'
+    if (lastLog && (nowMs - new Date(lastLog.event_time).getTime()) < cooldownMs) {
+      const remainingSec = Math.ceil((cooldownMs - (nowMs - new Date(lastLog.event_time).getTime())) / 1000)
+      const actionText = lastLog.type === 'CHECK_IN' ? 'vào ca' : 'tan ca'
+      const nextActionText = lastLog.type === 'CHECK_IN' ? 'tan ca' : 'vào ca'
+      return {
+        success: true,
+        matched: true,
+        door_open: true,
+        cooldown: true,
+        event_id: data.event_id,
+        mode: lastLog.type,
+        employee: {
+          id: match.emp_id,
+          employee_code: match.employee_code,
+          full_name: match.full_name,
+          avatar_url: match.avatar_url,
+        },
+        similarity: Number(match.similarity.toFixed(4)),
+        message: `Bạn vừa điểm danh ${actionText} lúc ${new Date(lastLog.event_time).toLocaleTimeString('vi-VN')}. Vui lòng chờ ${remainingSec}s để điểm danh ${nextActionText}.`,
+      }
     }
+
+    // Khi đã hết thời gian cooldown:
+    // Chưa có lượt nào hôm nay hoặc lượt gần nhất là CHECK_OUT -> CHECK_IN
+    // Lượt gần nhất là CHECK_IN và đã qua cooldown -> CHECK_OUT
+    resolvedMode = (!lastLog || lastLog.type === 'CHECK_OUT') ? 'CHECK_IN' : 'CHECK_OUT'
   } else {
     resolvedMode = normalizedRequestedMode === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN'
   }

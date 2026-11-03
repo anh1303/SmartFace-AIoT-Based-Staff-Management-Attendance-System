@@ -84,7 +84,7 @@ class ConfirmationFlowTests(unittest.TestCase):
                           UltrasonicSensor=Mock(), update_track_pad=lambda *a, **kw:0,
                           get_input_face=lambda *a:np.zeros((112,112,3),np.uint8),
                           ULTRASONIC_ENABLED=False, SHOW_GUI=False, current_mode=mode, mode_generation=0)
-        with patch.multiple(edge, **replacements), patch.object(edge.cv2,'VideoCapture',return_value=camera), patch('builtins.print'):
+        with patch.multiple(edge, **replacements), patch.object(edge.cv2,'VideoCapture',return_value=camera), patch('builtins.print'), patch.object(edge.vision, 'ATTENDANCE_STABLE_COUNT', 3):
             edge.main()
         self.assertEqual(len(sent),target)
         self.assertEqual(track.stable_recognitions,3)

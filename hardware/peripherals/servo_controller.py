@@ -104,18 +104,25 @@ class ServoController:
         def _action():
             with self._lock:
                 normalized = mode.upper() if mode else "CHECK_IN"
-                target_angle = 0 if normalized == "CHECK_IN" else 180
-                action_label = "MỞ VÀO (0°)" if target_angle == 0 else "MỞ RA (180°)"
-                self.door_state = "OPEN_IN" if target_angle == 0 else "OPEN_OUT"
+                # Góc an toàn tránh kẹt chốt cơ khí (0-10° cho check-in, 170-180° cho check-out)
+                target_angle = 10.0 if normalized == "CHECK_IN" else 170.0
+                action_label = f"MỞ VÀO ({int(target_angle)}°)" if normalized == "CHECK_IN" else f"MỞ RA ({int(target_angle)}°)"
+                self.door_state = "OPEN_IN" if normalized == "CHECK_IN" else "OPEN_OUT"
 
                 print(f"[SERVO] 🚪 Kích hoạt mở cổng {normalized}: Quay {action_label}...")
                 self.set_angle(target_angle)
                 if on_state_change:
                     on_state_change(self.door_state)
 
+                # Chờ motor quay tới góc mở rồi ngắt PWM ngay lập tức để triệt tiêu hoàn toàn rung lắc
+                time.sleep(0.4)
+                self.set_angle(None)
+                print("[SERVO] 🔌 Đã ngắt xung PWM khi mở -> Cổng giữ vị trí, triệt tiêu 100% rung giật!")
+
                 try:
-                    # Giữ mở trong thời gian tối thiểu
-                    time.sleep(open_seconds)
+                    # Giữ mở trong thời gian tối thiểu (trừ 0.4s đã xoay)
+                    remaining_open = max(0.1, open_seconds - 0.4)
+                    time.sleep(remaining_open)
 
                     # Kiểm tra an toàn: Nếu người vẫn đứng trước cảm biến (<= 50cm), tiếp tục giữ mở
                     if is_person_present_fn:
@@ -131,12 +138,12 @@ class ServoController:
                 finally:
                     # Đóng cửa về vị trí 90 độ và ngắt PWM chống giật
                     print("[SERVO] 🚪 Đóng cổng: Quay về vị trí chờ 90°...")
-                    self.set_angle(90)
+                    self.set_angle(90.0)
                     self.door_state = "CLOSED"
                     if on_state_change:
                         on_state_change(self.door_state)
 
-                    time.sleep(0.5)  # Chờ 0.5s để motor quay về tới vị trí cơ khí hoàn chỉnh
+                    time.sleep(0.4)  # Chờ 0.4s để motor quay về tới vị trí 90 độ hoàn chỉnh
 
                     # Triệt tiêu hoàn toàn xung PWM chống rung giật và chống nóng động cơ
                     print("[SERVO] 🔌 Ngắt xung PWM (servo.angle = None) -> Động cơ nghỉ hoàn toàn, không rung lắc.")

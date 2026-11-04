@@ -97,17 +97,21 @@ class RTSPStreamer:
             try:
                 frame = self._frames.get(timeout=0.2)
                 data = memoryview(frame.tobytes())
-                deadline = time.monotonic() + 2
+                deadline = time.monotonic() + 0.8
                 fd = self.process.stdin.fileno()
                 while data and not self._stop.is_set():
                     if time.monotonic() > deadline:
-                        raise TimeoutError('FFmpeg stdin bị nghẽn')
-                    if select.select([], [fd], [], 0.1)[1]:
-                        try: data = data[os.write(fd, data):]
-                        except BlockingIOError: pass
+                        # Staggered frame drop thay vì kill process: giữ luồng RTSP/WebRTC luôn sống
+                        break
+                    if select.select([], [fd], [], 0.05)[1]:
+                        try:
+                            written = os.write(fd, data)
+                            data = data[written:]
+                        except (BlockingIOError, InterruptedError):
+                            pass
             except queue.Empty:
                 continue
-            except (OSError, ValueError, TimeoutError) as exc:
+            except (OSError, ValueError) as exc:
                 print(f'[STREAM] {exc}; khởi động lại sau 3 giây.')
                 self._close_process()
                 self._stop.wait(3)
@@ -122,7 +126,7 @@ class RTSPStreamer:
                     raw = process.stderr.read()
                     if raw:
                         lines = [l.strip() for l in raw.decode('utf-8', errors='ignore').splitlines() if l.strip()]
-                        ignored_prefixes = ("conversion failed", "video:", "frame=", "[libx264")
+                        ignored_prefixes = ("conversion failed", "video:", "frame=", "[libx264", "cpb:")
                         error_lines = [
                             l for l in lines
                             if any(k in l.lower() for k in ("error", "failed", "refused", "timeout", "no route", "cannot", "denied", "unreachable"))

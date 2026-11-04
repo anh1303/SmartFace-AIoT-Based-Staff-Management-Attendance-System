@@ -16,8 +16,8 @@ interface WebRTCPlayerProps {
   streamUrl?: string; // e.g. http://10.52.138.36:8889/pi4_cam/whep
   deviceId?: string;
   deviceName?: string;
-  currentMode?: 'CHECK_IN' | 'CHECK_OUT' | 'OFF' | null;
-  onModeChange?: (newMode: 'CHECK_IN' | 'CHECK_OUT' | 'OFF') => void;
+  currentMode?: 'CHECK_IN' | 'CHECK_OUT' | 'AUTO' | 'OFF' | null;
+  onModeChange?: (newMode: 'CHECK_IN' | 'CHECK_OUT' | 'AUTO' | 'OFF') => void;
   showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
@@ -53,7 +53,7 @@ const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // Không mặc định Pi luôn là CHECK_IN; khởi tạo theo prop hoặc null (TẮT / CHỜ CẢM BIẾN)
-  const [activeMode, setActiveMode] = useState<'CHECK_IN' | 'CHECK_OUT' | 'OFF' | null>(currentMode || null);
+  const [activeMode, setActiveMode] = useState<'CHECK_IN' | 'CHECK_OUT' | 'AUTO' | 'OFF' | null>(currentMode || null);
   const [isSwitchingMode, setIsSwitchingMode] = useState(false);
 
   const isLive = iceState === 'connected' || iceState === 'completed';
@@ -63,7 +63,7 @@ const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
     try {
       const res = await apiFetch(`/api/devices/${deviceId}/mode`);
       if (res.success && res.data?.mode) {
-        const m = res.data.mode === 'CHECK_IN' || res.data.mode === 'CHECK_OUT' ? res.data.mode : 'OFF';
+        const m = res.data.mode === 'CHECK_IN' || res.data.mode === 'CHECK_OUT' || res.data.mode === 'AUTO' ? res.data.mode : 'OFF';
         setActiveMode(m);
         onModeChange?.(m);
       } else {
@@ -98,7 +98,7 @@ const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
     });
     socket.on('device-mode-changed', (data: any) => {
       if (data && (data.deviceId === deviceId || data.deviceId === 'PI4_FRONT_GATE')) {
-        if (data.mode === 'CHECK_IN' || data.mode === 'CHECK_OUT') {
+        if (data.mode === 'CHECK_IN' || data.mode === 'CHECK_OUT' || data.mode === 'AUTO') {
           setActiveMode(data.mode);
           onModeChange?.(data.mode);
         } else if (data.mode === 'OFF' || data.confirmed === false) {
@@ -506,10 +506,12 @@ const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
                 ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                 : activeMode === 'CHECK_OUT'
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                : activeMode === 'AUTO'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                 : 'bg-slate-700/40 text-slate-400 border border-slate-600/50'
             }`}
           >
-            {activeMode === 'CHECK_IN' ? 'CHECK-IN' : activeMode === 'CHECK_OUT' ? 'CHECK-OUT' : 'TẮT / CHỜ CẢM BIẾN'}
+            {activeMode === 'CHECK_IN' ? 'CHECK-IN' : activeMode === 'CHECK_OUT' ? 'CHECK-OUT' : activeMode === 'AUTO' ? 'TỰ ĐỘNG (AUTO)' : 'TẮT / CHỜ CẢM BIẾN'}
           </span>
         </div>
       </div>

@@ -32,6 +32,9 @@ class TransportTests(unittest.TestCase):
     def scan(self, **kwargs):
         return self.tb.send_scan_rpc(self.vector, 0.9, 'CHECK_IN', self.results.append, **kwargs)
 
+    def test_single_device_defaults_to_auto(self):
+        self.assertEqual(self.tb.current_mode, 'AUTO')
+
     def response(self, request, payload):
         msg = SimpleNamespace(topic=f'v1/devices/me/rpc/response/{request}', payload=json.dumps(payload).encode())
         self.tb.on_message(self.tb.client, None, msg)

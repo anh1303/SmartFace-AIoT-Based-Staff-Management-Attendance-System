@@ -332,7 +332,7 @@ async function resolveTbDevice(deviceId: string): Promise<{ id: { id: string }; 
   return tbRequest('/api/tenant/devices?deviceName=' + encodeURIComponent(deviceId))
 }
 
-export type AttendanceModeValue = 'CHECK_IN' | 'CHECK_OUT' | 'OFF'
+export type AttendanceModeValue = 'CHECK_IN' | 'CHECK_OUT' | 'AUTO' | 'OFF'
 
 export interface DeviceModeState {
   deviceId: string
@@ -384,7 +384,7 @@ export async function getDeviceMode(deviceId: string): Promise<DeviceModeState> 
         `/api/plugins/telemetry/DEVICE/${target.id.id}/values/timeseries?keys=current_mode,mode`
       ).catch(() => null)
       const rawMode = telemetry?.['current_mode']?.[0]?.value || telemetry?.['mode']?.[0]?.value
-      if (rawMode === 'CHECK_IN' || rawMode === 'CHECK_OUT' || rawMode === 'OFF') {
+      if (rawMode === 'CHECK_IN' || rawMode === 'CHECK_OUT' || rawMode === 'AUTO' || rawMode === 'OFF') {
         const state = recordDeviceModeNotify(deviceId, rawMode)
         recordDeviceModeNotify(target.name, rawMode)
         recordDeviceModeNotify(target.id.id, rawMode)
@@ -409,7 +409,7 @@ export async function getDeviceAttendanceMode(deviceId: string) {
       const value = await tbRequest(`/api/rpc/twoway/${target.id.id}`, { method: 'getMode', params: {}, timeout: 5000 })
       if (value && typeof value === 'object' && ('mode' in value)) {
         const m = (value as any).mode
-        const mode: AttendanceModeValue = (m === 'CHECK_IN' || m === 'CHECK_OUT') ? m : 'OFF'
+        const mode: AttendanceModeValue = (m === 'CHECK_IN' || m === 'CHECK_OUT' || m === 'AUTO') ? m : 'OFF'
         recordDeviceModeNotify(deviceId, mode)
         recordDeviceModeNotify(target.name, mode)
         recordDeviceModeNotify(target.id.id, mode)

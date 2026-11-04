@@ -70,7 +70,7 @@ def get_env_bool(key: str, default: bool) -> bool:
 
 # Cấu hình thiết bị & server
 DEVICE_ID = get_env_str("DEVICE_ID", "PI4_FRONT_GATE")
-INITIAL_MODE = get_env_str("INITIAL_MODE", "OFF")
+INITIAL_MODE = get_env_str("INITIAL_MODE", "AUTO")
 
 TB_HOST = get_env_str("TB_HOST", "127.0.0.1")
 TB_PORT = get_env_int("TB_PORT", 1883)
@@ -111,21 +111,20 @@ TFT_BGR = get_env_bool("TFT_BGR", False)
 TFT_INVERT = get_env_bool("TFT_INVERT", False)
 TFT_DISPLAY_FPS = get_env_float("TFT_DISPLAY_FPS", 10.0)
 
-# Cấu hình 2 Cảm biến siêu âm chọn chế độ CHECK_IN / CHECK_OUT & Wake-on-Presence
+# Cấu hình Cảm biến siêu âm duy nhất Wake-on-Presence (khoảng cách <= 50cm bật AI)
 ULTRASONIC_ENABLED = get_env_bool("ULTRASONIC_ENABLED", True)
-# Chân GPIO cố định phần cứng (BCM numbering, cố định trong mã nguồn):
-# Cảm biến #1: CHECK_IN (Vào ca)  -> TRIG = Pin 16 (GPIO 23), ECHO = Pin 13 (GPIO 27)
-ULTRASONIC_CHECKIN_TRIG_PIN = 23
-ULTRASONIC_CHECKIN_ECHO_PIN = 27
-# Cảm biến #2: CHECK_OUT (Ra ca) -> TRIG = Pin 11 (GPIO 17), ECHO = Pin 15 (GPIO 22)
-ULTRASONIC_CHECKOUT_TRIG_PIN = 17
-ULTRASONIC_CHECKOUT_ECHO_PIN = 22
-# Ngưỡng khoảng cách đưa tay vào kích hoạt chế độ (mặc định <= 20.0 cm)
-ULTRASONIC_TRIGGER_DISTANCE = get_env_float("ULTRASONIC_TRIGGER_DISTANCE", 20.0)
-ULTRASONIC_MAX_DISTANCE = get_env_float("ULTRASONIC_MAX_DISTANCE", 100.0)
+ULTRASONIC_TRIG_PIN = get_env_int("ULTRASONIC_TRIG_PIN", 23)
+ULTRASONIC_ECHO_PIN = get_env_int("ULTRASONIC_ECHO_PIN", 27)
+ULTRASONIC_TRIGGER_DISTANCE = get_env_float("ULTRASONIC_TRIGGER_DISTANCE", 50.0)
+ULTRASONIC_MAX_DISTANCE = get_env_float("ULTRASONIC_MAX_DISTANCE", 150.0)
 ULTRASONIC_DEBOUNCE_SECONDS = get_env_float("ULTRASONIC_DEBOUNCE_SECONDS", 0.5)
 ULTRASONIC_SLEEP_DELAY = get_env_float("ULTRASONIC_SLEEP_DELAY", 0.5)
 FACE_LOST_RESET_SECONDS = get_env_float("FACE_LOST_RESET_SECONDS", 1.5)
+
+# Cấu hình Động cơ Servo mô phỏng mở cổng (90° đóng, 0° checkin, 180° checkout, ngắt PWM chống giật)
+SERVO_ENABLED = get_env_bool("SERVO_ENABLED", True)
+SERVO_PIN = get_env_int("SERVO_PIN", 18)
+SERVO_OPEN_SECONDS = get_env_float("SERVO_OPEN_SECONDS", 3.0)
 
 # Tự động phát hiện môi trường Headless (SSH trên Pi) để tránh lỗi Qt xcb abort()
 if SHOW_GUI and sys.platform.startswith("linux"):
@@ -151,6 +150,7 @@ from display import TFTDisplay
 from peripherals import (
     UltrasonicSensor,
     AudioManager,
+    ServoController,
     get_hardware_telemetry,
     scan_bluetooth_devices,
     get_bluetooth_info,
@@ -204,7 +204,7 @@ def parse_args():
 
 
 def main(args=None):
-    global current_mode
+    global current_mode, mode_generation
     if args is None:
         args = parse_args()
 
@@ -235,11 +235,32 @@ def main(args=None):
     print(f"  Max Faces/Frame  : {MAX_FACES_PER_FRAME if MAX_FACES_PER_FRAME > 0 else 'KHÔNG GIỚI HẠN (All faces)'}")
     print(f"  Cooldown         : {COOLDOWN_SEC}s mỗi Track")
     print(f"  TFT ST7789V SPI  : {'BẬT (320x240)' if TFT_ENABLED else 'TẮT'}")
-    print(f"  Ultrasonic #1 IN : {'BẬT (TRIG=GPIO' + str(ULTRASONIC_CHECKIN_TRIG_PIN) + ' [Pin 16], ECHO=GPIO' + str(ULTRASONIC_CHECKIN_ECHO_PIN) + ' [Pin 13], <= ' + str(ULTRASONIC_TRIGGER_DISTANCE) + 'cm, delay=' + str(ULTRASONIC_DEBOUNCE_SECONDS) + 's)' if ULTRASONIC_ENABLED else 'TẮT'}")
-    print(f"  Ultrasonic #2 OUT: {'BẬT (TRIG=GPIO' + str(ULTRASONIC_CHECKOUT_TRIG_PIN) + ' [Pin 11], ECHO=GPIO' + str(ULTRASONIC_CHECKOUT_ECHO_PIN) + ' [Pin 15], <= ' + str(ULTRASONIC_TRIGGER_DISTANCE) + 'cm, delay=' + str(ULTRASONIC_DEBOUNCE_SECONDS) + 's)' if ULTRASONIC_ENABLED else 'TẮT'}")
+    print(f"  Ultrasonic Sensor: {'BẬT (TRIG=GPIO' + str(ULTRASONIC_TRIG_PIN) + ' [Pin 16], ECHO=GPIO' + str(ULTRASONIC_ECHO_PIN) + ' [Pin 13], <= ' + str(ULTRASONIC_TRIGGER_DISTANCE) + 'cm)' if ULTRASONIC_ENABLED else 'TẮT'}")
+    print(f"  Servo Barrier Gate: {'BẬT (GPIO' + str(SERVO_PIN) + ' [Pin 12], Open=' + str(SERVO_OPEN_SECONDS) + 's)' if SERVO_ENABLED else 'TẮT'}")
     print("=======================================================\n")
 
     result_queue = queue.SimpleQueue()
+
+    # Quản lý cài đặt ngoại vi, âm thanh & động cơ servo mở cửa
+    current_show_fps = vision.SHOW_FPS
+    current_stream_enabled = STREAM_ENABLED
+    current_max_faces = MAX_FACES_PER_FRAME
+    current_volume = 75
+    current_is_muted = False
+    audio_manager = AudioManager(initial_volume=current_volume, initial_muted=current_is_muted)
+    servo_gate = ServoController(pin=SERVO_PIN, enabled=SERVO_ENABLED)
+
+    # 1 Cảm biến siêu âm nhận diện hiện diện (Wake-on-Presence)
+    ultrasonic_sensor = UltrasonicSensor(
+        enabled=ULTRASONIC_ENABLED,
+        trig_pin=ULTRASONIC_TRIG_PIN,
+        echo_pin=ULTRASONIC_ECHO_PIN,
+        max_distance=ULTRASONIC_MAX_DISTANCE,
+        trigger_distance=ULTRASONIC_TRIGGER_DISTANCE,
+        debounce_duration=ULTRASONIC_DEBOUNCE_SECONDS,
+        name="ULTRASONIC_PRESENCE",
+    )
+    ultrasonic_sensor.start()
 
     # Callback khi nhận kết quả đối soát điểm danh Two-way RPC từ Backend
     def on_attendance_result(res: dict):
@@ -269,6 +290,14 @@ def main(args=None):
                 )
             except Exception as e:
                 print(f"[AUDIO WARN] Lỗi phát âm thanh điểm danh: {e}")
+
+            # Kích hoạt mở cổng Servo mô phỏng (0° check-in, 180° check-out, chống giật)
+            if res.get("door_open", True):
+                servo_gate.open_gate_safe(
+                    mode=mode,
+                    is_person_present_fn=ultrasonic_sensor.is_person_present,
+                    open_seconds=SERVO_OPEN_SECONDS,
+                )
         elif is_matched and not is_success:
             emp = res.get("employee", {})
             emp_name = emp.get("full_name") or emp.get("employee_code") or "Nhân viên"
@@ -280,14 +309,6 @@ def main(args=None):
             status_banner = f"KHÔNG KHỚP NHÂN VIÊN (Sim: {sim:.2f})"
             status_banner_time = time.time()
             print(f"[EDGE] ⚠️ KHÔNG KHỚP: {res.get('message', 'Không tìm thấy')} (Sim: {sim:.2f})")
-
-    # Quản lý cài đặt ngoại vi & âm thanh
-    current_show_fps = vision.SHOW_FPS
-    current_stream_enabled = STREAM_ENABLED
-    current_max_faces = MAX_FACES_PER_FRAME
-    current_volume = 75
-    current_is_muted = False
-    audio_manager = AudioManager(initial_volume=current_volume, initial_muted=current_is_muted)
 
     def _persist_env_max_faces(val: int):
         env_path = BASE_DIR / ".env"
@@ -509,28 +530,6 @@ def main(args=None):
         max_fps=TFT_DISPLAY_FPS,
     )
 
-    # 6. Khởi tạo 2 Cảm biến siêu âm (Sensor 1: CHECK_IN, Sensor 2: CHECK_OUT)
-    ultrasonic_checkin = UltrasonicSensor(
-        enabled=ULTRASONIC_ENABLED,
-        trig_pin=ULTRASONIC_CHECKIN_TRIG_PIN,
-        echo_pin=ULTRASONIC_CHECKIN_ECHO_PIN,
-        max_distance=ULTRASONIC_MAX_DISTANCE,
-        trigger_distance=ULTRASONIC_TRIGGER_DISTANCE,
-        debounce_duration=ULTRASONIC_DEBOUNCE_SECONDS,
-        name="ULTRASONIC_CHECKIN",
-    )
-    ultrasonic_checkout = UltrasonicSensor(
-        enabled=ULTRASONIC_ENABLED,
-        trig_pin=ULTRASONIC_CHECKOUT_TRIG_PIN,
-        echo_pin=ULTRASONIC_CHECKOUT_ECHO_PIN,
-        max_distance=ULTRASONIC_MAX_DISTANCE,
-        trigger_distance=ULTRASONIC_TRIGGER_DISTANCE,
-        debounce_duration=ULTRASONIC_DEBOUNCE_SECONDS,
-        name="ULTRASONIC_CHECKOUT",
-    )
-    ultrasonic_checkin.start()
-    ultrasonic_checkout.start()
-
     last_hb_time = time.time()
     last_detection_time = None
     fps_counter = 0
@@ -539,9 +538,8 @@ def main(args=None):
     status_banner = ""
     status_banner_time = 0.0
 
-    # Trạng thái máy hữu hạn Wake-on-Presence & Chọn Chế Độ Cảm Biến Đôi
-    is_awake = current_mode in ("CHECK_IN", "CHECK_OUT")
-    last_sensor_mode = "OFF"
+    # Trạng thái máy hữu hạn Wake-on-Presence
+    is_awake = False
     attendance_latch = False
     last_mode_generation = mode_generation
     presence_generation = 0
@@ -555,36 +553,10 @@ def main(args=None):
     last_submission_embedding = None
     previous_recognition_tracks = {}
 
-    def _evaluate_ultrasonic_mode():
-        nonlocal last_sensor_mode
-        d_in = ultrasonic_checkin.get_distance() if ULTRASONIC_ENABLED else None
-        d_out = ultrasonic_checkout.get_distance() if ULTRASONIC_ENABLED else None
-        in_trig = ultrasonic_checkin.is_person_present() if ULTRASONIC_ENABLED else False
-        out_trig = ultrasonic_checkout.is_person_present() if ULTRASONIC_ENABLED else False
-
-        if ULTRASONIC_ENABLED:
-            if in_trig and out_trig:
-                s_mode = "CHECK_IN" if (d_in or 999.0) <= (d_out or 999.0) else "CHECK_OUT"
-            elif in_trig:
-                s_mode = "CHECK_IN"
-            elif out_trig:
-                s_mode = "CHECK_OUT"
-            else:
-                s_mode = "OFF"
-
-            if s_mode in ("CHECK_IN", "CHECK_OUT"):
-                if current_mode != s_mode:
-                    d_active = d_in if s_mode == "CHECK_IN" else d_out
-                    print(f"[SENSOR] 🖐️ Cảm biến {s_mode} kích hoạt ổn định (d = {d_active}cm <= {ULTRASONIC_TRIGGER_DISTANCE}cm trong >= {ULTRASONIC_DEBOUNCE_SECONDS}s) -> BẬT {s_mode}!")
-                    tb_client.set_mode(s_mode)
-            elif last_sensor_mode in ("CHECK_IN", "CHECK_OUT") and s_mode == "OFF":
-                if current_mode != "OFF":
-                    print(f"[SENSOR] 💤 Đã rút tay khỏi cảm biến {last_sensor_mode} ổn định (trong >= {ULTRASONIC_DEBOUNCE_SECONDS}s) -> TẮT chế độ điểm danh (OFF)!")
-                    tb_client.set_mode("OFF")
-
-            last_sensor_mode = s_mode
-
-        return d_in, d_out, in_trig, out_trig
+    def _evaluate_presence():
+        d = ultrasonic_sensor.get_distance() if ULTRASONIC_ENABLED else None
+        present = ultrasonic_sensor.is_person_present() if ULTRASONIC_ENABLED else True
+        return d, present
 
     recognition_worker = RecognitionWorker(embedder, queue_size=vision.RECOGNITION_QUEUE_SIZE)
     identity_cache = IdentityCache(vision.RECOGNITION_CACHE_TTL_SECONDS,
@@ -600,7 +572,7 @@ def main(args=None):
 
             # ── 0. Bật/Tắt camera phần cứng từ xa (camera_enabled) ───────────
             if not current_stream_enabled:
-                _evaluate_ultrasonic_mode()
+                _evaluate_presence()
                 if cap is not None:
                     cap.release()
                     cap = None
@@ -684,13 +656,19 @@ def main(args=None):
                 if current_show_fps:
                     print(f"[FPS] {current_fps:.1f} (average over 10s)")
 
-            # ── 4.1. Đánh giá 2 Cảm biến Siêu âm (CHECK_IN & CHECK_OUT <= 20cm) ──
-            dist_in, dist_out, in_present, out_present = _evaluate_ultrasonic_mode()
+            # ── 4.1. Đánh giá Cảm biến Siêu âm Hiện diện (Wake-on-Presence <= 50cm) ──
+            dist_val, person_present = _evaluate_presence()
 
-            person_present = in_present or out_present
             was_awake = is_awake
-            is_awake = current_mode in ("CHECK_IN", "CHECK_OUT")
-            if was_awake and not is_awake:
+            is_awake = person_present if ULTRASONIC_ENABLED else True
+
+            if not was_awake and is_awake:
+                print(f"[PRESENCE] 👤 Phát hiện người đứng trước hệ thống (d = {dist_val}cm <= {ULTRASONIC_TRIGGER_DISTANCE}cm) -> BẬT AI AWAKE!")
+                if current_mode in (None, "", "OFF", "IDLE"):
+                    current_mode = "AUTO"
+                    mode_generation += 1
+            elif was_awake and not is_awake:
+                print(f"[PRESENCE] 💤 Người đã rời đi (> {ULTRASONIC_TRIGGER_DISTANCE}cm trong >= {ULTRASONIC_DEBOUNCE_SECONDS}s) -> AI SLEEP!")
                 attendance_latch = False
                 last_submission = None
                 presence_generation += 1
@@ -710,12 +688,10 @@ def main(args=None):
                 calc_fps = current_fps if current_fps > 0 else (fps_counter / max(0.1, (now_wall - last_hb_time)))
                 tb_client.send_telemetry({
                     "fps": round(calc_fps, 1),
-                    "distance": round(dist_in, 1) if dist_in is not None else -1.0,
-                    "distance_checkin": round(dist_in, 1) if dist_in is not None else -1.0,
-                    "distance_checkout": round(dist_out, 1) if dist_out is not None else -1.0,
+                    "distance": round(dist_val, 1) if dist_val is not None else -1.0,
                     "person_present": person_present,
-                    "checkin_active": current_mode == "CHECK_IN",
-                    "checkout_active": current_mode == "CHECK_OUT",
+                    "door_state": servo_gate.door_state,
+                    "servo_angle": servo_gate.current_angle if servo_gate.current_angle is not None else -1,
                     "ai_state": "AWAKE" if is_awake else "SLEEP",
                     "attendance_latch": "LOCKED" if attendance_latch else "READY",
                     "current_mode": current_mode,
@@ -832,7 +808,8 @@ def main(args=None):
                     # (B) Đánh giá trạng thái PAD đa frame
                     if track.pad_ready and track.is_spoof:
                         if not getattr(track, 'spoof_reported', False):
-                            track.spoof_reported = tb_client.send_spoof_event(liveness_score(track.last_pad_score, track.last_pad_threshold), current_mode)
+                            spoof_mode = current_mode if current_mode in ('CHECK_IN', 'CHECK_OUT', 'AUTO') else 'AUTO'
+                            track.spoof_reported = tb_client.send_spoof_event(liveness_score(track.last_pad_score, track.last_pad_threshold), spoof_mode)
                     elif track.pad_ready:
                         # Người thật (REAL)
 
@@ -982,11 +959,11 @@ def main(args=None):
 
             # ── 7. Vẽ Thanh Thông Tin & Banners Lên Video ────────────────────
             # Compact status; telemetry still carries FPS/distance for diagnostics.
-            if not is_awake or current_mode == "OFF":
-                banner_bg = (50, 50, 50)  # Xám sẫm khi cả 2 cảm biến đều tắt (IDLE/SLEEP)
-                banner_text = "IDLE (OFF) | DUA TAY VAO CAM BIEN (<20CM)"
+            if not is_awake:
+                banner_bg = (50, 50, 50)  # Xám sẫm khi AI đang ngủ (chờ người đến gần)
+                banner_text = f"IDLE (SLEEP) | TIEN VAO KHU VUC DIEM DANH (<={int(ULTRASONIC_TRIGGER_DISTANCE)}CM)"
             else:
-                banner_bg = (180, 100, 0) if current_mode == "CHECK_IN" else (0, 100, 200)
+                banner_bg = (0, 150, 100) if current_mode == "AUTO" else ((180, 100, 0) if current_mode == "CHECK_IN" else (0, 100, 200))
                 latch_str = "WAIT NEXT PERSON" if attendance_latch else "READY"
                 banner_text = f"{current_mode} | {latch_str}"
 
@@ -1076,8 +1053,8 @@ def main(args=None):
                 cv2.destroyAllWindows()
             except Exception:
                 pass
-        ultrasonic_checkin.stop()
-        ultrasonic_checkout.stop()
+        ultrasonic_sensor.stop()
+        servo_gate.close()
         if tft_display.cleanup() is False:
             print("[TFT] Worker còn chờ SPI; sẽ tự đóng tài nguyên khi driver trả về.")
         streamer.stop()

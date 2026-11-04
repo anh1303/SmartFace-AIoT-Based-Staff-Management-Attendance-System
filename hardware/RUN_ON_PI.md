@@ -38,7 +38,7 @@ cd ~/test/pi_edge
 - IP LAN server: `10.52.138.38` (cần cập nhật nếu đổi Wi-Fi/mạng).
 - ThingsBoard: `http://10.52.138.38:8081`, MQTT `10.52.138.38:1883`.
 - MediaMTX: RTSP `rtsp://10.52.138.38:8554/pi4_cam`.
-- Đã tạo device `PI4_FRONT_GATE`, shared `attendance_mode=CHECK_IN`, nối nhánh
+- Đã tạo device `PI4_FRONT_GATE`, shared `attendance_mode=AUTO`, nối nhánh
   RPC qua `http://backend:3000/api/attendance/tb-webhook` rồi RPC reply.
 - Token thực tế đã lưu trong `pi_edge/.env` và `backend/.env` (file local bị Git
   bỏ qua). Khi copy nguyên `pi_edge` có `.env` sang Pi, không cần tạo lại device
@@ -74,7 +74,7 @@ database ứng dụng để cấu hình IoT.
 Mở `http://<IP_SERVER>:8081`, đăng nhập tenant (cài mới mặc định
 `tenant@thingsboard.org` / `tenant`). Tạo device `PI4_FRONT_GATE`, profile default,
 Credentials loại Access token. Copy token từ thiết bị vào `.env` trên Pi.
-Trong Attributes → Shared attributes, tạo chuỗi `attendance_mode=CHECK_IN`.
+Trong Attributes → Shared attributes, tạo chuỗi `attendance_mode=AUTO`.
 
 Trong Root Rule Chain, giữ các nhánh sẵn có và nối:
 

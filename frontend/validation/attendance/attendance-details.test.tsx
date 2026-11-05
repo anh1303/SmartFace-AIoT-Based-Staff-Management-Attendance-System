@@ -40,19 +40,37 @@ describe('Attendance details and per-item review', () => {
     await filter('COUNTED');
     expect(host.textContent).toContain('Không có dữ liệu checkin / checkout trong ca làm việc');
   });
-  it('opens the selected adjustment as read-only and links to its attendance date', async () => {
+  it('shows adjustments without a review column', async () => {
     vi.mocked(apiFetch).mockResolvedValue({success:true,data:[
       {id:'11',employee_id:'NV1',employee_name:'Nhân viên 1',date:'2026-10-01',kind:'OVERTIME',hours:1,amount:100000,status:'PENDING',note:'Đã làm thêm',updated_at:'2026-10-02T00:00:00.000Z',can_review:true},
       {id:'12',employee_id:'NV1',employee_name:'Nhân viên 1',date:'2026-10-02',kind:'ABSENCE',hours:8,amount:200000,status:'PENDING',note:null,updated_at:'2026-10-02T00:00:00.000Z',can_review:true},
     ]} as any);
-    await mount(<AdjustmentReviewPanel period="2026-10"/>);await settle();
+    await mount(<AdjustmentReviewPanel period="2026-10" workShifts={[{ employee_id:'NV1', date:'2026-10-01', shift_type:'MORNING', start_time:'08:00', end_time:'12:00' } as WorkShift]}/>);await settle();
     const rows=host.querySelectorAll('tbody tr');expect(rows).toHaveLength(2);
-    const first=Array.from(rows).find(row=>row.textContent?.includes('2026-10-01'))!;await click(first.querySelector('button'));await settle();
+    expect(host.textContent).toContain('01/10/2026');
+    expect(host.textContent).toContain('Ca sáng');
+    expect(host.textContent).toContain('1 giờ');
+    expect(host.textContent).toContain('Chưa duyệt');
+    expect(host.textContent).not.toContain('Xem xét');
+    expect(host.textContent).not.toContain('Xem chi tiết');
     expect(vi.mocked(apiFetch).mock.calls.some(([,options])=>options?.method==='PATCH')).toBe(false);
-    const dialog = document.querySelector('[role=dialog]')!;
-    expect(dialog.querySelector('button[type=submit]')).toBeNull();
-    expect(dialog.querySelector('a')?.getAttribute('href')).toBe('/app/manager/employees/NV1?tab=attendance&date=2026-10-01');
-    expect(vi.mocked(apiFetch).mock.calls.some(([,options])=>options?.method==='PATCH')).toBe(false);
+  });
+  it('filters adjustment rows and counts by the selected dates across months', async () => {
+    const adjustments = [
+      {id:'1', employee_id:'NV1', employee_name:'Test', date:'2026-10-28', kind:'OVERTIME', hours:1, amount:100, status:'APPROVED'},
+      {id:'2', employee_id:'NV1', employee_name:'Test', date:'2026-11-05', kind:'OVERTIME', hours:2, amount:200, status:'PENDING'},
+    ];
+    vi.mocked(apiFetch).mockResolvedValue({ success: true, data: adjustments } as any);
+    cache.setQueryData(['attendanceAdjustments', 'ALL', 'NV1'], adjustments);
+    await mount(<AdjustmentReviewPanel period="ALL" employeeId="NV1" startDate="2026-11-05" endDate="2026-11-05" />);
+    expect(host.textContent).toContain('05/11/2026');
+    expect(host.textContent).not.toContain('28/10/2026');
+    expect(host.textContent).toContain('Chờ duyệt: 1 khoản');
+    await mount(<AdjustmentReviewPanel period="ALL" employeeId="NV1" startDate="2026-10-26" endDate="2026-11-05" />);
+    expect(host.textContent).toContain('28/10/2026');
+    expect(host.textContent).toContain('05/11/2026');
+    await mount(<AdjustmentReviewPanel period="ALL" employeeId="NV1" />);
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(2);
   });
   it('uses backend overview boundaries instead of unmatched raw scans', async () => {
     const employee={employee_id:'NV1',full_name:'Test',department:'QA',position:'Tester'} as Employee;

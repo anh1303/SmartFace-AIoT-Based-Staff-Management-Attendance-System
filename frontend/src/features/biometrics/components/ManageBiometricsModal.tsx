@@ -1,3 +1,4 @@
+import { Avatar } from '../../../components/common/Avatar';
 import React from 'react';
 import { ScanFace, Fingerprint, Upload, Camera, Trash2, Radio } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
@@ -37,14 +38,7 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
         {/* Employee Profile Header Card */}
         <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center justify-between gap-4">
           <div className="flex items-center gap-3.5 min-w-0 flex-1">
-            <img
-              src={
-                employee.avatar ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
-              }
-              alt={employee.full_name}
-              className="w-12 h-12 rounded-xl object-cover border border-blue-200 dark:border-blue-800 shrink-0"
-            />
+            <Avatar src={employee.avatar} name={employee.full_name} size={48} />
             <div className="min-w-0 flex-1">
               <h4 className="text-sm font-bold text-slate-900 dark:text-white max-w-[150px] sm:max-w-[180px] truncate" title={employee.full_name}>
                 {employee.full_name}

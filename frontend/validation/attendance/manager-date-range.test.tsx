@@ -9,6 +9,8 @@ import * as client from '../../src/api/client'
 ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 vi.mock('../../src/utils/dateUtils', () => ({ getTodayVNString: () => '2026-10-25' }))
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => ({ employees: [], workShifts: [], role: 'manager', currentUser: { employee_id: 'manager' }, showToast: vi.fn() }) }))
+vi.mock('../../src/context/ShiftContext', () => ({ useShiftContext: () => ({ isLoading: false, isError: false }) }))
+vi.mock('../../src/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ isLoading: false, isError: false }) }))
 vi.mock('../../src/features/employees', () => ({ useDepartmentPositions: () => ({ departmentOptions: [], positionOptions: [] }) }))
 vi.mock('../../src/features/attendances', () => ({
   AttendanceHeader: () => null,

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Modal } from '../../components/common/Modal';
 import { PageHeaderBanner } from '../../components/common';
+import { Avatar } from '../../components/common/Avatar';
 
 export const EmployeeSchedule: React.FC = () => {
   const { currentUser, workShifts, employees, attendance, showToast } = useApp();
@@ -139,7 +140,7 @@ export const EmployeeSchedule: React.FC = () => {
         <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
           <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Số ca hoàn thành</span>
           <div className="mt-2 text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{completedShifts} / {weekShifts.length} ca</div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Đạt {weekShifts.length > 0 ? Math.round((completedShifts / weekShifts.length) * 100) : 100}% tiến độ</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{weekShifts.length > 0 ? `Đạt ${Math.round((completedShifts / weekShifts.length) * 100)}% tiến độ` : 'Chưa có ca trong tuần'}</p>
         </div>
 
         <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
@@ -264,11 +265,7 @@ export const EmployeeSchedule: React.FC = () => {
               className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors flex items-center justify-between shadow-xs"
             >
               <div className="flex items-center gap-3">
-                <img
-                  src={emp.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"}
-                  alt={emp.full_name}
-                  className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700"
-                />
+                <Avatar src={emp.avatar} name={emp.full_name} />
                 <div>
                   <p className="text-xs font-semibold text-slate-900 dark:text-white">{emp.full_name}</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">{emp.position}</p>
@@ -278,7 +275,7 @@ export const EmployeeSchedule: React.FC = () => {
 
               <div className="text-right">
                 <span className="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
-                  {emp.status === 'ACTIVE' ? 'ONLINE' : 'OFFLINE'}
+                  {emp.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm ngưng'}
                 </span>
               </div>
             </div>

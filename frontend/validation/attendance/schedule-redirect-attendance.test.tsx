@@ -33,6 +33,8 @@ vi.mock('../../src/context/AppContext', () => ({
     showToast: vi.fn(),
   }),
 }));
+vi.mock('../../src/context/ShiftContext', () => ({ useShiftContext: () => ({ isLoading: false, isError: false }) }));
+vi.mock('../../src/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ isLoading: false, isError: false }) }));
 
 vi.mock('../../src/features/employees', () => ({
   useDepartmentPositions: () => ({ departmentOptions: [], positionOptions: [] }),

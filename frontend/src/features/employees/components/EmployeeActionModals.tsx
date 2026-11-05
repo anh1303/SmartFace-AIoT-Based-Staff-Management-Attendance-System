@@ -109,7 +109,7 @@ export const ConfirmStatusEmployeeModal: React.FC<ConfirmStatusEmployeeModalProp
                   : 'text-slate-500'
               }
             >
-              {employee.status === 'ACTIVE' ? 'ĐANG HOẠT ĐỘNG' : 'TẠM NGƯNG'}
+              {employee.status === 'ACTIVE' ? 'Hoạt động' : 'TẠM NGƯNG'}
             </strong>{' '}
             ➔ Chuyển thành:{' '}
             <strong
@@ -119,7 +119,7 @@ export const ConfirmStatusEmployeeModal: React.FC<ConfirmStatusEmployeeModalProp
                   : 'text-emerald-600 dark:text-emerald-400'
               }
             >
-              {employee.status === 'ACTIVE' ? 'TẠM NGƯNG' : 'ĐANG HOẠT ĐỘNG'}
+              {employee.status === 'ACTIVE' ? 'TẠM NGƯNG' : 'Hoạt động'}
             </strong>
           </p>
           <p className="text-[11px] text-slate-400 dark:text-slate-500">

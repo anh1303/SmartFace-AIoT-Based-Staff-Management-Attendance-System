@@ -3,7 +3,8 @@ import type {Prisma} from '@prisma/client';
 import {prisma} from '../../config/database.js';
 import {AppError} from '../../common/AppError.js';
 import {storedProfile,type ProfileInput} from './profile.dto.js';
-export async function getProfile(userId:string){const user=await prisma.user.findUnique({where:{id:userId},include:{roles:true,employees:{include:{department:true,position:true}}}});if(!user||!user.is_active)throw AppError.unauthorized();const p=storedProfile(user.profile);const emp=user.employees;return {display_name:p.display_name??emp?.full_name??user.username,contact_email:p.contact_email??emp?.email??'',phone:p.phone??emp?.phone??'',avatar:p.avatar!==undefined?p.avatar:emp?.avatar_url??null,account:{username:user.username,role:user.roles.role_name,employee_code:emp?.employee_code??null,official_name:emp?.full_name??null,department:emp?.department?.name??null,position:emp?.position?.name??null}};}
+import {updateEmployeePersonalDetails} from '../employees/public.js';
+export async function getProfile(userId:string){const user=await prisma.user.findUnique({where:{id:userId},include:{roles:true,employees:{include:{department:true,position:true}}}});if(!user||!user.is_active)throw AppError.unauthorized();const p=storedProfile(user.profile);const emp=user.employees;return {display_name:emp?.full_name??p.display_name??user.username,contact_email:emp?.email??p.contact_email??'',phone:emp?.phone??p.phone??'',avatar:p.avatar!==undefined?p.avatar:emp?.avatar_url??null,account:{username:user.username,role:user.roles.role_name,employee_code:emp?.employee_code??null,official_name:emp?.full_name??null,department:emp?.department?.name??null,position:emp?.position?.name??null,joined_at:null,status:emp?.status??null}};}
 export async function updateProfile(userId: string, input: ProfileInput) {
   await prisma.$transaction(async tx => {
     if (typeof (tx as any).$executeRaw === 'function') {
@@ -17,6 +18,12 @@ export async function updateProfile(userId: string, input: ProfileInput) {
       ...storedProfile(user.profile),
       ...input,
     };
+    await updateEmployeePersonalDetails(userId, {
+      full_name: input.display_name,
+      email: input.contact_email || null,
+      phone: input.phone || null,
+      ...(input.avatar !== undefined ? { avatar_url: input.avatar } : {}),
+    }, tx);
     await tx.user.update({
       where: { id: userId },
       data: {
@@ -35,6 +42,11 @@ export async function updateProfile(userId: string, input: ProfileInput) {
     });
   });
   return getProfile(userId);
+}
+
+export async function verifyCurrentPassword(userId: string, current: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { is_active: true, passwordHash: true } });
+  if (!user?.is_active || !(await bcrypt.compare(current, user.passwordHash))) throw new AppError(400, 'Mật khẩu hiện tại không đúng');
 }
 
 export async function changePassword(userId: string, current: string, next: string) {

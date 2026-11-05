@@ -39,4 +39,22 @@ describe('monthly attendance for payroll', () => {
     const totals = payrollAttendanceTotals(rows, shifts, '2026-10');
     expect(totals.get('NV1')).toBe(0);
   });
+
+  it('excludes unapproved absent shifts from payroll totals when review_status is NONE or PENDING', () => {
+    const rows = [
+      { employee_id: 'NV-022', date: '2026-11-19', status: 'ABSENT', review_status: 'NONE' },
+      { employee_id: 'NV-022', date: '2026-11-20', status: 'ABSENT', review_status: 'PENDING' },
+      { employee_id: 'NV-022', date: '2026-11-25', status: 'ABSENT', review_status: 'APPROVED' },
+    ] as unknown as BackendAttendanceSummaryItem[];
+
+    const shifts = [
+      { employee_id: 'NV-022', date: '2026-11-19', shift_type: 'OFFICE_HOURS' },
+      { employee_id: 'NV-022', date: '2026-11-20', shift_type: 'OFFICE_HOURS' },
+      { employee_id: 'NV-022', date: '2026-11-25', shift_type: 'OFFICE_HOURS' },
+    ] as WorkShift[];
+
+    const totals = payrollAttendanceTotals(rows, shifts, '2026-11');
+    // Only the approved absence on 2026-11-25 is counted!
+    expect(totals.get('NV-022')).toBe(1);
+  });
 });

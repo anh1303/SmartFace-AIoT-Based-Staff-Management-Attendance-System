@@ -1,5 +1,6 @@
 // Utilities
 export * from './utils/employeeUtils';
+export * from './utils/employeeExport';
 
 // Management & List Components
 export * from './components/EmployeeListHeader';

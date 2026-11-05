@@ -614,7 +614,32 @@ export function useAttendancePairs(
     });
 
 
-    const validPairs = pairs.filter((item): item is AttendancePairItem => item !== null);
+    const validPairs = pairs.filter((item): item is AttendancePairItem => {
+      if (!item) return false;
+      // Ca OFF (ngày nghỉ) chỉ hiển thị khi có phát sinh chấm công hoặc có tăng ca (OT) / yêu cầu xét duyệt
+      if (item.isOffDay) {
+        const hasActivityOrOT =
+          item.hasCheckedIn ||
+          item.hasCheckedOut ||
+          (item.rawEvents && item.rawEvents.length > 0) ||
+          item.workingHours > 0 ||
+          item.currentOTSec > 0 ||
+          item.approvedOtHours > 0 ||
+          item.pendingOtHours > 0 ||
+          item.proposedOtHours > 0 ||
+          item.candidateHours > 0 ||
+          item.needsReview ||
+          item.reviewStatus === 'APPROVED' ||
+          item.reviewStatus === 'PENDING' ||
+          item.overtimeStatus === 'APPROVED' ||
+          item.overtimeStatus === 'PENDING';
+
+        if (!hasActivityOrOT) {
+          return false;
+        }
+      }
+      return true;
+    });
 
     if (statusFilter === 'ALL') return validPairs;
     return validPairs.filter(item =>

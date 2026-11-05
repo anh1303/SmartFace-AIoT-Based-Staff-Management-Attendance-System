@@ -40,12 +40,47 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
     });
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    socket.on('connect', async () => {
       setIsConnected(true);
       console.log('[Socket.IO] Đã kết nối tới namespace /attendance');
       // Lấy lại dữ liệu công và summaries mới nhất sau khi reconnect
       queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
+
+      // Đồng bộ các sự kiện gần nhất hôm nay vào Live Event feed
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE || ''}/api/attendance?limit=5`, { credentials: 'include' });
+        if (res.ok) {
+          const json = await res.json();
+          const items = Array.isArray(json) ? json : (json.data || []);
+          if (Array.isArray(items) && items.length > 0) {
+            setLiveEvents(prev => {
+              const existingIds = new Set(prev.map(e => e.id));
+              const hydrated: LiveAttendanceEvent[] = items.slice(0, 5).map((record: any) => {
+                const recordId = String(record.id || record.attendance_id || `log-${record.event_time}`);
+                seenEventIdsRef.current.add(recordId);
+                const isCheckIn = record.type === 'CHECK_IN';
+                return {
+                  id: recordId,
+                  type: record.type,
+                  employeeCode: record.employees?.employee_code || record.employee_code || '',
+                  employeeName: record.employees?.full_name || record.employee_name || 'Nhân viên',
+                  avatarUrl: record.employees?.avatar_url || null,
+                  time: new Date(record.event_time || record.timestamp).toLocaleTimeString('vi-VN'),
+                  timestamp: record.event_time || record.timestamp,
+                  verificationScore: record.verification_score,
+                  similarity: record.verification_score,
+                  deviceId: record.device_info || undefined,
+                  message: isCheckIn ? 'Điểm danh vào ca thành công' : 'Điểm danh tan ca thành công',
+                };
+              }).filter((e: LiveAttendanceEvent) => !existingIds.has(e.id));
+              return [...hydrated, ...prev].slice(0, 10);
+            });
+          }
+        }
+      } catch {
+        // bỏ qua lỗi fetch đồng bộ ngầm
+      }
     });
 
     socket.on('disconnect', () => {
@@ -64,7 +99,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
       const empName = record.employee_name || record.employeeName || record.employees?.full_name || 'Nhân viên';
       const empCode = record.employee_code || record.employeeCode || record.employees?.employee_code || record.employee_id || '';
       const avatarUrl = record.avatar_url || record.avatarUrl || record.employees?.avatar_url || null;
-      const deviceId = record.device_id || record.deviceId || record.device_info || 'PI4_FRONT_GATE';
+      const deviceId = record.device_id || record.deviceId || record.device_info || undefined;
       const rawTimestamp = record.timestamp || record.event_time || new Date().toISOString();
       const eventTime = new Date(rawTimestamp).toLocaleTimeString('vi-VN');
       const verificationScore = record.verification_score !== undefined && record.verification_score !== null
@@ -103,7 +138,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
       const empName = record.employee_name || record.employeeName || record.employees?.full_name || 'Nhân viên';
       const empCode = record.employee_code || record.employeeCode || record.employees?.employee_code || record.employee_id || '';
       const avatarUrl = record.avatar_url || record.avatarUrl || record.employees?.avatar_url || null;
-      const deviceId = record.device_id || record.deviceId || record.device_info || 'PI4_FRONT_GATE';
+      const deviceId = record.device_id || record.deviceId || record.device_info || undefined;
       const rawTimestamp = record.timestamp || record.event_time || new Date().toISOString();
       const eventTime = new Date(rawTimestamp).toLocaleTimeString('vi-VN');
       const verificationScore = record.verification_score !== undefined && record.verification_score !== null
@@ -154,7 +189,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
       seenEventIdsRef.current.add(recordId);
 
       showToast?.('Phát hiện khuôn mặt chưa đăng ký trong hệ thống!', 'warning');
-      const deviceId = data?.device_id || data?.deviceId || 'PI4_FRONT_GATE';
+      const deviceId = data?.device_id || data?.deviceId || undefined;
       const similarity = data?.similarity ?? (data?.score ? Number(data.score) : undefined);
       const rawTimestamp = data?.timestamp || new Date().toISOString();
 
@@ -178,7 +213,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
       seenEventIdsRef.current.add(recordId);
 
       showToast?.('CẢNH BÁO: Đã chặn hành vi giả mạo khuôn mặt!', 'error');
-      const deviceId = data?.device_id || data?.deviceId || 'PI4_FRONT_GATE';
+      const deviceId = data?.device_id || data?.deviceId || undefined;
       const rawTimestamp = data?.timestamp || new Date().toISOString();
 
       const newEvt: LiveAttendanceEvent = {

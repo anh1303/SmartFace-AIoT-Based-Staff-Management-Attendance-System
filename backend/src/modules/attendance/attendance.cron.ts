@@ -1,4 +1,4 @@
-import { aggregateDailyAttendance, autoCloseDueAttendance } from './attendance.service.js'
+import { aggregateDailyAttendance, autoCloseDueAttendance, autoLockCompletedAttendanceDates } from './attendance.service.js'
 import { getTodayVNString } from '../../common/utils.js'
 import { logger } from '../../common/logger.js'
 import { prisma } from '../../config/database.js'
@@ -27,6 +27,8 @@ export async function runAutoCloseDueJob(asOf = new Date()) {
   try {
     cronLogger.info('Kiểm tra và tự động chốt công đến hạn (từ 00:05 VN)...')
     const result = await autoCloseDueAttendance(asOf)
+    const lockedDates = await autoLockCompletedAttendanceDates(asOf)
+    if (lockedDates) cronLogger.info(`Tự động khóa ${lockedDates} ngày công đã hoàn tất.`)
     if (result.closedCount > 0 || result.absentConvertedCount > 0) {
       cronLogger.info(`Tự chốt công hoàn tất: ${result.closedCount} ngày công APPROVED, ${result.absentConvertedCount} ca chuyển vắng mặt.`)
     }
@@ -109,8 +111,8 @@ function scheduleNext0005Job() {
   exactMidnightTimeout = setTimeout(async () => {
     try {
       cronLogger.info('Kích hoạt tác vụ tự chốt công định kỳ chính xác lúc 00:05 VN...')
-      await runAutoCloseDueJob()
       await runAttendanceAggregationJob()
+      await runAutoCloseDueJob()
     } catch (err) {
       cronLogger.error('Lỗi khi chạy tác vụ tự chốt lúc 00:05 VN:', err)
     } finally {
@@ -130,8 +132,8 @@ export function startAttendanceCron(intervalMs: number = 30 * 60 * 1000) {
 
   // 1. Chạy bù ngay lần đầu tiên khi khởi động sau 10 giây
   startupTimeout = setTimeout(async () => {
+    await runAttendanceAggregationJob()
     await runAutoCloseDueJob()
-    runAttendanceAggregationJob().catch(() => {})
     runMissingScanAlerts().catch(error => cronLogger.error('Không thể kiểm tra cảnh báo thiếu lượt chấm công:', error))
   }, 10000)
 
@@ -140,8 +142,8 @@ export function startAttendanceCron(intervalMs: number = 30 * 60 * 1000) {
 
   // 3. Chu kỳ định kỳ (30 phút): Kiểm tra tự chốt các ca đã hết hạn OT 4h và tổng hợp chấm công
   cronInterval = setInterval(async () => {
+    await runAttendanceAggregationJob()
     await runAutoCloseDueJob()
-    runAttendanceAggregationJob().catch(() => {})
   }, intervalMs)
   alertsInterval = setInterval(() => {
     runMissingScanAlerts().catch(error => cronLogger.error('Không thể kiểm tra cảnh báo thiếu lượt chấm công:', error))

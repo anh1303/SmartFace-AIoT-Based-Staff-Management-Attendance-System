@@ -1,3 +1,5 @@
+import { exportToExcel } from '@/utils/excelExport';
+
 export interface EmployeePairExportItem {
   employee: { employee_id: string; full_name: string; department: string };
   shift: { name: string; timeRange: string };
@@ -7,15 +9,16 @@ export interface EmployeePairExportItem {
   date?: string;
 }
 
-export const exportAttendanceToCSV = (
+export const exportAttendanceToExcel = (
   employeePairs: EmployeePairExportItem[],
   dateLabel: string,
-  showToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void
+  showToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void,
+  format: 'excel' | 'pdf' = 'excel'
 ) => {
   const headers = [
     'Mã NV',
     'Họ Tên',
-    'Chức vụ',
+    'Phòng Ban',
     'Ngày',
     'Ca Làm Việc',
     'Khung Giờ Ca',
@@ -25,12 +28,12 @@ export const exportAttendanceToCSV = (
     'Thiết Bị',
     'Trạng Thái',
     'Trễ/Sớm',
-    'Tăng Ca'
+    'Tăng Ca',
   ];
 
-  const rows: string[] = [];
+  const rows: (string | number)[][] = [];
 
-  employeePairs.forEach(item => {
+  employeePairs.forEach((item) => {
     const emp = item.employee;
     const shift = item.shift;
     const checkIn = item.events[0];
@@ -40,47 +43,48 @@ export const exportAttendanceToCSV = (
     const rowDate = item.date || dateLabel;
 
     rows.push([
-      `"${emp.employee_id}"`,
-      `"${emp.full_name}"`,
-      `"${emp.department}"`,
-      `"${rowDate}"`,
-      `"${shift.name}"`,
-      `"${shift.timeRange}"`,
-      `"CHECK_IN"`,
-      `"${checkIn.time}"`,
-      `"${checkIn.methodLabel}"`,
-      `"${checkIn.device_id}"`,
-      `"${checkIn.statusText}"`,
-      `"${lateEarlyStr}"`,
-      `"${overtimeStr}"`
-    ].join(','));
+      emp.employee_id,
+      emp.full_name,
+      emp.department,
+      rowDate,
+      shift.name,
+      shift.timeRange,
+      'CHECK_IN',
+      checkIn?.time || '',
+      checkIn?.methodLabel || '',
+      checkIn?.device_id || '',
+      checkIn?.statusText || '',
+      lateEarlyStr,
+      overtimeStr,
+    ]);
 
     rows.push([
-      `"${emp.employee_id}"`,
-      `"${emp.full_name}"`,
-      `"${emp.department}"`,
-      `"${rowDate}"`,
-      `"${shift.name}"`,
-      `"${shift.timeRange}"`,
-      `"CHECK_OUT"`,
-      `"${checkOut.time}"`,
-      `"${checkOut.methodLabel}"`,
-      `"${checkOut.device_id}"`,
-      `"${checkOut.statusText}"`,
-      `"${lateEarlyStr}"`,
-      `"${overtimeStr}"`
-    ].join(','));
+      emp.employee_id,
+      emp.full_name,
+      emp.department,
+      rowDate,
+      shift.name,
+      shift.timeRange,
+      'CHECK_OUT',
+      checkOut?.time || '',
+      checkOut?.methodLabel || '',
+      checkOut?.device_id || '',
+      checkOut?.statusText || '',
+      lateEarlyStr,
+      overtimeStr,
+    ]);
   });
 
-  const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
   const safeFilenameDate = dateLabel.replace(/[^\w.-]/g, '_');
-  a.download = `BaoCaoChamCong_${safeFilenameDate}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  showToast(`Đã xuất báo cáo CSV thành công (${dateLabel})!`, 'success');
+  void exportToExcel({
+    format,
+    sheetName: 'Báo cáo điểm danh',
+    headers,
+    rows,
+    fileName: `Bao_cao_cham_cong_${safeFilenameDate}.xlsx`,
+  }).then(saved => { if (saved) showToast(`Đã lưu báo cáo chấm công sang file Excel (${dateLabel})!`, 'success'); })
+    .catch(() => showToast('Không thể lưu báo cáo.', 'error'));
 };
+
+// Alias giữ lại để tương thích ngược với các file gọi cũ
+export const exportAttendanceToCSV = exportAttendanceToExcel;

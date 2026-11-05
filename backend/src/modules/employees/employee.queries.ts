@@ -18,6 +18,10 @@ export function getEmployeeClient(tx?: Prisma.TransactionClient) {
   return (tx && 'employee' in tx ? tx : prisma)
 }
 
+export function updateEmployeePersonalDetails(userId: string, data: { full_name: string; email: string | null; phone: string | null; avatar_url?: string | null }, tx: Prisma.TransactionClient) {
+  return tx.employee.updateMany({ where: { user_id: userId }, data })
+}
+
 /**
  * Public Module API: Tìm một nhân viên theo UUID hoặc mã nhân viên (hỗ trợ transaction)
  */

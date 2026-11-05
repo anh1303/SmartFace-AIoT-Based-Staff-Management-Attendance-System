@@ -1248,7 +1248,7 @@ export function getAutoCloseThresholdVN(dateStr: string): Date {
   return new Date(Date.UTC(y, m - 1, d, 17, 5, 0, 0))
 }
 
-/** Lock the whole day only after every assigned working shift has been approved. */
+/** Lock the whole day only after its attendance summaries have been approved. */
 export async function autoLockAttendanceDate(dateStr: string, asOf = new Date()): Promise<boolean> {
   if (+asOf < +getAutoCloseThresholdVN(dateStr)) return false
   const work_date = new Date(`${dateStr}T00:00:00.000Z`)
@@ -1262,13 +1262,12 @@ export async function autoLockAttendanceDate(dateStr: string, asOf = new Date())
     if (current && +asOf < +current.locked_at + 24 * 60 * 60 * 1000 && +current.locked_at >= +getAutoCloseThresholdVN(dateStr)) return false
 
     const shifts = (await getEmployeeShiftsByFilter({ workDate: work_date }, tx)).filter(shift => shift.shift_type !== 'OFF')
-    if (!shifts.length) return false
     const summaries = await tx.daily_attendance_summary.findMany({ where: { work_date }, select: { employee_id: true, review_status: true, calculation_details: true } })
     const approved = new Set(summaries.filter(summary => {
       const details = summary.calculation_details as { scheduledEnd?: string } | null
       return summary.review_status === 'APPROVED' && (!details?.scheduledEnd || +new Date(details.scheduledEnd) <= +asOf)
     }).map(summary => summary.employee_id))
-    if (shifts.some(shift => !approved.has(shift.employee_id))) return false
+    if (!summaries.length || summaries.some(summary => !approved.has(summary.employee_id)) || shifts.some(shift => !approved.has(shift.employee_id))) return false
 
     await tx.attendance_locks.upsert({
       where: { work_date },
@@ -1286,9 +1285,10 @@ export async function autoLockCompletedAttendanceDates(asOf = new Date()): Promi
   const start = new Date(Date.UTC(year, month - 2, 1))
   const end = new Date(`${today}T00:00:00.000Z`)
   const shifts = await getEmployeeShiftsByFilter({ workDate: { gte: start, lte: end } })
+  const summaries = await prisma.daily_attendance_summary.findMany({ where: { work_date: { gte: start, lt: end } }, select: { work_date: true }, distinct: ['work_date'] })
   const locked = await prisma.attendance_locks.findMany({ where: { work_date: { gte: start, lt: end }, is_locked: true }, select: { work_date: true } })
   const lockedDates = new Set(locked.map(lock => vnDay(lock.work_date)))
-  const dates = [...new Set(shifts.filter(shift => shift.shift_type !== 'OFF').map(shift => vnDay(shift.work_date)))].filter(date => date < today && !lockedDates.has(date))
+  const dates = [...new Set([...shifts.filter(shift => shift.shift_type !== 'OFF').map(shift => vnDay(shift.work_date)), ...summaries.map(summary => vnDay(summary.work_date))])].filter(date => date < today && !lockedDates.has(date))
   let count = 0
   for (const date of dates) if (await autoLockAttendanceDate(date, asOf)) count++
   return count

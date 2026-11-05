@@ -24,6 +24,18 @@ const bounds = (period: string) => {
 }
 
 export async function listAdjustments(period: string, employeeId: string | undefined, actor: Actor) {
+  if (period === 'ALL') {
+    if (!employeeId) throw AppError.badRequest('Cần chọn nhân viên để xem tất cả các kỳ')
+    await assertCanAccessEmployeeDetail(actor, employeeId)
+    const employeeScope = await getEmployeeScope(actor, 'read')
+    const rows = await findAttendanceAdjustmentsWithScope({ employee: buildIdOrCodeWhere(employeeId), AND: [{ employee: employeeScope }] })
+    const periods = [...new Set(rows.map(row => row.work_date.toISOString().slice(0, 7)))]
+    return (await Promise.all(periods.map(p => listPeriodAdjustments(p, employeeId, actor)))).flat()
+  }
+  return listPeriodAdjustments(period, employeeId, actor)
+}
+
+async function listPeriodAdjustments(period: string, employeeId: string | undefined, actor: Actor) {
   const { start, end } = bounds(period)
   const where: Prisma.AttendanceAdjustmentWhereInput = { work_date: { gte: start, lt: end } }
   const employeeScope = await getEmployeeScope(actor, 'read')

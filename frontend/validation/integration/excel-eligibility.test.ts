@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { exportScheduleToExcel } from '../../src/features/schedules/utils/scheduleExport';
 import { canExportPayroll } from '../../src/features/payrolls/payrollExportEligibility';
 
-vi.mock('../../src/utils/excelExport', () => ({ exportToExcel: vi.fn() }));
+vi.mock('../../src/utils/excelExport', () => ({ exportToExcel: vi.fn().mockResolvedValue(false) }));
 import { exportToExcel } from '../../src/utils/excelExport';
 
 describe('schedule Excel eligibility', () => {

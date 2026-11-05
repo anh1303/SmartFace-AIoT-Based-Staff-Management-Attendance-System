@@ -1,6 +1,9 @@
 import * as XLSX from 'xlsx';
+import { printReport } from './reportPrint';
+import { saveWorkbook } from './saveWorkbook';
 
 export interface ExportToExcelOptions {
+  format?: 'excel' | 'pdf';
   sheetName: string;
   headers: string[];
   rows: (string | number | boolean | null | undefined)[][];
@@ -41,13 +44,15 @@ export const calculateAutoFitWidths = (
  * Xuất dữ liệu bảng ra file Excel (.xlsx) chuẩn
  */
 export const exportToExcel = ({
+  format = 'excel',
   sheetName,
   headers,
   rows,
   fileName,
   colWidths,
   measureText,
-}: ExportToExcelOptions): void => {
+}: ExportToExcelOptions): Promise<boolean> => {
+  if (format === 'pdf') { printReport({ sheetName, headers, rows, fileName }); return Promise.resolve(false); }
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
@@ -58,6 +63,6 @@ export const exportToExcel = ({
   XLSX.utils.book_append_sheet(workbook, worksheet, validSheetName);
 
   const cleanFileName = fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`;
-  XLSX.writeFile(workbook, cleanFileName);
+  return saveWorkbook(workbook, cleanFileName);
 };
 

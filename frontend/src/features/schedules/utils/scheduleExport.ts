@@ -10,6 +10,7 @@ export interface ExportScheduleOptions {
   weekNumber: number;
   startLabel: string;
   endLabel: string;
+  format?: 'excel' | 'pdf';
   showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
@@ -141,6 +142,7 @@ export const exportScheduleToExcel = ({
   startLabel,
   endLabel,
   showToast,
+  format = 'excel',
 }: ExportScheduleOptions): void => {
   const scheduledEmployees = employeesWithScheduledShifts(filteredEmployees, daysOfWeek, workShifts);
   if (scheduledEmployees.length === 0) {
@@ -160,17 +162,14 @@ export const exportScheduleToExcel = ({
   const safeEnd = endLabel.replace(/[\/\\]/g, '-');
   const filename = `Lich_lam_viec_Tuan_${weekNumber}_${safeStart}_${safeEnd}.xlsx`;
 
-  exportToExcel({
+  void exportToExcel({
+    format,
     sheetName: `Tuần ${weekNumber}`,
     headers,
     rows,
     fileName: filename,
     colWidths,
-  });
-
-  showToast?.(
-    `Đã xuất lịch làm việc Tuần ${weekNumber} (${startLabel} - ${endLabel}) sang file Excel!`,
-    'success'
-  );
+  }).then(saved => { if (saved) showToast?.(`Đã lưu lịch làm việc Tuần ${weekNumber} (${startLabel} - ${endLabel}) sang file Excel!`, 'success'); })
+    .catch(() => showToast?.('Không thể lưu báo cáo.', 'error'));
 };
 

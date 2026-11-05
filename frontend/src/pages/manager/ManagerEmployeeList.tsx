@@ -226,9 +226,10 @@ export const ManagerEmployeeList: React.FC = () => {
     setEditEmployee(null);
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = (format: 'excel' | 'pdf') => {
     if (employeeState.isLoading || employeeState.isError || filteredEmployees.length === 0) return;
     exportEmployeesToExcel({
+      format,
       employees: filteredEmployees,
       showToast,
     });

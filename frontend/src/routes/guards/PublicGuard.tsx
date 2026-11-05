@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 
@@ -13,16 +13,12 @@ interface PublicGuardProps {
  */
 export const PublicGuard: React.FC<PublicGuardProps> = ({ children }) => {
   const { currentUser, isInitializing } = useAuth();
-  const location = useLocation();
 
   if (isInitializing) {
     return <LoadingScreen message="Đang kiểm tra trạng thái đăng nhập..." />;
   }
 
   if (currentUser) {
-    // If the user was redirected to /login with a previous target location, send them there
-    const fromLocation = (location.state as { from?: { pathname?: string } })?.from?.pathname;
-
     const isManagerOrAdmin =
       currentUser.role === 'admin' ||
       currentUser.role === 'manager' ||
@@ -33,8 +29,7 @@ export const PublicGuard: React.FC<PublicGuardProps> = ({ children }) => {
     const defaultDashboard =
       isManagerOrAdmin ? '/app/manager/dashboard' : '/app/employee/dashboard';
 
-    const target = fromLocation && fromLocation !== '/login' ? fromLocation : defaultDashboard;
-    return <Navigate to={target} replace />;
+    return <Navigate to={defaultDashboard} replace />;
   }
 
   return children ? <>{children}</> : <Outlet />;

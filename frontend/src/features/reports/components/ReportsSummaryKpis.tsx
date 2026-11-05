@@ -26,9 +26,10 @@ export interface ReportsSummaryKpisData {
 
 interface ReportsSummaryKpisProps {
   data: ReportsSummaryKpisData;
+  hideDepartments?: boolean;
 }
 
-export const ReportsSummaryKpis: React.FC<ReportsSummaryKpisProps> = ({ data }) => {
+export const ReportsSummaryKpis: React.FC<ReportsSummaryKpisProps> = ({ data, hideDepartments = false }) => {
   const kpis = [
     {
       id: 'departments',
@@ -102,8 +103,8 @@ export const ReportsSummaryKpis: React.FC<ReportsSummaryKpisProps> = ({ data }) 
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-      {kpis.map((kpi) => {
+    <div className={`grid grid-cols-2 sm:grid-cols-4 ${hideDepartments ? 'lg:grid-cols-7' : 'lg:grid-cols-8'} gap-3`}>
+      {kpis.filter(kpi => !hideDepartments || kpi.id !== 'departments').map((kpi) => {
         const Icon = kpi.icon;
         return (
           <div

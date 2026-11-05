@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   ReportsHeader,
@@ -6,18 +6,15 @@ import {
   ReportsBiometricAndPunctualityCharts,
   ReportsDepartmentTable,
   ReportsEmployeeLeaderboard,
-  ExportReportsModal,
-  ExportReportType,
   useMonthlyReport,
 } from '@/features/reports';
-import { exportToExcel } from '@/utils/excelExport';
+import { exportMonthlyExcel, printMonthlyReport } from '@/features/reports/utils/monthlyReportExport';
 
 export const ManagerReports: React.FC = () => {
-  const { employees, selectedPeriod, setSelectedPeriod, showToast } = useApp();
+  const { selectedPeriod, setSelectedPeriod, showToast, role } = useApp();
+  const isManager = role === 'manager';
 
-  // Export Modal State
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportType, setExportType] = useState<ExportReportType>('attendance');
+  const chartRef = useRef<HTMLDivElement>(null);
 
   // Backend Reports Query Hook - Single Source of Truth
   const { reportData, isLoading, isError, error, refetch } = useMonthlyReport(selectedPeriod);
@@ -64,99 +61,14 @@ export const ManagerReports: React.FC = () => {
   const departmentsData = reportData?.departments || [];
   const leaderboardData = reportData?.leaderboard || [];
 
-  // Excel (.xlsx) Export logic
-  const handleExecuteExport = () => {
-    let headers: string[] = [];
-    let rows: (string | number)[][] = [];
-    let fileName = '';
-    let sheetName = 'Báo cáo';
-
-    if (exportType === 'attendance') {
-      sheetName = 'Chuyên cần nhân viên';
-      headers = [
-        'Mã NV',
-        'Họ và Tên',
-        'Phòng Ban',
-        'Số Lần Chấm Công',
-        'Giờ Tăng Ca (h)',
-        'Đi Muộn / Về Sớm (h)',
-        'Số Ca Nghỉ Làm',
-        'Tỉ Lệ Đúng Giờ (%)',
-        'Quỹ Lương (VNĐ)',
-      ];
-
-      rows = leaderboardData.map((item) => [
-        item.employeeId,
-        item.fullName,
-        item.department,
-        item.punchCount,
-        Number(item.overtimeHours.toFixed(1)),
-        Number(item.lateEarlyHours.toFixed(1)),
-        item.absenceCount,
-        item.punchCount > 0 ? `${item.onTimeRate}%` : '',
-        item.salary ?? '',
-      ]);
-
-      fileName = `Bao_cao_chuyen_can_nhan_vien_${selectedPeriod}.xlsx`;
-    } else if (exportType === 'payroll') {
-      sheetName = 'Tổng hợp phòng ban';
-      headers = [
-        'Phòng Ban',
-        'Số Nhân Viên',
-        'Số Lần Chấm Công',
-        'Giờ Tăng Ca (h)',
-        'Đi Muộn / Về Sớm (h)',
-        'Số Ca Nghỉ Làm',
-        'Tỉ Lệ Đúng Giờ (%)',
-        'Quỹ Lương (VNĐ)',
-      ];
-
-      rows = departmentsData.map((d) => [
-        d.departmentName,
-        d.employeeCount,
-        d.totalPunches,
-        Number(d.totalOvertimeHours.toFixed(1)),
-        Number(d.totalLateEarlyHours.toFixed(1)),
-        d.unexcusedAbsenceCount,
-        d.totalPunches > 0 ? `${d.onTimeRate}%` : '',
-        d.totalSalary,
-      ]);
-
-      fileName = `Bao_cao_tong_hop_phong_ban_${selectedPeriod}.xlsx`;
+  const handleExport = (format: 'excel' | 'pdf') => {
+    if (format === 'excel') {
+      void exportMonthlyExcel(reportData, isManager)
+        .then(saved => { if (saved) showToast('Đã lưu báo cáo Excel.', 'success'); })
+        .catch(() => showToast('Không thể lưu báo cáo.', 'error'));
     } else {
-      sheetName = 'Danh sách nhân sự';
-      headers = [
-        'Mã NV',
-        'Họ và Tên',
-        'Phòng Ban',
-        'Chức Vụ',
-        'Email',
-        'Trạng Thái',
-        'Lương Theo Giờ (VNĐ)',
-      ];
-
-      rows = employees.map((emp) => [
-        emp.employee_id,
-        emp.full_name,
-        emp.department,
-        emp.position,
-        emp.email,
-        emp.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm ngưng',
-        emp.hourly_rate || 0,
-      ]);
-
-      fileName = `Danh_sach_nhan_su_${selectedPeriod}.xlsx`;
+      printMonthlyReport(reportData, isManager, chartRef.current);
     }
-
-    exportToExcel({
-      sheetName,
-      headers,
-      rows,
-      fileName,
-    });
-
-    setIsExportModalOpen(false);
-    showToast(`Đã xuất báo cáo Excel: ${fileName}`, 'success');
   };
 
   return (
@@ -166,25 +78,25 @@ export const ManagerReports: React.FC = () => {
         selectedPeriod={selectedPeriod}
         onSelectPeriod={setSelectedPeriod}
         availablePeriods={availablePeriods}
-        onOpenExportModal={() => setIsExportModalOpen(true)}
+        onOpenExportModal={handleExport}
       />
 
       {/* Hàng 2: 8 Hộp Thống Kê KPI */}
-      <ReportsSummaryKpis data={summaryKpisData} />
+      <ReportsSummaryKpis data={summaryKpisData} hideDepartments={isManager} />
 
       {/* Hàng 3: Phương thức chấm công (2 Donut) + Biểu đồ tỷ lệ đúng giờ theo ngày */}
-      <ReportsBiometricAndPunctualityCharts
+      <div ref={chartRef}><ReportsBiometricAndPunctualityCharts
         faceStats={faceStats}
         fpStats={fpStats}
         dailyPunctualityData={dailyPunctualityData}
         selectedPeriod={selectedPeriod}
-      />
+      /></div>
 
       {/* Hàng 4: Bảng Tổng hợp theo phòng ban */}
-      <ReportsDepartmentTable
+      {!isManager && <ReportsDepartmentTable
         departmentsData={departmentsData}
         selectedPeriod={selectedPeriod}
-      />
+      />}
 
       {/* Hàng 5: Bảng xếp hạng chuyên cần nhân viên */}
       <ReportsEmployeeLeaderboard
@@ -192,14 +104,6 @@ export const ManagerReports: React.FC = () => {
         selectedPeriod={selectedPeriod}
       />
 
-      {/* CSV Export Option Modal */}
-      <ExportReportsModal
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
-        exportType={exportType}
-        onSelectExportType={setExportType}
-        onExecuteExport={handleExecuteExport}
-      />
     </div>
   );
 };

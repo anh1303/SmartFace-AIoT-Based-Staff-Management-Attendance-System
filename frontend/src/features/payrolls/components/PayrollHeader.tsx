@@ -1,3 +1,4 @@
+import { ReportExportButton, type ReportFormat } from '@/components/common/ReportExportButton';
 import React from 'react';
 import { Calendar, Sparkles, Lock, Unlock, Download, Banknote } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
@@ -12,7 +13,7 @@ interface PayrollHeaderProps {
   onCalculatePayroll: () => void;
   onOpenFinalizeModal: () => void;
   onOpenUnlockModal: () => void;
-  onExportCSV: () => void;
+  onExportCSV: (format: ReportFormat) => void;
   canExport?: boolean;
 }
 
@@ -104,16 +105,7 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
                 <span>Chốt kỳ lương</span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={onExportCSV}
-              disabled={!canExport}
-              className="h-10 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
-              title={canExport ? 'Xuất bảng lương chi tiết sang file Excel (.xlsx)' : 'Chỉ xuất khi kỳ lương đã chốt và dữ liệu đã sẵn sàng'}
-            >
-              <Download className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Xuất Excel</span>
-            </button>
+            <ReportExportButton onExport={onExportCSV} disabled={!canExport} />
         </div>
       }
     />

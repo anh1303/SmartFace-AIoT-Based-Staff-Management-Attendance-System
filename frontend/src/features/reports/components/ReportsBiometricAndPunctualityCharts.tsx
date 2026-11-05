@@ -265,7 +265,7 @@ export const ReportsBiometricAndPunctualityCharts: React.FC<ReportsBiometricAndP
                 interval="preserveStartEnd"
               />
               <YAxis
-                domain={[70, 100]}
+                domain={[0, 100]}
                 stroke="#64748b"
                 fontSize={10}
                 tickLine={false}
@@ -280,7 +280,7 @@ export const ReportsBiometricAndPunctualityCharts: React.FC<ReportsBiometricAndP
                   color: '#fff',
                 }}
                 formatter={(val: any, _name: any, item: any) => [
-                  `${val}% (${item?.payload?.onTime || 0}/${item?.payload?.total || 0} lượt đúng giờ)`,
+                  `${val}% (${item?.payload?.onTime || 0}/${item?.payload?.total || 0} ngày công đúng giờ)`,
                   'Tỷ lệ đúng giờ',
                 ]}
                 labelFormatter={(label) => `Ngày ${label}/${monthStr}/${yearStr}`}
@@ -294,7 +294,6 @@ export const ReportsBiometricAndPunctualityCharts: React.FC<ReportsBiometricAndP
                 fill="url(#colorRate)"
                 dot={{ r: 3, fill: '#38bdf8', strokeWidth: 1.5, stroke: '#0f1224' }}
                 activeDot={{ r: 5, fill: '#38bdf8', stroke: '#fff', strokeWidth: 2 }}
-                connectNulls
               />
             </AreaChart>
           </ResponsiveContainer>

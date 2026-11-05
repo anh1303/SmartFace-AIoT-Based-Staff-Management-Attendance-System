@@ -1,3 +1,4 @@
+import { ReportExportButton, type ReportFormat } from '@/components/common/ReportExportButton';
 import React from 'react';
 import { Download, Calendar, BarChart3 } from 'lucide-react';
 import { PageHeaderBanner } from '../../../components/common';
@@ -6,7 +7,7 @@ interface ReportsHeaderProps {
   selectedPeriod: string;
   onSelectPeriod: (period: string) => void;
   availablePeriods: string[];
-  onOpenExportModal: () => void;
+  onOpenExportModal: (format: ReportFormat) => void;
 }
 
 export const ReportsHeader: React.FC<ReportsHeaderProps> = ({
@@ -46,14 +47,7 @@ export const ReportsHeader: React.FC<ReportsHeaderProps> = ({
         </div>
       }
       actions={
-        <button
-          type="button"
-          onClick={onOpenExportModal}
-          className="h-10 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm shadow-blue-500/20 transition-all active:scale-95 cursor-pointer"
-        >
-          <Download className="w-4 h-4" />
-          <span>Xuất báo cáo Excel</span>
-        </button>
+        <ReportExportButton onExport={onOpenExportModal} />
       }
     />
   );

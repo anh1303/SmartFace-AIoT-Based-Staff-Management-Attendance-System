@@ -164,12 +164,7 @@ export const ManagerEmployeeDetail: React.FC = () => {
   // ==========================
   const {
     employeeAttendanceLogs,
-    attendanceStats,
     hourlyRate,
-    standardHours,
-    overtimeHours,
-    lateEarlyHours,
-    currentNetSalary,
     pastPayrolls,
     employeeShifts,
     otRate,
@@ -217,10 +212,6 @@ export const ManagerEmployeeDetail: React.FC = () => {
     } catch {
       showToast('Có lỗi xảy ra khi cập nhật thông tin nhân viên', 'error');
     }
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   if (!currentEmp) {
@@ -293,7 +284,6 @@ export const ManagerEmployeeDetail: React.FC = () => {
           onPrevEmployee={handlePrevEmployee}
           onNextEmployee={handleNextEmployee}
           onOpenEditModal={handleOpenEditModal}
-          onPrint={handlePrint}
         />
         <div className="p-10 text-center bg-white dark:bg-[#13162b] border border-amber-300/70 dark:border-amber-900/40 rounded-2xl shadow-sm max-w-2xl mx-auto my-6">
           <div className="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto mb-4 border border-amber-200 dark:border-amber-800/60 shadow-xs">
@@ -348,7 +338,6 @@ export const ManagerEmployeeDetail: React.FC = () => {
         onPrevEmployee={handlePrevEmployee}
         onNextEmployee={handleNextEmployee}
         onOpenEditModal={handleOpenEditModal}
-        onPrint={handlePrint}
       />
 
       {/* 2. TAB 1: OVERVIEW & BIOMETRICS */}
@@ -356,11 +345,6 @@ export const ManagerEmployeeDetail: React.FC = () => {
         <EmployeeOverviewTab
           currentEmp={currentEmp}
           hourlyRate={hourlyRate}
-          standardHours={standardHours}
-          overtimeHours={overtimeHours}
-          lateEarlyHours={lateEarlyHours}
-          currentNetSalary={currentNetSalary}
-          workDays={attendanceStats.workDays}
           onOpenEditModal={handleOpenEditModal}
         />
       )}

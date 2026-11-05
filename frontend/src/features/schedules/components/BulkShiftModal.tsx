@@ -1,4 +1,3 @@
-import {ShiftTemplatePicker,templateAssignment} from './ShiftTemplates';
 import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
@@ -14,6 +13,7 @@ interface BulkShiftModalProps {
   endLabel: string;
   employees: Employee[];
   departments?: DepartmentItem[] | string[];
+  managerDepartment?: string | null;
   bulkTarget: 'ALL' | 'DEPARTMENT' | string;
   setBulkTarget: (target: 'ALL' | 'DEPARTMENT' | string) => void;
   bulkDepartment: string;
@@ -41,6 +41,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
   endLabel,
   employees,
   departments = [],
+  managerDepartment,
   bulkTarget,
   setBulkTarget,
   bulkDepartment,
@@ -79,7 +80,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
       subtitle={`Áp dụng cho Tuần ${weekNumber} (${startLabel} - ${endLabel})`}
       maxWidth="lg"
     >
-      <form onSubmit={onSubmit} className="space-y-4"><fieldset disabled={isSubmitting} className="space-y-4"><ShiftTemplatePicker onApply={template=>{const value=templateAssignment(template);setBulkShiftType(value.shift_type);setBulkStartTime(value.start_time);setBulkEndTime(value.end_time);setBulkNote(value.note);}}/>
+      <form onSubmit={onSubmit} className="space-y-4"><fieldset disabled={isSubmitting} className="space-y-4">
         {/* Target Selection */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Đối tượng áp dụng</label>
@@ -95,60 +96,37 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
               Tất cả nhân sự ({employees.filter(e => e.status !== 'INACTIVE').length})
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setBulkTarget('DEPARTMENT');
-                if (!bulkDepartment && departmentList.length > 0) {
-                  setBulkDepartment(departmentList[0]);
-                }
-              }}
-              className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${bulkTarget === 'DEPARTMENT'
-                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-600'
-                : 'bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-blue-300'
-                }`}
-            >
-              Theo phòng ban
-            </button>
+            <details className="relative min-w-0" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.open = false; }} onKeyDown={e => { if (e.key === 'Escape') { e.currentTarget.open = false; e.currentTarget.querySelector('summary')?.focus(); } }}>
+              <summary className={`flex h-full min-h-10 items-center justify-between gap-1 rounded-xl border px-3 py-2 text-xs font-semibold cursor-pointer list-none focus-visible:outline-2 focus-visible:outline-blue-500 ${bulkTarget === 'DEPARTMENT' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-600' : 'bg-slate-50 dark:bg-[#0f1224] text-slate-900 dark:text-slate-200 border-slate-200 dark:border-[#272d5a]'}`}>
+                <span className="truncate">{bulkTarget === 'DEPARTMENT' ? bulkDepartment : 'Theo phòng ban'}</span><span aria-hidden="true">&#9662;</span>
+              </summary>
+              <div className="absolute z-20 top-full left-0 w-full max-h-50 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#272d5a] bg-white dark:bg-[#13162b] shadow-lg">
+                {departmentList.length === 0 ? <p className="px-3 py-2 text-xs text-slate-500">Chưa có phòng ban nào</p> : departmentList.map(deptName => (
+                  <button key={deptName} type="button" title={deptName} disabled={managerDepartment !== undefined && deptName !== managerDepartment} onClick={event => { setBulkDepartment(deptName); setBulkTarget('DEPARTMENT'); event.currentTarget.closest('details')?.removeAttribute('open'); }} className="block h-10 w-full truncate px-3 text-left text-xs text-slate-900 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-900/40 focus:bg-blue-50 dark:focus:bg-blue-900/40 disabled:cursor-not-allowed disabled:opacity-40">
+                    {deptName}
+                  </button>
+                ))}
+              </div>
+            </details>
 
-            <select
-              aria-label="Đối tượng áp dụng"
-              value={bulkTarget !== 'ALL' && bulkTarget !== 'DEPARTMENT' ? bulkTarget : ''}
-              onChange={e => setBulkTarget(e.target.value)}
-              className="py-2 px-3 rounded-xl text-xs font-semibold border transition-all bg-slate-50 dark:bg-[#0f1224] text-slate-900 dark:text-slate-200 border-slate-200 dark:border-[#272d5a] focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="" className="bg-white dark:bg-[#13162b]">Chọn từng NV...</option>
-              {employees.filter(e => e.status !== 'INACTIVE').map(e => (
-                <option key={e.employee_id} value={e.employee_id} className="bg-white dark:bg-[#13162b]">
-                  {e.full_name} ({e.employee_id})
-                </option>
-              ))}
-            </select>
+            <details className="relative min-w-0" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.open = false; }} onKeyDown={e => { if (e.key === 'Escape') { e.currentTarget.open = false; e.currentTarget.querySelector('summary')?.focus(); } }}>
+              <summary className="flex h-full min-h-10 items-center justify-between gap-1 rounded-xl border border-slate-200 dark:border-[#272d5a] bg-slate-50 dark:bg-[#0f1224] px-3 py-2 text-xs font-semibold text-slate-900 dark:text-slate-200 cursor-pointer list-none focus-visible:outline-2 focus-visible:outline-blue-500">
+                <span className="truncate">{employees.find(e => e.employee_id === bulkTarget)?.full_name || 'Chọn từng NV...'}</span><span aria-hidden="true">&#9662;</span>
+              </summary>
+              <div className="absolute z-20 top-full left-0 w-full max-h-50 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#272d5a] bg-white dark:bg-[#13162b] shadow-lg">
+                {employees.filter(e => e.status !== 'INACTIVE').map(e => (
+                  <button key={e.employee_id} type="button" title={`${e.full_name} (${e.employee_id})`} onClick={event => { setBulkTarget(e.employee_id); event.currentTarget.closest('details')?.removeAttribute('open'); }} className="block h-10 w-full truncate px-3 text-left text-xs text-slate-900 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-900/40 focus:bg-blue-50 dark:focus:bg-blue-900/40">
+                    {e.full_name} ({e.employee_id})
+                  </button>
+                ))}
+              </div>
+            </details>
           </div>
 
-          {bulkTarget === 'DEPARTMENT' && (
-            <div className="mt-2.5">
-              <select
-                value={bulkDepartment}
-                onChange={e => setBulkDepartment(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-              >
-                {departmentList.length === 0 ? (
-                  <option value="" disabled className="bg-white dark:bg-[#13162b]">Chưa có phòng ban nào</option>
-                ) : (
-                  departmentList.map(deptName => (
-                    <option key={deptName} value={deptName} className="bg-white dark:bg-[#13162b]">
-                      {deptName}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-          )}
         </div>
 
         {/* Shift Type Selection */}
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Ca làm việc</label>
             <select
@@ -188,10 +166,10 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
             <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
               Khung giờ làm việc:
             </span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
-                  Bắt đầu
+                  Giờ bắt đầu
                 </label>
                 <ShiftTimeInput
                   id="bulk-shift-start"
@@ -203,7 +181,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
               </div>
               <div>
                 <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
-                  Kết thúc
+                  Giờ kết thúc
                 </label>
                 <ShiftTimeInput
                   id="bulk-shift-end"
@@ -275,10 +253,6 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
               );
             })}
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1">
-            <span>ℹ️</span>
-            <span>Hệ thống sẽ tự động bỏ qua các ngày trong quá khứ để bảo vệ dữ liệu chấm công đã hoàn thành.</span>
-          </p>
         </div>
 
         <div>

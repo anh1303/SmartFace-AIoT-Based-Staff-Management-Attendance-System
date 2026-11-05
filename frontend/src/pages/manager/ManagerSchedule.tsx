@@ -243,7 +243,7 @@ export const ManagerSchedule: React.FC = () => {
       }
     }
 
-    let targetEmps = employees.filter(e => e.status === 'ACTIVE');
+    let targetEmps = employees.filter(e => e.status === 'ACTIVE' && (!isManager || (Boolean(managerDept) && e.department === managerDept)));
     if (bulkTarget === 'DEPARTMENT') {
       targetEmps = targetEmps.filter(e => e.department === bulkDepartment);
     } else if (bulkTarget !== 'ALL') {
@@ -387,9 +387,10 @@ export const ManagerSchedule: React.FC = () => {
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = (format: 'excel' | 'pdf') => {
     if (!canExport) return;
     exportScheduleToExcel({
+      format,
       filteredEmployees,
       daysOfWeek,
       workShifts,
@@ -474,8 +475,9 @@ export const ManagerSchedule: React.FC = () => {
         weekNumber={weekNumber}
         startLabel={startLabel}
         endLabel={endLabel}
-        employees={employees}
+        employees={isManager ? employees.filter(e => Boolean(managerDept) && e.department === managerDept) : employees}
         departments={dbDepartments}
+        managerDepartment={isManager ? managerDept || null : undefined}
         bulkTarget={bulkTarget}
         setBulkTarget={setBulkTarget}
         bulkDepartment={bulkDepartment}

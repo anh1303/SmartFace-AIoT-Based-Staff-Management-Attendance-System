@@ -1,3 +1,4 @@
+import { ReportExportButton, type ReportFormat } from '@/components/common/ReportExportButton';
 import React from 'react';
 import {
   Unlock,
@@ -14,7 +15,7 @@ interface AttendanceHeaderProps {
   endDate: string;
   isCurrentDateLocked: boolean;
   onToggleLock: () => void;
-  onExportCSV: () => void;
+  onExportCSV: (format: ReportFormat) => void;
   canLock?: boolean;
   canExport?: boolean;
 }
@@ -85,20 +86,7 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
             )}
           </button>}
 
-          <button
-            type="button"
-            onClick={onExportCSV}
-            disabled={!canExport}
-            title={!canExport ? 'Chỉ xuất sau khi đã chốt ca và dữ liệu sẵn sàng' : 'Xuất dữ liệu chấm công sang file Excel (.xlsx)'}
-            className={`h-10 px-4 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
-              canExport
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs hover:from-blue-500 hover:to-indigo-500 cursor-pointer'
-                : 'bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700/50 cursor-not-allowed'
-            }`}
-          >
-            <Download className="w-4 h-4" />
-            <span>Xuất Excel</span>
-          </button>
+          <ReportExportButton onExport={onExportCSV} disabled={!canExport} />
         </>
       }
     />

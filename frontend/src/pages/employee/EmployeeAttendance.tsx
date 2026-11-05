@@ -1,4 +1,5 @@
 import { AttendanceEventBadge } from '../../components/common/AttendanceEventBadge';
+import { confidenceColor } from '../../utils/confidence';
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
@@ -243,7 +244,7 @@ export const EmployeeAttendance: React.FC = () => {
                       <TableCell className="font-mono text-slate-700 dark:text-slate-300 truncate" title={record.device_id}>
                         {record.device_id}
                       </TableCell>
-                      <TableCell className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                      <TableCell className={`font-mono font-bold ${confidenceColor(record.verification_score)}`}>
                         {record.verification_score !== null && record.verification_score !== undefined
                           ? `${(record.verification_score * 100).toFixed(1)}% Match`
                           : '--'}

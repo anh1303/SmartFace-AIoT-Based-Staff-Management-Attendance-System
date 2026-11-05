@@ -334,7 +334,7 @@ export const ManagerPayroll: React.FC = () => {
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = (format: 'excel' | 'pdf') => {
     if (!canExport) {
       showToast('Chỉ xuất Excel khi kỳ lương đã chốt và dữ liệu đã sẵn sàng.', 'warning');
       return;
@@ -385,14 +385,14 @@ export const ManagerPayroll: React.FC = () => {
       ];
     });
 
-    exportToExcel({
+    void exportToExcel({
+      format,
       sheetName: `Kỳ lương ${selectedPeriod}`,
       headers,
       rows,
       fileName: `Bang_luong_chi_tiet_ky_${selectedPeriod}.xlsx`,
-    });
-
-    showToast(`Đã xuất báo cáo bảng lương kỳ ${selectedPeriod} sang file Excel (.xlsx)!`, 'success');
+    }).then(saved => { if (saved) showToast(`Đã lưu báo cáo bảng lương kỳ ${selectedPeriod} sang file Excel (.xlsx)!`, 'success'); })
+      .catch(() => showToast('Không thể lưu báo cáo.', 'error'));
   };
 
   return (

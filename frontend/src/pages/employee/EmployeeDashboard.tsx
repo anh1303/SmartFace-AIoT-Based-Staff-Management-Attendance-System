@@ -1,4 +1,5 @@
 import { Avatar } from '../../components/common/Avatar';
+import { confidenceColor } from '../../utils/confidence';
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatVNTime, getTodayVNString, formatVNDateISO, getMonday } from '../../utils/dateUtils';
@@ -144,7 +145,7 @@ export const EmployeeDashboard: React.FC = () => {
               </span>
             </p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-              Xác thực: {latestPunch ? `${latestPunch.verification_score != null ? `${(latestPunch.verification_score * 100).toFixed(1)}% Match` : 'Chưa có điểm'} • ${latestPunch.device_id || 'Chưa ghi nhận thiết bị'}` : 'Chưa có dữ liệu'}
+              Xác thực: {latestPunch ? <><span className={confidenceColor(latestPunch.verification_score)}>{latestPunch.verification_score != null ? `${(latestPunch.verification_score * 100).toFixed(1)}% Match` : 'Chưa có điểm'}</span> • {latestPunch.device_id || 'Chưa ghi nhận thiết bị'}</> : 'Chưa có dữ liệu'}
             </p>
           </div>
         </div>

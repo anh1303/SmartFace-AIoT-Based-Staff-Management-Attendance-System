@@ -47,6 +47,7 @@ export const buildEmployeeExportRows = (
 
 export interface ExportEmployeesOptions {
   employees: Employee[];
+  format?: 'excel' | 'pdf';
   showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   fileName?: string;
 }
@@ -54,6 +55,7 @@ export interface ExportEmployeesOptions {
 export const exportEmployeesToExcel = ({
   employees,
   showToast,
+  format = 'excel',
   fileName,
 }: ExportEmployeesOptions): void => {
   if (!employees || employees.length === 0) {
@@ -65,13 +67,13 @@ export const exportEmployeesToExcel = ({
   const todayStr = new Date().toISOString().slice(0, 10);
   const targetFileName = fileName || `Danh_sach_nhan_su_${todayStr}.xlsx`;
 
-  exportToExcel({
+  void exportToExcel({
+    format,
     sheetName: 'Danh sách nhân sự',
     headers,
     rows,
     fileName: targetFileName,
-  });
-
-  showToast?.('Đã xuất danh sách nhân sự sang file Excel (.xlsx)!', 'success');
+  }).then(saved => { if (saved) showToast?.('Đã lưu danh sách nhân sự sang file Excel (.xlsx)!', 'success'); })
+    .catch(() => showToast?.('Không thể lưu báo cáo.', 'error'));
 };
 

@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  Printer,
   Edit,
   User,
   Clock,
@@ -27,7 +26,6 @@ interface EmployeeDetailHeaderProps {
   onPrevEmployee: () => void;
   onNextEmployee: () => void;
   onOpenEditModal: () => void;
-  onPrint: () => void;
 }
 
 export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
@@ -39,7 +37,6 @@ export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
   onPrevEmployee,
   onNextEmployee,
   onOpenEditModal,
-  onPrint,
 }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -223,15 +220,6 @@ export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
             <span>Sửa</span>
           </button>
 
-          {/* Print Button */}
-          <button
-            type="button"
-            onClick={onPrint}
-            className="w-[44px] h-[44px] flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1d2243] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#272d5a] transition-colors cursor-pointer shrink-0"
-            title="In / Xuất PDF Hồ sơ" aria-label="In hồ sơ"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
         </div>
       </div>
 

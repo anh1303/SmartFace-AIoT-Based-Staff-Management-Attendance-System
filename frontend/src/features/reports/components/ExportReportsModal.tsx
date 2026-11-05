@@ -5,6 +5,7 @@ import { Award, FileSpreadsheet, Users, Check, Download } from 'lucide-react';
 export type ExportReportType = 'attendance' | 'payroll' | 'employees';
 
 interface ExportReportsModalProps {
+  format: 'excel' | 'pdf';
   isOpen: boolean;
   onClose: () => void;
   exportType: ExportReportType;
@@ -14,6 +15,7 @@ interface ExportReportsModalProps {
 
 export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
   isOpen,
+  format,
   onClose,
   exportType,
   onSelectExportType,
@@ -23,7 +25,7 @@ export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Xuất báo cáo hệ thống (Excel)"
+      title={`Báo cáo hệ thống (${format === 'excel' ? 'Excel' : 'PDF'})`}
       subtitle="Chọn loại báo cáo bạn muốn tải xuống với đầy đủ dữ liệu cập nhật"
       maxWidth="md"
     >
@@ -146,7 +148,7 @@ export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
             className="px-5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 flex items-center gap-1.5 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Tải file Excel ngay</span>
+            <span>{format === 'excel' ? 'Tải file Excel' : 'Mở bản in PDF'}</span>
           </button>
         </div>
       </div>

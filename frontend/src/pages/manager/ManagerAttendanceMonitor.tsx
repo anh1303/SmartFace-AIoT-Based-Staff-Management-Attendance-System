@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { confidenceColor } from '../../utils/confidence';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useShiftContext } from '../../context/ShiftContext';
@@ -238,13 +239,13 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = (format: 'excel' | 'pdf') => {
     if (!canExport) {
       showToast('Chỉ xuất sau khi đã chốt ca và dữ liệu sẵn sàng', 'warning');
       return;
     }
     const dateLabel = startDate === endDate ? startDate : `${startDate}_den_${endDate}`;
-    exportAttendanceToCSV(employeePairs, dateLabel, showToast);
+    exportAttendanceToCSV(employeePairs, dateLabel, showToast, format);
   };
 
   const handleSaveAdjustments = async (payload: {
@@ -474,7 +475,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
                       </td>
                       <td className="py-2.5 px-3">{log.method}</td>
                       <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">{log.device_id || '--'}</td>
-                      <td className="py-2.5 px-3 font-mono text-emerald-600">
+                      <td className={`py-2.5 px-3 font-mono ${confidenceColor(log.verification_score)}`}>
                         {log.verification_score !== undefined && log.verification_score !== null
                           ? `${(log.verification_score * 100).toFixed(0)}%`
                           : '--'}

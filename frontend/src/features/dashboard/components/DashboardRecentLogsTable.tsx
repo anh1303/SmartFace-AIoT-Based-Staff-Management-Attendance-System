@@ -1,4 +1,5 @@
 import React from 'react';
+import { confidenceColor } from '../../../utils/confidence';
 import { Briefcase } from 'lucide-react';
 import { AttendanceEventBadge } from '../../../components/common/AttendanceEventBadge';
 import { formatVNTime } from '../../../utils/dateUtils';
@@ -87,7 +88,7 @@ export const DashboardRecentLogsTable: React.FC<DashboardRecentLogsTableProps> =
                     </td>
 
                     <td className="py-2.5 px-3 text-center">
-                      <span className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium">
+                      <span className={`px-2 py-0.5 text-[10px] font-mono font-medium ${confidenceColor(att.verification_score)}`}>
                         {att.verification_score !== null &&
                         att.verification_score !== undefined
                           ? `${(att.verification_score * (att.verification_score > 1 ? 1 : 100)).toFixed(1)}%`

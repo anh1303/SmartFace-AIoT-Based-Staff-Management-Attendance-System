@@ -1,4 +1,5 @@
 import { AttendanceDayDetails } from './AttendanceDayDetails';
+import { confidenceColor } from '../../../utils/confidence';
 import React, { useState } from 'react';
 import { ScanFace, Fingerprint, Edit, Clock, ChevronDown, ChevronUp, Unlock } from 'lucide-react';
 import { AttendancePairItem, AttendanceEventItem } from '../hooks/useAttendancePairs';
@@ -100,15 +101,12 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
     );
   };
 
-  /**
-   * Render điểm tin cậy: số % xanh lá hoặc --
-   */
   const renderScore = (score: number | null) => {
     if (score === null || score === undefined) {
       return <span className="text-slate-500 font-mono text-xs">--</span>;
     }
     return (
-      <span className="text-emerald-400 font-mono font-bold text-xs whitespace-nowrap">
+      <span className={`${confidenceColor(score)} font-mono font-bold text-xs whitespace-nowrap`}>
         {(score * 100).toFixed(0)}%
       </span>
     );

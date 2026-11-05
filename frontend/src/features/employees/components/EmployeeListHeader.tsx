@@ -1,3 +1,4 @@
+import { ReportExportButton, type ReportFormat } from '@/components/common/ReportExportButton';
 import React from 'react';
 import { Settings, Plus, Download, Users } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
@@ -7,7 +8,7 @@ export interface EmployeeListHeaderProps {
   onOpenDeptPositionDrawer?: () => void;
   onOpenPositionModal?: () => void;
   onOpenAddModal: () => void;
-  onExportExcel?: () => void;
+  onExportExcel?: (format: ReportFormat) => void;
   canExport?: boolean;
 }
 
@@ -57,16 +58,7 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
 
           {/* 3. Nút Xuất Excel */}
           {onExportExcel && (
-            <button
-              type="button"
-              onClick={onExportExcel}
-              disabled={!canExport}
-              className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#272d5a] text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer shadow-xs whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
-              title={canExport ? 'Xuất danh sách nhân sự sang file Excel (.xlsx)' : 'Không có dữ liệu nhân viên sẵn sàng để xuất'}
-            >
-              <Download className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span>Xuất Excel</span>
-            </button>
+            <ReportExportButton onExport={onExportExcel} disabled={!canExport} />
           )}
         </div>
       }

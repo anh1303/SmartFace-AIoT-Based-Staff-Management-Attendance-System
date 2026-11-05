@@ -1,3 +1,4 @@
+import { Avatar } from '../../../components/common/Avatar';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ScanFace, Fingerprint, Lock } from 'lucide-react';
@@ -81,15 +82,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
                         }
                       >
                         <div className="relative shrink-0">
-                          <img
-                            src={
-                              emp.avatar ||
-                              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
-                            }
-                            alt={emp.full_name}
-                            className={`w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-[#272d5a] transition-all shadow-xs ${restricted ? 'grayscale-25' : 'group-hover:border-blue-500'
-                              }`}
-                          />
+                          <Avatar src={emp.avatar} name={emp.full_name} size={40} />
                           {restricted && (
                             <span
                               className="absolute -bottom-1 -right-1 bg-amber-500 text-white rounded-full p-0.5 shadow-xs"

@@ -23,7 +23,7 @@ export interface EmployeeLeaderboardItem {
   lateEarlyHours: number;
   absenceCount: number;
   onTimeRate: number;
-  salary: number;
+  salary: number | null;
 }
 
 interface ReportsEmployeeLeaderboardProps {
@@ -231,19 +231,19 @@ export const ReportsEmployeeLeaderboard: React.FC<ReportsEmployeeLeaderboardProp
                   {/* Tỉ lệ đúng giờ: >=95% xanh lá, >=80% vàng, <80% đỏ */}
                   <TableCell align="center">
                     <span className={`font-mono font-bold px-2 py-0.5 rounded-md text-[11px] ${getRateBadgeClass(item.onTimeRate)}`}>
-                      {item.onTimeRate.toFixed(1)}%
+                      {item.punchCount > 0 ? `${item.onTimeRate.toFixed(1)}%` : '—'}
                     </span>
                   </TableCell>
 
                   {/* Quỹ lương: dữ liệu căn phải */}
                   <TableCell align="right" className="font-mono font-bold text-slate-900 dark:text-white">
-                    {item.salary.toLocaleString('vi-VN')} ₫
+                    {item.salary == null ? 'Chưa có phiếu' : `${item.salary.toLocaleString('vi-VN')} ₫`}
                   </TableCell>
 
                   {/* Cột Đánh giá theo tỉ lệ đúng giờ */}
                   <TableCell align="center" isLast>
                     <span className={`font-semibold text-[11px] px-2.5 py-1 rounded-full border ${evalInfo.badgeClass}`}>
-                      {evalInfo.label}
+                      {item.punchCount > 0 ? evalInfo.label : 'Chưa có dữ liệu'}
                     </span>
                   </TableCell>
                 </TableRow>

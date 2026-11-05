@@ -272,7 +272,7 @@ export interface StatusBadgeProps {
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({
   status,
-  activeText = 'ĐANG HOẠT ĐỘNG',
+  activeText = 'Hoạt động',
   inactiveText = 'TẠM NGƯNG',
   onClick,
   disabled = false,

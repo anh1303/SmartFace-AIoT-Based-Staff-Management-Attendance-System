@@ -10,3 +10,5 @@ export type { ShiftType, WorkShift } from '../../types/shift.types';
 export { useShifts, SHIFTS_QUERY_KEY } from './hooks/useShifts';
 export { ShiftTimeInput } from './components/ShiftTimeInput';
 export * from './api/shiftApi';
+export * from './utils/scheduleExport';
+

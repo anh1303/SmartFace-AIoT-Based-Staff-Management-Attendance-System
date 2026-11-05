@@ -165,11 +165,6 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
                           onClick={() => onCellClick(emp.employee_id, emp.full_name, day.date, `${day.name} (${day.label})`)}
                         >
                           {renderShiftBadge(shift, isPast)}
-                          {shift?.shift_type === 'OTHER' && shift.note && (
-                            <span className="block text-xs text-slate-500 dark:text-slate-300 px-1 mt-1 truncate" title={shift.note}>
-                              {shift.note}
-                            </span>
-                          )}
                         </button>
                       </td>
                     );

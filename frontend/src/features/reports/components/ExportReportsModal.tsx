@@ -23,7 +23,7 @@ export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Xuất báo cáo hệ thống (CSV / Excel)"
+      title="Xuất báo cáo hệ thống (Excel)"
       subtitle="Chọn loại báo cáo bạn muốn tải xuống với đầy đủ dữ liệu cập nhật"
       maxWidth="md"
     >
@@ -146,7 +146,7 @@ export const ExportReportsModal: React.FC<ExportReportsModalProps> = ({
             className="px-5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 flex items-center gap-1.5 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Tải file CSV ngay</span>
+            <span>Tải file Excel ngay</span>
           </button>
         </div>
       </div>

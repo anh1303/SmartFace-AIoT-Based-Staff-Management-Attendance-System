@@ -18,6 +18,8 @@ export interface DashboardPunctuality {
   donutData: Array<{ name: string; value: number; color: string }>;
 }
 
+export type ShiftLiveStatusCode = 'UPCOMING' | 'ONGOING' | 'ENDED';
+
 export interface DashboardShiftGroup {
   id: string;
   name: string;
@@ -27,8 +29,9 @@ export interface DashboardShiftGroup {
   count: number;
   type: string;
   liveStatus: {
+    code?: ShiftLiveStatusCode;
     label: string;
-    style: string;
+    style?: string;
   };
 }
 
@@ -56,7 +59,7 @@ export interface DashboardRecentLog {
   avatar?: string | null;
   type: string;
   timestamp: string;
-  device_id: string;
+  device_id: string | null;
   verification_score?: number | null;
   status: string;
   statusInfo: {

@@ -25,6 +25,8 @@ import {
 import { useAttendanceSummaries } from '@/features/attendances';
 import { useShiftContext } from '../../context/ShiftContext';
 import { formatVNDateISO } from '../../utils/dateUtils';
+import { exportToExcel } from '@/utils/excelExport';
+import { canExportPayroll } from '@/features/payrolls/payrollExportEligibility';
 
 const payrollLogger = logger.child('ManagerPayroll');
 
@@ -180,6 +182,7 @@ export const ManagerPayroll: React.FC = () => {
   const controlledPeriodRecords = allPeriodRecords.filter(p => role === 'admin' || p.employee_id !== currentUser?.employee_id);
   const isFinalized =
     controlledPeriodRecords.length > 0 && controlledPeriodRecords.every((p) => p.status !== 'PENDING');
+  const canExport = !isLoadingPayroll && !payrollError && canExportPayroll(allPeriodRecords);
 
   // Compute metrics
   const totalExpense = allPeriodRecords.reduce((sum, r) => sum + (r.net_salary || 0), 0);
@@ -332,8 +335,12 @@ export const ManagerPayroll: React.FC = () => {
   };
 
   const handleExportCSV = () => {
+    if (!canExport) {
+      showToast('Chỉ xuất Excel khi kỳ lương đã chốt và dữ liệu đã sẵn sàng.', 'warning');
+      return;
+    }
     if (allPeriodRecords.length === 0) {
-      showToast(`Kỳ ${selectedPeriod} chưa có dữ liệu bảng lương để xuất CSV!`, 'warning');
+      showToast(`Kỳ ${selectedPeriod} chưa có dữ liệu bảng lương để xuất Excel!`, 'warning');
       return;
     }
 
@@ -365,7 +372,7 @@ export const ManagerPayroll: React.FC = () => {
 
       return [
         r.employee_id,
-        `"${name}"`,
+        name,
         r.period || r.payroll_period || selectedPeriod,
         r.hourly_rate || 0,
         r.total_working_hours || 0,
@@ -374,22 +381,18 @@ export const ManagerPayroll: React.FC = () => {
         r.total_absence_penalty || 0,
         r.allowance || 0,
         r.net_salary || 0,
-        `"${statusStr}"`,
+        statusStr,
       ];
     });
 
-    const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Bang_luong_chi_tiet_ky_${selectedPeriod}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    exportToExcel({
+      sheetName: `Kỳ lương ${selectedPeriod}`,
+      headers,
+      rows,
+      fileName: `Bang_luong_chi_tiet_ky_${selectedPeriod}.xlsx`,
+    });
 
-    showToast(`Đã xuất báo cáo bảng lương kỳ ${selectedPeriod} định dạng CSV!`, 'success');
+    showToast(`Đã xuất báo cáo bảng lương kỳ ${selectedPeriod} sang file Excel (.xlsx)!`, 'success');
   };
 
   return (
@@ -407,6 +410,7 @@ export const ManagerPayroll: React.FC = () => {
         onOpenFinalizeModal={() => setConfirmFinalizeOpen(true)}
         onOpenUnlockModal={() => setConfirmUnlockOpen(true)}
         onExportCSV={handleExportCSV}
+        canExport={canExport}
       />
 
       {/* 3 Bento Metric Cards */}

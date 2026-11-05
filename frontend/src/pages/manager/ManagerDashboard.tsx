@@ -1,4 +1,6 @@
 import React from 'react';
+import { LayoutDashboard } from 'lucide-react';
+import { PageHeaderBanner } from '../../components/common';
 import { useApp } from '../../context/AppContext';
 import {
   useDashboardToday,
@@ -18,7 +20,11 @@ export const ManagerDashboard: React.FC = () => {
     currentUser?.role_name?.toUpperCase() === 'ADMIN';
 
   // Backend Dashboard Real-time Query Hook
-  const { dashboardData } = useDashboardToday();
+  const { dashboardData, isLoading, isError, error, refetch } = useDashboardToday();
+
+  if (!dashboardData && isLoading) return <p role="status">Đang tải dữ liệu tổng quan…</p>;
+  if (!dashboardData && isError) return <div className="sf-feedback error" role="alert">{error?.message || 'Không thể tải dữ liệu tổng quan.'} <button className="underline" onClick={() => refetch()}>Thử lại</button></div>;
+  if (!dashboardData) return <p role="status">Chưa có dữ liệu tổng quan.</p>;
 
   // Fallback defaults to prevent layout shift during initial load
   const kpis = dashboardData?.kpis || {
@@ -51,11 +57,7 @@ export const ManagerDashboard: React.FC = () => {
   return (
     <div className="space-y-6 pb-8">
       {/* Tiêu đề Trang */}
-      <div className="pb-2 border-b border-slate-200/80 dark:border-[#1d2243]">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-          Tổng quan hôm nay
-        </h1>
-      </div>
+      <PageHeaderBanner title="Tổng quan hệ thống" icon={<div className="w-10 h-10 rounded-xl bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-inner"><LayoutDashboard className="w-5 h-5" /></div>} />
 
       {/* Hàng 1: 4 Thẻ KPI Tổng quan */}
       <DashboardSummaryKpis kpis={kpis} />

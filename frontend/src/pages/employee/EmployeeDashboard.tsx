@@ -39,8 +39,16 @@ export const EmployeeDashboard: React.FC = () => {
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     : [];
 
-  const latestPunch = myAttendance[0];
-  const todayShift = myShifts.find(s => s.date === getTodayVNString()) || myShifts[0];
+  const today = getTodayVNString();
+  const latestPunch = myAttendance.find(a => a.timestamp && !Number.isNaN(Date.parse(a.timestamp)) && formatVNDateISO(a.timestamp) === today);
+  const todayShift = myShifts.find(s => s.date === today);
+  const weekStart = new Date(`${today}T00:00:00Z`);
+  weekStart.setUTCDate(weekStart.getUTCDate() - (weekStart.getUTCDay() + 6) % 7);
+  const weekStartDate = weekStart.toISOString().slice(0, 10);
+  weekStart.setUTCDate(weekStart.getUTCDate() + 7);
+  const weekEndDate = weekStart.toISOString().slice(0, 10);
+  const weekShifts = myShifts.filter(s => s.date >= weekStartDate && s.date < weekEndDate && s.shift_type !== 'OFF');
+  const upcomingShifts = myShifts.filter(s => s.date >= today && s.shift_type !== 'OFF').slice(0, 3);
 
   // Distinct attendance dates
   const attendedDates = Array.from(new Set(myAttendance.map(a => formatVNDateISO(a.timestamp))));
@@ -48,11 +56,11 @@ export const EmployeeDashboard: React.FC = () => {
 
   // Current period payroll record
   const currentPayroll = empCode
-    ? payroll.find(p => p.employee_id === empCode || (currentEmp && p.employee_id === currentEmp.id)) || null
+    ? payroll.find(p => (p.employee_id === empCode || (currentEmp && p.employee_id === currentEmp.id)) && (p.period || p.payroll_period) === getTodayVNString().slice(0, 7)) || null
     : null;
   const netSalaryFormatted = currentPayroll
     ? Number(currentPayroll.net_salary || 0).toLocaleString('vi-VN') + '₫'
-    : '0 ₫';
+    : '—';
 
   // Dynamic 7-day week rhythm
   const monday = getMonday(new Date());
@@ -65,7 +73,7 @@ export const EmployeeDashboard: React.FC = () => {
     const dayLabel = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
     const dayShift = myShifts.find(s => s.date === dateStr);
     const dayPunches = myAttendance.filter(a => formatVNDateISO(a.timestamp) === dateStr);
-    const inPunch = dayPunches.find(a => a.type === 'CHECK_IN') || dayPunches[dayPunches.length - 1];
+    const inPunch = dayPunches.find(a => a.type === 'CHECK_IN');
     const outPunch = dayPunches.find(a => a.type === 'CHECK_OUT');
 
     let status = 'UPCOMING';
@@ -75,8 +83,8 @@ export const EmployeeDashboard: React.FC = () => {
     if (dayShift?.shift_type === 'OFF') {
       status = 'OFF';
     } else if (inPunch) {
-      const inPunc = inPunch.punctuality || (inPunch.status === 'VALID' ? 'ON_TIME' : inPunch.status);
-      status = inPunc === 'ON_TIME' ? 'ON_TIME' : 'LATE';
+      const inPunc = inPunch.punctuality;
+      status = inPunc === 'ON_TIME' ? 'ON_TIME' : inPunc === 'LATE' ? 'LATE' : 'UPCOMING';
       inText = formatVNTime(inPunch.timestamp, false);
       outText = outPunch ? formatVNTime(outPunch.timestamp, false) : (dateStr === getTodayVNString() ? 'Đang ca...' : '--:--');
     }
@@ -88,7 +96,7 @@ export const EmployeeDashboard: React.FC = () => {
       in: inText,
       out: outText,
       status,
-      type: dayShift?.shift_type === 'OFFICE_HOURS' ? 'Ca Chuẩn' : dayShift?.shift_type === 'MORNING' ? 'Ca Sáng' : dayShift?.shift_type === 'AFTERNOON' ? 'Ca Chiều' : dayShift?.shift_type === 'OTHER' ? 'Ca khác' : 'Nghỉ ca',
+      type: dayShift?.shift_type === 'OFFICE_HOURS' ? 'Ca Chuẩn' : dayShift?.shift_type === 'MORNING' ? 'Ca Sáng' : dayShift?.shift_type === 'AFTERNOON' ? 'Ca Chiều' : dayShift?.shift_type === 'OTHER' ? 'Ca khác' : dayShift?.shift_type === 'OFF' ? 'Nghỉ ca' : 'Chưa có ca',
     };
   });
 
@@ -121,7 +129,7 @@ export const EmployeeDashboard: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
-                Xin chào, {currentUser?.full_name || currentEmp?.full_name || 'Nguyễn Văn A'} 👋
+                Xin chào, {currentUser?.full_name || currentEmp?.full_name || 'bạn'} 👋
               </h1>
               <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700/50">
                 {empCode}
@@ -132,11 +140,11 @@ export const EmployeeDashboard: React.FC = () => {
               <span>•</span>
               <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Mới nhất: {latestPunch ? `${latestPunch.type === 'CHECK_IN' ? 'Check-in' : 'Check-out'} ${formatVNTime(latestPunch.timestamp, false)} (${(latestPunch.punctuality || (latestPunch.status === 'VALID' ? 'ON_TIME' : latestPunch.status)) === 'ON_TIME' ? 'Đúng giờ' : 'Trễ/Sớm'})` : 'Chưa có lượt quẹt hôm nay'}
+                Mới nhất: {latestPunch ? `${latestPunch.type === 'CHECK_IN' ? 'Check-in' : 'Check-out'} ${formatVNTime(latestPunch.timestamp, false)}${latestPunch.punctuality === 'ON_TIME' ? ' (Đúng giờ)' : latestPunch.punctuality === 'LATE' || latestPunch.punctuality === 'EARLY_LEAVE' ? ' (Trễ/Sớm)' : ''}` : 'Chưa có lượt quẹt hôm nay'}
               </span>
             </p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-              Xác thực: {latestPunch ? `${latestPunch.verification_score !== null && latestPunch.verification_score !== undefined ? `${(latestPunch.verification_score * 100).toFixed(1)}% Match` : 'Đã xác thực'} • ${latestPunch.device_id || 'AI Node'}` : 'AI Face Recognition Node 01'}
+              Xác thực: {latestPunch ? `${latestPunch.verification_score != null ? `${(latestPunch.verification_score * 100).toFixed(1)}% Match` : 'Chưa có điểm'} • ${latestPunch.device_id || 'Chưa ghi nhận thiết bị'}` : 'Chưa có dữ liệu'}
             </p>
           </div>
         </div>
@@ -163,17 +171,17 @@ export const EmployeeDashboard: React.FC = () => {
         {/* Card 1: Hôm nay */}
         <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
           <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            Hôm nay ({todayShift ? todayShift.shift_type : 'Hành chính'})
+            Hôm nay {todayShift ? `(${todayShift.shift_type})` : ''}
           </span>
           <div className="mt-3">
             <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
-              {todayShift ? `${todayShift.start_time} - ${todayShift.end_time}` : '08:00 - 18:00'}
+              {todayShift ? `${todayShift.start_time} - ${todayShift.end_time}` : 'Chưa có ca'}
             </div>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 uppercase font-mono border border-blue-200 dark:border-blue-700/50">
-                {todayShift?.work_day || 'Thứ Hai'}
+                {todayShift?.work_day || '—'}
               </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[130px]">{todayShift?.note || 'Đúng tiến độ'}</span>
+              {todayShift?.note && <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[130px]">{todayShift.note}</span>}
             </div>
           </div>
         </div>
@@ -185,14 +193,14 @@ export const EmployeeDashboard: React.FC = () => {
           </span>
           <div className="mt-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">{myShifts.length}</span>
+              <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">{weekShifts.length}</span>
               <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">ca đã đăng ký</span>
             </div>
             <div className="w-full bg-slate-100 dark:bg-[#0f1224] h-2 rounded-full mt-2.5 overflow-hidden border border-slate-200 dark:border-[#272d5a]">
-              <div className="bg-blue-600 h-full rounded-full" style={{ width: `${Math.min(100, (myShifts.length / 7) * 100)}%` }} />
+              <div className="bg-blue-600 h-full rounded-full" style={{ width: `${Math.min(100, (weekShifts.length / 7) * 100)}%` }} />
             </div>
             <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-2 flex items-center gap-1 font-medium">
-              <ArrowUpRight className="w-3 h-3" /> Đầy đủ phân bổ
+              <ArrowUpRight className="w-3 h-3" /> Lịch đã ghi nhận
             </p>
           </div>
         </div>
@@ -209,7 +217,7 @@ export const EmployeeDashboard: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 uppercase font-mono border border-emerald-200 dark:border-emerald-800/40">
-                {myAttendance.filter(a => (a.punctuality || (a.status === 'VALID' ? 'ON_TIME' : a.status)) === 'ON_TIME').length} lượt chuẩn giờ
+                {myAttendance.filter(a => a.punctuality === 'ON_TIME').length} lượt chuẩn giờ
               </span>
             </div>
           </div>
@@ -225,7 +233,7 @@ export const EmployeeDashboard: React.FC = () => {
               {netSalaryFormatted}
             </div>
             <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-2 font-medium">
-              Lương/giờ: {Number(currentEmp?.hourly_rate || 120000).toLocaleString('vi-VN')} ₫/h
+              Lương/giờ: {currentEmp?.hourly_rate != null ? `${Number(currentEmp.hourly_rate).toLocaleString('vi-VN')} ₫/h` : '—'}
             </p>
           </div>
         </div>
@@ -294,7 +302,7 @@ export const EmployeeDashboard: React.FC = () => {
               Sinh trắc học cá nhân
             </h2>
             <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-              <ShieldCheck className="w-4 h-4" /> Đã kích hoạt
+              <ShieldCheck className="w-4 h-4" /> Trạng thái đăng ký
             </span>
           </div>
 
@@ -303,10 +311,9 @@ export const EmployeeDashboard: React.FC = () => {
               <ScanFace className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-900 dark:text-white">Vector Face ID 512-D</p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Đã đăng ký 3 góc khuôn mặt tại Gate A</p>
+              <p className="text-xs font-semibold text-slate-900 dark:text-white">Khuôn mặt</p>
               <span className="inline-block mt-1 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-                ACTIVE • LIVENESS 3D
+                {currentEmp ? (currentEmp.face_enrolled ? 'Đã đăng ký' : 'Chưa đăng ký') : 'Chưa có dữ liệu'}
               </span>
             </div>
           </div>
@@ -316,10 +323,9 @@ export const EmployeeDashboard: React.FC = () => {
               <Fingerprint className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-900 dark:text-white">Vân tay FAP30 Chuẩn FBI</p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Phương thức dự phòng tại máy chấm công</p>
+              <p className="text-xs font-semibold text-slate-900 dark:text-white">Vân tay</p>
               <span className="inline-block mt-1 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-                ACTIVE • 2 NGÓN TRỎ
+                {currentEmp ? (currentEmp.fingerprint_enrolled ? 'Đã đăng ký' : 'Chưa đăng ký') : 'Chưa có dữ liệu'}
               </span>
             </div>
           </div>
@@ -339,18 +345,18 @@ export const EmployeeDashboard: React.FC = () => {
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Lịch phân bổ từ Trưởng bộ phận</p>
               </div>
-              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">3 ca sắp tới</span>
             </div>
 
             <div className="space-y-3">
-              {myShifts.slice(0, 3).map((shift, idx) => (
+              {upcomingShifts.length === 0 && <p className="text-xs text-slate-500">Chưa có ca sắp tới</p>}
+              {upcomingShifts.map((shift, idx) => (
                 <div
                   key={shift.shift_id || idx}
                   className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40 flex flex-col items-center justify-center font-mono text-xs">
-                      <span className="text-[10px] text-slate-400">T9</span>
+                      <span className="text-[10px] text-slate-400">T{Number(shift.date.split('-')[1])}</span>
                       <span className="font-bold text-slate-900 dark:text-white">{shift.date.split('-')[2]}</span>
                     </div>
                     <div>
@@ -373,7 +379,7 @@ export const EmployeeDashboard: React.FC = () => {
                   </div>
 
                   <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700/50 font-mono">
-                    ĐÃ XÁC NHẬN
+                    ĐÃ PHÂN CA
                   </span>
                 </div>
               ))}

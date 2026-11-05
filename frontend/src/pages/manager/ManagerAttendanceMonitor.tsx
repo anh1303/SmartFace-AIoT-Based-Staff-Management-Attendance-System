@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { useShiftContext } from '../../context/ShiftContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
 import { getTodayVNString } from '../../utils/dateUtils';
 import { useDepartmentPositions } from '@/features/employees';
 import {
@@ -37,6 +39,8 @@ const useSafeSearchParams = () => {
 };
 
 export const ManagerAttendanceMonitor: React.FC = () => {
+  const shiftState = useShiftContext();
+  const employeeState = useEmployeeContext();
   const { employees, workShifts, showToast, role, currentUser } = useApp();
   const isManager = role === 'manager';
   const managerDept = currentUser?.department;
@@ -98,9 +102,9 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   });
 
   const { devices, isError: isDevicesError } = useDevices(role === 'admin');
-  const { isDateLocked, toggleLockAsync } = useAttendanceLocks();
+  const { isDateLocked, toggleLockAsync, isLoading: locksLoading, isError: locksError } = useAttendanceLocks();
   // useAttendanceSummaries lấy đúng khoảng ngày đang xem [startDate, endDate]
-  const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap, adjustAttendance, unlockEmployeeAttendance, refetch: refetchSummaries } = useAttendanceSummaries(startDate, endDate);
+  const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap, adjustAttendance, unlockEmployeeAttendance, refetch: refetchSummaries, isLoading: summariesLoading, isError: summariesError } = useAttendanceSummaries(startDate, endDate);
 
   const getDatesInRange = (startStr: string, endStr: string): string[] => {
     const dates: string[] = [];
@@ -115,6 +119,11 @@ export const ManagerAttendanceMonitor: React.FC = () => {
 
   const datesInRange = getDatesInRange(startDate, endDate);
   const isCurrentDateLocked = datesInRange.length > 0 && datesInRange.every(d => isDateLocked(d));
+  const lockDataReady = !locksLoading && !locksError && !shiftState.isLoading && !shiftState.isError;
+  const today = getTodayVNString();
+  const todayRequiresShift = datesInRange.includes(today) && !isCurrentDateLocked;
+  const canLock = lockDataReady && (!todayRequiresShift || workShifts.some(shift => shift.date === today && shift.shift_type !== 'OFF'));
+  const canExport = isCurrentDateLocked && !locksLoading && !locksError && !shiftState.isLoading && !shiftState.isError && !employeeState.isLoading && !employeeState.isError && !attendanceQuery.isLoading && !attendanceQuery.isError && !summariesLoading && !summariesError;
 
   // useAttendancePairs tiêu thụ giờ, cặp và cờ rà soát từ backend summary
   const employeePairs = useAttendancePairs(
@@ -182,7 +191,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   };
 
   const handleToggleLock = async () => {
-    if (role !== 'admin' || !startDate) return;
+    if (role !== 'admin' || !startDate || !canLock) return;
     const targetLockState = !isCurrentDateLocked;
     const dates = getDatesInRange(startDate, endDate);
 
@@ -230,8 +239,8 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    if (!isCurrentDateLocked) {
-      showToast('Nút chỉ bật sau khi đã chốt ca ngày đang chọn', 'warning');
+    if (!canExport) {
+      showToast('Chỉ xuất sau khi đã chốt ca và dữ liệu sẵn sàng', 'warning');
       return;
     }
     const dateLabel = startDate === endDate ? startDate : `${startDate}_den_${endDate}`;
@@ -289,6 +298,8 @@ export const ManagerAttendanceMonitor: React.FC = () => {
         isCurrentDateLocked={isCurrentDateLocked}
         onToggleLock={handleToggleLock}
         onExportCSV={handleExportCSV}
+        canLock={canLock}
+        canExport={canExport}
       />
 
       {(attendanceQuery.isError || attendanceQuery.isLoading) && (

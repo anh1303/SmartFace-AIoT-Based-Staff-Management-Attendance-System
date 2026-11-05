@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
 import { Employee } from '../../types';
 import {
   getNextEmployeeId,
@@ -14,9 +15,11 @@ import {
   ConfirmStatusEmployeeModal,
   DepartmentPositionDrawer,
   useDepartmentPositions,
+  exportEmployeesToExcel,
 } from '@/features/employees';
 
 export const ManagerEmployeeList: React.FC = () => {
+  const employeeState = useEmployeeContext();
   const {
     employees,
     addEmployee,
@@ -97,8 +100,7 @@ export const ManagerEmployeeList: React.FC = () => {
       face_enrolled: false,
       fingerprint_enrolled: false,
       hourly_rate: 50000,
-      avatar:
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+      avatar: '',
     };
   });
 
@@ -204,8 +206,7 @@ export const ManagerEmployeeList: React.FC = () => {
       face_enrolled: false,
       fingerprint_enrolled: false,
       hourly_rate: 50000,
-      avatar:
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
+      avatar: '',
     });
   };
 
@@ -225,12 +226,22 @@ export const ManagerEmployeeList: React.FC = () => {
     setEditEmployee(null);
   };
 
+  const handleExportExcel = () => {
+    if (employeeState.isLoading || employeeState.isError || filteredEmployees.length === 0) return;
+    exportEmployeesToExcel({
+      employees: filteredEmployees,
+      showToast,
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Bento Header Banner */}
       <EmployeeListHeader
         onOpenDeptPositionDrawer={() => setDeptPositionDrawerOpen(true)}
         onOpenAddModal={handleOpenAddModal}
+        onExportExcel={handleExportExcel}
+        canExport={!employeeState.isLoading && !employeeState.isError && filteredEmployees.length > 0}
       />
 
       {/* Bento Filters and Search Bar */}

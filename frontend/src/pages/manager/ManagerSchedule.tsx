@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
+import { useShiftContext } from '../../context/ShiftContext';
 import { useAuth } from '../../context/AuthContext';
 import { isAnotherManager } from '../../utils/permissionUtils';
 import { WorkShift } from '../../types';
@@ -11,11 +13,15 @@ import {
   ShiftEditModal,
   EditingShiftTarget,
   BulkShiftModal,
+  exportScheduleToExcel,
+  employeesWithScheduledShifts,
 } from '@/features/schedules';
 import { getMonday, formatDateToYYYYMMDD, getISOWeekNumber, getTodayVNString } from '@/utils/dateUtils';
 import { useDepartmentPositions } from '@/features/employees';
 
 export const ManagerSchedule: React.FC = () => {
+  const employeeState = useEmployeeContext();
+  const shiftState = useShiftContext();
   const { employees, workShifts, assignOrUpdateShift, showToast } = useApp();
   const { currentUser, role } = useAuth();
   const isManager = role === 'manager';
@@ -381,6 +387,21 @@ export const ManagerSchedule: React.FC = () => {
     }
   };
 
+  const handleExportExcel = () => {
+    if (!canExport) return;
+    exportScheduleToExcel({
+      filteredEmployees,
+      daysOfWeek,
+      workShifts,
+      weekNumber,
+      startLabel,
+      endLabel,
+      showToast,
+    });
+  };
+
+  const canExport = !employeeState.isLoading && !employeeState.isError && !shiftState.isLoading && !shiftState.isError && employeesWithScheduledShifts(filteredEmployees, daysOfWeek, workShifts).length > 0;
+
   return (
     <div className="space-y-6">
       {/* 1. Header with week navigator, bulk & copy actions */}
@@ -396,6 +417,8 @@ export const ManagerSchedule: React.FC = () => {
         onDateSelect={handleDateSelect}
         onCopyPreviousWeek={handleCopyPreviousWeek}
         onOpenBulkModal={() => {setShiftError('');setBulkModalOpen(true);}}
+        onExportExcel={handleExportExcel}
+        canExport={canExport}
       />
 
       {/* 2. Filters */}

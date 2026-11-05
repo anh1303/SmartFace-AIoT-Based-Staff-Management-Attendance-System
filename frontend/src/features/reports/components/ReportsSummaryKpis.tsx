@@ -81,7 +81,7 @@ export const ReportsSummaryKpis: React.FC<ReportsSummaryKpisProps> = ({ data }) 
     {
       id: 'ontime-rate',
       title: 'Tỉ lệ đúng giờ',
-      value: `${data.onTimeRate.toFixed(1)}%`,
+      value: data.totalPunches > 0 ? `${data.onTimeRate.toFixed(1)}%` : '—',
       unit: '',
       icon: CheckCircle2,
       iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',

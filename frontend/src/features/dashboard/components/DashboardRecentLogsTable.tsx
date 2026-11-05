@@ -83,7 +83,7 @@ export const DashboardRecentLogsTable: React.FC<DashboardRecentLogsTableProps> =
                     </td>
 
                     <td className="py-2.5 px-3 text-center font-mono text-slate-500 dark:text-slate-400 text-[11px]">
-                      {att.device_id || 'Gate-01'}
+                      {att.device_id || '—'}
                     </td>
 
                     <td className="py-2.5 px-3 text-center">

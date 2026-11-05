@@ -67,7 +67,7 @@ export const EmployeeListFilters: React.FC<EmployeeListFiltersProps> = ({
           onChange={onStatusFilterChange}
           allLabel="Tất cả trạng thái"
           options={[
-            { value: 'ACTIVE', label: 'Đang hoạt động' },
+            { value: 'ACTIVE', label: 'Hoạt động' },
             { value: 'INACTIVE', label: 'Tạm ngưng' },
           ]}
         />

@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Lock,
   Download,
+  Clock,
 } from 'lucide-react';
 import { getTodayVNString } from '../../../utils/dateUtils';
 import { useAuth } from '../../../context/AuthContext';
@@ -14,6 +15,8 @@ interface AttendanceHeaderProps {
   isCurrentDateLocked: boolean;
   onToggleLock: () => void;
   onExportCSV: () => void;
+  canLock?: boolean;
+  canExport?: boolean;
 }
 
 export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
@@ -22,16 +25,20 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
   isCurrentDateLocked,
   onToggleLock,
   onExportCSV,
+  canLock = true,
+  canExport = isCurrentDateLocked,
 }) => {
   const { role } = useAuth();
   const isAdmin = role === 'admin';
   const isSameDay = startDate === endDate;
 
-  const canClickLock = isAdmin && Boolean(startDate);
+  const canClickLock = isAdmin && Boolean(startDate) && canLock;
 
   return (
     <PageHeaderBanner
-      title={isAdmin ? 'Giám sát chấm công toàn doanh nghiệp' : 'Giám sát chấm công phòng ban'}
+      className="[&>div:first-child]:items-center"
+      icon={<div className="w-10 h-10 rounded-xl bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-inner"><Clock className="w-5 h-5" /></div>}
+      title="Theo dõi chấm công"
       actions={
         <>
           {isAdmin && <button
@@ -43,16 +50,16 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
             }}
             disabled={!canClickLock}
             title={
-              !startDate
-                ? 'Vui lòng chọn ngày để chốt ca'
+              !canClickLock
+                ? 'Cần có ca làm việc hôm nay và dữ liệu sẵn sàng để chốt ca'
                 : isCurrentDateLocked && !isAdmin
                 ? 'Chỉ Quản trị viên (Admin) mới có quyền mở khóa ca làm việc đã chốt'
                 : isCurrentDateLocked
                 ? 'Bấm để mở khóa chỉnh sửa dữ liệu công'
                 : 'Bấm để chốt ca làm việc'
             }
-            className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
-              !startDate
+            className={`h-10 px-4 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+              !canClickLock
                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700/50 cursor-not-allowed'
                 : isCurrentDateLocked
                 ? isAdmin
@@ -83,16 +90,16 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
           <button
             type="button"
             onClick={onExportCSV}
-            disabled={!isCurrentDateLocked}
-            title={!isCurrentDateLocked ? 'Nút chỉ bật sau khi đã chốt ca' : 'Xuất dữ liệu chấm công sang file CSV/Excel'}
-            className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
-              isCurrentDateLocked
+            disabled={!canExport}
+            title={!canExport ? 'Chỉ xuất sau khi đã chốt ca và dữ liệu sẵn sàng' : 'Xuất dữ liệu chấm công sang file Excel (.xlsx)'}
+            className={`h-10 px-4 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all ${
+              canExport
                 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs hover:from-blue-500 hover:to-indigo-500 cursor-pointer'
                 : 'bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700/50 cursor-not-allowed'
             }`}
           >
             <Download className="w-4 h-4" />
-            <span>Xuất Excel/CSV</span>
+            <span>Xuất Excel</span>
           </button>
         </>
       }

@@ -122,7 +122,7 @@ export const ReportsDepartmentTable: React.FC<ReportsDepartmentTableProps> = ({
                 {/* Tỉ lệ đúng giờ */}
                 <TableCell align="center">
                   <span className={`font-mono font-bold px-2 py-0.5 rounded-md text-[11px] ${getRateBadgeClass(dept.onTimeRate)}`}>
-                    {dept.onTimeRate.toFixed(1)}%
+                    {dept.totalPunches > 0 ? `${dept.onTimeRate.toFixed(1)}%` : '—'}
                   </span>
                 </TableCell>
 
@@ -157,7 +157,7 @@ export const ReportsDepartmentTable: React.FC<ReportsDepartmentTableProps> = ({
               </td>
               <td className="py-3 px-4 text-center border-r border-slate-200 dark:border-[#202752] bg-slate-50 dark:bg-[#0c0f1f]">
                 <span className={`font-mono font-bold px-2 py-0.5 rounded-md text-[11px] ${getRateBadgeClass(overallOnTimeRate)}`}>
-                  {overallOnTimeRate}%
+                  {totalPunches > 0 ? `${overallOnTimeRate}%` : '—'}
                 </span>
               </td>
               <td className="py-3 px-4 text-right font-mono text-emerald-600 dark:text-emerald-400 bg-slate-50 dark:bg-[#0c0f1f]">

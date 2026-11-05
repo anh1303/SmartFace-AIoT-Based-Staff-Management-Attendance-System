@@ -10,6 +10,7 @@ import {
   ExportReportType,
   useMonthlyReport,
 } from '@/features/reports';
+import { exportToExcel } from '@/utils/excelExport';
 
 export const ManagerReports: React.FC = () => {
   const { employees, selectedPeriod, setSelectedPeriod, showToast } = useApp();
@@ -19,16 +20,14 @@ export const ManagerReports: React.FC = () => {
   const [exportType, setExportType] = useState<ExportReportType>('attendance');
 
   // Backend Reports Query Hook - Single Source of Truth
-  const { reportData } = useMonthlyReport(selectedPeriod);
+  const { reportData, isLoading, isError, error, refetch } = useMonthlyReport(selectedPeriod);
+
+  if (!reportData && isLoading) return <p role="status">Đang tải báo cáo…</p>;
+  if (!reportData && isError) return <div className="sf-feedback error" role="alert">{error?.message || 'Không thể tải báo cáo.'} <button className="underline" onClick={() => refetch()}>Thử lại</button></div>;
+  if (!reportData) return <p role="status">Chưa có dữ liệu báo cáo.</p>;
 
   // Available Periods for Month Dropdown
-  const availablePeriods = reportData?.availablePeriods || [
-    selectedPeriod,
-    '2026-11',
-    '2026-10',
-    '2026-09',
-    '2026-08',
-  ];
+  const availablePeriods = Array.from(new Set([selectedPeriod, ...reportData.availablePeriods]));
 
   // Data structures for presentation components
   const summaryKpisData = reportData?.summary || {
@@ -40,7 +39,7 @@ export const ManagerReports: React.FC = () => {
     unexcusedAbsenceCount: 0,
     onTimePunches: 0,
     totalPunches: 0,
-    onTimeRate: 100,
+    onTimeRate: 0,
     totalSalary: 0,
     selectedPeriod,
   };
@@ -65,13 +64,15 @@ export const ManagerReports: React.FC = () => {
   const departmentsData = reportData?.departments || [];
   const leaderboardData = reportData?.leaderboard || [];
 
-  // CSV Export logic
+  // Excel (.xlsx) Export logic
   const handleExecuteExport = () => {
     let headers: string[] = [];
     let rows: (string | number)[][] = [];
     let fileName = '';
+    let sheetName = 'Báo cáo';
 
     if (exportType === 'attendance') {
+      sheetName = 'Chuyên cần nhân viên';
       headers = [
         'Mã NV',
         'Họ và Tên',
@@ -86,18 +87,19 @@ export const ManagerReports: React.FC = () => {
 
       rows = leaderboardData.map((item) => [
         item.employeeId,
-        `"${item.fullName}"`,
-        `"${item.department}"`,
+        item.fullName,
+        item.department,
         item.punchCount,
-        item.overtimeHours.toFixed(1),
-        item.lateEarlyHours.toFixed(1),
+        Number(item.overtimeHours.toFixed(1)),
+        Number(item.lateEarlyHours.toFixed(1)),
         item.absenceCount,
-        `${item.onTimeRate}%`,
-        item.salary,
+        item.punchCount > 0 ? `${item.onTimeRate}%` : '',
+        item.salary ?? '',
       ]);
 
-      fileName = `Bao_cao_chuyen_can_nhan_vien_${selectedPeriod}.csv`;
+      fileName = `Bao_cao_chuyen_can_nhan_vien_${selectedPeriod}.xlsx`;
     } else if (exportType === 'payroll') {
+      sheetName = 'Tổng hợp phòng ban';
       headers = [
         'Phòng Ban',
         'Số Nhân Viên',
@@ -110,18 +112,19 @@ export const ManagerReports: React.FC = () => {
       ];
 
       rows = departmentsData.map((d) => [
-        `"${d.departmentName}"`,
+        d.departmentName,
         d.employeeCount,
         d.totalPunches,
-        d.totalOvertimeHours.toFixed(1),
-        d.totalLateEarlyHours.toFixed(1),
+        Number(d.totalOvertimeHours.toFixed(1)),
+        Number(d.totalLateEarlyHours.toFixed(1)),
         d.unexcusedAbsenceCount,
-        `${d.onTimeRate}%`,
+        d.totalPunches > 0 ? `${d.onTimeRate}%` : '',
         d.totalSalary,
       ]);
 
-      fileName = `Bao_cao_tong_hop_phong_ban_${selectedPeriod}.csv`;
+      fileName = `Bao_cao_tong_hop_phong_ban_${selectedPeriod}.xlsx`;
     } else {
+      sheetName = 'Danh sách nhân sự';
       headers = [
         'Mã NV',
         'Họ và Tên',
@@ -134,30 +137,26 @@ export const ManagerReports: React.FC = () => {
 
       rows = employees.map((emp) => [
         emp.employee_id,
-        `"${emp.full_name}"`,
-        `"${emp.department}"`,
-        `"${emp.position}"`,
+        emp.full_name,
+        emp.department,
+        emp.position,
         emp.email,
-        emp.status === 'ACTIVE' ? 'Đang Làm Việc' : 'Tạm Dừng',
+        emp.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm ngưng',
         emp.hourly_rate || 0,
       ]);
 
-      fileName = `Danh_sach_nhan_su_${selectedPeriod}.csv`;
+      fileName = `Danh_sach_nhan_su_${selectedPeriod}.xlsx`;
     }
 
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    exportToExcel({
+      sheetName,
+      headers,
+      rows,
+      fileName,
+    });
 
     setIsExportModalOpen(false);
-    showToast(`Đã xuất báo cáo CSV: ${fileName}`, 'success');
+    showToast(`Đã xuất báo cáo Excel: ${fileName}`, 'success');
   };
 
   return (

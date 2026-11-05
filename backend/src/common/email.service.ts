@@ -27,7 +27,22 @@ export async function sendPasswordChangedEmail(to: string): Promise<'sent' | 'un
   if (!smtpUser || !smtpPass) return 'unavailable';
   try {
     const transporter = nodemailer.createTransport({ host: env.SMTP_HOST, port: env.SMTP_PORT, secure: env.SMTP_SECURE, auth: { user: smtpUser, pass: smtpPass }, connectionTimeout: 10000, greetingTimeout: 5000, socketTimeout: 15000 });
-    await transporter.sendMail({ from: env.SMTP_FROM, to, subject: '[SmartFace] Mật khẩu đã được thay đổi', text: 'Mật khẩu tài khoản SmartFace của bạn vừa được thay đổi. Nếu bạn không thực hiện thao tác này, hãy liên hệ quản trị viên ngay.' });
+    await transporter.sendMail({
+      from: env.SMTP_FROM,
+      to,
+      subject: '[SmartFace AIoT] Mật khẩu tài khoản đã được thay đổi',
+      text: `Xin chào,
+
+Mật khẩu tài khoản truy cập hệ thống SmartFace AIoT của bạn đã được thay đổi thành công.
+
+Nếu bạn không thực hiện thay đổi này, vui lòng liên hệ ngay với Quản trị viên hệ thống để được hỗ trợ bảo vệ tài khoản.
+
+Vui lòng không chia sẻ mật khẩu với bất kỳ ai.
+
+Trân trọng,
+Bộ phận Quản trị Hệ thống
+SmartFace AIoT Attendance System`,
+    });
     return 'sent';
   } catch (error) {
     emailLogger.error('Không thể gửi thông báo đổi mật khẩu:', error);

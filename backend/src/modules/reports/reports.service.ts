@@ -1,6 +1,6 @@
 import { prisma } from '../../config/database.js';
 import { getEmployeeScope, type EmployeeActor } from '../employees/public.js';
-import { formatVNDateISO, vnDay } from '../../common/utils.js';
+import { vnDay } from '../../common/utils.js';
 import type {
   MonthlyReportResponseDto,
   DepartmentSummaryDto,
@@ -203,9 +203,12 @@ export async function getMonthlyReport(
   for (let d = 1; d <= daysInMonth; d++) {
     const dayStr = String(d).padStart(2, '0');
     const dateKey = `${selectedPeriod}-${dayStr}`;
-    const dayLogs = attendanceLogs.filter((a) => formatVNDateISO(a.event_time) === dateKey);
-    const total = dayLogs.length;
-    const onTime = dayLogs.filter((a) => a.status === 'VALID').length;
+    const daySummaries = dailySummaries.filter((s) =>
+      s.work_date.toISOString().slice(0, 10) === dateKey &&
+      ['PRESENT', 'EARLY_LEAVE', 'LATE', 'LATE_AND_EARLY'].includes(s.attendance_status)
+    );
+    const total = daySummaries.length;
+    const onTime = daySummaries.filter((s) => s.attendance_status === 'PRESENT' || s.attendance_status === 'EARLY_LEAVE').length;
     const rate = total > 0 ? Number(((onTime / total) * 100).toFixed(1)) : undefined;
 
     dailyPunctuality.push({

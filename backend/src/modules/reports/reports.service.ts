@@ -153,16 +153,12 @@ export async function getMonthlyReport(
   const periodSet = new Set<string>([
     selectedPeriod,
     ...distinctPeriods.map((p) => p.payroll_period).filter(Boolean),
-    '2026-11',
-    '2026-10',
-    '2026-09',
-    '2026-08',
   ]);
   const availablePeriods = Array.from(periodSet).sort().reverse();
 
   // 1. BIOMETRICS STATS
   const getNormalizedScore = (score: number | null | undefined): number => {
-    if (score === null || score === undefined) return 0.96;
+    if (score === null || score === undefined) return NaN;
     if (score > 1) return score / 100;
     return score;
   };
@@ -231,7 +227,7 @@ export async function getMonthlyReport(
     const totalPunches = deptAttendance.length;
     const onTimePunches = deptAttendance.filter((a) => a.status === 'VALID').length;
     const onTimeRate =
-      totalPunches > 0 ? Number(((onTimePunches / totalPunches) * 100).toFixed(1)) : 100;
+      totalPunches > 0 ? Number(((onTimePunches / totalPunches) * 100).toFixed(1)) : 0;
 
     const deptSummaries = dailySummaries.filter((s) => deptEmpIds.has(s.employee_id));
     const totalOvertimeHours = deptSummaries.reduce(
@@ -249,12 +245,6 @@ export async function getMonthlyReport(
     // Payroll per department
     const deptPayroll = payrollRecords.filter((p) => deptEmpIds.has(p.employeeId));
     const deptPayrollSum = deptPayroll.reduce((acc, p) => acc + Number(p.net_salary || 0), 0);
-    const deptEstimated = deptEmployees.reduce((acc, e) => {
-      const empSums = dailySummaries.filter((s) => s.employee_id === e.id);
-      const hours =
-        empSums.reduce((h, s) => h + Number(s.total_working_hours || 0), 0) || 160;
-      return acc + hours * Number(e.hourly_rate || 50000);
-    }, 0);
 
     return {
       departmentName: deptName,
@@ -265,7 +255,7 @@ export async function getMonthlyReport(
       totalLateEarlyHours,
       unexcusedAbsenceCount,
       onTimeRate,
-      totalSalary: deptPayrollSum > 0 ? deptPayrollSum : deptEstimated,
+      totalSalary: deptPayrollSum,
     };
   });
 
@@ -275,7 +265,7 @@ export async function getMonthlyReport(
     const punchCount = empLogs.length;
     const onTimeCount = empLogs.filter((a) => a.status === 'VALID').length;
     const onTimeRate =
-      punchCount > 0 ? Number(((onTimeCount / punchCount) * 100).toFixed(1)) : 100;
+      punchCount > 0 ? Number(((onTimeCount / punchCount) * 100).toFixed(1)) : 0;
 
     const empSummaries = dailySummaries.filter((s) => s.employee_id === emp.id);
     const overtimeHours = empSummaries.reduce((acc, s) => acc + Number(s.overtime || 0), 0);
@@ -283,11 +273,7 @@ export async function getMonthlyReport(
     const absenceCount = empSummaries.filter((s) => s.attendance_status === 'ABSENT').length;
 
     const empPayroll = payrollRecords.find((p) => p.employeeId === emp.id);
-    const hours =
-      empSummaries.reduce((h, s) => h + Number(s.total_working_hours || 0), 0) || 160;
-    const salary = empPayroll?.net_salary
-      ? Number(empPayroll.net_salary)
-      : hours * Number(emp.hourly_rate || 50000);
+    const salary = empPayroll ? Number(empPayroll.net_salary) : null;
 
     return {
       rank: 1,
@@ -305,6 +291,7 @@ export async function getMonthlyReport(
   });
 
   rawLeaderboard.sort((a, b) => {
+    if (!a.punchCount || !b.punchCount) return Number(b.punchCount > 0) - Number(a.punchCount > 0);
     if (b.onTimeRate !== a.onTimeRate) return b.onTimeRate - a.onTimeRate;
     if (b.punchCount !== a.punchCount) return b.punchCount - a.punchCount;
     return a.absenceCount - b.absenceCount;
@@ -319,7 +306,7 @@ export async function getMonthlyReport(
   const totalPunches = attendanceLogs.length;
   const onTimePunches = attendanceLogs.filter((a) => a.status === 'VALID').length;
   const onTimeRate =
-    totalPunches > 0 ? Number(((onTimePunches / totalPunches) * 100).toFixed(1)) : 100;
+    totalPunches > 0 ? Number(((onTimePunches / totalPunches) * 100).toFixed(1)) : 0;
 
   const totalOvertimeHours = dailySummaries.reduce(
     (acc, s) => acc + Number(s.overtime || 0),
@@ -331,32 +318,11 @@ export async function getMonthlyReport(
   );
 
   // Unexcused absences across month
-  const today = vnDay(new Date());
-  const shiftKeysWithPunches = new Set(
-    attendanceLogs.map((a) => `${a.employee_id}_${formatVNDateISO(a.event_time)}`)
-  );
-  const pastShiftsWithoutPunch = monthShifts.filter((s) => {
-    const shiftDateStr = formatVNDateISO(s.work_date);
-    return shiftDateStr <= today && !shiftKeysWithPunches.has(`${s.employee_id}_${shiftDateStr}`);
-  }).length;
-  const unexcusedAbsenceCount = Math.max(
-    dailySummaries.filter((s) => s.attendance_status === 'ABSENT').length,
-    pastShiftsWithoutPunch
-  );
-
-  let totalSalary = payrollRecords.reduce((acc, p) => acc + Number(p.net_salary || 0), 0);
-  if (totalSalary <= 0) {
-    totalSalary = employees.reduce((acc, emp) => {
-      const empSums = dailySummaries.filter((s) => s.employee_id === emp.id);
-      const hours =
-        empSums.reduce((h, s) => h + Number(s.total_working_hours || 0), 0) || 160;
-      const rate = Number(emp.hourly_rate || 50000);
-      return acc + hours * rate;
-    }, 0);
-  }
+  const unexcusedAbsenceCount = dailySummaries.filter((s) => s.attendance_status === 'ABSENT').length;
+  const totalSalary = payrollRecords.reduce((acc, p) => acc + Number(p.net_salary ?? 0), 0);
 
   const summary = {
-    departmentCount: departmentList.length || 1,
+    departmentCount: departmentList.length,
     employeeCount: employees.length,
     totalShiftsCount: monthShifts.length,
     totalOvertimeHours,

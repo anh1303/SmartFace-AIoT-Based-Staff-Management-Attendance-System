@@ -31,6 +31,31 @@ describe('Attendance lock concurrency and recalculation safety', () => {
     db.attendanceAggregationState.findUnique.mockResolvedValue({ period: '2026-11', failed: false })
   })
 
+  it('rejects locking today without a working shift before aggregating', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-01T08:00:00Z'))
+    try {
+      db.employee_shifts.findMany.mockResolvedValueOnce([{ employee_id: 'emp-1', shift_type: 'OFF' }])
+      await expect(toggleLock('2026-11-01', true, 'admin-1', 'ADMIN')).rejects.toThrow(/ca làm việc/)
+      expect(mockAgg).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('allows a scheduled shift without requiring attendance events', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-01T08:00:00Z'))
+    try {
+      db.employee_shifts.findMany.mockResolvedValueOnce([{ employee_id: 'emp-1', shift_type: 'MORNING' }])
+      mockAgg.mockRejectedValueOnce(new Error('aggregation reached'))
+      await expect(toggleLock('2026-11-01', true, 'admin-1', 'ADMIN')).rejects.toThrow('aggregation reached')
+      expect(mockAgg).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('recalculates an adjustment inside the locked transaction', async () => {
     mockAgg.mockRejectedValueOnce(new Error('stop after aggregation'))
     await expect(adjustAttendance({ employeeId: 'emp-1', date: '2026-11-01', late_early: 0, overtime: 0, reason: 'review' })).rejects.toThrow('stop after aggregation')

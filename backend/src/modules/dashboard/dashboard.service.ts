@@ -1,10 +1,11 @@
 import { prisma } from '../../config/database.js';
 import { getEmployeeScope, type EmployeeActor } from '../employees/public.js';
 import { determinePunctuality } from '../attendance/public.js';
-import { formatVNDateISO, formatVNTime, vnDay } from '../../common/utils.js';
+import { formatShiftTime, formatVNDateISO, formatVNTime, vnDay } from '../../common/utils.js';
 import type {
   TodayDashboardResponseDto,
   DashboardShiftGroupDto,
+  ShiftLiveStatusCode,
   DashboardDepartmentProgressDto,
   DashboardEmployeeShiftItemDto,
   DashboardRecentLogDto,
@@ -97,8 +98,7 @@ export async function getTodayDashboard(
 
   // Scheduled employees
   const scheduledEmpIds = new Set(todayShifts.map((s) => s.employee_id));
-  const workingEmployeesCount =
-    scheduledEmpIds.size > 0 ? scheduledEmpIds.size : employees.length;
+  const workingEmployeesCount = scheduledEmpIds.size;
   const totalEmployees = employees.length;
 
   // Checkins & Checkouts
@@ -133,7 +133,8 @@ export async function getTodayDashboard(
   const checkedInEmpIds = new Set(todayCheckIns.map((a) => a.employee_id));
 
   // Punctuality statistics
-  const lateCount = todayCheckIns.filter((log) => determinePunctuality(
+  const scheduledCheckIns = todayCheckIns.filter((log) => scheduledEmpIds.has(log.employee_id));
+  const lateCount = scheduledCheckIns.filter((log) => determinePunctuality(
     'CHECK_IN', log.event_time,
     todayShifts.filter((shift) => shift.employee_id === log.employee_id).map((shift) => ({
       ...shift,
@@ -141,8 +142,8 @@ export async function getTodayDashboard(
       end_time: shift.end_time ?? shift.work_shifts?.end_time,
     }))
   ) === 'LATE').length;
-  const onTimeCount = todayCheckIns.length - lateCount;
-  const notCheckedInCount = Math.max(0, workingEmployeesCount - checkedInEmpIds.size);
+  const onTimeCount = scheduledCheckIns.length - lateCount;
+  const notCheckedInCount = workingEmployeesCount - scheduledCheckIns.length;
   const totalPunctuality = onTimeCount + lateCount + notCheckedInCount;
 
   const onTimePct =
@@ -156,73 +157,89 @@ export async function getTodayDashboard(
     totalPunctuality === 0
       ? [{ name: 'Chưa có dữ liệu', value: 1, color: '#334155' }]
       : [
-          { name: 'Đúng giờ', value: onTimeCount, color: '#10b981' },
-          { name: 'Đi muộn / về sớm', value: lateCount, color: '#f43f5e' },
-          { name: 'Chưa check-in', value: notCheckedInCount, color: '#8b5cf6' },
-        ];
+        { name: 'Đúng giờ', value: onTimeCount, color: '#10b981' },
+        { name: 'Đi muộn / về sớm', value: lateCount, color: '#f43f5e' },
+        { name: 'Chưa check-in', value: notCheckedInCount, color: '#8b5cf6' },
+      ];
 
-  // Helper for live shift status
-  const getShiftLiveStatus = (startTime: string, endTime: string) => {
-    if (currentHHMM >= startTime && currentHHMM <= endTime) {
+  // Helper for live shift status: Sắp diễn ra | Đang diễn ra | Đã kết thúc
+  const getShiftLiveStatus = (
+    startTime: string,
+    endTime: string
+  ): { code: ShiftLiveStatusCode; label: string; style: string } => {
+    const isOvernight = endTime < startTime;
+
+    if (isOvernight) {
+      if (currentHHMM >= startTime || currentHHMM < endTime) {
+        return {
+          code: 'ONGOING',
+          label: 'Đang diễn ra',
+          style:
+            'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        };
+      }
       return {
-        label: 'Đang diễn ra',
-        style:
-          'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-      };
-    }
-    if (currentHHMM < startTime) {
-      return {
+        code: 'UPCOMING',
         label: 'Sắp diễn ra',
         style:
           'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
       };
+    } else {
+      if (currentHHMM < startTime) {
+        return {
+          code: 'UPCOMING',
+          label: 'Sắp diễn ra',
+          style:
+            'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+        };
+      }
+      if (currentHHMM >= startTime && currentHHMM <= endTime) {
+        return {
+          code: 'ONGOING',
+          label: 'Đang diễn ra',
+          style:
+            'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        };
+      }
+      return {
+        code: 'ENDED',
+        label: 'Đã kết thúc',
+        style:
+          'bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/20',
+      };
     }
-    return {
-      label: 'Đã kết thúc',
-      style:
-        'bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/20',
-    };
   };
 
-  // Shifts grouping
+  // Shifts grouping from DB
   let shifts: DashboardShiftGroupDto[] = [];
-  if (todayShifts.length === 0) {
-    shifts = [
-      {
-        id: 'office',
-        name: 'Ca hành chính',
-        timeRange: '08:00 - 17:00',
-        startTime: '08:00',
-        endTime: '17:00',
-        count: workingEmployeesCount,
-        type: 'OFFICE_HOURS',
-        liveStatus: getShiftLiveStatus('08:00', '17:00'),
-      },
-    ];
-  } else {
+  {
     const shiftGroupMap = new Map<string, DashboardShiftGroupDto>();
     todayShifts.forEach((s) => {
-      const startTime = s.start_time
-        ? formatVNTime(s.start_time).slice(0, 5)
-        : s.work_shifts?.start_time
-          ? formatVNTime(s.work_shifts.start_time).slice(0, 5)
-          : '08:00';
-      const endTime = s.end_time
-        ? formatVNTime(s.end_time).slice(0, 5)
-        : s.work_shifts?.end_time
-          ? formatVNTime(s.work_shifts.end_time).slice(0, 5)
-          : '17:00';
-      const key = `${s.shift_type || 'OFFICE_HOURS'}_${startTime}_${endTime}`;
+      const startTime = formatShiftTime(
+        s.start_time ?? s.work_shifts?.start_time,
+        '08:00'
+      );
+      const endTime = formatShiftTime(
+        s.end_time ?? s.work_shifts?.end_time,
+        '17:00'
+      );
+      const shiftType = s.shift_type || 'OFFICE_HOURS';
+      const key = `${shiftType}_${startTime}_${endTime}`;
 
       if (!shiftGroupMap.has(key)) {
-        const name =
-          s.shift_type === 'MORNING'
-            ? 'Ca sáng'
-            : s.shift_type === 'AFTERNOON'
-              ? 'Ca chiều'
-              : s.shift_type === 'OFFICE_HOURS'
-                ? 'Ca hành chính'
-                : 'Ca làm việc';
+        let name = 'Ca làm việc';
+        if (shiftType === 'OFFICE_HOURS') {
+          name = 'Ca hành chính';
+        } else if (shiftType === 'MORNING') {
+          name = 'Ca sáng';
+        } else if (shiftType === 'AFTERNOON') {
+          name = 'Ca chiều';
+        } else if (shiftType === 'NIGHT') {
+          name = 'Ca đêm';
+        } else if (s.work_shifts?.shift_name) {
+          name = s.work_shifts.shift_name;
+        }
+
         shiftGroupMap.set(key, {
           id: key,
           name,
@@ -230,7 +247,7 @@ export async function getTodayDashboard(
           startTime,
           endTime,
           count: 0,
-          type: s.shift_type || 'OFFICE_HOURS',
+          type: shiftType,
           liveStatus: getShiftLiveStatus(startTime, endTime),
         });
       }
@@ -327,7 +344,7 @@ export async function getTodayDashboard(
       avatar: empInfo?.avatar || null,
       type: att.type,
       timestamp: att.event_time.toISOString(),
-      device_id: att.device_info || 'Gate-01',
+      device_id: att.device_info || null,
       verification_score: att.verification_score,
       status: att.status,
       statusInfo: {
@@ -340,11 +357,10 @@ export async function getTodayDashboard(
   // Alerts
   const overdueEmployees: string[] = [];
   todayShifts.forEach((s) => {
-    const startTime = s.start_time
-      ? formatVNTime(s.start_time).slice(0, 5)
-      : s.work_shifts?.start_time
-        ? formatVNTime(s.work_shifts.start_time).slice(0, 5)
-        : '08:00';
+    const startTime = formatShiftTime(
+      s.start_time ?? s.work_shifts?.start_time,
+      '08:00'
+    );
     if (startTime <= currentHHMM && !checkedInEmpIds.has(s.employee_id)) {
       const emp = empIdToInfoMap.get(s.employee_id);
       if (emp) overdueEmployees.push(emp.code);
@@ -355,11 +371,7 @@ export async function getTodayDashboard(
   const uniqueStartTimes = Array.from(
     new Set(
       todayShifts.map((s) =>
-        s.start_time
-          ? formatVNTime(s.start_time).slice(0, 5)
-          : s.work_shifts?.start_time
-            ? formatVNTime(s.work_shifts.start_time).slice(0, 5)
-            : '08:00'
+        formatShiftTime(s.start_time ?? s.work_shifts?.start_time, '08:00')
       )
     )
   ).sort();
@@ -370,11 +382,10 @@ export async function getTodayDashboard(
     const diff = shiftMinutes - nowMinutes;
     if (diff > 0 && diff <= 60) {
       const sample = todayShifts.find((s) => {
-        const sTime = s.start_time
-          ? formatVNTime(s.start_time).slice(0, 5)
-          : s.work_shifts?.start_time
-            ? formatVNTime(s.work_shifts.start_time).slice(0, 5)
-            : '08:00';
+        const sTime = formatShiftTime(
+          s.start_time ?? s.work_shifts?.start_time,
+          '08:00'
+        );
         return sTime === st;
       });
       const shiftName =
@@ -382,7 +393,9 @@ export async function getTodayDashboard(
           ? 'Ca sáng'
           : sample?.shift_type === 'AFTERNOON'
             ? 'Ca chiều'
-            : 'Ca hành chính';
+            : sample?.shift_type === 'NIGHT'
+              ? 'Ca đêm'
+              : 'Ca hành chính';
       upcomingShiftNotice = {
         name: shiftName,
         time: st,

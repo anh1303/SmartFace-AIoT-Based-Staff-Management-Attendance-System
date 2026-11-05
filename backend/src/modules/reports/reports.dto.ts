@@ -59,7 +59,7 @@ export interface EmployeeLeaderboardDto {
   lateEarlyHours: number;
   absenceCount: number;
   onTimeRate: number;
-  salary: number;
+  salary: number | null;
 }
 
 export interface MonthlyReportResponseDto {

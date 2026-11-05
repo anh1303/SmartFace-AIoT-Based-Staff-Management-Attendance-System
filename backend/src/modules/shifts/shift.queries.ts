@@ -63,6 +63,19 @@ export async function getDefaultShift(tx?: Prisma.TransactionClient) {
 }
 
 /**
+ * Public Module API: Lấy danh mục ca làm việc (work_shifts) đang hoạt động
+ */
+export async function getActiveWorkShiftsCatalog(tx?: Prisma.TransactionClient) {
+  const client = tx ?? prisma
+  return client.work_shifts.findMany({
+    where: {
+      shift_name: { notIn: ['Nghỉ ca', 'OFF', 'Nghỉ tuần', 'Ca khác'] },
+    },
+    orderBy: { start_time: 'asc' },
+  })
+}
+
+/**
  * Public Module API: Lấy ca làm việc theo danh sách ngày và nhân viên (cho Attendance batch query)
  */
 export async function getEmployeeShiftsByDates(

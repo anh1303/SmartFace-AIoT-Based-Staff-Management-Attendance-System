@@ -9,13 +9,14 @@ services:
       MODEL_PACK_NAME: ${PBL6_FACE_MODEL_PACK:-buffalo_s}
       EMBEDDING_MODEL_VERSION: ${PBL6_FACE_MODEL_PACK:-buffalo_s}
       MODEL_CTX_ID: -1
-      PAD_RUNTIME_CONFIG_PATH: ''
+      PAD_RUNTIME_CONFIG_PATH: ${FACE_LOGIN_PAD_RUNTIME_CONFIG_PATH:-}
       PAD_ADAPTIVE_ENABLED: 'false'
     ports:
     - 127.0.0.1:${PBL6_FACE_API_PORT:-5000}:5000
     volumes:
     - ${PBL6_INSIGHTFACE_CACHE:-insightface_models}:/root/.insightface
     - ./face_auth/gallery:/app/gallery:ro
+    - ./hardware/models:/app/login-models:ro
     healthcheck:
       test:
       - CMD

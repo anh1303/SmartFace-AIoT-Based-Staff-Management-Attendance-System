@@ -3,6 +3,7 @@ import type { Socket } from 'socket.io'
 import { env } from '../config/env.js'
 import type { AuthUser } from '../middlewares/auth.middleware.js'
 import { prisma } from '../config/database.js'
+import { assertFaceSession } from '../modules/auth/public.js'
 
 export async function refreshSocketScope(socket: Socket): Promise<void> {
   socket.data._refreshSeq = (socket.data._refreshSeq || 0) + 1
@@ -51,6 +52,11 @@ export async function refreshSocketScope(socket: Socket): Promise<void> {
     const profile = (user.profile && typeof user.profile === 'object') ? (user.profile as Record<string, unknown>) : {}
     const currentTv = typeof profile.token_version === 'number' ? profile.token_version : 1
     const tokenTv = typeof decoded.tv === 'number' ? decoded.tv : 1
+    await assertFaceSession(decoded.amr, user.employees?.id, user.roles.role_name)
+    if (socket.data._refreshSeq > currentSeq) return
+    if (decoded.amr?.includes('face') && user.employees?.status !== 'ACTIVE') {
+      throw new Error('Authentication failed: Face session revoked')
+    }
     if (tokenTv < currentTv) {
       throw new Error('Authentication failed: Token revoked')
     }

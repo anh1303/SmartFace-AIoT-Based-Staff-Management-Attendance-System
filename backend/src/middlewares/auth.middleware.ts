@@ -8,6 +8,7 @@ import { verifyAndLoadActiveUser } from '../modules/auth/public.js'
 // role là role_name (string) từ bảng roles: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
 export type AuthUser = {
   id: string
+  amr?: string[]
   employeeId?: string | null
   employee_id?: string | null
   role: string

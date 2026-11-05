@@ -52,5 +52,5 @@ export const successResponse = <T>(res: Response, data: T, message?: string, sta
     ...(message ? { message } : {}),
   })
 
-export const errorResponse = (res: Response, message: string, status = 400, details?: unknown) =>
-  res.status(status).json({ success: false, message, ...(details ? { details } : {}) })
+export const errorResponse = (res: Response, message: string, status = 400, details?: unknown, code?: string) =>
+  res.status(status).json({ success: false, message, ...(details ? { details } : {}), ...(code ? { code } : {}) })

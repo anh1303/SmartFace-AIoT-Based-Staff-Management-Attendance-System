@@ -21,6 +21,8 @@ from detection.detector import FaceDetector
 from enrollment.enroll import build_identity_embedding
 from recognition.embedder import FaceEmbedder
 from remote_extraction import AlignedFaceExtractor
+from face_login.http import build_router as build_face_login_router
+from types import SimpleNamespace
 
 # Reconfigure stdout/stderr to UTF-8
 if hasattr(sys.stdout, "reconfigure"):
@@ -40,6 +42,7 @@ embedder: Optional[FaceEmbedder] = None
 db: Optional[VectorDB] = None
 remote_extractor: Optional[AlignedFaceExtractor] = None
 remote_slot = BoundedSemaphore(1)
+login_pad = None
 
 
 @app.on_event("startup")
@@ -264,3 +267,16 @@ def extract_aligned_embedding(req: AlignedEmbeddingRequest):
         raise HTTPException(503, "ArcFace extraction failed") from exc
     finally:
         remote_slot.release()
+
+
+def get_face_login_models():
+    global login_pad
+    if os.getenv('FACE_LOGIN_ENABLED', 'false').lower() != 'true' or detector is None or embedder is None:
+        return None
+    if login_pad is None:
+        from antispoof.predictor import AntiSpoofPredictor
+        login_pad = AntiSpoofPredictor()
+    return SimpleNamespace(detector=detector, embedder=embedder, predictor=login_pad)
+
+
+app.include_router(build_face_login_router(get_face_login_models, require_internal_key))

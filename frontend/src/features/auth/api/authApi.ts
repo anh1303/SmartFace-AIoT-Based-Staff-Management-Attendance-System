@@ -1,4 +1,4 @@
-import { apiFetch } from '../../../api/client';
+import { apiFetch, type ApiResponse } from '../../../api/client';
 import { UserSession, Role } from '../../../types';
 
 export const DEFAULT_USERS: Record<Role, UserSession> = {
@@ -49,6 +49,11 @@ export async function loginApi(identifier: string, password?: string, rememberMe
     method: 'POST',
     body: JSON.stringify({ identifier: identifier.trim(), password, rememberMe }),
   });
+
+  return normalizeLoginResponse(res);
+}
+
+export function normalizeLoginResponse(res: ApiResponse<any>) {
 
   if (res.success && res.data) {
     const { user } = res.data;

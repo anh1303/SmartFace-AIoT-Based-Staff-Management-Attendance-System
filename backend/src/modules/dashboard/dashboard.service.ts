@@ -1,5 +1,6 @@
 import { prisma } from '../../config/database.js';
 import { getEmployeeScope, type EmployeeActor } from '../employees/public.js';
+import { determinePunctuality } from '../attendance/public.js';
 import { formatVNDateISO, formatVNTime, vnDay } from '../../common/utils.js';
 import type {
   TodayDashboardResponseDto,
@@ -101,7 +102,13 @@ export async function getTodayDashboard(
   const totalEmployees = employees.length;
 
   // Checkins & Checkouts
-  const todayCheckIns = todayLogs.filter((a) => a.type === 'CHECK_IN');
+  const firstArrivals = new Map<string, (typeof todayLogs)[0]>();
+  for (const log of [...todayLogs].sort((a, b) => +a.event_time - +b.event_time)) {
+    if (log.type === 'CHECK_IN' && log.status === 'VALID' && !firstArrivals.has(log.employee_id)) {
+      firstArrivals.set(log.employee_id, log);
+    }
+  }
+  const todayCheckIns = [...firstArrivals.values()];
   const todayCheckOuts = todayLogs.filter(
     (a) => a.type === 'CHECK_OUT' || a.type === 'TAN_CA'
   );
@@ -126,12 +133,15 @@ export async function getTodayDashboard(
   const checkedInEmpIds = new Set(todayCheckIns.map((a) => a.employee_id));
 
   // Punctuality statistics
-  const onTimeCount = todayCheckIns.filter(
-    (a) => a.status === 'VALID' || (!a.status && a.type === 'CHECK_IN')
-  ).length;
-  const lateCount = todayCheckIns.filter(
-    (a) => a.status === 'FLAGGED' || a.status === 'LATE' || a.status === 'EARLY_LEAVE'
-  ).length;
+  const lateCount = todayCheckIns.filter((log) => determinePunctuality(
+    'CHECK_IN', log.event_time,
+    todayShifts.filter((shift) => shift.employee_id === log.employee_id).map((shift) => ({
+      ...shift,
+      start_time: shift.start_time ?? shift.work_shifts?.start_time,
+      end_time: shift.end_time ?? shift.work_shifts?.end_time,
+    }))
+  ) === 'LATE').length;
+  const onTimeCount = todayCheckIns.length - lateCount;
   const notCheckedInCount = Math.max(0, workingEmployeesCount - checkedInEmpIds.size);
   const totalPunctuality = onTimeCount + lateCount + notCheckedInCount;
 

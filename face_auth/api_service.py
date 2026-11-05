@@ -112,6 +112,7 @@ def enroll_faces(req: EnrollRequest):
 
     embeddings = []
     failed_count = 0
+    failures = {"decode": 0, "no_face": 0, "multiple_faces": 0, "alignment": 0, "embedding": 0}
 
     for b64_str in req.images_base64:
         try:
@@ -123,24 +124,29 @@ def enroll_faces(req: EnrollRequest):
             img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             if img is None:
                 failed_count += 1
+                failures["decode"] += 1
                 continue
         except Exception:
+            failures["decode"] += 1
             failed_count += 1
             continue
 
         detections = detector.detect(img)
         if len(detections) == 0:
+            failures["no_face"] += 1
             failed_count += 1
             continue
 
         # Nếu có nhiều hơn 1 khuôn mặt, bỏ qua ảnh này
         if len(detections) > 1:
+            failures["multiple_faces"] += 1
             failed_count += 1
             continue
 
         best = max(detections, key=lambda d: d.get("score", 0.0))
         aligned = get_input_face(img, best["bbox"], best.get("landmarks"), embedder.input_size)
         if aligned is None:
+            failures["alignment"] += 1
             failed_count += 1
             continue
 
@@ -148,10 +154,13 @@ def enroll_faces(req: EnrollRequest):
         if emb is not None:
             embeddings.append(emb)
         else:
+            failures["embedding"] += 1
             failed_count += 1
 
     if len(embeddings) == 0:
-        raise HTTPException(status_code=400, detail="Không phát hiện được khuôn mặt hợp lệ nào trong các ảnh đã gửi")
+        labels = {"decode": "ảnh không đọc được (hãy dùng JPEG/PNG)", "no_face": "không thấy mặt rõ hoặc mặt quá nhỏ", "multiple_faces": "ảnh có nhiều khuôn mặt", "alignment": "không căn chỉnh được mặt", "embedding": "không trích xuất được đặc trưng"}
+        reasons = "; ".join(f"{count} {labels[key]}" for key, count in failures.items() if count)
+        raise HTTPException(status_code=400, detail=f"Không phát hiện được khuôn mặt hợp lệ: {reasons}. Hãy chụp lại một người, đủ sáng, mặt gần camera.")
 
     centroid, warnings, valid_embeddings = build_identity_embedding(embeddings, outlier_threshold=0.35)
 

@@ -68,5 +68,6 @@ export function useAttendanceLocks() {
     toggleLockAsync: (date: string, lock: boolean) => toggleLockMutation.mutateAsync({ date, lock }),
     isLoading: query.isLoading,
     isError: query.isError,
+    refetch: query.refetch,
   };
 }

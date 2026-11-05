@@ -311,21 +311,22 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                       <button
                         type="button"
                         onClick={() => onUnlockEmployee?.(item)}
-                        className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 text-xs font-semibold transition-all shadow-xs cursor-pointer group whitespace-nowrap"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#181c38] dark:hover:bg-[#20254b] border border-slate-200 dark:border-[#272d5a] text-xs font-semibold text-amber-700 dark:text-amber-400 transition-all cursor-pointer group whitespace-nowrap"
+                        aria-label="Mở khóa ngày công"
                         title="Mở khóa ngày công của nhân viên này để điều chỉnh hoặc xét duyệt lại"
                       >
-                        <Unlock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 group-hover:text-amber-800 dark:group-hover:text-amber-200 transition-colors" />
+                        <Unlock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                         <span>Mở khóa</span>
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={() => onOpenEditModal(item)}
-                        className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#181d38] dark:hover:bg-[#232a52] text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-[#2b3563] text-xs font-medium transition-all shadow-xs cursor-pointer group whitespace-nowrap"
+                        className="inline-flex items-center justify-center p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#181c38] dark:hover:bg-[#20254b] border border-slate-200 dark:border-[#272d5a] transition-all cursor-pointer group"
+                        aria-label="Xét duyệt ngày công"
                         title={item.isOffDay ? 'Điều chỉnh hoặc phê duyệt OT ngày nghỉ (OFF)' : 'Chỉnh sửa giờ trễ/sớm và tăng ca'}
                       >
-                        <Edit className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
-                        <span>Xét duyệt</span>
+                        <Edit className="w-4 h-4 text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors" />
                       </button>
                     )}
                   </td>

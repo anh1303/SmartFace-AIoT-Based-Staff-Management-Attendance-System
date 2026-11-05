@@ -29,7 +29,7 @@ export const EmployeeListHeader: React.FC<EmployeeListHeaderProps> = ({
           <Users className="w-5 h-5" />
         </div>
       }
-      title="Nhân viên"
+      title="Quản lý nhân viên"
       actions={
         <div className="flex items-center gap-2.5 flex-wrap justify-end">
           {/* 1. Nút Quản lý phòng ban và chức vụ */}

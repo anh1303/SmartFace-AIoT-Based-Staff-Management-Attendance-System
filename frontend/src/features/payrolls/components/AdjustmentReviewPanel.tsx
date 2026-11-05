@@ -1,67 +1,67 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useSearchParams, useLocation } from 'react-router-dom';
-import { Check, X, Clock, FileSearch, Lock, RotateCcw, ArrowUpRight, Info } from 'lucide-react';
+﻿import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
+import { Clock } from 'lucide-react';
 import { apiFetch } from '../../../api/client';
-import { useToast } from '../../../context/ToastContext';
-import { Modal } from '../../../components/common/Modal';
+import { FilterBar, FilterSelect, SearchInput, TableContainer, TableHead, TableHeadRow, TableHeadCell, TableBody, TableRow, TableCell, TableEmpty } from '../../../components/common';
+import type { WorkShift } from '../../../types';
+
 export interface AttendanceAdjustment {
-    id: string;
-    employee_id: string;
-    employee_name: string;
-    date: string;
-    kind: 'OVERTIME' | 'LATE_EARLY' | 'ABSENCE';
-    hours: number;
-    amount: number | null;
-    amount_unavailable?: boolean;
-    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'VOID';
-    note: string | null;
-    reviewed_by: string | null;
-    reviewed_at: string | null;
-    updated_at: string;
-    can_review: boolean;
-    locked?: boolean;
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  date: string;
+  kind: 'OVERTIME' | 'LATE_EARLY' | 'ABSENCE';
+  hours: number;
+  amount: number | null;
+  amount_unavailable?: boolean;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'VOID';
+  note: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  updated_at: string;
+  can_review: boolean;
+  locked?: boolean;
 }
 export const adjustmentLabels = { OVERTIME: 'Tăng ca', LATE_EARLY: 'Phạt trễ / sớm', ABSENCE: 'Phạt vắng ca' };
-const statuses = { PENDING: 'Chờ duyệt', APPROVED: 'Đã duyệt', REJECTED: 'Không duyệt', VOID: 'Không còn phát sinh' };
+const statuses = { PENDING: 'Chờ duyệt', APPROVED: 'Đã duyệt' } as const;
 const money = (n: number | null) => n == null ? 'Chưa có đơn giá đối chiếu' : `${Number(n).toLocaleString('vi-VN')} ₫`;
 export function filterAdjustments(items: AttendanceAdjustment[], status: string, kind: string, search: string) { const q = search.trim().toLocaleLowerCase('vi-VN'); return items.filter(i => (status === 'ALL' || i.status === status) && (kind === 'ALL' || i.kind === kind) && (!q || `${i.employee_name} ${i.employee_id} ${i.date}`.toLocaleLowerCase('vi-VN').includes(q))); }
 export function canReviewAdjustment(item: AttendanceAdjustment) { return item.can_review && item.amount != null && !item.amount_unavailable && !item.locked && item.status !== 'VOID'; }
-export function AdjustmentReviewPanel({ period, employeeId }: {
-    period: string;
-    employeeId?: string;
-}) {
-    const location = useLocation();
-    const client = useQueryClient();
-    const { showToast } = useToast();
-    const [params, setParams] = useSearchParams();
-    const status = params.get('reviewStatus') || 'PENDING', kind = params.get('reviewKind') || 'ALL', search = params.get('reviewSearch') || '';
-    const setFilter = (name: string, value: string) => setParams(previous => { const next = new URLSearchParams(previous); if (value)
-        next.set(name, value);
-    else
-        next.delete(name); return next; }, { replace: true });
-    const [selected, setSelected] = useState<AttendanceAdjustment | null>(null);
-    const [note, setNote] = useState('');
-    const [decision, setDecision] = useState<'APPROVED' | 'REJECTED'>('APPROVED');
-    const [dirty, setDirty] = useState(false);
-    const query = useQuery({ queryKey: ['attendanceAdjustments', period, employeeId || 'ALL'], queryFn: async (): Promise<AttendanceAdjustment[]> => { const p = new URLSearchParams({ period }); if (employeeId)
-            p.set('employeeId', employeeId); const res = await apiFetch(`/api/payroll/adjustments?${p}`); if (!res.success)
-            throw new Error(res.message || 'Không tải được OT và các khoản phạt'); return res.data; } });
-    const review = useMutation({ mutationFn: async () => { if (!selected || !canReviewAdjustment(selected))
-            throw new Error('Khoản này không còn được phép xét duyệt. Vui lòng tải lại.'); const res = await apiFetch(`/api/payroll/adjustments/${encodeURIComponent(selected.id)}`, { method: 'PATCH', body: JSON.stringify({ status: decision, note, updated_at: selected.updated_at }) }); if (!res.success)
-            throw new Error(res.message || 'Không lưu được quyết định'); }, onSuccess: () => { showToast('Đã lưu quyết định xét duyệt.', 'success'); setSelected(null); setDirty(true); for (const key of ['attendanceAdjustments', 'attendanceSummaries', 'payroll'])
-            client.invalidateQueries({ queryKey: [key] }); }, onError: () => { client.invalidateQueries({ queryKey: ['attendanceAdjustments'] }); } });
-    const items = query.data || [];
-    const active = items.filter(i => i.status !== 'VOID');
-    const pending = active.filter(i => i.status === 'PENDING');
-    const pendingUnknown = pending.filter(i => i.amount == null || i.amount_unavailable).length;
-    const visible = filterAdjustments(items, status, kind, search).sort((a, b) => b.date.localeCompare(a.date) || a.employee_name.localeCompare(b.employee_name));
-    const open = (item: AttendanceAdjustment) => { setSelected(item); };
-    return <section className="space-y-4" aria-label="Theo dõi OT và khoản phạt"><div className="flex flex-wrap justify-between gap-3"><div><h2 className="text-lg font-semibold">Theo dõi OT & khoản phạt</h2><p className="sf-secondary">Kỳ {period} · Khoản phát sinh tự động đồng bộ theo trạng thái phê duyệt ngày công.</p></div><button className="sf-button" onClick={() => query.refetch()} disabled={query.isFetching}><RotateCcw size={16}/>Tải lại</button></div>
- <div className="sf-summary"><span><strong>{pending.length}</strong> khoản chờ duyệt ngày công</span><span>OT chờ: <strong>{pending.filter(i => i.kind === 'OVERTIME').reduce((n, i) => n + i.hours, 0)} giờ</strong></span><span>Phạt chờ đã có đơn giá: <strong>{money(pending.filter(i => i.kind !== 'OVERTIME' && !i.amount_unavailable).reduce((n, i) => n + (i.amount ?? 0), 0))}</strong></span>{pendingUnknown > 0 && <span>{pendingUnknown} khoản chưa xác định số tiền</span>}<span>Đã duyệt: <strong>{active.filter(i => i.status === 'APPROVED').length} khoản</strong></span></div>
- <div className="sf-toolbar"><label className="sf-field sf-search">Tìm khoản phát sinh<input className="sf-input" value={search} onChange={e => setFilter('reviewSearch', e.target.value)} placeholder="Tên nhân viên, mã hoặc ngày…"/></label><label className="sf-field">Loại khoản<select className="sf-input" value={kind} onChange={e => setFilter('reviewKind', e.target.value)}><option value="ALL">Tất cả loại khoản</option>{Object.entries(adjustmentLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label className="sf-field">Trạng thái<select className="sf-input" value={status} onChange={e => setFilter('reviewStatus', e.target.value)}><option value="ALL">Tất cả trạng thái</option>{Object.entries(statuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></div>
- {query.isPending ? <div className="sf-empty" role="status">Đang tải các khoản phát sinh…</div> : query.isError ? <div className="sf-feedback error" role="alert"><span>{query.error.message} <button className="underline" onClick={() => query.refetch()}>Thử lại</button></span></div> : <div className="sf-panel"><table className="sf-table sf-responsive"><thead><tr><th>Nhân viên / ngày</th><th>Khoản phát sinh</th><th>Khối lượng / số tiền</th><th>Trạng thái</th><th>Xem xét</th></tr></thead><tbody>{visible.map(item => <tr key={item.id}><td><strong>{item.employee_name}</strong><div className="sf-secondary">{item.employee_id} · {item.date}</div></td><td data-label="Loại khoản">{adjustmentLabels[item.kind]}<div className="sf-secondary line-clamp-2">{item.note || 'Chưa có ghi chú'}</div></td><td data-label="Khối lượng"><span>{item.kind === 'ABSENCE' ? `1 ca (${item.hours} giờ)` : `${item.hours} giờ`}</span><div className={`sf-money font-semibold mt-1 ${item.kind === 'OVERTIME' ? 'text-emerald-700' : 'text-rose-700'}`}>{money(item.amount)}</div></td><td data-label="Trạng thái"><span className={`sf-badge ${item.status === 'PENDING' ? 'warning' : item.status === 'APPROVED' ? 'success' : ''}`}><Clock size={13}/>{statuses[item.status]}</span>{item.locked && <div className="sf-secondary flex items-center gap-1"><Lock size={12}/>Ngày công / kỳ lương đã khóa</div>}{item.reviewed_at && <div className="sf-secondary">{new Date(item.reviewed_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</div>}</td><td><button className="sf-button" onClick={() => open(item)}><FileSearch size={15}/>Xem chi tiết</button></td></tr>)}</tbody></table>{!visible.length && <div className="sf-empty"><Check size={28}/><p className="font-semibold">{!items.length ? 'Chưa có khoản phát sinh trong kỳ' : 'Không có khoản phù hợp'}</p><p className="sf-secondary">{!items.length ? 'Dùng Tính lương để cập nhật các ngày công.' : 'Thử thay đổi loại khoản, trạng thái hoặc từ khóa.'}</p>{items.length > 0 && <button className="sf-button mt-4" onClick={() => setFilter('reviewStatus', 'ALL')}>Xem mọi trạng thái</button>}</div>}</div>}
- <p className="sf-secondary">Chỉ các khoản thuộc ngày công đã phê duyệt (review_status = APPROVED) được tính vào lương. Mọi điều chỉnh và phê duyệt được thực hiện trực tiếp trên bảng chấm công.</p>
- <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={selected ? adjustmentLabels[selected.kind] : 'Chi tiết khoản phát sinh'} subtitle={selected ? `${selected.employee_name} · ${selected.employee_id} · ${selected.date}` : undefined} maxWidth="2xl">{selected && <div><div className="sf-review-grid"><div className="sf-review-context"><h3 className="font-semibold mb-4">Căn cứ khoản phát sinh</h3><dl className="space-y-3"><div className="flex justify-between gap-3"><dt>Ngày làm việc</dt><dd>{selected.date}</dd></div><div className="flex justify-between gap-3"><dt>Khối lượng</dt><dd>{selected.hours} giờ</dd></div><div className="flex justify-between gap-3"><dt>Số tiền đề xuất</dt><dd className="sf-money font-semibold">{money(selected.amount)}</dd></div><div className="flex justify-between gap-3"><dt>Trạng thái</dt><dd>{statuses[selected.status]}</dd></div></dl><Link className="sf-button mt-5 w-full" to={location.pathname.startsWith('/app/employee') ? `/app/employee/attendance?date=${selected.date}` : `/app/manager/employees/${encodeURIComponent(selected.employee_id)}?tab=attendance&date=${selected.date}`}><ArrowUpRight size={16}/>Đối chiếu trên bảng chấm công</Link><p className="sf-secondary mt-3">Mở nhật ký quét, cặp vào/ra và kết quả tính công của đúng ngày.</p></div><div className="space-y-4"><h3 className="font-semibold">Thông tin đồng bộ</h3><div className="sf-feedback"><Info size={18}/><span>Khoản này được tự động phê duyệt đồng bộ theo ngày công (review_status = APPROVED) trên bảng chấm công. Phê duyệt hoặc mở khóa ngày công sẽ cập nhật khoản này.{selected.note && <p className="mt-2 font-medium">Ghi chú: {selected.note}</p>}</span></div>{selected.reviewed_by && <p className="sf-secondary">Người duyệt ngày công: {selected.reviewed_by}</p>}{selected.reviewed_at && <p className="sf-secondary">Thời gian duyệt: {new Date(selected.reviewed_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</p>}</div></div><div className="sf-footer"><button type="button" className="sf-button primary" onClick={() => setSelected(null)}>Đóng</button></div></div>}</Modal>
- </section>;
+
+export function AdjustmentReviewPanel({ period, employeeId, workShifts = [], startDate = '', endDate = '' }: { period: string; employeeId?: string; workShifts?: WorkShift[]; startDate?: string; endDate?: string }) {
+  const [params, setParams] = useSearchParams();
+  const requestedStatus = params.get('reviewStatus');
+  const status = requestedStatus === 'PENDING' || requestedStatus === 'APPROVED' ? requestedStatus : 'ALL';
+  const kind = params.get('reviewKind') || 'ALL', search = params.get('reviewSearch') || '';
+  const setFilter = (name: string, value: string) => setParams(previous => { const next = new URLSearchParams(previous); if (value) next.set(name, value); else next.delete(name); return next; }, { replace: true });
+  const query = useQuery({ queryKey: ['attendanceAdjustments', period, employeeId || 'ALL'], queryFn: async (): Promise<AttendanceAdjustment[]> => {
+    const p = new URLSearchParams({ period });
+    if (employeeId) p.set('employeeId', employeeId);
+    const res = await apiFetch(`/api/payroll/adjustments?${p}`);
+    if (!res.success) throw new Error(res.message || 'Không tải được OT và các khoản phạt');
+    return res.data;
+  } });
+  const items = (query.data || []).filter(item => (item.status === 'PENDING' || item.status === 'APPROVED') && (!startDate || item.date >= startDate) && (!endDate || item.date <= endDate));
+  const visible = filterAdjustments(items, status, kind, search).sort((a, b) => b.date.localeCompare(a.date) || a.employee_name.localeCompare(b.employee_name));
+
+  return <section className="space-y-4" aria-label="Các khoản thưởng phạt trong kỳ">
+    <div className="sf-summary"><span>Chờ duyệt: <strong>{items.filter(i => i.status === 'PENDING').length} khoản</strong></span><span>Đã duyệt: <strong>{items.filter(i => i.status === 'APPROVED').length} khoản</strong></span></div>
+    <FilterBar><label className="w-full lg:w-96"><span className="sr-only">Tìm khoản phát sinh</span><SearchInput value={search} onChange={value => setFilter('reviewSearch', value)} placeholder="Tên nhân viên, mã hoặc ngày…" containerClassName="relative w-full" /></label><div className="flex flex-wrap items-center gap-4 w-full lg:w-auto"><FilterSelect label="Loại khoản:" value={kind} onChange={value => setFilter('reviewKind', value)} allLabel="Tất cả loại khoản" options={Object.entries(adjustmentLabels).map(([value, label]) => ({ value, label }))} widthClass="w-[180px]"/><FilterSelect label="Trạng thái:" value={status} onChange={value => setFilter('reviewStatus', value)} allLabel="Tất cả trạng thái" options={Object.entries(statuses).map(([value, label]) => ({ value, label }))} widthClass="w-[180px]"/></div></FilterBar>
+    {query.isPending ? <div className="sf-empty" role="status">Đang tải các khoản phát sinh…</div> : query.isError ? <div className="sf-feedback error" role="alert"><span>{query.error.message} <button className="underline" onClick={() => query.refetch()}>Thử lại</button></span></div> : <TableContainer minWidth="1050px" maxHeight="548px">
+      <TableHead><TableHeadRow className="h-12"><TableHeadCell width="9%">Ngày</TableHeadCell><TableHeadCell width="13%">Ca làm việc</TableHeadCell><TableHeadCell width="12%">Thưởng / Phạt</TableHeadCell><TableHeadCell width="8%">Thời gian</TableHeadCell><TableHeadCell width="11%">Số tiền</TableHeadCell><TableHeadCell width="34%">Lý do</TableHeadCell><TableHeadCell width="13%" isLast>Trạng thái</TableHeadCell></TableHeadRow></TableHead>
+      <TableBody>{visible.length ? visible.map(item => {
+        const shift = workShifts.find(s => s.employee_id === item.employee_id && s.date === item.date);
+        const shiftLabels: Record<WorkShift['shift_type'], string> = { MORNING: 'Ca sáng', AFTERNOON: 'Ca chiều', OFFICE_HOURS: 'Ca hành chính', OTHER: 'Ca khác', OFF: 'Nghỉ ca' };
+        return <TableRow key={item.id} className="h-[100px]">
+        <TableCell>{item.date.split('-').reverse().join('/')}</TableCell>
+        <TableCell>{shift ? <>{shiftLabels[shift.shift_type]}{shift.shift_type !== 'OFF' && shift.start_time && shift.end_time && <div className="sf-secondary">{shift.start_time} – {shift.end_time}</div>}</> : 'Không có dữ liệu ca'}</TableCell>
+        <TableCell>{adjustmentLabels[item.kind]}</TableCell>
+        <TableCell>{item.hours} giờ</TableCell>
+        <TableCell className={`sf-money font-semibold ${item.kind === 'OVERTIME' ? 'text-emerald-700' : 'text-rose-700'}`}>{money(item.amount)}</TableCell>
+        <TableCell><span className="line-clamp-2" title={item.note || undefined}>{item.note || 'Chưa có lý do'}</span></TableCell>
+        <TableCell isLast><span className={`sf-badge ${item.status === 'PENDING' ? 'warning' : 'success'}`}><Clock size={13}/>{item.status === 'PENDING' ? 'Chưa duyệt' : statuses.APPROVED}</span>{item.status === 'APPROVED' && item.reviewed_at && <div className="sf-secondary">{new Date(item.reviewed_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</div>}</TableCell>
+      </TableRow>}) : <TableEmpty colSpan={7} message={items.length ? 'Không có khoản phù hợp' : 'Chưa có khoản phát sinh trong kỳ'} />}</TableBody>
+    </TableContainer>}
+  </section>;
 }

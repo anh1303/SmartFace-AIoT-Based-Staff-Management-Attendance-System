@@ -131,9 +131,7 @@ export const ManagerEmployeeDetail: React.FC = () => {
   // 1. DATE RANGE & FILTERS FOR ATTENDANCE
   // ==========================
   const todayVN = getTodayVNString();
-  const currentYear = new Date().getFullYear();
-  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-  const startOfCurrentMonth = `${currentYear}-${currentMonth}-01`;
+  const startOfCurrentMonth = `${todayVN.slice(0, 7)}-01`;
 
   const [startDate, setStartDate] = useState<string>(() => searchParams.get('date') || startOfCurrentMonth);
   const [endDate, setEndDate] = useState<string>(() => searchParams.get('date') || todayVN);
@@ -353,12 +351,6 @@ export const ManagerEmployeeDetail: React.FC = () => {
         onPrint={handlePrint}
       />
 
-      {activeTab === 'overview' && <div className="flex justify-end">
-        <button type="button" onClick={() => setActiveTab('attendance')} className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-semibold">
-          Xem lịch sử checkin / checkout
-        </button>
-      </div>}
-
       {/* 2. TAB 1: OVERVIEW & BIOMETRICS */}
       {activeTab === 'overview' && (
         <EmployeeOverviewTab
@@ -388,7 +380,6 @@ export const ManagerEmployeeDetail: React.FC = () => {
           setAttendanceTypeFilter={setAttendanceTypeFilter}
           attendanceStatusFilter={attendanceStatusFilter}
           setAttendanceStatusFilter={setAttendanceStatusFilter}
-          attendanceStats={attendanceStats}
           employeeAttendanceLogs={employeeAttendanceLogs}
         />
       )}

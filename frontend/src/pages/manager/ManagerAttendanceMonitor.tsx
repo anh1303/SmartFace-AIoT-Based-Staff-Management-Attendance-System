@@ -102,7 +102,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   });
 
   const { devices, isError: isDevicesError } = useDevices(role === 'admin');
-  const { isDateLocked, toggleLockAsync, isLoading: locksLoading, isError: locksError } = useAttendanceLocks();
+  const { isDateLocked, toggleLockAsync, isLoading: locksLoading, isError: locksError, refetch: refetchLocks } = useAttendanceLocks();
   // useAttendanceSummaries lấy đúng khoảng ngày đang xem [startDate, endDate]
   const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap, adjustAttendance, unlockEmployeeAttendance, refetch: refetchSummaries, isLoading: summariesLoading, isError: summariesError } = useAttendanceSummaries(startDate, endDate);
 
@@ -119,7 +119,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
 
   const datesInRange = getDatesInRange(startDate, endDate);
   const isCurrentDateLocked = datesInRange.length > 0 && datesInRange.every(d => isDateLocked(d));
-  const lockDataReady = !locksLoading && !locksError && !shiftState.isLoading && !shiftState.isError;
+  const lockDataReady = !locksLoading && !locksError && (isCurrentDateLocked || (!shiftState.isLoading && !shiftState.isError));
   const today = getTodayVNString();
   const todayRequiresShift = datesInRange.includes(today) && !isCurrentDateLocked;
   const canLock = lockDataReady && (!todayRequiresShift || workShifts.some(shift => shift.date === today && shift.shift_type !== 'OFF'));
@@ -301,6 +301,25 @@ export const ManagerAttendanceMonitor: React.FC = () => {
         canLock={canLock}
         canExport={canExport}
       />
+
+      {(locksError || shiftState.isError || employeeState.isError || attendanceQuery.isError || summariesError) && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+          <span>Không thể tải {[
+            locksError && 'trạng thái khóa ngày',
+            shiftState.isError && 'lịch làm việc',
+            employeeState.isError && 'danh sách nhân viên',
+            attendanceQuery.isError && 'lượt quẹt',
+            summariesError && 'tổng hợp công',
+          ].filter(Boolean).join(', ')}. Vui lòng tải lại dữ liệu để xuất Excel đầy đủ.</span>
+          <button type="button" className="underline font-semibold cursor-pointer" onClick={() => {
+            if (locksError) refetchLocks();
+            if (shiftState.isError) shiftState.refetchShifts();
+            if (employeeState.isError) employeeState.refetchEmployees();
+            if (attendanceQuery.isError) attendanceQuery.refetch();
+            if (summariesError) refetchSummaries();
+          }}>Thử tải lại</button>
+        </div>
+      )}
 
       {(attendanceQuery.isError || attendanceQuery.isLoading) && (
         <div role="alert" className="p-4 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm flex items-center justify-between gap-4">

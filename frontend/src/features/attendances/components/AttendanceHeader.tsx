@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  CheckCircle2,
+  Unlock,
   Lock,
   Download,
   Clock,
@@ -38,7 +38,7 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
     <PageHeaderBanner
       className="[&>div:first-child]:items-center"
       icon={<div className="w-10 h-10 rounded-xl bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-inner"><Clock className="w-5 h-5" /></div>}
-      title="Theo dõi chấm công"
+      title="Giám sát chấm công"
       actions={
         <>
           {isAdmin && <button
@@ -70,11 +70,9 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
           >
             {isCurrentDateLocked ? (
               <>
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <Unlock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>
-                  {isAdmin
-                    ? `Đã chốt ca (${isSameDay ? startDate : `${startDate} → ${endDate}`}) - Mở khóa`
-                    : `Đã chốt ca (${isSameDay ? startDate : `${startDate} → ${endDate}`})`}
+                  {`Mở khóa ngày (${isSameDay ? startDate : `${startDate} → ${endDate}`})`}
                 </span>
               </>
             ) : (

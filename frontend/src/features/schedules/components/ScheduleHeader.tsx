@@ -51,7 +51,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
           <CalendarDays className="w-5 h-5" />
         </div>
       }
-      title="Lịch làm việc"
+      title="Phân ca làm việc"
       titleExtra={
         <div className="flex basis-full items-center gap-2 flex-wrap">
           {/* Week Selector */}

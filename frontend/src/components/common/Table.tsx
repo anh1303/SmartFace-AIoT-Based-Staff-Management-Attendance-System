@@ -334,7 +334,9 @@ export const ActionEditButton: React.FC<ActionEditButtonProps> = ({
     <button
       type="button"
       disabled={disabled}
-      className={`px-3.5 py-1.5 rounded-xl border font-medium text-xs inline-flex items-center gap-1.5 transition-all shadow-xs ${
+      aria-label={label}
+      title={label}
+      className={`p-2 rounded-xl border inline-flex items-center justify-center transition-all shadow-xs ${
         disabled
           ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-[#181c38] text-slate-400 border-slate-200 dark:border-slate-800'
           : 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-200 border-slate-200 dark:border-[#272d5a] cursor-pointer'
@@ -342,7 +344,6 @@ export const ActionEditButton: React.FC<ActionEditButtonProps> = ({
       {...props}
     >
       {renderIcon()}
-      <span>{label}</span>
     </button>
   );
 };

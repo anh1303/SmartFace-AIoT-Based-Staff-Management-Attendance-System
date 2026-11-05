@@ -156,7 +156,7 @@ export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="max-h-[min(320px,50dvh)] overflow-y-auto divide-y divide-slate-100 dark:divide-[#1d2243]">
+                  <div className="max-h-[min(240px,50dvh)] overflow-y-auto divide-y divide-slate-100 dark:divide-[#1d2243]">
                     {filteredEmployeeList.length === 0 ? (
                       <div className="p-3 text-center text-xs text-slate-400">
                         Không tìm thấy
@@ -181,7 +181,7 @@ export const EmployeeDetailHeader: React.FC<EmployeeDetailHeaderProps> = ({
                                 ? `Quản lý khác (${emp.full_name}) - Không có quyền xem chi tiết`
                                 : `${emp.employee_id} - ${emp.full_name}`
                             }
-                            className={`w-full min-h-12 px-2.5 flex items-center gap-2 text-left transition-colors min-w-0 ${restricted
+                            className={`w-full h-12 px-2.5 flex items-center gap-2 text-left transition-colors min-w-0 ${restricted
                               ? 'opacity-50 cursor-not-allowed bg-slate-50/50 dark:bg-[#121528]'
                               : 'hover:bg-slate-50 dark:hover:bg-[#1a1e3a] cursor-pointer'
                               } ${emp.employee_id === currentEmp.employee_id ? 'bg-blue-50/60 dark:bg-blue-950/30' : ''

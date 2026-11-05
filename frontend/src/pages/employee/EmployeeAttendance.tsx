@@ -51,9 +51,7 @@ export const EmployeeAttendance: React.FC = () => {
 
   // Dates & Presets for Summary view
   const todayVN = getTodayVNString();
-  const currentYear = new Date().getFullYear();
-  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-  const startOfCurrentMonth = `${currentYear}-${currentMonth}-01`;
+  const startOfCurrentMonth = `${todayVN.slice(0, 7)}-01`;
 
   const [startDate, setStartDate] = useState<string>(() => urlParams.get('date') || startOfCurrentMonth);
   const [endDate, setEndDate] = useState<string>(() => urlParams.get('date') || todayVN);
@@ -83,7 +81,7 @@ export const EmployeeAttendance: React.FC = () => {
   }, [currentUser, employees]);
 
   // Hook for attendance statistics & filtered logs
-  const { employeeAttendanceLogs, attendanceStats } = useEmployeeAttendanceDetail({
+  const { employeeAttendanceLogs } = useEmployeeAttendanceDetail({
     currentEmp: currentEmp || null,
     startDate,
     endDate,
@@ -165,7 +163,6 @@ export const EmployeeAttendance: React.FC = () => {
           setAttendanceTypeFilter={setAttendanceTypeFilter}
           attendanceStatusFilter={attendanceStatusFilter}
           setAttendanceStatusFilter={setAttendanceStatusFilter}
-          attendanceStats={attendanceStats}
           employeeAttendanceLogs={employeeAttendanceLogs}
         />
       ) : (

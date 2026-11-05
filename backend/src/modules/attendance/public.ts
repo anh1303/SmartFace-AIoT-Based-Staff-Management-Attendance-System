@@ -5,3 +5,4 @@ export { assertEditableDay, getAttendanceSummariesByEmployeesAndDateRange, audit
 export { isAttendanceDateLocked } from './attendance.lock.js'
 export { aggregateDailyAttendance } from './attendance.aggregation.js'
 export * from './attendance.contract.js'
+export { determinePunctuality } from './attendance.format.js'

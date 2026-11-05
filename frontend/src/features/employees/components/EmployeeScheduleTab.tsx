@@ -190,9 +190,9 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
       </div>
 
       {/* Schedule Table */}
-      <TableContainer minWidth="700px">
+      <TableContainer minWidth="700px" maxHeight="568px">
         <TableHead>
-          <TableHeadRow>
+          <TableHeadRow className="h-12">
             <TableHeadCell width="140px" align="center">Thứ</TableHeadCell>
             <TableHeadCell width="150px" align="center">Ngày làm việc</TableHeadCell>
             <TableHeadCell width="210px" align="center">Ca làm việc</TableHeadCell>
@@ -228,7 +228,7 @@ export const EmployeeScheduleTab: React.FC<EmployeeScheduleTabProps> = ({
               const fullShiftInfo = `${typeLabel}${shiftTime}`;
 
               return (
-                <TableRow key={shift.shift_id || idx}>
+                <TableRow key={shift.shift_id || idx} className="h-[52px]">
                   <TableCell align="center" className="font-medium text-slate-800 dark:text-slate-200 truncate" title={dayStr}>
                     {dayStr}
                   </TableCell>

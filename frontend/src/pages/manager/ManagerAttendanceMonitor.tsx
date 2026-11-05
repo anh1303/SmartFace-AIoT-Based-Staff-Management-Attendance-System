@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { confidenceColor } from '../../utils/confidence';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { useShiftContext } from '../../context/ShiftContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
 import { getTodayVNString } from '../../utils/dateUtils';
 import { useDepartmentPositions } from '@/features/employees';
 import {
@@ -37,6 +40,8 @@ const useSafeSearchParams = () => {
 };
 
 export const ManagerAttendanceMonitor: React.FC = () => {
+  const shiftState = useShiftContext();
+  const employeeState = useEmployeeContext();
   const { employees, workShifts, showToast, role, currentUser } = useApp();
   const isManager = role === 'manager';
   const managerDept = currentUser?.department;
@@ -98,9 +103,9 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   });
 
   const { devices, isError: isDevicesError } = useDevices(role === 'admin');
-  const { isDateLocked, toggleLockAsync } = useAttendanceLocks();
+  const { isDateLocked, toggleLockAsync, isLoading: locksLoading, isError: locksError, refetch: refetchLocks } = useAttendanceLocks();
   // useAttendanceSummaries lấy đúng khoảng ngày đang xem [startDate, endDate]
-  const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap, adjustAttendance, unlockEmployeeAttendance, refetch: refetchSummaries } = useAttendanceSummaries(startDate, endDate);
+  const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap, adjustAttendance, unlockEmployeeAttendance, refetch: refetchSummaries, isLoading: summariesLoading, isError: summariesError } = useAttendanceSummaries(startDate, endDate);
 
   const getDatesInRange = (startStr: string, endStr: string): string[] => {
     const dates: string[] = [];
@@ -115,6 +120,11 @@ export const ManagerAttendanceMonitor: React.FC = () => {
 
   const datesInRange = getDatesInRange(startDate, endDate);
   const isCurrentDateLocked = datesInRange.length > 0 && datesInRange.every(d => isDateLocked(d));
+  const lockDataReady = !locksLoading && !locksError && (isCurrentDateLocked || (!shiftState.isLoading && !shiftState.isError));
+  const today = getTodayVNString();
+  const todayRequiresShift = datesInRange.includes(today) && !isCurrentDateLocked;
+  const canLock = lockDataReady && (!todayRequiresShift || workShifts.some(shift => shift.date === today && shift.shift_type !== 'OFF'));
+  const canExport = isCurrentDateLocked && !locksLoading && !locksError && !shiftState.isLoading && !shiftState.isError && !employeeState.isLoading && !employeeState.isError && !attendanceQuery.isLoading && !attendanceQuery.isError && !summariesLoading && !summariesError;
 
   // useAttendancePairs tiêu thụ giờ, cặp và cờ rà soát từ backend summary
   const employeePairs = useAttendancePairs(
@@ -182,7 +192,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   };
 
   const handleToggleLock = async () => {
-    if (role !== 'admin' || !startDate) return;
+    if (role !== 'admin' || !startDate || !canLock) return;
     const targetLockState = !isCurrentDateLocked;
     const dates = getDatesInRange(startDate, endDate);
 
@@ -229,13 +239,13 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     }
   };
 
-  const handleExportCSV = () => {
-    if (!isCurrentDateLocked) {
-      showToast('Nút chỉ bật sau khi đã chốt ca ngày đang chọn', 'warning');
+  const handleExportCSV = (format: 'excel' | 'pdf') => {
+    if (!canExport) {
+      showToast('Chỉ xuất sau khi đã chốt ca và dữ liệu sẵn sàng', 'warning');
       return;
     }
     const dateLabel = startDate === endDate ? startDate : `${startDate}_den_${endDate}`;
-    exportAttendanceToCSV(employeePairs, dateLabel, showToast);
+    exportAttendanceToCSV(employeePairs, dateLabel, showToast, format);
   };
 
   const handleSaveAdjustments = async (payload: {
@@ -289,7 +299,28 @@ export const ManagerAttendanceMonitor: React.FC = () => {
         isCurrentDateLocked={isCurrentDateLocked}
         onToggleLock={handleToggleLock}
         onExportCSV={handleExportCSV}
+        canLock={canLock}
+        canExport={canExport}
       />
+
+      {(locksError || shiftState.isError || employeeState.isError || attendanceQuery.isError || summariesError) && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+          <span>Không thể tải {[
+            locksError && 'trạng thái khóa ngày',
+            shiftState.isError && 'lịch làm việc',
+            employeeState.isError && 'danh sách nhân viên',
+            attendanceQuery.isError && 'lượt quẹt',
+            summariesError && 'tổng hợp công',
+          ].filter(Boolean).join(', ')}. Vui lòng tải lại dữ liệu để xuất Excel đầy đủ.</span>
+          <button type="button" className="underline font-semibold cursor-pointer" onClick={() => {
+            if (locksError) refetchLocks();
+            if (shiftState.isError) shiftState.refetchShifts();
+            if (employeeState.isError) employeeState.refetchEmployees();
+            if (attendanceQuery.isError) attendanceQuery.refetch();
+            if (summariesError) refetchSummaries();
+          }}>Thử tải lại</button>
+        </div>
+      )}
 
       {(attendanceQuery.isError || attendanceQuery.isLoading) && (
         <div role="alert" className="p-4 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm flex items-center justify-between gap-4">
@@ -444,7 +475,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
                       </td>
                       <td className="py-2.5 px-3">{log.method}</td>
                       <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">{log.device_id || '--'}</td>
-                      <td className="py-2.5 px-3 font-mono text-emerald-600">
+                      <td className={`py-2.5 px-3 font-mono ${confidenceColor(log.verification_score)}`}>
                         {log.verification_score !== undefined && log.verification_score !== null
                           ? `${(log.verification_score * 100).toFixed(0)}%`
                           : '--'}

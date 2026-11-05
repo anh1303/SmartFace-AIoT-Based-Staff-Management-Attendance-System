@@ -1,13 +1,10 @@
 import { Avatar } from '../../../components/common/Avatar';
+import { EmployeeMonthlyAverages } from './EmployeeMonthlyAverages';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ScanFace,
   Fingerprint,
-  Calendar,
-  Clock,
-  Sparkles,
-  TrendingUp
 } from 'lucide-react';
 import { Employee } from '../../../types';
 import { formatVNDate } from '../../../utils/dateUtils';
@@ -16,26 +13,15 @@ import { BiometricStatusBadge } from '@/features/biometrics';
 interface EmployeeOverviewTabProps {
   currentEmp: Employee;
   hourlyRate: number;
-  standardHours: number;
-  overtimeHours: number;
-  lateEarlyHours: number;
-  currentNetSalary: number | null;
-  workDays: number;
   onOpenEditModal: () => void;
 }
 
 export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
   currentEmp,
   hourlyRate,
-  standardHours,
-  overtimeHours,
-  lateEarlyHours,
-  currentNetSalary,
-  workDays,
   onOpenEditModal,
 }) => {
   const navigate = useNavigate();
-  const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
   return (
     <div className="space-y-6">
@@ -188,112 +174,8 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
         </div>
       </div>
 
-      {/* KHỐI DƯỚI: ĐÁNH GIÁ CHUNG (TRUNG BÌNH TRÊN MỘT THÁNG) - 4 CỘT */}
-      <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-xl overflow-hidden shadow-xs transition-colors">
-        {/* Tiêu đề bảng */}
-        <div className="p-4 sm:p-5 bg-slate-50/70 dark:bg-[#0f1224]/70 border-b border-slate-100 dark:border-[#21264b] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white font-heading">
-              Đánh giá chung (trung bình trên một tháng)
-            </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Tổng hợp số ngày công, giờ tăng ca, thời gian đi trễ/về sớm và mức lương thực nhận
-            </p>
-          </div>
+      <EmployeeMonthlyAverages employee={currentEmp} />
 
-          <div className="flex items-center gap-2 text-xs font-mono text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-[#0f1224] px-3 py-1.5 rounded-xl border border-blue-200 dark:border-[#272d5a] self-start sm:self-auto">
-            <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>Kỳ: {currentMonthKey}</span>
-          </div>
-        </div>
-
-        {/* 4 Cột Bento Thống kê */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-[#21264b]">
-          {/* Cột 1: Tổng ngày công */}
-          <div className="p-5 flex flex-col justify-between space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Tổng ngày công</span>
-              <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                <Calendar className="w-4 h-4" />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 dark:text-white">
-                  {workDays}
-                </span>
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">/ 22 ngày</span>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Đạt ~{Math.min(100, Math.round((workDays / 22) * 100))}% chỉ tiêu tháng
-              </p>
-            </div>
-          </div>
-
-          {/* Cột 2: Giờ tăng ca (OT) */}
-          <div className="p-5 flex flex-col justify-between space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Giờ tăng ca (OT)</span>
-              <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
-                <Sparkles className="w-4 h-4" />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400">
-                  +{overtimeHours}
-                </span>
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">giờ</span>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Lương định mức: {standardHours} giờ chuẩn
-              </p>
-            </div>
-          </div>
-
-          {/* Cột 3: Đi trễ / Về sớm */}
-          <div className="p-5 flex flex-col justify-between space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Đi trễ / Về sớm</span>
-              <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400">
-                <Clock className="w-4 h-4" />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-baseline gap-1.5">
-                <span className={`text-2xl sm:text-3xl font-extrabold font-mono ${lateEarlyHours > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
-                  {lateEarlyHours}
-                </span>
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">giờ</span>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                {lateEarlyHours === 0 ? 'Tuân thủ giờ làm việc xuất sắc' : 'Đã trừ vào khấu trừ chuyên cần'}
-              </p>
-            </div>
-          </div>
-
-          {/* Cột 4: Lương thực nhận */}
-          <div className="p-5 flex flex-col justify-between space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Lương thực nhận tạm tính</span>
-              <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                <TrendingUp className="w-4 h-4" />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-xl sm:text-2xl font-black font-mono text-blue-600 dark:text-blue-400">
-                  {currentNetSalary === null ? 'Chưa tính lương kỳ này' : currentNetSalary.toLocaleString('vi-VN')}
-                </span>
-                {currentNetSalary !== null && <span className="text-xs font-medium text-slate-500 dark:text-slate-400">đ</span>}
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Bao gồm lương cứng + OT + phụ cấp
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

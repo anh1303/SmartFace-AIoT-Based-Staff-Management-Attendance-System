@@ -1,3 +1,4 @@
+import { Avatar } from '../../../components/common/Avatar';
 import React from 'react';
 import { Lock } from 'lucide-react';
 import {
@@ -102,14 +103,7 @@ export const BiometricsEmployeeTable: React.FC<BiometricsEmployeeTableProps> = (
               <TableRow key={emp.employee_id}>
                 <TableCell align="left" className="px-5 max-w-[240px]">
                   <div className="flex items-center gap-3.5 min-w-0 text-left" title={emp.full_name}>
-                    <img
-                      src={
-                        emp.avatar ||
-                        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
-                      }
-                      alt={emp.full_name}
-                      className="w-9 h-9 rounded-full object-cover border border-blue-200 dark:border-[#272d5a] shrink-0"
-                    />
+                    <Avatar src={emp.avatar} name={emp.full_name} size={36} />
                     <span className="font-semibold text-slate-900 dark:text-white truncate flex-1" title={emp.full_name}>
                       {emp.full_name}
                     </span>

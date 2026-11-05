@@ -12,6 +12,7 @@ import { AccountProfilePage } from '../../src/pages/account/AccountProfilePage';
 const mockProfileGet = vi.fn();
 const mockProfileUpdate = vi.fn();
 const mockChangePassword = vi.fn();
+const mockVerifyPassword = vi.fn();
 const mockMeApi = vi.fn().mockResolvedValue(null);
 
 vi.mock('@/features/auth', () => ({
@@ -19,6 +20,7 @@ vi.mock('@/features/auth', () => ({
     get: () => mockProfileGet(),
     update: (data: any) => mockProfileUpdate(data),
     changePassword: (...args: any[]) => mockChangePassword(...args),
+    verifyPassword: (...args: any[]) => mockVerifyPassword(...args),
   },
   meApi: () => mockMeApi(),
   loginApi: vi.fn(),
@@ -106,14 +108,14 @@ describe('Session Isolation and Profile Mutation Bleed Prevention (P1-2)', () =>
       await new Promise(r => setTimeout(r, 50));
     });
 
-    // Trigger save for User A
-    const saveButton = document.querySelector('button.sf-button.primary') as HTMLButtonElement;
-    expect(saveButton).toBeTruthy();
-
+    // Save User A's edited profile.
+    const nameInputA = document.querySelector('input[autocomplete="name"]') as HTMLInputElement;
+    const setterA = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
     await act(async () => {
-      const form = document.querySelector('form')!;
-      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      setterA?.call(nameInputA, 'User A Updated');
+      nameInputA.dispatchEvent(new Event('input', { bubbles: true }));
     });
+    await act(async () => { (document.querySelector('button.sf-button.primary') as HTMLButtonElement).click(); });
 
     // Mutation is pending now for user A
     expect(mockProfileUpdate).toHaveBeenCalled();
@@ -233,9 +235,13 @@ describe('Session Isolation and Profile Mutation Bleed Prevention (P1-2)', () =>
       await new Promise(r => setTimeout(r, 50));
     });
 
-    // 2. User A fills password form and submits
+    // 2. User A opens the security tab, fills the password form and submits
+    await act(async () => { (Array.from(document.querySelectorAll('[role="tab"]')).find(el => el.textContent?.includes('Bảo mật')) as HTMLButtonElement).click(); });
     const passwordInputs = document.querySelectorAll('#security input[type="password"]') as NodeListOf<HTMLInputElement>;
     expect(passwordInputs.length).toBeGreaterThanOrEqual(3);
+    await act(async () => { (document.querySelector('[aria-label="Hiện mật khẩu hiện tại"]') as HTMLButtonElement).click(); });
+    expect(passwordInputs[0].type).toBe('text');
+    expect(passwordInputs[1].type).toBe('password');
 
     const setInputValue = (input: HTMLInputElement, val: string) => {
       const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
@@ -244,16 +250,26 @@ describe('Session Isolation and Profile Mutation Bleed Prevention (P1-2)', () =>
       input.dispatchEvent(new Event('change', { bubbles: true }));
     };
 
+    mockVerifyPassword.mockRejectedValueOnce(new Error('Mật khẩu hiện tại không đúng'));
+    await act(async () => { setInputValue(passwordInputs[0], 'wrong'); });
+    await act(async () => { passwordInputs[0].dispatchEvent(new FocusEvent('focusout', { bubbles: true })); });
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Mật khẩu hiện tại không đúng');
+
     await act(async () => {
       setInputValue(passwordInputs[0], 'OldPassword123');
-      setInputValue(passwordInputs[1], 'NewPassword123');
-      setInputValue(passwordInputs[2], 'NewPassword123');
+      setInputValue(passwordInputs[1], 'NewPassword123!');
+      setInputValue(passwordInputs[2], 'Different123!');
     });
 
     const passwordForm = document.querySelector('#security form')!;
     await act(async () => {
       passwordForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
+
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('không khớp');
+    expect(mockChangePassword).not.toHaveBeenCalled();
+    await act(async () => { setInputValue(passwordInputs[2], 'NewPassword123!'); });
+    await act(async () => { passwordForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
 
     expect(mockChangePassword).toHaveBeenCalled();
 
@@ -409,11 +425,8 @@ describe('Session Isolation and Profile Mutation Bleed Prevention (P1-2)', () =>
       nameInput.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    const form = document.querySelector('section#personal form')!;
-    expect(form).toBeTruthy();
-
     await act(async () => {
-      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      (document.querySelector('button.sf-button.primary') as HTMLButtonElement).click();
     });
 
     await act(async () => {
@@ -424,7 +437,7 @@ describe('Session Isolation and Profile Mutation Bleed Prevention (P1-2)', () =>
 
     // Check that success feedback is displayed
     const successFeedback = document.querySelector('div[role="status"]');
-    expect(successFeedback?.textContent).toContain('Đã lưu thông tin cá nhân');
+    expect(successFeedback?.textContent).toContain('Đã lưu thông tin');
 
     // Query cache must be updated
     const cached = queryClient.getQueryData(['accountProfile', 'johndoe']) as any;

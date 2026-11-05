@@ -8,4 +8,4 @@ export * from './Toast';
 export * from './ErrorBoundary';
 export * from './LoadingScreen';
 export * from './Drawer';
-
+export * from './DonutChart';

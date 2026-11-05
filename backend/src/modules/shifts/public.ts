@@ -12,4 +12,5 @@ export {
   deleteShiftsForEmployee,
   getEmployeeShiftsForRecalculation,
   getActiveEmployeeShiftsWithDetails,
+  getActiveWorkShiftsCatalog,
 } from './shift.queries.js'

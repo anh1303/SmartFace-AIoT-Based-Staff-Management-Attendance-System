@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../../api/client';
 import { useToast } from '../../../context/ToastContext';
-import { getTodayVNString } from '../../../utils/dateUtils';
 
 export interface LockItem {
   date: string;
@@ -17,15 +16,9 @@ export function useAttendanceLocks() {
   const query = useQuery({
     queryKey: ['attendanceLocks'],
     queryFn: async () => {
-      try {
-        const res = await apiFetch('/api/attendance/locks');
-        if (res.success && Array.isArray(res.data)) {
-          return res.data;
-        }
-      } catch (err) {
-        console.warn('[useAttendanceLocks] Không thể lấy danh sách khoá công từ máy chủ:', err);
-      }
-      return [];
+      const res = await apiFetch('/api/attendance/locks');
+      if (!res.success || !Array.isArray(res.data)) throw new Error('Không thể tải trạng thái chốt ca');
+      return res.data;
     },
     staleTime: 1000 * 60, // 1 phút
     refetchInterval: 1000 * 60, // Tự động refetch mỗi phút để cập nhật khi qua 0h00
@@ -64,19 +57,8 @@ export function useAttendanceLocks() {
 
   const isDateLocked = (date: string): boolean => {
     if (!date) return false;
-    const today = getTodayVNString();
-
     const item = (query.data || []).find((l: LockItem) => l.date === date);
-    if (item !== undefined) {
-      return Boolean(item.is_locked);
-    }
-
-    // Khi đã qua 24h00 hoặc 0h00 (tức ngày trong quá khứ: date < today), tự động chốt ca
-    if (date < today) {
-      return true;
-    }
-
-    return false;
+    return Boolean(item?.is_locked);
   };
 
   return {
@@ -85,5 +67,7 @@ export function useAttendanceLocks() {
     toggleLock: (date: string, lock: boolean) => toggleLockMutation.mutate({ date, lock }),
     toggleLockAsync: (date: string, lock: boolean) => toggleLockMutation.mutateAsync({ date, lock }),
     isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
   };
 }

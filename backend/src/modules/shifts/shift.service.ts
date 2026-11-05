@@ -83,6 +83,7 @@ export interface RawShift {
   note?: string | null
   employee_id?: string
   employees?: { employee_code?: string; department?: { name?: string } | null } | null
+  work_shifts?: { start_time?: Date | string | null; end_time?: Date | string | null } | null
 }
 
 export function formatShift(s: RawShift) {
@@ -99,8 +100,8 @@ export function formatShift(s: RawShift) {
     employee_id: s.employees?.employee_code || s.employee_id,
     date: dateStr,
     work_day: workDay,
-    start_time: formatTimeHHMM(s.start_time, '08:00'),
-    end_time: formatTimeHHMM(s.end_time, '17:00'),
+    start_time: formatTimeHHMM(s.start_time ?? s.work_shifts?.start_time, ''),
+    end_time: formatTimeHHMM(s.end_time ?? s.work_shifts?.end_time, ''),
     shift_type: s.shift_type || 'OFFICE_HOURS',
     department: s.employees?.department?.name || '',
     note: s.note || '',
@@ -135,6 +136,7 @@ export async function list(
   const shifts = await prisma.employee_shifts.findMany({
     where,
     include: {
+      work_shifts: true,
       employees: {
         include: { department: true },
       },

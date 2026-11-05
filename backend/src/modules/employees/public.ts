@@ -15,6 +15,7 @@ export {
   findEmployeesWithFilter,
   findEmployeeWageProfile,
   findEmployeeWithRelations,
+  updateEmployeePersonalDetails,
   findDepartmentByIdOrCode,
   findPositionByName,
 } from './employee.queries.js'

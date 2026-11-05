@@ -11,7 +11,7 @@ from typing import Callable, Optional
 
 class ThingsBoardClient:
     def __init__(self, host: str, port: int, token: str, device_id='PI4_FRONT_GATE',
-                 initial_mode='CHECK_IN', on_mode_change: Optional[Callable] = None,
+                 initial_mode='AUTO', on_mode_change: Optional[Callable] = None,
                  on_attendance_result: Optional[Callable] = None,
                  initial_volume: int = 75, initial_show_fps: bool = True,
                  initial_stream_enabled: bool = True,

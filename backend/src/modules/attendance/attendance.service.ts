@@ -741,6 +741,12 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
     }
 
     if (is_locked) {
+      if (dateStr === vnDay(new Date())) {
+        const todayShifts = await getEmployeeShiftsByFilter({ workDate: work_date }, tx)
+        if (!todayShifts.some(shift => shift.shift_type !== 'OFF')) {
+          throw AppError.conflict('Hôm nay chưa có ca làm việc để chốt')
+        }
+      }
       await aggregateDailyAttendance(Number(dateStr.slice(5, 7)), Number(dateStr.slice(0, 4)), undefined, dateStr, undefined, tx)
     }
 
@@ -1065,7 +1071,6 @@ export async function unlockEmployeeAttendance(
     // 1. Khóa theo thứ tự chuẩn
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${dateStr.slice(0, 7)}`}))`
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${dateStr}`}))`
-
     // 2. Tìm thông tin nhân viên trước để lấy UUID chuẩn
     const emp = await findEmployeeByIdOrCode(employeeId, tx)
     if (!emp) throw AppError.notFound('Không tìm thấy nhân viên')
@@ -1243,6 +1248,81 @@ export function getAutoCloseThresholdVN(dateStr: string): Date {
   return new Date(Date.UTC(y, m - 1, d, 17, 5, 0, 0))
 }
 
+/** Lock the whole day only after its attendance summaries have been approved. */
+export async function autoLockAttendanceDate(dateStr: string, asOf = new Date()): Promise<boolean> {
+  if (+asOf < +getAutoCloseThresholdVN(dateStr)) return false
+  const work_date = new Date(`${dateStr}T00:00:00.000Z`)
+  return prisma.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${dateStr.slice(0, 7)}`}))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${dateStr}`}))`
+    const aggregation = await tx.attendanceAggregationState.findUnique({ where: { period: dateStr.slice(0, 7) } })
+    if (aggregation?.failed) return false
+    const current = await tx.attendance_locks.findUnique({ where: { work_date } })
+    if (current?.is_locked) return false
+    if (current && +asOf < +current.locked_at + 24 * 60 * 60 * 1000 && +current.locked_at >= +getAutoCloseThresholdVN(dateStr)) return false
+
+    const shifts = (await getEmployeeShiftsByFilter({ workDate: work_date }, tx)).filter(shift => shift.shift_type !== 'OFF')
+    const summaries = await tx.daily_attendance_summary.findMany({ where: { work_date }, select: { employee_id: true, review_status: true, calculation_details: true } })
+    const approved = new Set(summaries.filter(summary => {
+      const details = summary.calculation_details as { scheduledEnd?: string } | null
+      return summary.review_status === 'APPROVED' && (!details?.scheduledEnd || +new Date(details.scheduledEnd) <= +asOf)
+    }).map(summary => summary.employee_id))
+    if (!summaries.length || summaries.some(summary => !approved.has(summary.employee_id)) || shifts.some(shift => !approved.has(shift.employee_id))) return false
+
+    await tx.attendance_locks.upsert({
+      where: { work_date },
+      create: { work_date, is_locked: true, locked_at: asOf, locked_by: 'SYSTEM_AUTO' },
+      update: { is_locked: true, locked_at: asOf, locked_by: 'SYSTEM_AUTO' },
+    })
+    await tx.auditLog.create({ data: { action: 'LOCK_ATTENDANCE_DATE', target_table: 'attendance_locks', record_id: dateStr, new_values: { date: dateStr, is_locked: true, source: 'AUTO' } } })
+    return true
+  }, { maxWait: 20000, timeout: 60000 })
+}
+
+export async function autoLockCompletedAttendanceDates(asOf = new Date()): Promise<number> {
+  const today = vnDay(asOf)
+  const [year, month] = today.split('-').map(Number)
+  const start = new Date(Date.UTC(year, month - 2, 1))
+  const end = new Date(`${today}T00:00:00.000Z`)
+  const shifts = await getEmployeeShiftsByFilter({ workDate: { gte: start, lte: end } })
+  const summaries = await prisma.daily_attendance_summary.findMany({ where: { work_date: { gte: start, lt: end } }, select: { work_date: true }, distinct: ['work_date'] })
+  const locked = await prisma.attendance_locks.findMany({ where: { work_date: { gte: start, lt: end }, is_locked: true }, select: { work_date: true } })
+  const lockedDates = new Set(locked.map(lock => vnDay(lock.work_date)))
+  const dates = [...new Set([...shifts.filter(shift => shift.shift_type !== 'OFF').map(shift => vnDay(shift.work_date)), ...summaries.map(summary => vnDay(summary.work_date))])].filter(date => date < today && !lockedDates.has(date))
+  let count = 0
+  for (const date of dates) if (await autoLockAttendanceDate(date, asOf)) count++
+  return count
+}
+
+/**
+ * Kiểm tra xem ngày công đang mở khóa bởi Quản lý có còn trong thời gian bảo vệ hay không:
+ * - Nếu mở khóa trước 00:05 VN của ngày kế tiếp (trong ngày ca): Bảo vệ đến mốc 00:05 VN ngày kế tiếp.
+ *   Khi thời gian đạt từ 00:05 VN ngày kế tiếp trở đi, quyền mở khóa hết hạn -> hệ thống tự động chốt lại.
+ * - Nếu mở khóa một ngày trong quá khứ (sau 00:05 VN): Bảo vệ trong 24 giờ kể từ thời điểm mở khóa.
+ *   Sau 24 giờ không xét duyệt, hệ thống tự động chốt lại để tránh treo công vĩnh viễn.
+ */
+export function isManagerReopenedProtected(
+  summary: { reopened_at?: Date | null; reopened_by?: string | null } | null | undefined,
+  asOf: Date,
+  autoCloseThreshold: Date
+): boolean {
+  if (!summary?.reopened_at || summary.reopened_by === 'SHIFT_CHANGED') {
+    return false
+  }
+  const reopenedTime = new Date(summary.reopened_at).getTime()
+  const thresholdTime = autoCloseThreshold.getTime()
+
+  // 1. Mở khóa trong ngày ca làm việc (trước 00:05 ngày hôm sau):
+  // Hết hạn bảo vệ khi thời gian asOf đạt từ 00:05 ngày hôm sau trở đi.
+  if (reopenedTime < thresholdTime) {
+    return asOf.getTime() < thresholdTime
+  }
+
+  // 2. Mở khóa ngày trong quá khứ: bảo vệ trong 24 giờ kể từ thời điểm mở khóa
+  const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000
+  return asOf.getTime() < reopenedTime + TWENTY_FOUR_HOURS_MS
+}
+
 /**
  * Tự động chốt công cho các ca đến hạn (hết giờ ca và từ 00:05 VN ngày hôm sau) và xử lý ca quá hạn OT 4h.
  * - Lúc 0h05 VN ngày kế tiếp, ca đã có lượt ra hợp lệ -> chốt APPROVED, nguồn AUTO.
@@ -1320,11 +1400,6 @@ export async function autoCloseDueAttendance(asOf = new Date()) {
           where: { id: summary.id },
           include: { employees: true },
         })
-        // Tự chốt bỏ qua các ngày đã APPROVED hoặc đang được Quản lý chủ động mở khóa (reopened_at !== null và không phải do ca làm việc đổi)
-        const isManagerReopened = Boolean((freshSummary as any).reopened_at !== null && (freshSummary as any).reopened_by !== 'SHIFT_CHANGED')
-        if (!freshSummary || freshSummary.review_status === 'APPROVED' || isManagerReopened) {
-          continue
-        }
 
         const autoCloseThreshold = getAutoCloseThresholdVN(dateStr)
 
@@ -1334,11 +1409,17 @@ export async function autoCloseDueAttendance(asOf = new Date()) {
           continue
         }
 
+        // Tự chốt bỏ qua các ngày đã APPROVED hoặc đang được Quản lý mở khóa còn trong thời hạn bảo vệ
+        const isManagerReopened = isManagerReopenedProtected(freshSummary as any, asOf, autoCloseThreshold)
+        if (!freshSummary || freshSummary.review_status === 'APPROVED' || isManagerReopened) {
+          continue
+        }
+
         const sourceChanged = freshSummary.review_reason === 'SOURCE_CHANGED' || !freshSummary.policy_version
         if (sourceChanged) {
           await aggregateDailyAttendance(Number(dateStr.slice(5, 7)), Number(dateStr.slice(0, 4)), freshSummary.employee_id, dateStr, undefined, tx)
           freshSummary = await tx.daily_attendance_summary.findUnique({ where: { id: summary.id }, include: { employees: true } })
-          const isManagerReopenedAfterAgg = Boolean((freshSummary as any)?.reopened_at !== null && (freshSummary as any)?.reopened_by !== 'SHIFT_CHANGED')
+          const isManagerReopenedAfterAgg = isManagerReopenedProtected(freshSummary as any, asOf, autoCloseThreshold)
           if (!freshSummary || freshSummary.review_status === 'APPROVED' || isManagerReopenedAfterAgg || !freshSummary.policy_version || freshSummary.review_reason === 'SOURCE_CHANGED') continue
         }
 

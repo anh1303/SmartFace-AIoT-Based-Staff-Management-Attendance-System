@@ -24,18 +24,18 @@ Khi nhận diện thành công khuôn mặt thật, Pi Edge gửi gói tin đi�
 
 ---
 
-## 3. Logic Xử Lý Tại Backend ([attendance.webhook.ts](file:///mnt/windows/Users/62205/Documents/locngo/school/7th-semester/PBL6/SmartFace-AIoT-Based-Staff-Management-Attendance-System/backend/src/modules/attendance/attendance.webhook.ts))
-Backend đã được tích hợp sẵn **Logic Chu kỳ Ngày + Cooldown Chống Quét Nhầm**:
+## 3. Logic Xử Lý Tại Backend ([attendance.webhook.ts](../backend/src/modules/attendance/attendance.webhook.ts))
+Một máy dùng `AUTO` cho cả vào và ra. Backend dùng cửa sổ ghép cặp 24 giờ của chính sách chấm công, kể cả ca qua đêm. Khi triển khai, đặt `INITIAL_MODE=AUTO` trong `hardware/.env` và `attendance_mode=AUTO` trong shared attributes của ThingsBoard.
 
 ```typescript
-// 1. Tìm lượt chấm công hợp lệ gần nhất trong ngày hôm nay của nhân viên
+// 1. Tìm lượt hợp lệ gần nhất trong cửa sổ ghép cặp, không cắt ở 00:00.
 const lastLog = await prisma.attendance_logs.findFirst({
   where: {
     employee_id: match.emp_id,
     status: 'VALID',
-    event_time: { gte: startOfDay },
+    event_time: { gte: new Date(capturedAt - MAX_PAIR_MS), lte: new Date(capturedAt) },
   },
-  orderBy: { event_time: 'desc' },
+  orderBy: [{ event_time: 'desc' }, { id: 'desc' }],
 });
 
 // 2. Phân định: Chưa có lượt nào (hoặc lượt trước là CHECK_OUT) -> Lần này là CHECK_IN
@@ -43,10 +43,13 @@ let resolvedMode = (!lastLog || lastLog.type === 'CHECK_OUT') ? 'CHECK_IN' : 'CH
 
 // 3. Cơ chế Cooldown chống quét nhầm linh hoạt (cấu hình qua ATTENDANCE_COOLDOWN_SECONDS trong .env):
 const cooldownMs = (Number(process.env.ATTENDANCE_COOLDOWN_SECONDS) || 60) * 1000;
-if (lastLog && lastLog.type === 'CHECK_IN' && (Date.now() - Number(lastLog.event_time)) < cooldownMs) {
-  resolvedMode = 'CHECK_IN'; // Giữ nguyên, không đảo thành CHECK_OUT
-}
+// VERIFY_ONLY luôn chỉ xác minh; CONFIRMED_SCAN phải đủ xác nhận liên tiếp.
+// PAD thất bại hoặc không khớp khuôn mặt sẽ reset chuỗi xác nhận AUTO.
+// Trong cooldown sau cả CHECK_IN lẫn CHECK_OUT: không ghi thêm công,
+// trả cooldown=true, success=false, door_open=false.
 ```
+
+Nếu không có lượt hợp lệ trong 24 giờ, lần quét tiếp theo bắt đầu một lượt vào mới. Việc quên quét ra cần quản lý kiểm tra và điều chỉnh; một cảm biến hiện diện không xác định được hướng di chuyển thực tế.
 
 ---
 

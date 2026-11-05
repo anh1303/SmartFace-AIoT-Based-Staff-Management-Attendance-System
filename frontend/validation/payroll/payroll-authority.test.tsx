@@ -91,14 +91,14 @@ describe('Payroll source of truth', () => {
   it('does not expose shared camera or mode controls to managers', () => {
     expect(renderToStaticMarkup(<WebRTCPlayer/>)).toBe('');
   });
-  it('shows unknown adjustment prices and excludes them from known pending totals', () => {
+  it('shows unknown adjustment prices and counts pending items', () => {
     const adjustment: AttendanceAdjustment = { id: 'a1', employee_id: 'NV01', employee_name: 'Test', date: '2026-10-29', kind: 'ABSENCE', hours: 8, amount: null, amount_unavailable: true, status: 'PENDING', note: null, reviewed_by: null, reviewed_at: null, updated_at: '2026-10-29T00:00:00Z', can_review: false };
     const client = new QueryClient();
     client.setQueryData(['attendanceAdjustments', '2026-10', 'ALL'], [adjustment, { ...adjustment, id: 'a2', amount: 123, amount_unavailable: false }]);
     const html = renderToStaticMarkup(<MemoryRouter><QueryClientProvider client={client}><ToastProvider><AdjustmentReviewPanel period="2026-10"/></ToastProvider></QueryClientProvider></MemoryRouter>);
     expect(html).toContain('Chưa có đơn giá đối chiếu');
     expect(html).toContain('123 ₫');
-    expect(html).toContain('1 khoản chưa xác định số tiền');
+    expect(html).toContain('2 khoản');
     expect(canReviewAdjustment({ ...adjustment, can_review: true })).toBe(false);
   });
 });

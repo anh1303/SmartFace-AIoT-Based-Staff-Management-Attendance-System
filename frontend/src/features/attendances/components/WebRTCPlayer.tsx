@@ -16,8 +16,8 @@ interface WebRTCPlayerProps {
   streamUrl?: string; // e.g. http://10.52.138.36:8889/pi4_cam/whep
   deviceId?: string;
   deviceName?: string;
-  currentMode?: 'CHECK_IN' | 'CHECK_OUT' | 'OFF' | null;
-  onModeChange?: (newMode: 'CHECK_IN' | 'CHECK_OUT' | 'OFF') => void;
+  currentMode?: 'CHECK_IN' | 'CHECK_OUT' | 'AUTO' | 'OFF' | null;
+  onModeChange?: (newMode: 'CHECK_IN' | 'CHECK_OUT' | 'AUTO' | 'OFF') => void;
   showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
@@ -53,7 +53,7 @@ const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // Không mặc định Pi luôn là CHECK_IN; khởi tạo theo prop hoặc null (TẮT / CHỜ CẢM BIẾN)
-  const [activeMode, setActiveMode] = useState<'CHECK_IN' | 'CHECK_OUT' | 'OFF' | null>(currentMode || null);
+  const [activeMode, setActiveMode] = useState<'CHECK_IN' | 'CHECK_OUT' | 'AUTO' | 'OFF' | null>(currentMode || null);
   const [isSwitchingMode, setIsSwitchingMode] = useState(false);
 
   const isLive = iceState === 'connected' || iceState === 'completed';
@@ -63,7 +63,7 @@ const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
     try {
       const res = await apiFetch(`/api/devices/${deviceId}/mode`);
       if (res.success && res.data?.mode) {
-        const m = res.data.mode === 'CHECK_IN' || res.data.mode === 'CHECK_OUT' ? res.data.mode : 'OFF';
+        const m = res.data.mode === 'CHECK_IN' || res.data.mode === 'CHECK_OUT' || res.data.mode === 'AUTO' ? res.data.mode : 'OFF';
         setActiveMode(m);
         onModeChange?.(m);
       } else {

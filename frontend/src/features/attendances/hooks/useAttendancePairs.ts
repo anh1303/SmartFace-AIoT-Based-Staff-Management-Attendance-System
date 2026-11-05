@@ -497,6 +497,7 @@ export function useAttendancePairs(
 
       const isCheckInFace = checkInLog?.method === 'FACE';
       const isCheckOutFace = checkOutLog?.method === 'FACE';
+      const inPunc = ['LATE', 'LATE_AND_EARLY'].includes(summary?.status) ? 'LATE' : checkInLog?.punctuality || 'ON_TIME';
 
       const checkInRow: AttendanceEventItem = {
         id: `${emp.employee_id}-${shiftDate}-in`,
@@ -510,18 +511,18 @@ export function useAttendancePairs(
         status: isNoShift
           ? 'UNRECORDED'
           : checkInLog
-            ? (['LATE', 'LATE_AND_EARLY'].includes(summary?.status)
+            ? (inPunc === 'LATE'
                 ? 'LATE'
-                : checkInLog.punctuality === 'UNRECORDED'
+                : inPunc === 'UNRECORDED'
                   ? 'UNRECORDED'
                   : 'ON_TIME')
             : 'UNRECORDED',
         statusText: isNoShift
           ? (checkInLog ? 'UNRECORDED' : '--')
           : checkInLog
-            ? (['LATE', 'LATE_AND_EARLY'].includes(summary?.status)
+            ? (inPunc === 'LATE'
                 ? 'Đi muộn'
-                : checkInLog.punctuality === 'UNRECORDED'
+                : inPunc === 'UNRECORDED'
                   ? 'UNRECORDED'
                   : 'Đúng giờ')
             : '--',
@@ -613,7 +614,32 @@ export function useAttendancePairs(
     });
 
 
-    const validPairs = pairs.filter((item): item is AttendancePairItem => item !== null);
+    const validPairs = pairs.filter((item): item is AttendancePairItem => {
+      if (!item) return false;
+      // Ca OFF (ngày nghỉ) chỉ hiển thị khi có phát sinh chấm công hoặc có tăng ca (OT) / yêu cầu xét duyệt
+      if (item.isOffDay) {
+        const hasActivityOrOT =
+          item.hasCheckedIn ||
+          item.hasCheckedOut ||
+          (item.rawEvents && item.rawEvents.length > 0) ||
+          item.workingHours > 0 ||
+          item.currentOTSec > 0 ||
+          item.approvedOtHours > 0 ||
+          item.pendingOtHours > 0 ||
+          item.proposedOtHours > 0 ||
+          item.candidateHours > 0 ||
+          item.needsReview ||
+          item.reviewStatus === 'APPROVED' ||
+          item.reviewStatus === 'PENDING' ||
+          item.overtimeStatus === 'APPROVED' ||
+          item.overtimeStatus === 'PENDING';
+
+        if (!hasActivityOrOT) {
+          return false;
+        }
+      }
+      return true;
+    });
 
     if (statusFilter === 'ALL') return validPairs;
     return validPairs.filter(item =>

@@ -1,4 +1,5 @@
 import { AttendanceEventBadge } from '../../components/common/AttendanceEventBadge';
+import { confidenceColor } from '../../utils/confidence';
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
@@ -51,9 +52,7 @@ export const EmployeeAttendance: React.FC = () => {
 
   // Dates & Presets for Summary view
   const todayVN = getTodayVNString();
-  const currentYear = new Date().getFullYear();
-  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-  const startOfCurrentMonth = `${currentYear}-${currentMonth}-01`;
+  const startOfCurrentMonth = `${todayVN.slice(0, 7)}-01`;
 
   const [startDate, setStartDate] = useState<string>(() => urlParams.get('date') || startOfCurrentMonth);
   const [endDate, setEndDate] = useState<string>(() => urlParams.get('date') || todayVN);
@@ -83,7 +82,7 @@ export const EmployeeAttendance: React.FC = () => {
   }, [currentUser, employees]);
 
   // Hook for attendance statistics & filtered logs
-  const { employeeAttendanceLogs, attendanceStats } = useEmployeeAttendanceDetail({
+  const { employeeAttendanceLogs } = useEmployeeAttendanceDetail({
     currentEmp: currentEmp || null,
     startDate,
     endDate,
@@ -165,7 +164,6 @@ export const EmployeeAttendance: React.FC = () => {
           setAttendanceTypeFilter={setAttendanceTypeFilter}
           attendanceStatusFilter={attendanceStatusFilter}
           setAttendanceStatusFilter={setAttendanceStatusFilter}
-          attendanceStats={attendanceStats}
           employeeAttendanceLogs={employeeAttendanceLogs}
         />
       ) : (
@@ -246,7 +244,7 @@ export const EmployeeAttendance: React.FC = () => {
                       <TableCell className="font-mono text-slate-700 dark:text-slate-300 truncate" title={record.device_id}>
                         {record.device_id}
                       </TableCell>
-                      <TableCell className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                      <TableCell className={`font-mono font-bold ${confidenceColor(record.verification_score)}`}>
                         {record.verification_score !== null && record.verification_score !== undefined
                           ? `${(record.verification_score * 100).toFixed(1)}% Match`
                           : '--'}

@@ -4,7 +4,7 @@ import React, { useMemo, useState, useId } from 'react';
 import { Clock } from 'lucide-react';
 import { AttendanceRecord, Employee } from '../../../types';
 import { useApp } from '../../../context/AppContext';
-import { useAttendance, useAttendancePairs, useAttendanceSummaries, AttendanceStats } from '@/features/attendances';
+import { useAttendance, useAttendancePairs, useAttendanceSummaries } from '@/features/attendances';
 
 interface EmployeeAttendanceTabProps {
   currentEmp?: Employee;
@@ -19,7 +19,6 @@ interface EmployeeAttendanceTabProps {
   setAttendanceTypeFilter: (t: string) => void;
   attendanceStatusFilter: string;
   setAttendanceStatusFilter: (s: string) => void;
-  attendanceStats: AttendanceStats;
   employeeAttendanceLogs: AttendanceRecord[];
 }
 
@@ -36,7 +35,6 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
   setAttendanceTypeFilter,
   attendanceStatusFilter,
   setAttendanceStatusFilter,
-  attendanceStats,
   employeeAttendanceLogs
 }) => {
   const { workShifts, employees } = useApp();
@@ -209,14 +207,7 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
         </div>
       </div>
 
-      <div className="sf-summary" aria-label="Tổng hợp trong khoảng đã chọn">
-        <span><strong>{attendanceStats.workDays}</strong> ngày làm việc</span>
-        <span><strong>{attendanceStats.totalLogs}</strong> lượt quét · {attendanceStats.checkIns} vào / {attendanceStats.checkOuts} ra</span>
-        <span><strong>{attendanceStats.lateCount + attendanceStats.earlyLeaveCount}</strong> lượt trễ / sớm</span>
-        <span>Điểm xác thực TB: <strong className={attendanceStats.avgConfidence > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}>{attendanceStats.avgConfidence}%</strong></span>
-      </div>
-
-      {currentEmp && <details className="sf-panel p-4"><summary className="font-semibold">Các khoản OT & phạt trong kỳ · Xem và đối chiếu</summary><div className="mt-5"><AdjustmentReviewPanel period={(startDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })).slice(0,7)} employeeId={currentEmp.employee_id} /></div></details>}
+      {currentEmp && <details className="sf-panel p-4"><summary className="text-lg font-semibold">Các khoản thưởng phạt trong kỳ</summary><div className="mt-5"><AdjustmentReviewPanel period="ALL" startDate={startDate} endDate={endDate} employeeId={currentEmp.employee_id} workShifts={workShifts} /></div></details>}
       <section className="space-y-3">
         <h3 className="font-bold text-slate-900 dark:text-white">Chi tiết các lượt vào / ra theo ngày</h3>
         <AttendanceLogFilterSelect value={logFilter} onChange={setLogFilter} />

@@ -1,3 +1,4 @@
+import { Avatar } from '../../../components/common/Avatar';
 import React, { useState, useRef, useEffect } from 'react';
 import { ScanFace, Fingerprint, ChevronDown, Search } from 'lucide-react';
 import { Employee } from '../../../types';
@@ -147,14 +148,7 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
       {currentEmp ? (
         <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-4 overflow-hidden">
           <div className="flex items-center gap-3 min-w-0">
-            <img
-              src={
-                currentEmp.avatar ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
-              }
-              alt={currentEmp.full_name}
-              className="w-14 h-14 rounded-xl object-cover border border-blue-200 dark:border-blue-800 shrink-0"
-            />
+            <Avatar src={currentEmp.avatar} name={currentEmp.full_name} size={56} />
             <div className="min-w-0 flex-1">
               <h3
                 className="text-sm font-bold text-slate-900 dark:text-white max-w-[150px] sm:max-w-[180px] truncate"

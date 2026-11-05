@@ -138,6 +138,10 @@ md/
 /face_auth/tests/test_pad_domain_optimization.py
 /docs/experiments/2026-10-22-pad-final/
 
+# Local report deliverables; keep sources on disk, outside version control.
+/docs/reports/
+/PBL6_SYSTEM_CONTEXT_FOR_REPORT.md
+
 # Local presentation deliverables; keep sources on disk, outside version control.
 /docs/presentation*/
 

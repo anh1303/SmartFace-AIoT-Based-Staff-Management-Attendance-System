@@ -11,8 +11,8 @@ export const modeNotify = async (req: Request, res: Response) => {
   }
   const rawMode = req.body.mode ?? req.body.current_mode ?? req.body.attendance_mode;
   const mode = rawMode === null || rawMode === '' || rawMode === 'NONE' || rawMode === 'IDLE' || rawMode === 'OFF' ? 'OFF' : rawMode;
-  if (!mode || !['CHECK_IN', 'CHECK_OUT', 'OFF'].includes(mode)) {
-    return res.status(400).json({ success: false, message: 'Invalid mode: must be CHECK_IN, CHECK_OUT, or OFF' });
+  if (!mode || !['CHECK_IN', 'CHECK_OUT', 'AUTO', 'OFF'].includes(mode)) {
+    return res.status(400).json({ success: false, message: 'Invalid mode: must be CHECK_IN, CHECK_OUT, AUTO, or OFF' });
   }
   console.log(`[Device Mode Notify] Thiết bị ${req.params.id} thông báo đổi chế độ: ${mode}`);
   const state = service.recordDeviceModeNotify(String(req.params.id), mode as service.AttendanceModeValue);
@@ -52,8 +52,8 @@ export const remove = async (req: Request, res: Response) => {
 export const setMode = async (req: Request, res: Response) => {
   const rawMode = req.body.mode;
   const mode = rawMode === null || rawMode === '' || rawMode === 'NONE' || rawMode === 'IDLE' || rawMode === 'OFF' ? 'OFF' : rawMode;
-  if (!mode || !['CHECK_IN', 'CHECK_OUT', 'OFF'].includes(mode)) {
-    return res.status(400).json({ success: false, message: 'Invalid mode: must be CHECK_IN, CHECK_OUT, or OFF' });
+  if (!mode || !['CHECK_IN', 'CHECK_OUT', 'AUTO', 'OFF'].includes(mode)) {
+    return res.status(400).json({ success: false, message: 'Invalid mode: must be CHECK_IN, CHECK_OUT, AUTO, or OFF' });
   }
   const result = await service.setDeviceAttendanceMode(String(req.params.id), mode as service.AttendanceModeValue, req.user?.role);
   eventBus.publish('device:mode-updated', { deviceId: String(req.params.id), mode, confirmed: result.confirmed });

@@ -21,4 +21,16 @@ describe('attendance punctuality', () => {
     expect(determinePunctuality('CHECK_OUT', '2026-10-31T17:59:00+07:00', shifts)).toBe('EARLY_LEAVE')
     expect(determinePunctuality('CHECK_IN', '2026-10-31T07:53:20+07:00', [])).toBe('UNRECORDED')
   })
+  it('compares overnight events against absolute shift boundaries', () => {
+    const shifts = [
+      { work_date: '2026-10-31', start_time: '22:00', end_time: '06:00', shift_type: 'OTHER' },
+      { work_date: '2026-11-01', start_time: '22:00', end_time: '06:00', shift_type: 'OTHER' },
+    ]
+    expect(determinePunctuality('CHECK_OUT', '2026-10-31T23:50:00+07:00', shifts)).toBe('EARLY_LEAVE')
+    expect(determinePunctuality('CHECK_OUT', '2026-11-01T05:00:00+07:00', shifts)).toBe('EARLY_LEAVE')
+    expect(determinePunctuality('CHECK_OUT', '2026-11-01T06:05:00+07:00', shifts)).toBe('ON_TIME')
+    expect(determinePunctuality('CHECK_IN', '2026-10-31T22:15:00+07:00', shifts)).toBe('ON_TIME')
+    expect(determinePunctuality('CHECK_IN', '2026-10-31T22:15:01+07:00', shifts)).toBe('LATE')
+  })
+
 })

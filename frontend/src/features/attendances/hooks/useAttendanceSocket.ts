@@ -70,7 +70,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
                   timestamp: record.event_time || record.timestamp,
                   verificationScore: record.verification_score,
                   similarity: record.verification_score,
-                  deviceId: record.device_info || 'PI4_FRONT_GATE',
+                  deviceId: record.device_info || undefined,
                   message: isCheckIn ? 'Điểm danh vào ca thành công' : 'Điểm danh tan ca thành công',
                 };
               }).filter((e: LiveAttendanceEvent) => !existingIds.has(e.id));
@@ -99,7 +99,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
       const empName = record.employee_name || record.employeeName || record.employees?.full_name || 'Nhân viên';
       const empCode = record.employee_code || record.employeeCode || record.employees?.employee_code || record.employee_id || '';
       const avatarUrl = record.avatar_url || record.avatarUrl || record.employees?.avatar_url || null;
-      const deviceId = record.device_id || record.deviceId || record.device_info || 'PI4_FRONT_GATE';
+      const deviceId = record.device_id || record.deviceId || record.device_info || undefined;
       const rawTimestamp = record.timestamp || record.event_time || new Date().toISOString();
       const eventTime = new Date(rawTimestamp).toLocaleTimeString('vi-VN');
       const verificationScore = record.verification_score !== undefined && record.verification_score !== null
@@ -138,7 +138,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
       const empName = record.employee_name || record.employeeName || record.employees?.full_name || 'Nhân viên';
       const empCode = record.employee_code || record.employeeCode || record.employees?.employee_code || record.employee_id || '';
       const avatarUrl = record.avatar_url || record.avatarUrl || record.employees?.avatar_url || null;
-      const deviceId = record.device_id || record.deviceId || record.device_info || 'PI4_FRONT_GATE';
+      const deviceId = record.device_id || record.deviceId || record.device_info || undefined;
       const rawTimestamp = record.timestamp || record.event_time || new Date().toISOString();
       const eventTime = new Date(rawTimestamp).toLocaleTimeString('vi-VN');
       const verificationScore = record.verification_score !== undefined && record.verification_score !== null
@@ -189,7 +189,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
       seenEventIdsRef.current.add(recordId);
 
       showToast?.('Phát hiện khuôn mặt chưa đăng ký trong hệ thống!', 'warning');
-      const deviceId = data?.device_id || data?.deviceId || 'PI4_FRONT_GATE';
+      const deviceId = data?.device_id || data?.deviceId || undefined;
       const similarity = data?.similarity ?? (data?.score ? Number(data.score) : undefined);
       const rawTimestamp = data?.timestamp || new Date().toISOString();
 
@@ -213,7 +213,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
       seenEventIdsRef.current.add(recordId);
 
       showToast?.('CẢNH BÁO: Đã chặn hành vi giả mạo khuôn mặt!', 'error');
-      const deviceId = data?.device_id || data?.deviceId || 'PI4_FRONT_GATE';
+      const deviceId = data?.device_id || data?.deviceId || undefined;
       const rawTimestamp = data?.timestamp || new Date().toISOString();
 
       const newEvt: LiveAttendanceEvent = {

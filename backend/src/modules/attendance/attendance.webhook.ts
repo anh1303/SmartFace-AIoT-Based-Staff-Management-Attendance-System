@@ -4,7 +4,7 @@ import { eventBus } from '../../common/event-bus.js'
 import { observeRecognition } from './recognition-confirmation.js'
 import { findBestFaceMatch } from '../biometrics/public.js'
 import { claimAlert } from './attendance.alert-dedup.js'
-import { vnDay } from './attendance.policy.js'
+import { MAX_PAIR_MS } from './attendance.policy.js'
 
 export interface ThingsBoardWebhookPayload {
   device_id?: string
@@ -130,15 +130,16 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
 
   // Logic 1: Tự động phân định CHECK_IN / CHECK_OUT nếu mode = AUTO (hoặc không truyền)
   let resolvedMode: 'CHECK_IN' | 'CHECK_OUT' = 'CHECK_IN'
+  let cooldownResponse: any = null
   if (normalizedRequestedMode === 'AUTO') {
-    const startOfDay = new Date(`${vnDay(new Date())}T00:00:00+07:00`)
+    // Use the same pairing window as the writer so overnight shifts keep their check-in.
     const lastLog = await prisma.attendance_logs.findFirst({
       where: {
         employee_id: match.emp_id,
         status: 'VALID',
-        event_time: { gte: startOfDay },
+        event_time: { gte: new Date(capturedAt - MAX_PAIR_MS), lte: new Date(capturedAt) },
       },
-      orderBy: { event_time: 'desc' },
+      orderBy: [{ event_time: 'desc' }, { id: 'desc' }],
     })
 
     // Cooldown chống quét nhầm: Nếu vừa điểm danh trong vòng ATTENDANCE_COOLDOWN_SECONDS
@@ -148,10 +149,10 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
       const remainingSec = Math.ceil((cooldownMs - (nowMs - new Date(lastLog.event_time).getTime())) / 1000)
       const actionText = lastLog.type === 'CHECK_IN' ? 'vào ca' : 'tan ca'
       const nextActionText = lastLog.type === 'CHECK_IN' ? 'tan ca' : 'vào ca'
-      return {
-        success: true,
+      cooldownResponse = {
+        success: false,
         matched: true,
-        door_open: true,
+        door_open: false,
         cooldown: true,
         event_id: data.event_id,
         mode: lastLog.type,
@@ -177,7 +178,7 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
   const isCheckOut = resolvedMode === 'CHECK_OUT'
 
   if (isConfirmation) {
-    const confirmation = observeRecognition(device_id, `${resolvedMode}:${data.event_id}`, data.recognition_id!, match.emp_id)
+    const confirmation = observeRecognition(device_id, `${normalizedRequestedMode}:${data.event_id}`, data.recognition_id!, match.emp_id)
     if (data.event_kind === 'VERIFY_ONLY' || !confirmation.ready || data.expected_employee_id !== match.emp_id) {
       return {
         success: true, matched: true, verification_only: true, event_id: data.event_id,
@@ -189,6 +190,8 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
       }
     }
   }
+
+  if (cooldownResponse) return cooldownResponse
 
   try {
     let attendanceRecord

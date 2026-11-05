@@ -28,6 +28,11 @@ export interface BackendAttendanceSummaryItem {
   overtime_candidate_hours?: number;
   calculation_details?: { pairs?: Array<{ inId: string; outId: string; start: string; end: string; counted?: boolean; regular_seconds?: number; overtime_seconds?: number; credited_regular_seconds?: number; credit_reason?: string }>; events?: Array<{ id: string; type: string; time: string; status: string; method?: string; device_info?: string; verification_score?: number | null }>; ignored?: Array<{ id: string; reason: string }>; [key: string]: unknown };
   review_reason: string | null;
+  review_status?: 'NONE' | 'PENDING' | 'APPROVED' | string;
+  approval_source?: string | null;
+  approval_reason?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
   reason_labels?: Record<string, string>;
   policy_version: string | null;
   is_legacy_no_policy: boolean;

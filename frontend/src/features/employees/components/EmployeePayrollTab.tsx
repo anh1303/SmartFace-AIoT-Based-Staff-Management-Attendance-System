@@ -39,9 +39,9 @@ export const EmployeePayrollTab: React.FC<EmployeePayrollTabProps> = ({
           </span>
         </div>
 
-        <TableContainer minWidth="850px">
+        <TableContainer minWidth="850px" maxHeight="568px">
           <TableHead>
-            <TableHeadRow>
+            <TableHeadRow className="h-12">
               <TableHeadCell width="130px" align="center">Tháng</TableHeadCell>
               <TableHeadCell width="130px" align="center">Lương theo giờ</TableHeadCell>
               <TableHeadCell width="110px" align="center">Tổng giờ làm</TableHeadCell>
@@ -71,7 +71,7 @@ export const EmployeePayrollTab: React.FC<EmployeePayrollTabProps> = ({
                     tabIndex={0}
                     onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelectPayslip(p);}}}
                     onClick={() => onSelectPayslip(p)}
-                    className="cursor-pointer"
+                    className="h-[52px] cursor-pointer"
                     title="Nhấp để xem chi tiết phiếu lương"
                   >
                     <TableCell className="font-mono font-bold text-slate-900 dark:text-white truncate" title={periodStr}>

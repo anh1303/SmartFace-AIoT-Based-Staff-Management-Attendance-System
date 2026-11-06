@@ -888,8 +888,9 @@ def main(args=None):
                     track.recognition_status = "CACHE (DISPLAY ONLY)"
                 event_id, captured_at, pad_score = result.context
                 expected_employee = getattr(track, 'employee_id', None)
-                commit = (getattr(track, 'stable_recognitions', 0) >= vision.ATTENDANCE_STABLE_COUNT - 1
-                          and bool(expected_employee))
+                commit = (vision.ATTENDANCE_STABLE_COUNT == 1 or
+                          (getattr(track, 'stable_recognitions', 0) >= vision.ATTENDANCE_STABLE_COUNT - 1
+                           and bool(expected_employee)))
                 event_kind = 'CONFIRMED_SCAN' if commit else 'VERIFY_ONLY'
                 submission = (track.track_id, result.key[2], event_id, result.key[3], result.key[4], result.key[1], event_kind)
                 track.scan_captured_at = captured_at

@@ -12,6 +12,16 @@ from tracking.tracker import Track
 
 
 class ConfirmationFlowTests(unittest.TestCase):
+    def test_single_confirmation_commits_first_rpc_in_both_modes(self):
+        for mode in ('CHECK_IN', 'CHECK_OUT'):
+            with self.subTest(mode=mode):
+                self.run_mode(mode, required=1)
+
+    def test_two_confirmations_still_require_two_rpcs_in_both_modes(self):
+        for mode in ('CHECK_IN', 'CHECK_OUT'):
+            with self.subTest(mode=mode):
+                self.run_mode(mode, required=2)
+
     def test_both_modes_verify_twice_before_the_commit_rpc(self):
         for mode in ('CHECK_IN', 'CHECK_OUT'):
             with self.subTest(mode=mode):
@@ -25,7 +35,7 @@ class ConfirmationFlowTests(unittest.TestCase):
         for mode in ('CHECK_IN', 'CHECK_OUT'):
             with self.subTest(mode=mode): self.run_mode(mode, interruption='lost')
 
-    def run_mode(self, mode, interruption=None):
+    def run_mode(self, mode, interruption=None, required=3):
         track = Track(1, (100,100,200,200), pad_min_votes=3)
         track.landmarks = [[130,135],[170,135],[150,155],[135,175],[165,175]]
         for _ in range(3): track.update_pad(True,3.)
@@ -43,9 +53,9 @@ class ConfirmationFlowTests(unittest.TestCase):
             event = kwargs["event_id"]
             counts[event] = counts.get(event, 0) + 1
             index = counts[event]
-            readonly = index < 3
+            readonly = index < required
             self.assertEqual(kwargs['event_kind'], 'VERIFY_ONLY' if readonly else 'CONFIRMED_SCAN')
-            self.assertEqual(kwargs['expected_employee_id'], None if readonly else 'employee-a')
+            self.assertEqual(kwargs['expected_employee_id'], None if readonly or required == 1 else 'employee-a')
             on_result(dict(event_id=kwargs['event_id'], success=True, matched=True,
                            verification_only=readonly, confirmation_count=index,
                            similarity=.95, mode=mode, employee={'id':'employee-a','full_name':'Alice'}))
@@ -53,7 +63,7 @@ class ConfirmationFlowTests(unittest.TestCase):
         tb.send_scan_rpc.side_effect = rpc
         reads = 0
         interruption_stage = 0
-        target = 5 if interruption else 3
+        target = required + (2 if interruption else 0)
         def read():
             nonlocal reads, visible, interruption_stage
             reads += 1
@@ -84,12 +94,12 @@ class ConfirmationFlowTests(unittest.TestCase):
                           UltrasonicSensor=Mock(), update_track_pad=lambda *a, **kw:0,
                           get_input_face=lambda *a:np.zeros((112,112,3),np.uint8),
                           ULTRASONIC_ENABLED=False, SHOW_GUI=False, current_mode=mode, mode_generation=0)
-        with patch.multiple(edge, **replacements), patch.object(edge.cv2,'VideoCapture',return_value=camera), patch('builtins.print'), patch.object(edge.vision, 'ATTENDANCE_STABLE_COUNT', 3):
+        with patch.multiple(edge, **replacements), patch.object(edge.vision, 'ATTENDANCE_STABLE_COUNT', required), patch.object(edge.cv2,'VideoCapture',return_value=camera), patch('builtins.print'):
             edge.main()
         self.assertEqual(len(sent),target)
-        self.assertEqual(track.stable_recognitions,3)
+        self.assertEqual(track.stable_recognitions,required)
         self.assertEqual(len({x['recognition_id'] for x in sent}),target)
-        self.assertEqual(list(counts.values()), [2,3] if interruption else [3])
+        self.assertEqual(list(counts.values()), [2,required] if interruption else [required])
         for event in counts:
             self.assertEqual(len({x['captured_at'] for x in sent if x['event_id'] == event}),1)
         self.assertTrue(track.attendance_sent)

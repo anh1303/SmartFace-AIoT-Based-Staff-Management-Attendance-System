@@ -33,6 +33,7 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 load_dotenv()
 import config as vision
+from attendance_feedback import AttendanceFeedbackGuard, is_accepted_attendance
 
 
 # Helper đọc biến môi trường
@@ -121,7 +122,7 @@ ULTRASONIC_DEBOUNCE_SECONDS = get_env_float("ULTRASONIC_DEBOUNCE_SECONDS", 0.5)
 ULTRASONIC_SLEEP_DELAY = get_env_float("ULTRASONIC_SLEEP_DELAY", 0.5)
 FACE_LOST_RESET_SECONDS = get_env_float("FACE_LOST_RESET_SECONDS", 1.5)
 
-# Cấu hình Động cơ Servo mô phỏng mở cổng (90° đóng, 0° checkin, 180° checkout, ngắt PWM chống giật)
+# Cấu hình Động cơ Servo mô phỏng mở cổng (0° đóng, 90° mở cho cả checkin/checkout, ngắt PWM chống giật)
 SERVO_ENABLED = get_env_bool("SERVO_ENABLED", True)
 SERVO_PIN = get_env_int("SERVO_PIN", 18)
 SERVO_OPEN_SECONDS = get_env_float("SERVO_OPEN_SECONDS", 3.0)
@@ -186,6 +187,8 @@ def face_status_label(track):
     if not track.is_real:
         return "CHECKING", (0, 255, 255)
     name, _, _ = track.display_result(vision.RECOGNITION_LABEL_HOLD_SECONDS)
+    if name == 'UNKNOWN' and not track.recognized_once:
+        return 'REAL - CHECKING ID', (0, 255, 255)
     return f"REAL - {name}", (0, 255, 0)
 
 
@@ -262,6 +265,7 @@ def main(args=None):
     )
     ultrasonic_sensor.start()
 
+    feedback_guard = AttendanceFeedbackGuard()
     # Callback khi nhận kết quả đối soát điểm danh Two-way RPC từ Backend
     def on_attendance_result(res: dict):
         nonlocal status_banner, status_banner_time
@@ -269,11 +273,14 @@ def main(args=None):
             return
 
         is_matched = res.get("matched", False)
-        is_success = res.get("success", False)
+        is_success = is_accepted_attendance(res)
         sim = res.get("similarity", 0.0)
         mode = res.get("mode", current_mode)
 
         if is_matched and is_success:
+            if not feedback_guard.claim(res):
+                print(f"[EDGE] Bỏ phản hồi điểm danh lặp event={res.get('event_id')}")
+                return
             emp = res.get("employee", {})
             emp_name = emp.get("full_name") or emp.get("employee_code") or "Nhân viên"
             review = res.get("attendance", {}).get("status") == "FLAGGED"
@@ -291,12 +298,15 @@ def main(args=None):
             except Exception as e:
                 print(f"[AUDIO WARN] Lỗi phát âm thanh điểm danh: {e}")
 
-            # Kích hoạt mở cổng Servo mô phỏng (0° check-in, 180° check-out, chống giật)
+            # Kích hoạt mở cổng Servo mô phỏng (0° đóng, 90° mở, chống giật)
             if res.get("door_open", True):
                 servo_gate.open_gate_safe(
                     mode=mode,
-                    is_person_present_fn=ultrasonic_sensor.is_person_present,
+                    is_person_present_fn=ultrasonic_sensor.is_person_present if ULTRASONIC_ENABLED else None,
+                    close_delay_seconds=3.0,
                     open_seconds=SERVO_OPEN_SECONDS,
+                    max_hold_seconds=8.0,
+                    detach_after_move=True,
                 )
         elif is_matched and not is_success:
             emp = res.get("employee", {})
@@ -786,6 +796,11 @@ def main(args=None):
                         track.invalidate_recognition()
                         track.stable_recognitions = 0
                         track.recognition_eligible = False
+                        # The identity was cleared: let this person be recognized
+                        # again when PAD recovers, even after a completed attendance.
+                        if track_id == last_active_track_id:
+                            attendance_latch = False
+                            last_submission = None
                 previous_recognition_tracks = visible_tracks
                 inference_frame = frame
                 if render_output:
@@ -920,7 +935,7 @@ def main(args=None):
                 if not isinstance(response, dict):
                     continue
 
-                is_final_success = bool(response.get('matched') and response.get('success') and not response.get('verification_only'))
+                is_final_success = is_accepted_attendance(response)
                 is_verify_only = bool(response.get('verification_only') and response.get('matched') and response.get('success'))
 
                 if is_verify_only:
@@ -957,7 +972,7 @@ def main(args=None):
                         response_track.update_display_identity(identity, vision.RECOGNITION_LABEL_CONFIRMATIONS,
                                                                vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
                         response_track.recognition_status = 'CLOUD'
-                    elif not response.get('matched'):
+                    elif response.get('matched') is False and not response.get('uncertain'):
                         key = (submission[0], submission[5], submission[1], submission[3], submission[4])
                         identity_cache.entries.pop(key, None)
                         response_track.update_result(None, "UNKNOWN", float(response.get("similarity", 0)))
@@ -1000,7 +1015,7 @@ def main(args=None):
                             tr.scan_scope = (tr.verification_generation, *frame_mode)
 
                 on_attendance_result(response)
-                if not (response.get('success') and response.get('matched')):
+                if not is_final_success:
                     attendance_latch = False
                     if not response.get('uncertain'):
                         last_submission = None

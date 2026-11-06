@@ -1,8 +1,8 @@
 """
 Driver điều khiển Động cơ Servo (SG90 / MG995 / MG996R) mô phỏng đóng/mở cổng:
-- Vị trí mặc định (Cửa đóng): 90°
-- Chiều Vào ca (CHECK_IN): 0°
-- Chiều Ra ca (CHECK_OUT): 180°
+- Vị trí mặc định (Cửa đóng): 0°
+- Chiều Vào ca (CHECK_IN): 90°
+- Chiều Ra ca (CHECK_OUT): 90°
 - Cơ chế an toàn (Obstacle safety): Giữ cửa mở nếu cảm biến siêu âm vẫn phát hiện người
 - Cơ chế chống giật (Anti-jitter): Ngắt xung PWM (servo.angle = None) khi cửa đã đóng
 - Hỗ trợ Mock Mode tự động khi chạy trên môi trường không có GPIO/Pi
@@ -29,8 +29,11 @@ class ServoController:
         self._servo = None
         self._is_mock = False
         self._lock = threading.Lock()
+        self._stopping = threading.Event()
+        self._worker = None
 
-        # Trạng thái cửa: "CLOSED" (90°), "OPEN_IN" (0°), "OPEN_OUT" (180°)
+        # Trạng thái cửa: "CLOSED" (0°), "OPEN_IN" / "OPEN_OUT" (90°)
+        self._open_state = "OPEN_IN"
         self.door_state = "CLOSED"
         self.current_angle: Optional[float] = None
 
@@ -47,13 +50,13 @@ class ServoController:
                 min_pulse_width=self.min_pulse_width,
                 max_pulse_width=self.max_pulse_width,
             )
-            # Khởi tạo vị trí 90 độ, sau đó ngắt xung để chống giật
-            self._servo.angle = 90
-            time.sleep(0.5)
+            # Khởi tạo vị trí 0 độ, sau đó ngắt xung để chống giật
+            self._servo.angle = 0
+            time.sleep(1.0)
             self._servo.angle = None
             self._is_mock = False
             self.current_angle = None
-            print(f"[SERVO] Khởi tạo thành công trên GPIO {self.pin} (Trạng thái: ĐÓNG 90°, PWM Detached).")
+            print(f"[SERVO] Khởi tạo thành công trên GPIO {self.pin} (Trạng thái: ĐÓNG 0°, PWM Detached).")
         except Exception as e:
             self._is_mock = True
             self._servo = None
@@ -76,87 +79,107 @@ class ServoController:
         else:
             self.current_angle = float(angle)
             if self.current_angle <= 45.0:
-                self.door_state = "OPEN_IN"
-            elif self.current_angle >= 135.0:
-                self.door_state = "OPEN_OUT"
-            else:
                 self.door_state = "CLOSED"
+            else:
+                self.door_state = self._open_state
 
     def open_gate_safe(
         self,
         mode: str,
         is_person_present_fn: Optional[Callable[[], bool]] = None,
         open_seconds: float = 3.0,
-        max_hold_seconds: float = 15.0,
+        close_delay_seconds: float = 5.0,
+        max_hold_seconds: Optional[float] = None,
+        detach_after_move: bool = False,
         on_state_change: Optional[Callable[[str], None]] = None,
     ):
+        """Hold open while occupied, then close after continuous absence.
+
+        - detach_after_move=True: Ngắt xung PWM (servo.angle = None) sau 0.6s quay để triệt tiêu
+          nhiệt lượng cuộn dây, chống rung lắc (jitter) và chống sụt áp nguồn 5V (theo dht11_servo.py).
+        - max_hold_seconds: Giới hạn thời gian mở tối đa (mặc định 10s) chống kẹt cổng vô hạn khi test tại bàn.
         """
-        Mở cửa an toàn theo mode trong một luồng riêng biệt (Non-blocking):
-        - mode == 'CHECK_IN': quay 0° (Mở vào)
-        - mode == 'CHECK_OUT': quay 180° (Mở ra)
-        - Chờ open_seconds (mặc định 3s).
-        - Nếu is_person_present_fn() vẫn trả về True, tiếp tục giữ cửa mở (tối đa max_hold_seconds).
-        - Khi người đã bước qua, quay về 90° (Đóng), chờ 0.5s rồi ngắt xung (servo.angle = None).
-        """
-        if not self.enabled:
+        if not self.enabled or self._stopping.is_set():
+            return
+        if not self._lock.acquire(blocking=False):
+            print('[SERVO] Cổng đang mở; không xếp thêm chu kỳ mở/đóng.')
             return
 
         def _action():
-            with self._lock:
-                normalized = mode.upper() if mode else "CHECK_IN"
-                # Góc an toàn tránh kẹt chốt cơ khí (0-10° cho check-in, 170-180° cho check-out)
-                target_angle = 10.0 if normalized == "CHECK_IN" else 170.0
-                action_label = f"MỞ VÀO ({int(target_angle)}°)" if normalized == "CHECK_IN" else f"MỞ RA ({int(target_angle)}°)"
-                self.door_state = "OPEN_IN" if normalized == "CHECK_IN" else "OPEN_OUT"
-
-                print(f"[SERVO] 🚪 Kích hoạt mở cổng {normalized}: Quay {action_label}...")
+            try:
+                normalized = (mode or 'CHECK_IN').upper()
+                self._open_state = 'OPEN_IN' if normalized == 'CHECK_IN' else 'OPEN_OUT'
+                target_angle = 90.0
+                print(f'[SERVO] Mở cổng {normalized}: {target_angle}°')
                 self.set_angle(target_angle)
                 if on_state_change:
                     on_state_change(self.door_state)
+                # Cho motor quay đến góc đích rồi ngắt xung PWM chống nóng motor và sụt áp nếu detach_after_move
+                move_time = 0.6 if detach_after_move else 1.0
+                time.sleep(move_time)
+                if detach_after_move:
+                    self.set_angle(None)
+                    print('[SERVO] 🔌 Đã ngắt xung PWM sau khi mở -> Bánh răng giữ vị trí, motor nghỉ mát.')
 
-                # Chờ motor quay tới góc mở rồi ngắt PWM ngay lập tức để triệt tiêu hoàn toàn rung lắc
-                time.sleep(0.4)
-                self.set_angle(None)
-                print("[SERVO] 🔌 Đã ngắt xung PWM khi mở -> Cổng giữ vị trí, triệt tiêu 100% rung giật!")
-
-                try:
-                    # Giữ mở trong thời gian tối thiểu (trừ 0.4s đã xoay)
-                    remaining_open = max(0.1, open_seconds - 0.4)
-                    time.sleep(remaining_open)
-
-                    # Kiểm tra an toàn: Nếu người vẫn đứng trước cảm biến (<= 50cm), tiếp tục giữ mở
-                    if is_person_present_fn:
-                        start_hold = time.time()
-                        while is_person_present_fn():
-                            if time.time() - start_hold >= max_hold_seconds:
-                                print("[SERVO] ⚠️ Cảnh báo: Vượt quá thời gian giữ cửa tối đa (15s); buộc phải đóng cửa!")
+                if is_person_present_fn is None:
+                    self._stopping.wait(max(0.0, open_seconds - move_time))
+                else:
+                    absent_since = None
+                    sensor_error = False
+                    start_open = time.monotonic()
+                    while not self._stopping.is_set():
+                        # Timeout an toàn tối đa: Tránh kẹt mở vô hạn khi ngồi test tại bàn
+                        if max_hold_seconds is not None and (time.monotonic() - start_open) >= max_hold_seconds:
+                            print(f'[SERVO] ⚠️ Đạt thời gian mở tối đa ({max_hold_seconds}s) -> Tự động đóng cổng an toàn.')
+                            break
+                        try:
+                            present = is_person_present_fn()
+                            sensor_error = False
+                        except Exception as exc:
+                            # An unreadable sensor cannot confirm an empty doorway.
+                            if not sensor_error:
+                                print(f'[SERVO WARN] Không đọc được cảm biến; giữ mở: {exc}')
+                            sensor_error = True
+                            absent_since = None
+                            time.sleep(0.1)
+                            continue
+                        if present:
+                            if absent_since is not None:
+                                print('[SERVO] Có người trở lại; hủy đếm đóng cửa.')
+                            absent_since = None
+                        else:
+                            if absent_since is None:
+                                absent_since = time.monotonic()
+                                print(f'[SERVO] Không còn người; chờ {close_delay_seconds:g}s trước khi đóng.')
+                            if time.monotonic() - absent_since >= close_delay_seconds:
                                 break
-                            print("[SERVO] ⏳ Người vẫn đang ở cổng (d <= 50cm) -> Tiếp tục giữ cửa mở an toàn...")
-                            time.sleep(0.5)
-                except Exception as exc:
-                    print(f"[SERVO] Ngoại lệ trong khi giữ cửa mở: {exc}")
-                finally:
-                    # Đóng cửa về vị trí 90 độ và ngắt PWM chống giật
-                    print("[SERVO] 🚪 Đóng cổng: Quay về vị trí chờ 90°...")
-                    self.set_angle(90.0)
-                    self.door_state = "CLOSED"
+                        time.sleep(0.1)
+            finally:
+                try:
+                    print('[SERVO] Đóng cổng: 0°')
+                    self.set_angle(0.0)
                     if on_state_change:
                         on_state_change(self.door_state)
-
-                    time.sleep(0.4)  # Chờ 0.4s để motor quay về tới vị trí 90 độ hoàn chỉnh
-
-                    # Triệt tiêu hoàn toàn xung PWM chống rung giật và chống nóng động cơ
-                    print("[SERVO] 🔌 Ngắt xung PWM (servo.angle = None) -> Động cơ nghỉ hoàn toàn, không rung lắc.")
+                    time.sleep(1.0)
                     self.set_angle(None)
+                finally:
+                    self._lock.release()
 
-        thread = threading.Thread(target=_action, daemon=True)
-        thread.start()
+        self._worker = threading.Thread(target=_action, daemon=True)
+        try:
+            self._worker.start()
+        except Exception:
+            self._lock.release()
+            raise
 
     def close(self):
         """Giải phóng tài nguyên phần cứng."""
+        self._stopping.set()
+        if self._worker and self._worker is not threading.current_thread():
+            self._worker.join(timeout=1.0)
         try:
-            self.set_angle(90)
-            time.sleep(0.2)
+            self.set_angle(0)
+            time.sleep(1.0)
             self.set_angle(None)
             if self._servo:
                 self._servo.close()

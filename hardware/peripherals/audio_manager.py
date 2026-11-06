@@ -372,14 +372,27 @@ class AudioManager:
         target_name: Optional[str] = None,
     ) -> bool:
         """
-        Phát giọng đọc thông báo điểm danh qua tai nghe/loa Bluetooth:
-        Ví dụ: '{emp_name} check in thành công' hoặc '{emp_name} check out thành công'.
-        Nếu chưa tải được TTS, tự động fallback về chuông báo chuẩn.
+        Phát âm thanh thông báo điểm danh qua tai nghe/loa Bluetooth:
+        Mặc định phát chuông Ding-Dong hai nốt (C5-E5) chuẩn (như nút phát thử âm thanh check-in)
+        để phản hồi tức thì (zero latency), triệt tiêu hoàn toàn độ trễ mạng và delay giọng nói.
+        Nếu muốn bật đọc giọng nói TTS tiếng Việt, đặt biến môi trường ENABLE_TTS=true.
         """
-        name = (emp_name or "").strip()
-        is_generic = not name or name.lower() in ("nhân viên", "nhan vien", "unknown", "none")
-
         mode_upper = (mode or "").strip().upper()
+        name = (emp_name or "").strip() or "Nhân viên"
+        enable_tts = os.getenv("ENABLE_TTS", "false").lower() in ("true", "1", "yes")
+
+        if not enable_tts:
+            chime_file = self.ensure_chime_wav()
+            print(f"[AUDIO] 🔔 Phát chuông điểm danh {mode_upper} cho '{name}' (Ding-Dong như âm thanh thử)")
+            return self.play_sound_file(
+                chime_file,
+                target_mac=target_mac,
+                target_name=target_name,
+                sound_label=f"chuông điểm danh {mode_upper} ({name})",
+            )
+
+        # Chế độ phát âm thanh đọc TTS tiếng Việt (khi bật ENABLE_TTS=true)
+        is_generic = not name or name.lower() in ("nhân viên", "nhan vien", "unknown", "none")
         if mode_upper == "CHECK_IN":
             action_phrase = "check in"
         elif mode_upper == "CHECK_OUT":
@@ -392,10 +405,9 @@ class AudioManager:
         else:
             speech_text = f"{name} {action_phrase} thành công"
 
-        print(f"[AUDIO] 📢 Chuẩn bị phát thông báo điểm danh: '{speech_text}'")
+        print(f"[AUDIO] 📢 Chuẩn bị phát thông báo điểm danh TTS: '{speech_text}'")
 
         def _speak_worker():
-            # Sinh file âm thanh giọng nói tiếng Việt (chạy ngầm, không block camera)
             audio_file = self.generate_tts_file(speech_text)
             if audio_file and os.path.exists(audio_file):
                 self.play_sound_file(
@@ -405,7 +417,6 @@ class AudioManager:
                     sound_label=f"thông báo '{speech_text}'",
                 )
             else:
-                # Fallback về chuông Ding-Dong nếu không tạo được file giọng nói
                 print("[AUDIO] Fallback về chuông thông báo Ding-Dong...")
                 self.play_test_sound(target_mac=target_mac, target_name=target_name)
 

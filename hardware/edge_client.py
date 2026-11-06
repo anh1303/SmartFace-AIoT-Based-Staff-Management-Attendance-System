@@ -932,7 +932,7 @@ def main(args=None):
 
                 # If this is a final attendance confirmation from the server, do not drop it due to transient track drop or ultrasonic sleep
                 if not is_final_success:
-                    if submission != last_submission or submission[1] != current_mode or submission[0] != last_active_track_id or submission[3] != mode_generation or submission[4] != presence_generation or not is_awake or now_wall - last_face_seen_time > FACE_LOST_RESET_SECONDS:
+                    if submission[1] != current_mode or submission[3] != mode_generation or submission[4] != presence_generation or not is_awake or now_wall - last_face_seen_time > FACE_LOST_RESET_SECONDS:
                         continue
 
                 response_track = next((track for _, track in tracked
@@ -940,18 +940,20 @@ def main(args=None):
                                        and track.verification_generation == submission[5]
                                        and track.missing_frames == 0 and track.is_real
                                        and not track.pad_invalid_reason), None)
-                if response_track is None and is_final_success:
+                if response_track is None:
                     response_track = next((track for _, track in tracked if track.track_id == submission[0]), None)
 
                 if response_track is not None:
                     if response.get('matched') and last_submission_embedding is not None:
                         employee = response.get('employee') or {}
-                        identity = (employee.get('id') or employee.get('employee_code'),
+                        emp_id = employee.get('id') or employee.get('employee_code')
+                        identity = (emp_id,
                                     employee.get('full_name') or employee.get('employee_code') or 'Nhân viên',
                                     float(response.get('similarity', 0)))
                         key = (submission[0], submission[5], submission[1], submission[3], submission[4])
                         identity_cache.confirm(key, last_submission_embedding, identity)
                         response_track.update_result(*identity)
+                        response_track.employee_id = emp_id
                         response_track.update_display_identity(identity, vision.RECOGNITION_LABEL_CONFIRMATIONS,
                                                                vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
                         response_track.recognition_status = 'CLOUD'
@@ -959,6 +961,7 @@ def main(args=None):
                         key = (submission[0], submission[5], submission[1], submission[3], submission[4])
                         identity_cache.entries.pop(key, None)
                         response_track.update_result(None, "UNKNOWN", float(response.get("similarity", 0)))
+                        response_track.employee_id = None
                         response_track.update_display_identity((None, 'UNKNOWN', 0.0),
                                                                vision.RECOGNITION_LABEL_CONFIRMATIONS,
                                                                vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
@@ -970,11 +973,31 @@ def main(args=None):
                         response_track.last_scan_sent = 0.0
                         response_track.last_recognition_time = None
                     attendance_latch = False
-                    last_submission = None
                     continue
 
                 if not is_final_success and response_track is None:
                     continue
+
+                # Refresh event_id immediately upon completion, cooldown, or conflict so next attendance session gets a fresh UUID
+                is_conflict_or_cooldown = bool(
+                    response.get('cooldown') or
+                    response.get('code') == 409 or
+                    'Event ID' in str(response.get('message', '')) or
+                    'đã được dùng' in str(response.get('message', ''))
+                )
+                if is_final_success:
+                    for _, tr in tracked:
+                        if tr.track_id == submission[0]:
+                            tr.scan_event_id = uuid.uuid4().hex
+                            tr.scan_captured_at = None
+                elif is_conflict_or_cooldown:
+                    for _, tr in tracked:
+                        if tr.track_id == submission[0]:
+                            tr.scan_event_id = uuid.uuid4().hex
+                            tr.scan_captured_at = None
+                            tr.stable_recognitions = 0
+                            tr.verification_generation += 1
+                            tr.scan_scope = (tr.verification_generation, *frame_mode)
 
                 on_attendance_result(response)
                 if not (response.get('success') and response.get('matched')):

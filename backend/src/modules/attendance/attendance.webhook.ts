@@ -6,6 +6,7 @@ import { findBestFaceMatch } from '../biometrics/public.js'
 import { claimAlert } from './attendance.alert-dedup.js'
 import { MAX_PAIR_MS } from './attendance.policy.js'
 import { attendanceIntervalRemaining, attendanceIntervalMessage } from './attendance.interval.js'
+import { createHash } from 'node:crypto'
 
 export interface ThingsBoardWebhookPayload {
   device_id?: string
@@ -147,8 +148,12 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
     })
 
     // Cheap AUTO fast path; the writer also enforces the interval inside its employee lock.
+    // A retry of the committed event must recover its acknowledgement, not
+    // become a cooldown response or switch to the opposite attendance mode.
+    const eventKey = createHash('sha256').update(`${device_id}:${data.event_id}`).digest('hex')
+    const isReplay = lastLog?.event_key === eventKey
     const remainingSec = attendanceIntervalRemaining(lastLog?.created_at ?? lastLog?.event_time)
-    if (lastLog && remainingSec > 0) {
+    if (lastLog && !isReplay && remainingSec > 0) {
       cooldownResponse = {
         success: true,
         ignored: true,
@@ -172,7 +177,8 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
     // Khi đã hết thời gian cooldown:
     // Chưa có lượt nào hôm nay hoặc lượt gần nhất là CHECK_OUT -> CHECK_IN
     // Lượt gần nhất là CHECK_IN và đã qua cooldown -> CHECK_OUT
-    resolvedMode = (!lastLog || lastLog.type === 'CHECK_OUT') ? 'CHECK_IN' : 'CHECK_OUT'
+    resolvedMode = isReplay ? lastLog!.type as 'CHECK_IN' | 'CHECK_OUT'
+      : (!lastLog || lastLog.type === 'CHECK_OUT') ? 'CHECK_IN' : 'CHECK_OUT'
   } else {
     resolvedMode = normalizedRequestedMode === 'CHECK_OUT' ? 'CHECK_OUT' : 'CHECK_IN'
   }
@@ -256,6 +262,8 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
       message: attendanceRecord.ignored ? attendanceRecord.message : `${isCheckOut ? 'Check-out' : 'Check-in'} thành công`,
     }
   } catch (err: any) {
+    const databaseUnavailable = ['P1017', 'P1001', 'P1002', 'P1008', 'P2024'].includes(err?.code)
+    if (databaseUnavailable) console.error('[ATTENDANCE] Database unavailable', { event_id: data.event_id, code: err.code })
     // Return structured response for 409 (already checked in / out today)
     return {
       success: false,
@@ -270,8 +278,11 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
         avatar_url: match.avatar_url,
       },
       similarity: Number(match.similarity.toFixed(4)),
-      code: err.statusCode || 400,
-      message: err.message || 'Lỗi xử lý điểm danh',
+      code: databaseUnavailable ? 503 : (err.statusCode || 400),
+      ...(databaseUnavailable ? { error_code: 'DATABASE_UNAVAILABLE', retryable: true } : {}),
+      message: databaseUnavailable
+        ? 'Đã nhận diện nhân viên nhưng chưa xác nhận được điểm danh do mất kết nối database. Vui lòng thử lại.'
+        : (err.message || 'Lỗi xử lý điểm danh'),
     }
   }
 }

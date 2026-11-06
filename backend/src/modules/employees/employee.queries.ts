@@ -28,10 +28,19 @@ export function updateEmployeePersonalDetails(userId: string, data: { full_name:
 export async function findEmployeeByIdOrCode(idOrCode: string, tx?: Prisma.TransactionClient) {
   const client = getEmployeeClient(tx)
   if (typeof (client as any)?.employee?.findFirst === 'function') {
-    return (client as any).employee.findFirst({
+    const read = () => (client as any).employee.findFirst({
       where: buildIdOrCodeWhere(idOrCode),
       include: employeeInclude,
     })
+    try {
+      return await read()
+    } catch (err: any) {
+      // Retry only this read outside a transaction, never an attendance write.
+      // A closed pooled connection may succeed on the next connection.
+      if (tx || err?.code !== 'P1017') throw err
+      console.warn('[DB] Employee lookup connection closed (P1017); retrying read once')
+      return read()
+    }
   }
   if (typeof (client as any)?.employee?.findUnique === 'function') {
     return (client as any).employee.findUnique({

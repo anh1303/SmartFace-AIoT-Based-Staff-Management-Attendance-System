@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const state = vi.hoisted(() => ({ rows: [] as any[], locks: [] as string[], locked: false, minutes: 10 }))
+const state = vi.hoisted(() => ({ rows: [] as any[], locks: [] as string[], locked: false, seconds: 600 }))
 const db = vi.hoisted(() => ({
   $transaction: vi.fn(), $executeRaw: vi.fn(),
   attendance_logs: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
@@ -12,7 +12,7 @@ const published = vi.hoisted(() => vi.fn())
 const aggregate = vi.hoisted(() => vi.fn(async () => ({ details: [] })))
 const shifts = vi.hoisted(() => vi.fn(async () => []))
 vi.mock('../../src/config/database.js', () => ({ prisma: db }))
-vi.mock('../../src/config/env.js', () => ({ env: { get ATTENDANCE_MIN_EVENT_INTERVAL_MINUTES() { return state.minutes } } }))
+vi.mock('../../src/config/env.js', () => ({ env: { get ATTENDANCE_MIN_EVENT_INTERVAL_SECONDS() { return state.seconds } } }))
 vi.mock('../../src/common/event-bus.js', () => ({ eventBus: { publish: published } }))
 vi.mock('../../src/modules/attendance/attendance.aggregation.js', () => ({ aggregateDailyAttendance: aggregate }))
 vi.mock('../../src/modules/attendance/attendance.format.js', () => ({ formatAttendanceRecords: vi.fn(async rows => rows.map((row: any) => ({ ...row, id: String(row.id) }))) }))
@@ -32,7 +32,7 @@ const scan = (type: string, id = 'a', capturedAt = Date.now()) => type === 'CHEC
 
 beforeEach(() => {
   vi.clearAllMocks(); vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(now)
-  state.rows = []; state.locks = []; state.locked = false; state.minutes = 10
+  state.rows = []; state.locks = []; state.locked = false; state.seconds = 600
   let queue = Promise.resolve()
   db.$transaction.mockImplementation(async callback => {
     const previous = queue
@@ -85,7 +85,7 @@ it('uses server receipt time, so manipulated capture timestamps cannot bypass th
 })
 
 it('applies the configured 30-minute interval and does not move its baseline on ignored scans', async () => {
-  state.minutes = 30; state.rows = [prior()]
+  state.seconds = 1800; state.rows = [prior()]
   expect(await scan('CHECK_OUT')).toMatchObject({ ignored: true, retry_after_seconds: 1740 })
   vi.setSystemTime(new Date(+now + 1740_000))
   expect(await scan('CHECK_OUT')).not.toHaveProperty('ignored', true)
@@ -96,4 +96,14 @@ it('serializes overlapping employee scans so only one creates an attendance even
   expect(state.rows).toHaveLength(1)
   expect(results.filter(result => (result as any).ignored)).toHaveLength(1)
   expect(published.mock.calls.filter(call => call[0].startsWith('attendance:checked-'))).toHaveLength(1)
+})
+
+it('supports a five-second demo interval and accepts its exact boundary', async () => {
+  state.seconds = 5
+  state.rows = [prior({ created_at: new Date(+now - 1000), event_time: new Date(+now - 1000) })]
+  expect(await scan('CHECK_OUT')).toMatchObject({ ignored: true, retry_after_seconds: 4 })
+  vi.setSystemTime(new Date(+now + 3999))
+  expect(await scan('CHECK_OUT')).toMatchObject({ ignored: true, retry_after_seconds: 1 })
+  vi.setSystemTime(new Date(+now + 4000))
+  expect(await scan('CHECK_OUT')).not.toHaveProperty('ignored', true)
 })

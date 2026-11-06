@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/modules/biometrics/public.js', () => ({ findBestFaceMatch: vi.fn() }))
@@ -92,4 +93,17 @@ describe('Single-confirmation attendance', () => {
     expect(writer.checkIn).not.toHaveBeenCalled()
     expect(writer.checkOut).not.toHaveBeenCalled()
   })
+
+it.each(['CHECK_IN', 'CHECK_OUT'])('recovers a committed AUTO %s acknowledgement during cooldown', async mode => {
+  const request = payload('AUTO')
+  const event_key = createHash('sha256').update(`${request.device_id}:${request.event_id}`).digest('hex')
+  vi.mocked(prisma.attendance_logs.findFirst).mockResolvedValue({
+    type: mode, event_time: new Date(request.client_timestamp), created_at: new Date(), event_key,
+  } as any)
+  const writer = actions()
+  expect(await processThingsBoardWebhook(request, writer))
+    .toMatchObject({ success: true, matched: true, door_open: true, mode, event_id: request.event_id })
+  expect(writer[mode === 'CHECK_IN' ? 'checkIn' : 'checkOut']).toHaveBeenCalledOnce()
+})
+
 })

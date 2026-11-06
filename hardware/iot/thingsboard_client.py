@@ -176,10 +176,17 @@ class ThingsBoardClient:
             payload = json.loads(msg.payload.decode('utf-8'))
             topic, request_id = msg.topic, msg.topic.rsplit('/', 1)[-1]
             if topic.startswith('v1/devices/me/rpc/response/'):
+                # Some REST relays return a JSON string or the API's data envelope.
+                # Keep event correlation mandatory even after unwrapping.
+                if isinstance(payload, str):
+                    payload = json.loads(payload)
+                if isinstance(payload, dict) and 'event_id' not in payload and isinstance(payload.get('data'), dict):
+                    payload = payload['data']
                 with self._lock:
                     info = self._pending_rpc_callbacks.get(request_id)
                     if info:
                         if not isinstance(payload, dict) or payload.get('event_id') != info['event_id']:
+                            print(f"[MQTT WARN] Bỏ RPC {request_id}: phản hồi thiếu/sai event_id; kiểm tra REST API Call → RPC Call Reply trong ThingsBoard.")
                             return
                         self._pending_rpc_callbacks.pop(request_id, None)
                     else:
@@ -192,6 +199,7 @@ class ThingsBoardClient:
                                 return
                         else:
                             return
+                print(f"[MQTT] Nhận RPC {request_id} event={info['event_id']} success={payload.get('success')} matched={payload.get('matched')} verification_only={payload.get('verification_only', False)} door_open={payload.get('door_open')} ignored={payload.get('ignored')} cooldown={payload.get('cooldown')} attendance_ignored={(payload.get('attendance') or {}).get('ignored')}")
                 self._deliver(info, payload)
             elif topic.startswith('v1/devices/me/rpc/request/') and isinstance(payload, dict):
                 method, params = payload.get('method'), payload.get('params')
@@ -425,6 +433,7 @@ class ThingsBoardClient:
                 if time.monotonic() < info['deadline']:
                     continue
                 if info['attempts'] < self.max_attempts:
+                    print(f"[MQTT WARN] Chưa nhận RPC {request_id} event={info['event_id']}; thử lại {info['attempts'] + 1}/{self.max_attempts}.")
                     info['attempts'] += 1
                     info['deadline'] = time.monotonic() + self.rpc_timeout
                     if self.connected:
@@ -438,6 +447,7 @@ class ThingsBoardClient:
                 if now >= expire_at:
                     self._recently_expired_rpc.pop(req_id, None)
         for info in expired:
+            print(f"[MQTT ERROR] Hết thời gian chờ event={info['event_id']}. Backend có thể đã ghi điểm danh; kiểm tra nhánh phản hồi ThingsBoard, không tự mở cửa khi chưa xác nhận.")
             self._deliver(info, {'event_id': info['event_id'], 'success': False, 'matched': False,
                 'uncertain': True, 'message': 'Hết thời gian chờ; chưa xác nhận được kết quả. Thử lại cùng event ID.'})
 

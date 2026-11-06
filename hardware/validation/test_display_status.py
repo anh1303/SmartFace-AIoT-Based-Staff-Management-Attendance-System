@@ -29,6 +29,14 @@ class DisplayStatusTests(unittest.TestCase):
     def test_real_uses_existing_display_identity_without_score(self):
         for name in ('UNKNOWN', 'EMP001'):
             track = SimpleNamespace(pad_invalid_reason=None, missing_frames=0,
+                                    recognized_once=True,
                                     pad_ready=True, is_spoof=False, is_real=True,
                                     display_result=Mock(return_value=(name, .98, False)))
             self.assertEqual(face_status_label(track)[0], 'REAL - '+name)
+
+    def test_first_server_result_is_pending_not_unknown(self):
+        track = SimpleNamespace(pad_invalid_reason=None, missing_frames=0,
+                                pad_ready=True, is_spoof=False, is_real=True,
+                                recognized_once=False,
+                                display_result=Mock(return_value=('UNKNOWN', 0, False)))
+        self.assertEqual(face_status_label(track)[0], 'REAL - CHECKING ID')

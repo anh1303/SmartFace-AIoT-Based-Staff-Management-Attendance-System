@@ -17,10 +17,10 @@
 Đã thêm vào `backend/.env` và `.env.example`:
 
 ```dotenv
-ATTENDANCE_MIN_EVENT_INTERVAL_MINUTES=10
+ATTENDANCE_MIN_EVENT_INTERVAL_SECONDS=600
 ```
 
-- Chấp nhận số nguyên từ **10 đến 30 phút**, mặc định 10. Đổi giá trị cần restart backend.
+- Chấp nhận số nguyên từ **1 đến 1800 giây**, mặc định 600 giây; demo có thể đặt 5 giây. Đổi giá trị cần restart backend.
 - Áp dụng giữa hai lượt chấm công hợp lệ liên tiếp của **cùng một nhân viên**, dùng chung CHECK_IN và CHECK_OUT, kể cả khác thiết bị. Tính theo thời gian server ghi nhận; timestamp thiết bị không thể rút ngắn khoảng cách.
 - Trong khoảng chờ: response có `ignored: true`, `cooldown: true`, `retry_after_seconds` và thông báo rõ; webhook trả `door_open: false`. Không đổi mã hardware.
 - Khi demo check-in rồi checkout ngay cùng người, checkout sẽ bị bỏ qua đúng cấu hình. Dùng nhân viên khác hoặc chờ đủ thời gian; điều chỉnh công hành chính vẫn dùng luồng điều chỉnh riêng.

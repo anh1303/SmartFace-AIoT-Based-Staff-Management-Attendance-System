@@ -30,7 +30,7 @@ const envSchema = z.object({
   TB_USERNAME: z.string().optional().default(''),
   TB_PASSWORD: z.string().optional().default(''),
   FACE_MATCH_THRESHOLD: z.string().optional().default('0.45').transform(Number),
-  ATTENDANCE_MIN_EVENT_INTERVAL_MINUTES: z.coerce.number().int().min(10).max(30).default(10),
+  ATTENDANCE_MIN_EVENT_INTERVAL_SECONDS: z.coerce.number().int().min(1).max(1800).default(600),
 
   // SMTP / Email Configuration for automated notifications
   SMTP_HOST: z.string().optional().default('smtp.gmail.com'),

@@ -111,7 +111,7 @@ Dưới đây là sơ đồ gán chân vật lý thực tế trên bo mạch Ras
 | | **GND** | **Chân 6** | — | Ground | Nối đất chung |
 | **Động cơ Servo (Cửa Barrier)** | **VCC (Đỏ)** | **Chân 4** | — | 5V Power | Tận dụng chân nguồn 5V cảm biến #2 cũ |
 | | **GND (Nâu/Đen)**| **Chân 14** | — | Ground | Tận dụng chân đất GND cảm biến #2 cũ |
-| | **PWM (Cam/Vàng)**| **Chân 12** | **GPIO 18** | Output (Hardware PWM0) | Điều khiển góc quay 0°/90°/180°, ngắt PWM chống giật (`SERVO_PIN=18`) |
+| | **PWM (Cam/Vàng)**| **Chân 12** | **GPIO 18** | Output (Hardware PWM0) | Đóng 0°, mở 90°, ngắt PWM chống giật (`SERVO_PIN=18`) |
 | **Chân giải phóng hoàn toàn** | — | **Chân 11** | **GPIO 17** | — | **TRỐNG (FREE)** |
 | | — | **Chân 15** | **GPIO 22** | — | **TRỐNG (FREE)** |
 | **Camera (Nhận diện)** | **Cáp Ribbon CSI** | **Cổng CSI** | — | Giao tiếp MIPI CSI-2 | Cắm cáp ribbon vào khe CAMERA trên Pi 4 |
@@ -137,11 +137,11 @@ Dưới đây là sơ đồ gán chân vật lý thực tế trên bo mạch Ras
 
 2. **Cơ chế chống rung giật Động cơ Servo (Anti-Jitter PWM Detach):**
    - Động cơ Servo sử dụng chân **GPIO 18 (Hardware PWM0)** để đảm bảo xung nhịp cơ sở thời gian thực chuẩn xác.
-   - Vị trí mặc định / đóng cửa: **`90°`**.
-   - Khi điểm danh `CHECK_IN`: Servo quay **`0°`** (Mở vào).
-   - Khi điểm danh `CHECK_OUT`: Servo quay **`180°`** (Mở ra).
-   - Cơ chế an toàn: Cửa mở 3s, nếu cảm biến siêu âm vẫn đo thấy người ($\le 50\text{cm}$) thì giữ mở; khi người đi qua ($> 50\text{cm}$) mới đóng về 90°.
-   - Sau khi cửa đóng về 90°, hệ thống tự động gán **`servo.angle = None`** để ngắt hoàn toàn xung PWM. Điều này giúp triệt tiêu 100% hiện tượng rung rè rè (jittering) và tránh làm nóng cháy động cơ khi nhàn rỗi!
+   - Vị trí mặc định / đóng cửa: **`0°`**.
+   - Khi điểm danh `CHECK_IN`: Servo quay **`90°`** (Mở vào).
+   - Khi điểm danh `CHECK_OUT`: Servo quay **`90°`** (Mở ra).
+   - Cơ chế an toàn: Cửa giữ mở khi cảm biến còn phát hiện người; sau khi không có người liên tục 5 giây mới đóng về 0°. Có người trở lại thì hủy bộ đếm.
+   - Sau khi cửa đóng về 0°, hệ thống tự động gán **`servo.angle = None`** để ngắt hoàn toàn xung PWM. Điều này giúp triệt tiêu 100% hiện tượng rung rè rè (jittering) và tránh làm nóng cháy động cơ khi nhàn rỗi!
 
 3. **Cơ chế lọc trễ chống rung 2 chiều Cảm biến Siêu âm (Debounce 0.5s):**
    - Cảm biến siêu âm hoạt động với chu kỳ đo 12.5Hz trong luồng ngầm.

@@ -196,30 +196,19 @@ class HardwareSettingsTests(unittest.TestCase):
         self.assertTrue(updated["is_muted"])
 
     def test_servo_controller_angles_and_detach(self):
-        """Kiểm tra điều khiển góc Servo (90/0/180) và cơ chế ngắt PWM (servo.angle=None) chống giật"""
+        """Closed 0°, open 90°, detach preserves the last door state."""
         servo = ServoController(pin=18, enabled=True)
-        # 1. Trạng thái sau khởi tạo: đóng (90°) và ngắt xung để chống giật
-        self.assertEqual(servo.door_state, "CLOSED")
-        self.assertIsNone(servo.current_angle)
-
-        # 2. Quay góc 0° (Check-in)
-        servo.set_angle(0)
-        self.assertEqual(servo.door_state, "OPEN_IN")
-        self.assertEqual(servo.current_angle, 0.0)
-
-        # 3. Quay góc 180° (Check-out)
-        servo.set_angle(180)
-        self.assertEqual(servo.door_state, "OPEN_OUT")
-        self.assertEqual(servo.current_angle, 180.0)
-
-        # 4. Đóng cửa về 90°
+        self.assertEqual(servo.door_state, 'CLOSED')
         servo.set_angle(90)
-        self.assertEqual(servo.door_state, "CLOSED")
+        self.assertEqual(servo.door_state, 'OPEN_IN')
         self.assertEqual(servo.current_angle, 90.0)
-
-        # 5. Ngắt xung PWM chống giật
         servo.set_angle(None)
-        self.assertEqual(servo.door_state, "CLOSED")
+        self.assertEqual(servo.door_state, 'OPEN_IN')
+        servo.set_angle(0)
+        self.assertEqual(servo.door_state, 'CLOSED')
+        self.assertEqual(servo.current_angle, 0.0)
+        servo.set_angle(None)
+        self.assertEqual(servo.door_state, 'CLOSED')
         self.assertIsNone(servo.current_angle)
 
     def test_ultrasonic_wake_presence_50cm(self):

@@ -298,14 +298,13 @@ def main(args=None):
             except Exception as e:
                 print(f"[AUDIO WARN] Lỗi phát âm thanh điểm danh: {e}")
 
-            # Kích hoạt mở cổng Servo mô phỏng (0° đóng, 90° mở, chống giật)
+            # Kích hoạt mở cổng Servo (0° đóng, 90° mở, ngắt xung nghỉ sau khi quay)
             if res.get("door_open", True):
                 servo_gate.open_gate_safe(
                     mode=mode,
                     is_person_present_fn=ultrasonic_sensor.is_person_present if ULTRASONIC_ENABLED else None,
-                    close_delay_seconds=3.0,
+                    close_delay_seconds=5.0,
                     open_seconds=SERVO_OPEN_SECONDS,
-                    max_hold_seconds=8.0,
                     detach_after_move=True,
                 )
         elif is_matched and not is_success:

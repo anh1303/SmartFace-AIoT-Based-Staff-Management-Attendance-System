@@ -22,3 +22,17 @@ it.each(['CHECK_IN', 'CHECK_OUT'])('returns a successful ignored %s response wit
   expect(actions[mode === 'CHECK_IN' ? 'checkOut' : 'checkIn']).not.toHaveBeenCalled()
   expect(publish).not.toHaveBeenCalled()
 })
+
+
+it('returns a database failure without granting access or exposing Prisma source', async () => {
+  const failure = Object.assign(new Error('Invalid employee.findFirst invocation: Server has closed the connection'), { code: 'P1017' })
+  const actions = { checkIn: vi.fn(async () => { throw failure }), checkOut: vi.fn() }
+  const result = await processThingsBoardWebhook({
+    device_id: 'device-test', mode: 'CHECK_IN', event_id: 'db-failure-event', event_kind: 'CONFIRMED_SCAN',
+    recognition_id: 'db-failure-recognition', client_timestamp: Date.now(),
+    antispoof_score: .9, embedding: Array(512).fill(.1),
+  }, actions as any)
+  expect(result).toMatchObject({ success: false, matched: true, door_open: false, code: 503, error_code: 'DATABASE_UNAVAILABLE', retryable: true })
+  expect(result.message).not.toContain('findFirst')
+  expect(publish).not.toHaveBeenCalled()
+})

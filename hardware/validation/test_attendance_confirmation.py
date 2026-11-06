@@ -57,6 +57,7 @@ class ConfirmationFlowTests(unittest.TestCase):
             self.assertEqual(kwargs['event_kind'], 'VERIFY_ONLY' if readonly else 'CONFIRMED_SCAN')
             self.assertEqual(kwargs['expected_employee_id'], None if readonly or required == 1 else 'employee-a')
             on_result(dict(event_id=kwargs['event_id'], success=True, matched=True,
+                           door_open=not readonly,
                            verification_only=readonly, confirmation_count=index,
                            similarity=.95, mode=mode, employee={'id':'employee-a','full_name':'Alice'}))
             return len(sent)

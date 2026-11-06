@@ -4,6 +4,7 @@ import { assertDeviceWebhook } from '../../common/device-auth.js';
 import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
 import * as service from './attendance.service.js';
+import { compactAttendanceRpcResponse } from './attendance.rpc-response.js';
 import {
   checkInSchema,
   adjustAttendanceSchema,
@@ -24,7 +25,7 @@ export const tbWebhook = async (req: Request, res: Response) => {
     ...rawData,
     device_id: deviceId,
   });
-  res.status(200).json(result);
+  res.status(200).json(compactAttendanceRpcResponse(result));
 };
 
 export const list = async (req: Request, res: Response) => {

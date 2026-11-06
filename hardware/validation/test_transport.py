@@ -77,6 +77,30 @@ class TransportTests(unittest.TestCase):
         self.assertTrue(self.results[0]['uncertain'])
         self.assertEqual(self.results[0]['event_id'], 'timeout-id')
 
+    def test_relay_envelopes_preserve_event_correlation(self):
+        for wrap in (lambda p: {'success': True, 'data': p}, json.dumps):
+            with self.subTest(wrap=wrap):
+                request = self.scan(event_id='relay-event-id')
+                self.response(request, wrap({'event_id': 'wrong-event', 'success': True}))
+                self.assertIn(str(request), self.tb._pending_rpc_callbacks)
+                result = {'event_id': 'relay-event-id', 'success': True, 'matched': True}
+                before = len(self.results)
+                self.response(request, wrap(result))
+                self.assertEqual(self.results[-1], result)
+                self.response(request, wrap(result))
+                self.assertEqual(len(self.results), before + 1)
+
+    def test_late_success_after_timeout_is_delivered_once(self):
+        request = self.scan(event_id='late-event-id')
+        for _ in range(self.tb.max_attempts):
+            self.tb._pending_rpc_callbacks[str(request)]['deadline'] = 0
+            self.tb.poll_pending()
+        result = {'event_id': 'late-event-id', 'success': True, 'matched': True}
+        self.response(request, result)
+        self.response(request, result)
+        self.assertEqual(self.results, [self.results[0], result])
+        self.assertTrue(self.results[0]['uncertain'])
+
     def test_pad_zero_is_preserved_and_nonfinite_or_bad_vectors_rejected(self):
         request = self.tb.send_scan_rpc(self.vector, 0.0, 'CHECK_IN')
         self.assertGreater(request, 0)

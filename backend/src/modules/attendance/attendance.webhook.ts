@@ -1,7 +1,7 @@
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { eventBus } from '../../common/event-bus.js'
-import { observeRecognition } from './recognition-confirmation.js'
+import { observeRecognition, requiredRecognitionCount } from './recognition-confirmation.js'
 import { findBestFaceMatch } from '../biometrics/public.js'
 import { claimAlert } from './attendance.alert-dedup.js'
 import { MAX_PAIR_MS } from './attendance.policy.js'
@@ -57,7 +57,10 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
   if (isConfirmation && (typeof data.recognition_id !== 'string' || !/^[a-zA-Z0-9_-]{8,120}$/.test(data.recognition_id))) {
     throw AppError.badRequest('Cần recognition_id duy nhất cho từng lượt nhận diện')
   }
-  if (data.event_kind === 'CONFIRMED_SCAN' && (typeof data.expected_employee_id !== 'string' || !data.expected_employee_id.trim())) {
+  // A single-confirmation client has no prior identity; matching below remains authoritative.
+  if (data.event_kind === 'CONFIRMED_SCAN' &&
+      (requiredRecognitionCount() > 1 || data.expected_employee_id !== undefined) &&
+      (typeof data.expected_employee_id !== 'string' || !data.expected_employee_id.trim())) {
     throw AppError.badRequest('Cần expected_employee_id khi xác nhận điểm danh')
   }
 
@@ -179,7 +182,8 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
 
   if (isConfirmation) {
     const confirmation = observeRecognition(device_id, `${normalizedRequestedMode}:${data.event_id}`, data.recognition_id!, match.emp_id)
-    if (data.event_kind === 'VERIFY_ONLY' || !confirmation.ready || data.expected_employee_id !== match.emp_id) {
+    if (data.event_kind === 'VERIFY_ONLY' || !confirmation.ready ||
+        (data.expected_employee_id !== undefined && data.expected_employee_id !== match.emp_id)) {
       return {
         success: true, matched: true, verification_only: true, event_id: data.event_id,
         mode: resolvedMode, recognition_id: data.recognition_id,

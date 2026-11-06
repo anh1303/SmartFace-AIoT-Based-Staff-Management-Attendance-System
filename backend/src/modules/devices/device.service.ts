@@ -472,6 +472,7 @@ export async function setDeviceAttendanceMode(deviceId: string, mode: Attendance
           attendance_mode: mode,
           checkin_active: mode === 'CHECK_IN',
           checkout_active: mode === 'CHECK_OUT',
+          auto_active: mode === 'AUTO',
           mode_changed_at: Date.now(),
         })
         const state = recordDeviceModeNotify(deviceId, mode)
@@ -500,6 +501,7 @@ export async function persistConfirmedAttendanceMode(deviceId: string, mode: Att
       attendance_mode: mode,
       checkin_active: mode === 'CHECK_IN',
       checkout_active: mode === 'CHECK_OUT',
+      auto_active: mode === 'AUTO',
       mode_changed_at: Date.now(),
     })
     recordDeviceModeNotify(deviceId, mode)

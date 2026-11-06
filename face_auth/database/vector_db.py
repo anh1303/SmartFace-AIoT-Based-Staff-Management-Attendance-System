@@ -22,7 +22,12 @@ class VectorDB:
                 "keepalives_interval": 2, "keepalives_count": 3,
                 "tcp_user_timeout": 5000,
             }}
-        self.pool = ConnectionPool(conninfo, min_size=min_size, max_size=max_size, open=True, **options)
+        # Neon/network idle disconnects may leave a socket unusable in the pool.
+        # Check on checkout so the pool replaces it before an enrollment transaction.
+        self.pool = ConnectionPool(
+            conninfo, min_size=min_size, max_size=max_size, open=True,
+            check=ConnectionPool.check_connection, **options,
+        )
         try:
             self.validate_schema()
         except Exception:

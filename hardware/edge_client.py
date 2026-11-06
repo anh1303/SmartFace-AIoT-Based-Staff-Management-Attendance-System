@@ -917,46 +917,73 @@ def main(args=None):
             identity_cache.retain(live_keys)
             while not result_queue.empty():
                 submission, response = result_queue.get()
-                if submission != last_submission or submission[1] != current_mode or submission[0] != last_active_track_id or submission[3] != mode_generation or submission[4] != presence_generation or not is_awake or now_wall - last_face_seen_time > FACE_LOST_RESET_SECONDS:
+                if not isinstance(response, dict):
                     continue
+
+                is_final_success = bool(response.get('matched') and response.get('success') and not response.get('verification_only'))
+                is_verify_only = bool(response.get('verification_only') and response.get('matched') and response.get('success'))
+
+                if is_verify_only:
+                    count = max(0, int(response.get('confirmation_count', 0)))
+                    req = max(1, int(response.get('confirmation_required', vision.ATTENDANCE_STABLE_COUNT)))
+                    emp = response.get('employee') or {}
+                    emp_name = emp.get('full_name') or emp.get('employee_code') or 'Nhân viên'
+                    print(f"[EDGE] 🔍 Đang xác minh: {emp_name} ({count}/{req} lượt)...")
+
+                # If this is a final attendance confirmation from the server, do not drop it due to transient track drop or ultrasonic sleep
+                if not is_final_success:
+                    if submission != last_submission or submission[1] != current_mode or submission[0] != last_active_track_id or submission[3] != mode_generation or submission[4] != presence_generation or not is_awake or now_wall - last_face_seen_time > FACE_LOST_RESET_SECONDS:
+                        continue
+
                 response_track = next((track for _, track in tracked
                                        if track.track_id == submission[0]
                                        and track.verification_generation == submission[5]
                                        and track.missing_frames == 0 and track.is_real
                                        and not track.pad_invalid_reason), None)
-                if response_track is None:
-                    continue
-                if response.get('matched') and last_submission_embedding is not None:
-                    employee = response.get('employee') or {}
-                    identity = (employee.get('id') or employee.get('employee_code'),
-                                employee.get('full_name') or employee.get('employee_code') or 'Nhân viên',
-                                float(response.get('similarity', 0)))
-                    key = (submission[0], submission[5], submission[1], submission[3], submission[4])
-                    identity_cache.confirm(key, last_submission_embedding, identity)
-                    response_track.update_result(*identity)
-                    response_track.update_display_identity(identity, vision.RECOGNITION_LABEL_CONFIRMATIONS,
-                                                           vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
-                    response_track.recognition_status = 'CLOUD'
-                elif not response.get('matched'):
-                    key = (submission[0], submission[5], submission[1], submission[3], submission[4])
-                    identity_cache.entries.pop(key, None)
-                    response_track.update_result(None, "UNKNOWN", float(response.get("similarity", 0)))
-                    response_track.update_display_identity((None, 'UNKNOWN', 0.0),
-                                                           vision.RECOGNITION_LABEL_CONFIRMATIONS,
-                                                           vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
-                if response.get('verification_only') and response.get('matched') and response.get('success'):
+                if response_track is None and is_final_success:
+                    response_track = next((track for _, track in tracked if track.track_id == submission[0]), None)
+
+                if response_track is not None:
+                    if response.get('matched') and last_submission_embedding is not None:
+                        employee = response.get('employee') or {}
+                        identity = (employee.get('id') or employee.get('employee_code'),
+                                    employee.get('full_name') or employee.get('employee_code') or 'Nhân viên',
+                                    float(response.get('similarity', 0)))
+                        key = (submission[0], submission[5], submission[1], submission[3], submission[4])
+                        identity_cache.confirm(key, last_submission_embedding, identity)
+                        response_track.update_result(*identity)
+                        response_track.update_display_identity(identity, vision.RECOGNITION_LABEL_CONFIRMATIONS,
+                                                               vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
+                        response_track.recognition_status = 'CLOUD'
+                    elif not response.get('matched'):
+                        key = (submission[0], submission[5], submission[1], submission[3], submission[4])
+                        identity_cache.entries.pop(key, None)
+                        response_track.update_result(None, "UNKNOWN", float(response.get("similarity", 0)))
+                        response_track.update_display_identity((None, 'UNKNOWN', 0.0),
+                                                               vision.RECOGNITION_LABEL_CONFIRMATIONS,
+                                                               vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
+
+                if is_verify_only:
                     count = max(0, int(response.get('confirmation_count', 0)))
-                    response_track.stable_recognitions = count
+                    if response_track is not None:
+                        response_track.stable_recognitions = count
+                        response_track.last_scan_sent = 0.0
+                        response_track.last_recognition_time = None
                     attendance_latch = False
                     last_submission = None
-                    response_track.last_scan_sent = 0.0
-                    response_track.last_recognition_time = None
                     continue
+
+                if not is_final_success and response_track is None:
+                    continue
+
                 on_attendance_result(response)
                 if not (response.get('success') and response.get('matched')):
                     attendance_latch = False
                     if not response.get('uncertain'):
                         last_submission = None
+                else:
+                    attendance_latch = True
+                    last_submission = None
 
             # ── 7. Vẽ Thanh Thông Tin & Banners Lên Video ────────────────────
             # Compact status; telemetry still carries FPS/distance for diagnostics.

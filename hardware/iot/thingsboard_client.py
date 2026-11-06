@@ -31,13 +31,14 @@ class ThingsBoardClient:
         # TB RPC protobuf requestId is int32. UUID event_id provides durable correlation.
         self._rpc_request_id = uuid.uuid4().int % (2 ** 30)
         self._pending_rpc_callbacks = {}
+        self._recently_expired_rpc = {}
         self._lock = threading.RLock()
         self._stopped = threading.Event()
         self._worker = None
         self._mode_version = 0
         self.connected, self.client = False, None
-        self.rpc_timeout = 8.0
-        self.max_attempts = 3
+        self.rpc_timeout = float(os.getenv('RPC_TIMEOUT', '12.0'))
+        self.max_attempts = int(os.getenv('RPC_MAX_ATTEMPTS', '3'))
         try:
             import paho.mqtt.client as mqtt
             self.mqtt = mqtt
@@ -177,10 +178,20 @@ class ThingsBoardClient:
             if topic.startswith('v1/devices/me/rpc/response/'):
                 with self._lock:
                     info = self._pending_rpc_callbacks.get(request_id)
-                    # Reject unsolicited, late or mismatched responses.
-                    if not info or not isinstance(payload, dict) or payload.get('event_id') != info['event_id']:
-                        return
-                    self._pending_rpc_callbacks.pop(request_id, None)
+                    if info:
+                        if not isinstance(payload, dict) or payload.get('event_id') != info['event_id']:
+                            return
+                        self._pending_rpc_callbacks.pop(request_id, None)
+                    else:
+                        recent = self._recently_expired_rpc.get(request_id)
+                        if recent and isinstance(payload, dict) and payload.get('event_id') == recent[1]['event_id']:
+                            if payload.get('success'):
+                                info = recent[1]
+                                self._recently_expired_rpc.pop(request_id, None)
+                            else:
+                                return
+                        else:
+                            return
                 self._deliver(info, payload)
             elif topic.startswith('v1/devices/me/rpc/request/') and isinstance(payload, dict):
                 method, params = payload.get('method'), payload.get('params')
@@ -420,7 +431,12 @@ class ThingsBoardClient:
                         self._publish(request_id, info)
                 else:
                     self._pending_rpc_callbacks.pop(request_id, None)
+                    self._recently_expired_rpc[request_id] = (time.monotonic() + 15.0, info)
                     expired.append(info)
+            now = time.monotonic()
+            for req_id, (expire_at, _) in list(self._recently_expired_rpc.items()):
+                if now >= expire_at:
+                    self._recently_expired_rpc.pop(req_id, None)
         for info in expired:
             self._deliver(info, {'event_id': info['event_id'], 'success': False, 'matched': False,
                 'uncertain': True, 'message': 'Hết thời gian chờ; chưa xác nhận được kết quả. Thử lại cùng event ID.'})

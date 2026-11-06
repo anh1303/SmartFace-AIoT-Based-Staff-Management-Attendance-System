@@ -32,6 +32,7 @@ export interface PaginatedAttendanceResponse {
  * để lịch sử không bị dừng âm thầm ở mốc 5.000 bản ghi.
  */
 export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promise<AttendanceRecordList> {
+  // Compact responses omit repeated photos, so larger pages avoid serial 100-row round trips.
   const pageSize = Number(params?.limit) || 5000;
   let currentPage = Number(params?.page) || 1;
 

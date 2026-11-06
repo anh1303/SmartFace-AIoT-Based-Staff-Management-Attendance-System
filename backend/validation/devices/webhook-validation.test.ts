@@ -85,7 +85,7 @@ describe('Trusted device webhook validation', () => {
     const resWrong = mockRes()
     await expect(notify(reqWrong, resWrong)).rejects.toThrow(/Device webhook authentication failed/)
 
-    // 3. Valid secret -> success 200
+    // 3. Valid secret with CHECK_IN -> success 200
     const reqValid = { header: (h: string) => h === 'X-TB-Webhook-Secret' ? validSecret : '', body: { mode: 'CHECK_IN' }, params: { id: 'DEV_01' } } as unknown as Request
     const resValid = mockRes()
     await notify(reqValid, resValid)
@@ -95,6 +95,16 @@ describe('Trusted device webhook validation', () => {
       data: expect.objectContaining(handler === 'modeNotify'
         ? { deviceId: 'DEV_01', mode: 'CHECK_IN', confirmed: true }
         : { deviceId: 'DEV_01' })
+    }))
+
+    // 4. Valid secret with AUTO -> success 200
+    const reqAuto = { header: (h: string) => h === 'X-TB-Webhook-Secret' ? validSecret : '', body: { mode: 'AUTO' }, params: { id: 'DEV_01' } } as unknown as Request
+    const resAuto = mockRes()
+    await controller.modeNotify(reqAuto, resAuto)
+    expect(resAuto.status).toHaveBeenCalledWith(200)
+    expect(resAuto.json).toHaveBeenCalledWith(expect.objectContaining({
+      success: true,
+      data: expect.objectContaining({ deviceId: 'DEV_01', mode: 'AUTO', confirmed: true })
     }))
     vi.unstubAllEnvs()
   })

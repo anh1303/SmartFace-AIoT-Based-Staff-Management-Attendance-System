@@ -37,6 +37,7 @@ export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promis
 
   const buildUrl = (page: number, limit: number | string) => {
     const searchParams = new URLSearchParams();
+    searchParams.set('compact', 'true');
     if (params?.startDate) searchParams.append('startDate', params.startDate);
     if (params?.endDate) searchParams.append('endDate', params.endDate);
     if (params?.date) searchParams.append('date', params.date);
@@ -99,6 +100,7 @@ export async function fetchAttendancePaginatedApi(
   const page = Number(params?.page) || 1;
 
   const searchParams = new URLSearchParams();
+  searchParams.set('compact', 'true');
   if (params?.startDate) searchParams.append('startDate', params.startDate);
   if (params?.endDate) searchParams.append('endDate', params.endDate);
   if (params?.date) searchParams.append('date', params.date);

@@ -149,3 +149,5 @@ export async function hasPayrollActivity(
   const count = await client.payrollRecord.count({ where: { employeeId } })
   return count > 0
 }
+
+export { getReportPayrolls, getReportPayrollPeriods } from './payroll.report-queries.js'

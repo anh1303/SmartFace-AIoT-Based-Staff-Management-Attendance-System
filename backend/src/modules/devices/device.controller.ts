@@ -6,9 +6,7 @@ import * as service from './device.service.js';
 import { createDeviceSchema, updateDeviceSchema } from './device.dto.js';
 
 export const modeNotify = async (req: Request, res: Response) => {
-  if (process.env.TB_WEBHOOK_SECRET) {
-    assertDeviceWebhook(req);
-  }
+  assertDeviceWebhook(req);
   const rawMode = req.body.mode ?? req.body.current_mode ?? req.body.attendance_mode;
   const mode = rawMode === null || rawMode === '' || rawMode === 'NONE' || rawMode === 'IDLE' || rawMode === 'OFF' ? 'OFF' : rawMode;
   if (!mode || !['CHECK_IN', 'CHECK_OUT', 'AUTO', 'OFF'].includes(mode)) {
@@ -71,9 +69,7 @@ export const getMode = async (req: Request, res: Response) => {
 };
 
 export const settingsNotify = async (req: Request, res: Response) => {
-  if (process.env.TB_WEBHOOK_SECRET) {
-    assertDeviceWebhook(req);
-  }
+  assertDeviceWebhook(req);
   const updated = service.recordDeviceSettingsNotify(String(req.params.id), req.body);
   eventBus.publish('device:settings-updated', updated);
   successResponse(res, updated, 'Device settings notification received');

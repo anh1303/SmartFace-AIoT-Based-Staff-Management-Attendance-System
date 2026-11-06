@@ -18,7 +18,11 @@ beforeEach(() => { host=document.createElement('div');document.body.append(host)
 afterEach(async () => {await act(async()=>root.unmount());host.remove();cache.clear();});
 const mount = async (component: React.ReactNode) => { await act(async()=> { root.render(<MemoryRouter><QueryClientProvider client={cache}>{component}</QueryClientProvider></MemoryRouter>); }); };
 const click = async (element: Element | null) => { expect(element).toBeTruthy();await act(async()=>{(element as HTMLElement).click();}); };
-const filter = async (value: string) => { await act(async () => { const select=host.querySelector('select[aria-label="Lọc lượt chấm công"]') as HTMLSelectElement; select.value=value;select.dispatchEvent(new Event('change',{bubbles:true})); }); };
+const filter = async (value: string) => {
+  const labels: Record<string, string> = { ALL: 'Tất cả lượt checkin / checkout', MATCHED: 'Chỉ lượt ghép cặp hợp lệ', COUNTED: 'Chỉ lượt được ghép cặp và tính giờ' };
+  await click(host.querySelector('[role="combobox"][aria-label="Hiển thị lượt:"]'));
+  await click([...host.querySelectorAll('[role="option"]')].find(option => option.textContent === labels[value]) || null);
+};
 const settle = async () => { await act(async()=>{await new Promise(r=>setTimeout(r,10));}); };
 const events = [
   {id:'1',type:'CHECK_IN',time:'22:00:00',timestamp:'2026-09-30T22:00:00+07:00',rawStatus:'VALID'},
@@ -27,6 +31,18 @@ const events = [
 ];
 const item = { workingHours:8,needsReview:false,rawEvents:events,reasonLabels:{OFF:'Ngày OFF, không tự ghi công'},validIntervals:[{inId:'1',outId:'2',counted:true,inTime:'22:00:00',outTime:'06:00:00',durationStr:'08:00:00',regularSeconds:28800,overtimeSeconds:0,creditedRegularSeconds:28800,creditReason:'HALF_SHIFT_REACHED'}] } as AttendancePairItem;
 describe('Attendance details and per-item review', () => {
+  it('shows actual time first as the sum of displayed pairs, including uncredited pairs', async () => {
+    const pairs = [
+      {...item.validIntervals[0], durationStr:'00:01:02', durationSeconds:62.079, counted:true},
+      {...item.validIntervals[0], inId:'4', outId:'5', durationStr:'00:05:18', durationSeconds:318.949, counted:false},
+    ];
+    const rawEvents = [...events, {...events[0],id:'4'}, {...events[1],id:'5'}];
+    await mount(<AttendanceDayDetails item={{...item,workingHours:0,rawEvents,validIntervals:pairs}}/>);
+    const statistics = () => host.querySelector('td[rowspan="' + host.querySelectorAll('tbody tr').length + '"]:last-child');
+    expect(statistics()?.textContent).toMatch(/^Thời gian làm thực:00:06:20Giờ làm:00:00:00/);
+    await filter('COUNTED');
+    expect(statistics()?.textContent).toMatch(/^Thời gian làm thực:00:01:02Giờ làm:00:00:00/);
+  });
   it('filters loose scans while retaining both ends of counted overnight pairs and checkout hours', async () => {
     await mount(<AttendanceDayDetails item={item}/>);
     expect(host.textContent).toContain('07:00:00');expect(host.textContent).toContain('2026-10-01');

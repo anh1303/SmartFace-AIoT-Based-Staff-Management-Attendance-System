@@ -5,6 +5,7 @@ import { observeRecognition, requiredRecognitionCount } from './recognition-conf
 import { findBestFaceMatch } from '../biometrics/public.js'
 import { claimAlert } from './attendance.alert-dedup.js'
 import { MAX_PAIR_MS } from './attendance.policy.js'
+import { attendanceIntervalRemaining, attendanceIntervalMessage } from './attendance.interval.js'
 
 export interface ThingsBoardWebhookPayload {
   device_id?: string
@@ -145,15 +146,13 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
       orderBy: [{ event_time: 'desc' }, { id: 'desc' }],
     })
 
-    // Cooldown chống quét nhầm: Nếu vừa điểm danh trong vòng ATTENDANCE_COOLDOWN_SECONDS
-    const cooldownMs = (Number(process.env.ATTENDANCE_COOLDOWN_SECONDS) || 60) * 1000
-    const nowMs = Date.now()
-    if (lastLog && (nowMs - new Date(lastLog.event_time).getTime()) < cooldownMs) {
-      const remainingSec = Math.ceil((cooldownMs - (nowMs - new Date(lastLog.event_time).getTime())) / 1000)
-      const actionText = lastLog.type === 'CHECK_IN' ? 'vào ca' : 'tan ca'
-      const nextActionText = lastLog.type === 'CHECK_IN' ? 'tan ca' : 'vào ca'
+    // Cheap AUTO fast path; the writer also enforces the interval inside its employee lock.
+    const remainingSec = attendanceIntervalRemaining(lastLog?.created_at ?? lastLog?.event_time)
+    if (lastLog && remainingSec > 0) {
       cooldownResponse = {
-        success: false,
+        success: true,
+        ignored: true,
+        retry_after_seconds: remainingSec,
         matched: true,
         door_open: false,
         cooldown: true,
@@ -166,7 +165,7 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
           avatar_url: match.avatar_url,
         },
         similarity: Number(match.similarity.toFixed(4)),
-        message: `Bạn vừa điểm danh ${actionText} lúc ${new Date(lastLog.event_time).toLocaleTimeString('vi-VN')}. Vui lòng chờ ${remainingSec}s để điểm danh ${nextActionText}.`,
+        message: attendanceIntervalMessage(remainingSec),
       }
     }
 
@@ -241,7 +240,8 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
 
     return {
       success: true,
-      door_open: true,
+      door_open: !attendanceRecord.ignored,
+      ...(attendanceRecord.ignored ? { ignored: true, cooldown: true, retry_after_seconds: attendanceRecord.retry_after_seconds } : {}),
       matched: true,
       event_id: data.event_id,
       mode: resolvedMode,
@@ -253,7 +253,7 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
       },
       similarity: Number(match.similarity.toFixed(4)),
       attendance: attendanceRecord,
-      message: `${isCheckOut ? 'Check-out' : 'Check-in'} thành công`,
+      message: attendanceRecord.ignored ? attendanceRecord.message : `${isCheckOut ? 'Check-out' : 'Check-in'} thành công`,
     }
   } catch (err: any) {
     // Return structured response for 409 (already checked in / out today)

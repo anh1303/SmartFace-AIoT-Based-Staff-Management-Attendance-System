@@ -19,14 +19,15 @@ from remote_extraction import AlignedFaceExtractor
 
 class ExtractionTests(unittest.TestCase):
     def setUp(self):
-        self.model = tempfile.NamedTemporaryFile()
-        self.addCleanup(self.model.close)
-        self.model.write(b'test-model'); self.model.flush()
+        model_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(model_directory.cleanup)
+        model_path = Path(model_directory.name) / 'test-model.onnx'
+        model_path.write_bytes(b'test-model')
         self.session = Mock()
         self.session.get_inputs.return_value = [Mock(name='input')]
         self.session.get_inputs.return_value[0].name = 'input'
         self.session.run.return_value = [np.ones((1, 512), np.float32)]
-        self.extractor = AlignedFaceExtractor(self.session, self.model.name, 'buffalo_s')
+        self.extractor = AlignedFaceExtractor(self.session, str(model_path), 'buffalo_s')
         self.face = np.random.default_rng(17).integers(0, 256, (112, 112, 3), dtype=np.uint8)
         self.png = base64.b64encode(cv2.imencode('.png', self.face)[1]).decode()
 

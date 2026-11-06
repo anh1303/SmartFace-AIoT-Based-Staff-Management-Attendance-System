@@ -2,6 +2,8 @@ import { formatEmployee } from './employee.format.js'
 export { formatEmployee, type RawEmployeeDb } from './employee.format.js'
 import type { Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { randomUUID } from 'node:crypto'
+import { enqueueOperation, findOperationByKey } from '../operations/operation.service.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, generateRandomPassword } from '../../common/utils.js'
@@ -95,7 +97,11 @@ export async function create(data: {
   avatar?: string | null
   avatar_url?: string | null
   fingerprint_enrolled?: boolean | null
-}, actorUserId?: string, actorRole?: string) {
+}, actorUserId?: string, actorRole?: string, operation?: { key: string; fingerprint: unknown }) {
+  if (operation && actorUserId) {
+    const previous = await findOperationByKey(actorUserId, operation.key, 'employee.create', operation.fingerprint)
+    if (previous) return { ...(await get(previous.result.employeeId)), email_status: 'queued', initial_account: undefined }
+  }
   let deptId = data.departmentId ?? data.department_id
   let posId = data.positionId ?? data.position_id
 
@@ -185,7 +191,15 @@ export async function create(data: {
   const rate = data.hourly_rate ?? 0
 
   // 6. Thực hiện tạo User và Employee đồng thời trong transaction
-  const { created, user } = await prisma.$transaction(async (tx) => {
+  const { created, replayed } = await prisma.$transaction(async (tx) => {
+    if (operation && actorUserId) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`operation:${actorUserId}:${operation.key}`}))`
+      const previous = await findOperationByKey(actorUserId, operation.key, 'employee.create', operation.fingerprint, tx)
+      if (previous) {
+        const created = await tx.employee.findUniqueOrThrow({ where: { id: previous.result.employeeId }, include: employeeInclude })
+        return { created, replayed: true }
+      }
+    }
     if (actorRole?.toUpperCase() === 'MANAGER') {
       await getEmployeeScope({ id: actorUserId, role: actorRole }, 'manage', tx)
       const self = await tx.employee.findFirst({ where: { user_id: actorUserId } })
@@ -220,54 +234,19 @@ export async function create(data: {
       include: employeeInclude,
     })
 
-    return { created: newEmployee, user: newUser }
-  })
-
-  // 7. Ghi Audit Log hành động tạo nhân viên và tài khoản
-  await logAction({
-    userId: actorUserId,
-    action: 'CREATE_EMPLOYEE',
-    target_table: 'employees',
-    record_id: created.id,
-    new_values: {
-      employee_code: created.employee_code,
-      full_name: created.full_name,
-      email: created.email,
-      positionId: created.positionId,
-      departmentId: created.departmentId,
-      status: created.status,
-      user_id: user.id,
-      username: user.username,
-    },
-  })
-
-  // 8. Tự động gửi email thông báo tài khoản & mật khẩu cho nhân viên
-  let emailResult: EmailSendResult = { success: false, simulated: false, error: 'Không có email' }
-  if (emailVal) {
-    try {
-      emailResult = await sendAccountCredentialsEmail({
-        to: emailVal,
-        fullName: created.full_name,
-        employeeCode: finalCode,
-        rawPassword,
-        subject: `[SmartFace AIoT] Thông tin tài khoản truy cập hệ thống - ${created.full_name} (${finalCode})`,
-      })
-    } catch (err: any) {
-      console.error('[Employee Service] Lỗi khi gửi email thông tin tài khoản:', err?.message || err)
-      emailResult = { success: false, simulated: false, error: err?.message || 'Gửi email thất bại' }
+    await tx.auditLog.create({ data: { userId: actorUserId, action: 'CREATE_EMPLOYEE', target_table: 'employees', record_id: newEmployee.id,
+      new_values: { employee_code: finalCode, full_name: newEmployee.full_name, user_id: newUser.id } } })
+    if (operation && actorUserId) {
+      const accepted = await enqueueOperation(tx, { ownerId: actorUserId, key: operation.key, type: 'employee.create', label: `Tạo nhân viên ${finalCode}`, payload: {}, fingerprint: operation.fingerprint })
+      await tx.$executeRaw`UPDATE background_operations SET status = 'succeeded', completed = 1, succeeded = 1, result = ${JSON.stringify({ employeeId: newEmployee.id })}::jsonb WHERE id = ${accepted.jobId}::uuid`
     }
-  }
+    if (emailVal && actorUserId) await enqueueOperation(tx, { ownerId: actorUserId, key: randomUUID(), type: 'employee.email', label: `Gửi email tài khoản ${finalCode}`,
+      payload: { employeeId: newEmployee.id }, secret: { to: emailVal, fullName: newEmployee.full_name, employeeCode: finalCode, rawPassword, passwordHash: hashedPassword } })
+    return { created: newEmployee, replayed: false }
+  })
 
-  const formatted = formatEmployee(created)
-  return {
-    ...formatted,
-    initial_account: {
-      username: finalCode,
-      temporary_password: rawPassword,
-      email_sent: emailResult.success,
-      simulated: emailResult.simulated ?? false,
-    },
-  }
+  return { ...formatEmployee(created), email_status: emailVal && actorUserId ? 'queued' : 'not_requested',
+    initial_account: replayed ? undefined : { username: created.employee_code, temporary_password: rawPassword, email_sent: false, simulated: false } }
 }
 
 
@@ -288,6 +267,7 @@ export async function update(
     avatar?: string | null
     hourly_rate?: number
     fingerprint_enrolled?: boolean
+    expectedVersion?: string
   },
   actorUserId?: string,
   tx?: Prisma.TransactionClient,
@@ -299,11 +279,16 @@ export async function update(
   if (data.hourly_rate !== undefined && typeof (tx as any).$executeRaw === 'function') {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${payrollPeriodLockKey(ratePeriod)}))`
   }
+  if (data.expectedVersion && typeof client.$executeRaw === 'function') {
+    await client.$executeRaw`SELECT id FROM employees WHERE employee_code = ${idOrCode} OR id::text = ${idOrCode} FOR UPDATE`
+  }
   const existing = await client.employee.findFirst({
     where: buildIdOrCodeWhere(idOrCode),
     include: employeeInclude,
   })
   if (!existing) throw new AppError(404, 'Employee not found')
+  if (data.expectedVersion && existing.updatedAt.toISOString() !== data.expectedVersion) throw AppError.conflict('Nhân viên đã được cập nhật bởi thao tác khác. Vui lòng tải lại thông tin trước khi sửa.')
+
 
   let deptId = data.departmentId ?? data.department_id
   let posId = data.positionId ?? data.position_id
@@ -585,7 +570,8 @@ async function scopeEmployeeChanges(body: any, actor?: EmployeeActor) {
 export async function createWithManagerCheck(
   body: any,
   actorUserId?: string,
-  actorRole?: string
+  actorRole?: string,
+  operation?: { key: string; fingerprint: unknown }
 ) {
   body = await scopeEmployeeChanges(body, { id: actorUserId, role: actorRole });
   if (actorRole === 'MANAGER') {
@@ -614,7 +600,7 @@ export async function createWithManagerCheck(
     departmentId: body.departmentId || body.department_id,
     positionId: body.positionId || body.position_id,
   };
-  return create(empData, actorUserId, actorRole);
+  return create(empData, actorUserId, actorRole, operation);
 }
 
 export async function updateWithManagerCheck(

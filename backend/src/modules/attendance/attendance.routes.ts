@@ -17,6 +17,7 @@ attendanceRouter.post('/check-in', authorize('ADMIN', 'MANAGER'), asyncHandler(c
 attendanceRouter.post('/check-out', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.checkOut));
 attendanceRouter.post('/dev-simulate-face', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.devSimulateFace));
 attendanceRouter.get('/summaries', asyncHandler(controller.getDailySummaries));
+attendanceRouter.get('/employee-overview', asyncHandler(controller.employeeOverview));
 attendanceRouter.post('/aggregate', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.aggregate));
 attendanceRouter.patch('/adjust', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.adjust));
 attendanceRouter.get('/locks', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.getLocks));

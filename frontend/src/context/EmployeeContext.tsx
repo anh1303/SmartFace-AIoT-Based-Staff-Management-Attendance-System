@@ -8,8 +8,8 @@ export interface EmployeeContextType {
   isError: boolean;
   error: unknown;
   refetchEmployees: () => void;
-  addEmployee: (emp: Omit<Employee, 'created_at' | 'updated_at'>) => void;
-  updateEmployee: (id: string, updates: Partial<Employee>) => void;
+  addEmployee: (emp: Omit<Employee, 'created_at' | 'updated_at'>) => Promise<unknown>;
+  updateEmployee: (id: string, updates: Partial<Employee>) => Promise<unknown>;
   deleteEmployee: (id: string) => void;
   toggleEmployeeStatus: (id: string) => void;
 }

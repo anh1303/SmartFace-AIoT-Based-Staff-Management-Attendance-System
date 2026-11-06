@@ -1,6 +1,7 @@
 export type ShiftType = 'MORNING' | 'AFTERNOON' | 'OFFICE_HOURS' | 'OTHER' | 'OFF';
 
 export interface WorkShift {
+  version?: number;
   shift_id: string;
   employee_id: string;
   date: string;           // "2026-09-08"

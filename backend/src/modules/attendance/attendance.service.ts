@@ -1,10 +1,12 @@
 import { aggregateDailyAttendance } from './attendance.aggregation.js'
+import { attendanceIntervalRemaining, attendanceIntervalMessage } from './attendance.interval.js'
 export { aggregateDailyAttendance } from './attendance.aggregation.js'
 import { createAttendanceSnapshot, restoreAttendanceFromSnapshot } from './attendance.snapshot.js'
 export { createAttendanceSnapshot, restoreAttendanceFromSnapshot } from './attendance.snapshot.js'
 import { formatAttendanceRecords } from './attendance.format.js'
 export { extractTimeString, roundToHalfHour, parseTimeToSecondsInVN, calcShiftWorkingHours, determinePunctuality, formatAttendanceRecord, type RawAttendanceLogDb } from './attendance.format.js'
 import { projectAttendanceDetails } from './attendance.details.js'
+import { summarizeEmployeeMonth } from './attendance.overview.js'
 import { ATTENDANCE_REASON_LABELS, displayAttendanceStatus } from './attendance.reasons.js'
 import { assertAggregationHealthy, notifyLockedScan } from './attendance.alerts.js'
 import { syncDayAdjustments, flushAdjustmentBatch } from './attendance.adjustments.js'
@@ -118,7 +120,9 @@ export async function list(
 
   const logs = await prisma.attendance_logs.findMany({
     where,
-    include: attendanceInclude,
+    include: query.compact === 'true'
+      ? { employees: { select: { ...attendanceInclude.employees.select, avatar_url: false } } }
+      : attendanceInclude,
     orderBy: { event_time: 'desc' },
     skip: skip > 0 ? skip : undefined,
     take: limit,
@@ -225,6 +229,12 @@ export async function getDailySummaries(
       late_early_seconds: s.late_early_seconds,
     }
   })
+}
+
+export async function getEmployeeOverview(query: Record<string, unknown>, requesterUser?: { id?: string; role?: string }) {
+  const today = vnDay(new Date())
+  const summaries = await getDailySummaries({ employeeId: query.employeeId, startDate: `${today.slice(0, 7)}-01`, endDate: today }, requesterUser)
+  return { ...summarizeEmployeeMonth(summaries, today), today: summaries.filter(day => day.date === today) }
 }
 
 export async function assertEditableDay(
@@ -429,7 +439,7 @@ async function recordAttendance(
   if (!Number.isFinite(+eventTime)) throw AppError.badRequest('Thời điểm ghi nhận không hợp lệ')
   const flagged = +eventTime > Date.now() + 120000 || +eventTime < Date.now() - MAX_PAIR_MS
   const eventKey = capture.eventId ? createHash('sha256').update(`${capture.deviceId || device || 'web'}:${capture.eventId}`).digest('hex') : undefined
-  const { created, affected, duplicate, accessDenied } = await prisma.$transaction(async tx => {
+  const outcome = await prisma.$transaction(async tx => {
     // Lock adjacent periods in chronological order for cross-midnight/month pairs.
     const periods = [-1, 0, 1].map(offset => { const d = new Date(eventTime); d.setUTCMonth(d.getUTCMonth() + offset, 1); return vnDay(d).slice(0, 7) }).sort()
     for (const period of periods) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${period}`}))`
@@ -455,8 +465,17 @@ async function recordAttendance(
         const reopened = Boolean(summary?.reopened_at)
         const closed = await isPayrollPeriodClosed(date.slice(0, 7), employee.id, tx)
         const accessDenied = flagged || existing.status === 'FLAGGED' || closed || Boolean(!reopened && (lock?.is_locked || summary?.review_status === 'APPROVED'))
-        return { created: existing, affected: lock?.is_locked ? [] : [...new Set([date, vnDay(existing.event_time)])], duplicate: true, accessDenied }
+        return { created: existing, affected: lock?.is_locked ? [] : [...new Set([date, vnDay(existing.event_time)])], duplicate: true, accessDenied, ignored: false as const }
       }
+    }
+    const latestAccepted = await tx.attendance_logs.findFirst({
+      where: { employee_id: employee.id, status: 'VALID' },
+      orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+    })
+    // Use server receipt time inside the employee lock; device timestamps cannot shorten the interval.
+    const remaining = attendanceIntervalRemaining(latestAccepted?.created_at)
+    if (!flagged && latestAccepted && remaining > 0) {
+      return { ignored: true as const, remaining, latestAccepted }
     }
     const previous = await tx.attendance_logs.findFirst({
       where: { employee_id: employee.id, status: 'VALID', event_time: { lte: eventTime } },
@@ -564,8 +583,18 @@ async function recordAttendance(
         })
       }
     }
-    return { created, affected, duplicate: false, accessDenied: false }
+    return { created, affected, duplicate: false, accessDenied: false, ignored: false as const }
   }, { timeout: 15000, maxWait: 10000 })
+  if (outcome.ignored) {
+    return {
+      id: String(outcome.latestAccepted.id), employee_id: employee.id,
+      status: 'VALID', type: outcome.latestAccepted.type, event_time: outcome.latestAccepted.event_time,
+      work_date: vnDay(outcome.latestAccepted.work_date || outcome.latestAccepted.event_time),
+      duplicate: true, ignored: true, cooldown: true, retry_after_seconds: outcome.remaining,
+      access_denied: false, summaries: [], message: attendanceIntervalMessage(outcome.remaining),
+    }
+  }
+  const { created, affected, duplicate, accessDenied } = outcome
   // Raw logs are durable even if a summary calculation fails. A replay retries the same summaries.
   const updatedSummaries: Array<Record<string, unknown>> = []
   for (const date of affected) {
@@ -574,7 +603,7 @@ async function recordAttendance(
   }
 
   const [formatted] = await formatAttendanceRecords([created])
-  const result = { ...formatted, duplicate, access_denied: accessDenied, summaries: updatedSummaries, work_date: vnDay(created.work_date || created.event_time) }
+  const result = { ...formatted, duplicate, ignored: false, cooldown: false, retry_after_seconds: 0, message: undefined as string | undefined, access_denied: accessDenied, summaries: updatedSummaries, work_date: vnDay(created.work_date || created.event_time) }
   eventBus.publish('attendance:summary-updated', {
     employeeId: employee.id,
     workDate: vnDay(created.work_date || created.event_time),

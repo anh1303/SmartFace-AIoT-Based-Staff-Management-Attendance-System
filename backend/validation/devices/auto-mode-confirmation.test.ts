@@ -61,7 +61,7 @@ it('uses the same device for IN, OUT, then a new IN after cooldown', async () =>
     await processThingsBoardWebhook(payload(event, `auto-cycle-recognition-${index}-2`), actions)
     const result = await processThingsBoardWebhook({ ...payload(event, `auto-cycle-recognition-${index}-3`), event_kind: 'CONFIRMED_SCAN', expected_employee_id: 'employee-a' }, actions)
     expect(result).toMatchObject({ success: true, door_open: true, mode })
-    vi.setSystemTime(new Date(Date.now() + 120_000))
+    vi.setSystemTime(new Date(Date.now() + 600_000))
   }
   expect(actions.checkIn).toHaveBeenCalledTimes(2)
   expect(actions.checkOut).toHaveBeenCalledOnce()

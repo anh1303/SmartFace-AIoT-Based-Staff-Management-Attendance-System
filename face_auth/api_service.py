@@ -9,6 +9,7 @@ import secrets
 from threading import BoundedSemaphore
 import sys
 from typing import List, Optional
+from uuid import UUID
 import cv2
 import numpy as np
 from fastapi import FastAPI, HTTPException, Header, Depends
@@ -85,6 +86,7 @@ def shutdown_event():
 class EnrollRequest(BaseModel):
     employee_code: str = Field(..., min_length=1, max_length=50)
     images_base64: List[str] = Field(..., min_length=1, max_length=10)
+    operation_id: Optional[UUID] = None
 
 
 @app.get("/health")
@@ -105,13 +107,26 @@ def health_check():
     }
 
 
-@app.post("/internal/enroll")
+def require_internal_key(x_face_auth_key: str = Header(default="")):
+    expected = os.getenv("FACE_AUTH_INTERNAL_KEY", "")
+    if len(expected) < 32:
+        raise HTTPException(503, "Server extraction is not configured")
+    if not secrets.compare_digest(expected.encode(), x_face_auth_key.encode()):
+        raise HTTPException(401, "Invalid internal credentials")
+
+
+@app.post("/internal/enroll", dependencies=[Depends(require_internal_key)])
 def enroll_faces(req: EnrollRequest):
     """
     Trích xuất vector khuôn mặt từ danh sách ảnh base64 và lưu vào database.
     """
     if detector is None or embedder is None or db is None:
         raise HTTPException(status_code=503, detail="Dịch vụ chưa sẵn sàng, đang khởi tạo model...")
+
+    if req.operation_id:
+        receipt = db.enrollment_receipt(str(req.operation_id))
+        if receipt:
+            return receipt
 
     embeddings = []
     failed_count = 0
@@ -177,21 +192,7 @@ def enroll_faces(req: EnrollRequest):
     if failed_count > 0:
         warnings.append(f"{failed_count}/{total_images} ảnh không trích xuất được khuôn mặt")
 
-    try:
-        db.upsert(
-            employee_code=req.employee_code,
-            individual_embeddings=valid_embeddings,
-            mean_embedding=centroid,
-            model_version=config.EMBEDDING_MODEL_VERSION,
-            overwrite=True,
-            save_individuals=True,
-        )
-    except ValueError as ve:
-        raise HTTPException(status_code=404, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu embeddings: {e}")
-
-    return {
+    result = {
         "status": "ok",
         "employee_code": req.employee_code,
         "total_images": total_images,
@@ -204,9 +205,28 @@ def enroll_faces(req: EnrollRequest):
         "warnings": warnings,
     }
 
+    try:
+        db.upsert(
+            employee_code=req.employee_code,
+            individual_embeddings=valid_embeddings,
+            mean_embedding=centroid,
+            model_version=config.EMBEDDING_MODEL_VERSION,
+            overwrite=True,
+            save_individuals=True,
+            operation_id=str(req.operation_id) if req.operation_id else None,
+            operation_result=result,
+            avatar_url=req.images_base64[0] if req.operation_id else None,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu embeddings: {e}")
+
+    return db.enrollment_receipt(str(req.operation_id)) if req.operation_id else result
 
 
-@app.delete("/internal/enroll/{employee_code}")
+
+@app.delete("/internal/enroll/{employee_code}", dependencies=[Depends(require_internal_key)])
 def delete_employee_faces(employee_code: str):
     """
     Xóa toàn bộ vector sinh trắc học của nhân viên theo employee_code.
@@ -226,6 +246,10 @@ def delete_employee_faces(employee_code: str):
                 raise HTTPException(status_code=404, detail="Employee not found")
 
             emp_uuid = row[0]
+            conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"biometric:{emp_uuid}",))
+            active = conn.execute("SELECT 1 FROM background_operations WHERE type = 'biometric.enroll' AND status IN ('queued', 'running') AND payload->>'employeeId' = %s", (str(emp_uuid),)).fetchone()
+            if active:
+                raise HTTPException(409, "Đang cập nhật khuôn mặt nền; chờ tác vụ hoàn tất trước khi xóa.")
             conn.execute(
                 "DELETE FROM face_embeddings WHERE employee_id = %s;",
                 (emp_uuid,)
@@ -240,14 +264,6 @@ class AlignedEmbeddingRequest(BaseModel):
     image_png_b64: str = Field(..., min_length=44, max_length=60000)
     model_sha256: str = Field(..., pattern=r"^[a-f0-9]{64}$")
     model_version: str = Field(..., min_length=1, max_length=80)
-
-
-def require_internal_key(x_face_auth_key: str = Header(default="")):
-    expected = os.getenv("FACE_AUTH_INTERNAL_KEY", "")
-    if len(expected) < 32:
-        raise HTTPException(503, "Server extraction is not configured")
-    if not secrets.compare_digest(expected.encode(), x_face_auth_key.encode()):
-        raise HTTPException(401, "Invalid internal credentials")
 
 
 @app.post("/internal/face-embedding", dependencies=[Depends(require_internal_key)])

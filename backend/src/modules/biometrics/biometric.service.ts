@@ -3,7 +3,8 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { logAction } from '../audit-logs/public.js'
 import { env } from '../../config/env.js'
-import { findEmployeeByIdOrCode, findActiveEmployeeIds, assertCanManageEmployee, type EmployeeActor } from '../employees/public.js'
+import { assertNoEnrollment } from '../operations/operation.service.js'
+import { findEmployeeByIdOrCode, assertCanManageEmployee, type EmployeeActor } from '../employees/public.js'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -45,9 +46,12 @@ export async function deactivate(idOrCode: string, actor?: EmployeeActor) {
   })
   if (count === 0) throw new AppError(404, 'No active biometric data found for this employee')
 
-  await prisma.face_embeddings.updateMany({
+  await prisma.$transaction(async tx => {
+    await assertNoEnrollment(tx, employeeId)
+    await tx.face_embeddings.updateMany({
     where: { employee_id: employeeId },
     data: { is_active: false },
+    })
   })
 }
 
@@ -55,7 +59,10 @@ export async function removeAll(idOrCode: string, actorUserId?: string) {
   const employeeId = await resolveEmployeeId(idOrCode)
   const count = await prisma.face_embeddings.count({ where: { employee_id: employeeId } })
   if (count === 0) throw new AppError(404, 'No biometric data found for this employee')
-  await prisma.face_embeddings.deleteMany({ where: { employee_id: employeeId } })
+  await prisma.$transaction(async tx => {
+    await assertNoEnrollment(tx, employeeId)
+    await tx.face_embeddings.deleteMany({ where: { employee_id: employeeId } })
+  })
 
   await logAction({
     userId: actorUserId,
@@ -79,7 +86,7 @@ export async function enrollImages(idOrCode: string, imagesBase64: string[], act
   try {
     resp = await fetch(`${env.FACE_AUTH_URL}/internal/enroll`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Face-Auth-Key': env.FACE_AUTH_INTERNAL_KEY },
       body: JSON.stringify({
         employee_code: emp.employee_code,
         images_base64: imagesBase64,
@@ -185,36 +192,38 @@ export async function findBestFaceMatch(
   const client = tx ?? prisma
   const currentModelVersion = env.FACE_AUTH_MODEL_VERSION
 
-  const activeEmployeeIds = await findActiveEmployeeIds(tx)
-  if (!activeEmployeeIds || activeEmployeeIds.length === 0) return null
-
   const rows: Array<{
     employee_id: string
+    employee_code: string
+    full_name: string
+    avatar_url: string | null
+    status: string
     embedding_type: string
     similarity: number
   }> = await client.$queryRaw`
     SELECT
       f.employee_id,
+      e.employee_code, e.full_name, e.avatar_url, e.status,
       f.embedding_type,
       (1 - (f.embedding <=> ${vecLiteral}::vector))::float AS similarity
     FROM face_embeddings f
+    JOIN employees e ON e.id = f.employee_id
     WHERE f.is_active = true
       AND f.embedding IS NOT NULL
       AND f.model_version = ${currentModelVersion}
       AND f.embedding_type = 'CENTROID'
-      AND f.employee_id = ANY(${activeEmployeeIds}::uuid[])
+      AND e.status = 'ACTIVE'
     ORDER BY f.embedding <=> ${vecLiteral}::vector ASC
     LIMIT 1;
   `
   if (!rows || rows.length === 0) return null
   const best = rows[0]
-  const emp = await findEmployeeByIdOrCode(best.employee_id, tx)
-  if (!emp || emp.status !== 'ACTIVE') return null
+  if (best.status !== 'ACTIVE') return null
   return {
-    emp_id: emp.id,
-    employee_code: emp.employee_code,
-    full_name: emp.full_name,
-    avatar_url: emp.avatar_url ?? null,
+    emp_id: best.employee_id,
+    employee_code: best.employee_code,
+    full_name: best.full_name,
+    avatar_url: best.avatar_url ?? null,
     embedding_type: best.embedding_type,
     similarity: best.similarity,
   }

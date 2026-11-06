@@ -142,6 +142,9 @@ class VectorDB:
         model_version: Optional[str] = None,
         overwrite: bool = True,
         save_individuals: bool = True,
+        operation_id: Optional[str] = None,
+        operation_result: Optional[dict] = None,
+        avatar_url: Optional[str] = None,
     ) -> Tuple[str, bool, bool]:
         """
         Đăng ký hoặc cập nhật dữ liệu sinh trắc học khuôn mặt cho nhân viên.
@@ -178,6 +181,18 @@ class VectorDB:
                         "Hãy tạo nhân viên qua Backend trước."
                     )
                 emp_uuid = row[0]
+
+                conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"biometric:{emp_uuid}",))
+                if operation_id:
+                    from enrollment.operation import begin_enrollment
+                    previous = begin_enrollment(conn, emp_uuid, operation_id)
+                    if previous is not None:
+                        return employee_code, False, True
+
+                if not operation_id:
+                    active = conn.execute("SELECT 1 FROM background_operations WHERE type = 'biometric.enroll' AND status IN ('queued', 'running') AND payload->>'employeeId' = %s", (str(emp_uuid),)).fetchone()
+                    if active:
+                        raise ValueError("Nhân viên đang được cập nhật khuôn mặt nền.")
 
                 # 2. Kiểm tra nhân viên đã có embedding cùng model_version chưa
                 existing = conn.execute("""
@@ -224,7 +239,16 @@ class VectorDB:
                     );
                 """, (emp_uuid, mean_vec, model_version))
 
+                if operation_id:
+                    from enrollment.operation import finish_enrollment
+                    finish_enrollment(conn, emp_uuid, operation_id, operation_result, avatar_url)
+
         return employee_code, is_new, False
+
+    def enrollment_receipt(self, operation_id):
+        with self.pool.connection() as conn:
+            row = conn.execute("SELECT result FROM face_enrollment_receipts WHERE operation_id = %s", (operation_id,)).fetchone()
+            return row[0] if row else None
 
     def close(self):
         self.pool.close()

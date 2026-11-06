@@ -17,6 +17,7 @@ import { AttendanceProvider, useAttendanceContext } from './AttendanceContext';
 import { PayrollProvider, usePayrollContext } from './PayrollContext';
 import type { PayrollItemUpdates } from '@/features/payrolls';
 import { NotificationProvider, useNotifications } from '../features/notifications';
+import { OperationsProvider } from '../features/operations/OperationsProvider';
 
 
 export interface AppContextType {
@@ -30,8 +31,8 @@ export interface AppContextType {
 
   // Employees
   employees: Employee[];
-  addEmployee: (emp: Omit<Employee, 'created_at' | 'updated_at'>) => void;
-  updateEmployee: (id: string, updates: Partial<Employee>) => void;
+  addEmployee: (emp: Omit<Employee, 'created_at' | 'updated_at'>) => Promise<unknown>;
+  updateEmployee: (id: string, updates: Partial<Employee>) => Promise<unknown>;
   deleteEmployee: (id: string) => void;
   toggleEmployeeStatus: (id: string) => void;
 
@@ -166,6 +167,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <NotificationProvider>
       <ToastProvider>
         <AuthProvider>
+          <OperationsProvider>
           <EmployeeProvider>
             <ShiftProvider>
               <AttendanceProvider>
@@ -175,6 +177,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               </AttendanceProvider>
             </ShiftProvider>
           </EmployeeProvider>
+          </OperationsProvider>
         </AuthProvider>
       </ToastProvider>
     </NotificationProvider>

@@ -1,3 +1,5 @@
+import { useOperations } from '../../features/operations/OperationsProvider';
+import { submitScheduleBatch, submitScheduleCopy } from '../../features/schedules/api/shiftApi';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useEmployeeContext } from '../../context/EmployeeContext';
@@ -20,6 +22,8 @@ import { getMonday, formatDateToYYYYMMDD, getISOWeekNumber, getTodayVNString } f
 import { useDepartmentPositions } from '@/features/employees';
 
 export const ManagerSchedule: React.FC = () => {
+  const { track, jobs } = useOperations();
+  const scheduleBusy = jobs.some(job => job.type === 'shifts.batch' && ['queued', 'running'].includes(job.status));
   const employeeState = useEmployeeContext();
   const shiftState = useShiftContext();
   const { employees, workShifts, assignOrUpdateShift, showToast } = useApp();
@@ -136,6 +140,7 @@ export const ManagerSchedule: React.FC = () => {
   });
 
   const handleCellClick = (empId: string, empName: string, date: string, dayLabel: string) => {
+    if (scheduleBusy) { showToast('Lịch đang được cập nhật nền. Vui lòng chờ kết quả.', 'warning'); return; }
     const todayVN = getTodayVNString();
     const isPast = date < todayVN;
 
@@ -185,6 +190,7 @@ export const ManagerSchedule: React.FC = () => {
   };
 
   const handleShiftSave = async (e: React.FormEvent) => {
+    if (scheduleBusy) { e.preventDefault(); showToast('Lịch đang được cập nhật nền. Vui lòng chờ kết quả trước khi sửa tiếp.', 'warning'); return; }
     e.preventDefault();
     if (!editingShift) return;
 
@@ -209,6 +215,7 @@ export const ManagerSchedule: React.FC = () => {
 
     setSaving(true);setShiftError('');
     try {await assignOrUpdateShift({
+      version: editingShift.shift?.version,
       shift_id: editingShift.shift?.shift_id,
       employee_id: editingShift.employeeId,
       date: editingShift.date,
@@ -228,6 +235,7 @@ export const ManagerSchedule: React.FC = () => {
 
   // Bulk shift assignment submission
   const handleBulkSubmit = async (e: React.FormEvent) => {
+    if (scheduleBusy) { e.preventDefault(); showToast('Lịch đang được cập nhật. Vui lòng chờ tác vụ hoàn tất.', 'warning'); return; }
     e.preventDefault();
     if (bulkDays.length === 0) {
       showToast('Vui lòng chọn ít nhất 1 ngày trong tuần để áp dụng ca!', 'warning');
@@ -264,127 +272,33 @@ export const ManagerSchedule: React.FC = () => {
       return;
     }
 
-    const dayNames = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
-    const todayVN = getTodayVNString();
-    let count = 0;
-    let skippedPast = 0;
-    let failed = 0;
-
-    setSaving(true);
-    setShiftError('');
-    for (const emp of targetEmps) {
-      for (const dayOffset of bulkDays) {
-        const d = new Date(currentMonday);
-        d.setDate(currentMonday.getDate() + dayOffset);
-        const dateStr = formatDateToYYYYMMDD(d);
-
-        if (dateStr < todayVN) {
-          skippedPast++;
-          continue;
-        }
-
-        const existing = workShifts.find(s => s.employee_id === emp.employee_id && s.date === dateStr);
-        try {
-          await assignOrUpdateShift({
-            shift_id: existing?.shift_id,
-            employee_id: emp.employee_id,
-            date: dateStr,
-            work_day: dayNames[dayOffset],
-            start_time: bulkShiftType === 'OFF' ? '00:00' : bulkStartTime,
-            end_time: bulkShiftType === 'OFF' ? '00:00' : bulkEndTime,
-            shift_type: bulkShiftType,
-            department: emp.department || 'Nhân viên',
-            note: bulkNote,
-          });
-          count++;
-        } catch {
-          failed++;
-        }
-      }
-    }
-    setSaving(false);
-    if (count === 0 && skippedPast > 0) {
-      showToast('Tất cả các ngày được chọn đều thuộc quá khứ và đã bị khóa. Không có ca nào được phân bổ.', 'warning');
-    } else if (failed) {
-      setShiftError(`Đã lưu ${count} ca; ${failed} ca chưa lưu được. Đã tự động bỏ qua ${skippedPast} lượt do thuộc ngày quá khứ.`);
-    } else {
-      setBulkModalOpen(false);
-      const pastNotice = skippedPast > 0 ? ` (đã tự động bỏ qua ${skippedPast} lượt do thuộc ngày quá khứ)` : '';
-      showToast(`Đã lưu ${count} ca cho ${targetEmps.length} nhân sự${pastNotice}.`, 'success');
-    }
+    const assignments = targetEmps.flatMap(emp => bulkDays.map(offset => {
+      const d = new Date(currentMonday); d.setDate(d.getDate() + offset);
+      const date = formatDateToYYYYMMDD(d);
+      const existing = workShifts.find(s => s.employee_id === emp.employee_id && s.date === date);
+      return { employee_id: emp.employee_id, date, shift_type: bulkShiftType, start_time: bulkStartTime, end_time: bulkEndTime, note: bulkNote, expectedVersion: existing ? existing.version ?? 1 : null };
+    }));
+    setSaving(true); setShiftError('');
+    showToast('Đang gửi yêu cầu phân lịch…', 'info');
+    try { track(await submitScheduleBatch(assignments)); setBulkModalOpen(false); }
+    catch (error) { const message = error instanceof Error ? error.message : 'Chưa gửi được yêu cầu'; setShiftError(message); showToast(message, 'error'); }
+    finally { setSaving(false); }
   };
 
-  // Copy shifts from previous week
   const handleCopyPreviousWeek = async () => {
-    const prevMonday = new Date(currentMonday);
-    prevMonday.setDate(currentMonday.getDate() - 7);
-    const dayNames = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
-    const todayVN = getTodayVNString();
-
-    let copiedCount = 0;
-    let skippedPastCount = 0;
-    let activeEmps = employees.filter(e => e.status === 'ACTIVE');
-
-    if (role !== 'admin') {
-      activeEmps = activeEmps.filter(e => {
-        const isSelf = currentUser && (e.employee_id === currentUser.employee_id || e.email === currentUser.email);
-        const isOtherMgr = isAnotherManager(e, currentUser);
-        return !isSelf && !isOtherMgr;
-      });
+    if (scheduleBusy || saving) { showToast('Lịch đang được cập nhật. Vui lòng chờ tác vụ hoàn tất.', 'warning'); return; }
+    const prevMonday = new Date(currentMonday); prevMonday.setDate(prevMonday.getDate() - 7);
+    const targets = employees.filter(emp => emp.status === 'ACTIVE' && (role === 'admin' || (emp.department === managerDept && emp.employee_id !== currentUser?.employee_id && !isAnotherManager(emp, currentUser))));
+    if (!targets.length) { showToast('Không có nhân viên phù hợp để sao chép lịch.', 'warning'); return; }
+    const expectedTargetVersions: Record<string, number | null> = {};
+    for (const emp of targets) for (const day of daysOfWeek) {
+      const shift = workShifts.find(s => s.employee_id === emp.employee_id && s.date === day.date);
+      expectedTargetVersions[`${emp.employee_id}:${day.date}`] = shift ? shift.version ?? 1 : null;
     }
-
-    let failed = 0;
-    setSaving(true);
-    for (const emp of activeEmps) {
-      for (const offset of [0, 1, 2, 3, 4, 5, 6]) {
-        const prevDateObj = new Date(prevMonday);
-        prevDateObj.setDate(prevMonday.getDate() + offset);
-        const prevDateStr = formatDateToYYYYMMDD(prevDateObj);
-
-        const currDateObj = new Date(currentMonday);
-        currDateObj.setDate(currentMonday.getDate() + offset);
-        const currDateStr = formatDateToYYYYMMDD(currDateObj);
-
-        if (currDateStr < todayVN) {
-          skippedPastCount++;
-          continue;
-        }
-
-        const prevShift = workShifts.find(s => s.employee_id === emp.employee_id && s.date === prevDateStr);
-        const currShift = workShifts.find(s => s.employee_id === emp.employee_id && s.date === currDateStr);
-
-        if (prevShift) {
-          try {
-            await assignOrUpdateShift({
-              shift_id: currShift?.shift_id,
-              employee_id: emp.employee_id,
-              date: currDateStr,
-              work_day: dayNames[offset],
-              start_time: prevShift.start_time,
-              end_time: prevShift.end_time,
-              shift_type: prevShift.shift_type,
-              department: emp.department || 'Nhân viên',
-              note: prevShift.note || 'Sao chép tuần trước',
-            });
-            copiedCount++;
-          } catch {
-            failed++;
-          }
-        }
-      }
-    }
-    setSaving(false);
-
-    if (failed) {
-      showToast(`Đã sao chép ${copiedCount} ca; ${failed} ca chưa lưu được. Vui lòng kiểm tra lại.`, 'warning');
-    } else if (copiedCount > 0) {
-      const pastNotice = skippedPastCount > 0 ? ' (đã tự động bỏ qua các ngày trong quá khứ)' : '';
-      showToast(`Đã sao chép thành công ${copiedCount} ca làm việc từ hôm nay trở đi${pastNotice}!`, 'success');
-    } else if (skippedPastCount > 0) {
-      showToast('Tuần này đã qua và các ngày đều bị khóa, không thể sao chép đè lên dữ liệu quá khứ!', 'warning');
-    } else {
-      showToast('Không tìm thấy dữ liệu ca làm việc ở tuần trước để sao chép!', 'warning');
-    }
+    setSaving(true); showToast('Đang gửi yêu cầu sao chép lịch tuần trước…', 'info');
+    try { track(await submitScheduleCopy({ sourceMonday: formatDateToYYYYMMDD(prevMonday), targetMonday: formatDateToYYYYMMDD(currentMonday), employeeIds: targets.map(e => e.employee_id), expectedTargetVersions })); }
+    catch (error) { showToast(error instanceof Error ? error.message : 'Chưa gửi được yêu cầu sao chép', 'error'); }
+    finally { setSaving(false); }
   };
 
   const handleExportExcel = (format: 'excel' | 'pdf') => {

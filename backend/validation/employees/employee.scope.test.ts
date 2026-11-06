@@ -114,6 +114,16 @@ describe('employee department authorization', () => {
       where: { AND: [{ id: { in: expect.arrayContaining(['manager', 'staff']) } }, { status: 'ACTIVE' }] },
     })
   })
+  it('restricts employee overview to the authenticated employee and current month without writes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-06T10:00:00+07:00'))
+    try {
+      await attendance.getEmployeeOverview({ employeeId: 'O1', startDate: '2020-01-01' }, { id: 'staff-user', role: 'EMPLOYEE' })
+      expect(db.daily_attendance_summary.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ employee_id: 'staff', work_date: { gte: new Date('2026-11-01T00:00:00Z'), lte: new Date('2026-11-06T00:00:00Z') } }) }))
+      expect(db.$transaction).not.toHaveBeenCalled()
+      expect(db.$executeRaw).not.toHaveBeenCalled()
+      expect(db.employee.update).not.toHaveBeenCalled()
+    } finally { vi.useRealTimers() }
+  })
   it('intersects an explicit aggregate target with the supplied management scope', async () => {
     const result = await attendance.aggregateDailyAttendance(10, 2026, 'O1', undefined, await getEmployeeScope(manager, 'manage'))
     expect(result.totalSummaries).toBe(0)

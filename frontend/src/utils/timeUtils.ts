@@ -7,7 +7,9 @@ export const roundPayableHours = (seconds: number): number => {
 };
 
 export const formatSecondsToHHMMSS = (totalSec: number): string => {
-  if (totalSec <= 0) return '00:00:00';
+  if (!Number.isFinite(totalSec) || totalSec <= 0) return '00:00:00';
+  // Discard milliseconds before splitting so every display uses whole seconds.
+  totalSec = Math.floor(totalSec);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;

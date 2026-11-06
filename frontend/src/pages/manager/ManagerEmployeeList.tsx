@@ -180,7 +180,11 @@ export const ManagerEmployeeList: React.FC = () => {
       return;
     }
 
-    addEmployee(newEmp);
+    const draft = { ...newEmp };
+    void addEmployee(draft).catch(() => {
+      setNewEmp(draft);
+      setAddModalOpen(true);
+    });
     setAddModalOpen(false);
     const updatedEmployees = [
       ...employees,
@@ -214,7 +218,8 @@ export const ManagerEmployeeList: React.FC = () => {
     e.preventDefault();
     if (!editEmployee) return;
 
-    updateEmployee(editEmployee.employee_id, {
+    const draft = { ...editEmployee };
+    void updateEmployee(editEmployee.employee_id, {
       full_name: editEmployee.full_name,
       department: editEmployee.department,
       position: editEmployee.position,
@@ -222,7 +227,7 @@ export const ManagerEmployeeList: React.FC = () => {
       phone: editEmployee.phone,
       hourly_rate: editEmployee.hourly_rate,
       fingerprint_enrolled: editEmployee.fingerprint_enrolled,
-    });
+    }).catch(() => setEditEmployee(draft));
     setEditEmployee(null);
   };
 

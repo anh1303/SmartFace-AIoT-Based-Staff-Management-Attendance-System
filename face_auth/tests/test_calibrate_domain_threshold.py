@@ -132,7 +132,7 @@ class TestRuntimeExport(unittest.TestCase):
         self.assertEqual(exported["calibrated_logit_threshold"], 2)
         self.assertEqual(exported["predictor_threshold_probability"], calibrate.probability(2))
         self.assertEqual(exported["model_sha256"], "abc")
-        self.assertEqual(exported["model_file"], "/tmp/model.onnx")
+        self.assertEqual(Path(exported["model_file"]), predictor.model_path)
 
     def test_unrepresentable_runtime_probability_is_reported(self):
         with self.assertRaisesRegex(ValueError, "độ chính xác"):

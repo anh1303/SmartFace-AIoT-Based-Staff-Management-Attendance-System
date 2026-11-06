@@ -74,6 +74,7 @@ function addDays(dateStr: string, days: number): string {
 }
 
 export interface RawShift {
+  version?: number
   id: string | bigint
   work_date: Date | string
   work_day?: string | null
@@ -97,6 +98,7 @@ export function formatShift(s: RawShift) {
 
   return {
     shift_id: s.id.toString(),
+    version: s.version ?? 1,
     employee_id: s.employees?.employee_code || s.employee_id,
     date: dateStr,
     work_day: workDay,
@@ -155,7 +157,7 @@ export async function assignOrUpdate(data: {
   start_time?: string
   end_time?: string
   note?: string
-}, actorUserId?: string, actorRole?: string, options?: { allowPastDate?: boolean }) {
+}, actorUserId?: string, actorRole?: string, options?: { allowPastDate?: boolean; tx?: Prisma.TransactionClient; expectedVersion?: number | null }) {
   const todayVN = getTodayVNString()
   if (!options?.allowPastDate && data.date < todayVN) {
     throw AppError.conflict(
@@ -221,7 +223,7 @@ export async function assignOrUpdate(data: {
     endTimeDate = parseTimeStringToDate(rawEnd, '00:00')
   }
 
-  const shiftRecord = await prisma.$transaction(async tx => {
+  const perform = async (tx: Prisma.TransactionClient) => {
     const prevDateStr = addDays(data.date, -1)
     const nextDateStr = addDays(data.date, 1)
     const candidateDates = [prevDateStr, data.date, nextDateStr]
@@ -265,6 +267,9 @@ export async function assignOrUpdate(data: {
       include: { work_shifts: true },
     })
 
+    if (options?.expectedVersion !== undefined && (existingShift ? (existingShift as any).version ?? 1 : null) !== options.expectedVersion) {
+      throw AppError.conflict('Ca đích đã được thay đổi bởi thao tác khác. Vui lòng tải lại lịch trước khi lưu.')
+    }
     const existingPrevShift = await tx.employee_shifts.findFirst({
       where: { employee_id: emp.id, work_date: new Date(`${prevDateStr}T00:00:00.000Z`) },
       include: { work_shifts: true },
@@ -373,6 +378,7 @@ export async function assignOrUpdate(data: {
       shiftRecord = await tx.employee_shifts.update({
         where: { id: existingShift.id },
         data: {
+          version: { increment: 1 },
           shift_id: defaultWorkShift.id,
           work_day,
           shift_type: standardConfig.code,
@@ -437,12 +443,14 @@ export async function assignOrUpdate(data: {
     }
 
     return shiftRecord
-  }, { maxWait: 20000, timeout: 60000 })
+  }
+  const shiftRecord = options?.tx ? await perform(options.tx) : await prisma.$transaction(perform, { maxWait: 20000, timeout: 60000 })
   return formatShift(shiftRecord)
 }
 
 export async function assignOrUpdateWithPermissionCheck(
   data: {
+    expectedVersion?: number | null
     employee_id: string
     date: string
     work_day?: string
@@ -455,7 +463,7 @@ export async function assignOrUpdateWithPermissionCheck(
 ) {
   await assertCanManageEmployee(actorUser, data.employee_id)
 
-  return assignOrUpdate(data, actorUser?.id, actorUser?.role)
+  return assignOrUpdate(data, actorUser?.id, actorUser?.role, { expectedVersion: data.expectedVersion })
 }
 
 /**

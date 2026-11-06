@@ -16,13 +16,23 @@ export function useAttendance(params?: FetchAttendanceParams) {
     if (!currentUser || (import.meta.env.DEV && import.meta.env.VITE_DEMO_MODE === 'true')) return;
     const base = import.meta.env.VITE_SOCKET_URL || window.location.origin;
     const socket = io(`${base}/attendance`, { withCredentials: true });
+    let pendingRefresh: ReturnType<typeof setTimeout> | undefined;
     const refresh = () => {
-      queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
-      queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
+      for (const domain of ['attendance', 'attendanceSummaries', 'attendanceAdjustments', 'dashboard', 'payroll', 'payrolls']) {
+        void queryClient.invalidateQueries({ queryKey: [domain] });
+      }
     };
-    for (const event of ['connect', 'checked-in', 'checked-out', 'attendance-summary-updated']) socket.on(event, refresh);
-    return () => { socket.disconnect(); };
+    const changed = () => {
+      if (pendingRefresh) return;
+      pendingRefresh = setTimeout(() => {
+        pendingRefresh = undefined;
+        refresh();
+        showToast('Chấm công vừa được cập nhật. Đang đồng bộ dữ liệu các trang.', 'info');
+      }, 50);
+    };
+    socket.on('connect', refresh);
+    for (const event of ['checked-in', 'checked-out', 'attendance-summary-updated']) socket.on(event, changed);
+    return () => { if (pendingRefresh) clearTimeout(pendingRefresh); socket.disconnect(); };
   }, [currentUser?.employee_id, queryClient]);
 
   // Chuẩn hóa và sort các key của params để đảm bảo queryKey ổn định, tránh cache miss khi params bị re-create
@@ -52,11 +62,16 @@ export function useAttendance(params?: FetchAttendanceParams) {
 
   const addAttendanceMutation = useMutation({
     mutationFn: (record: Omit<AttendanceRecord, 'attendance_id'>) => addAttendanceApi(record),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      if (result?.ignored) {
+        showToast(result.message || 'Lượt chấm công gần đây đã được ghi nhận. Đã bỏ qua lượt quét lặp.', 'info');
+        return;
+      }
       showToast('Điểm danh thành công', 'success');
       queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
       queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (error: Error) => {
       showToast(`Lỗi khi điểm danh: ${error.message || 'Không thể kết nối đến máy chủ'}`, 'error');

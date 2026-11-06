@@ -54,16 +54,12 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
 
   useEffect(() => {
     if (editingItem) {
-      const leH = Math.floor(editingItem.currentLateEarlySec / 3600);
-      const leM = Math.floor((editingItem.currentLateEarlySec % 3600) / 60);
-      const leS = editingItem.currentLateEarlySec % 60;
+      const [leH, leM, leS] = formatSecondsToHHMMSS(editingItem.currentLateEarlySec).split(':').map(Number);
       setInputLEHours(leH);
       setInputLEMinutes(leM);
       setInputLESeconds(leS);
 
-      const otH = Math.floor(editingItem.currentOTSec / 3600);
-      const otM = Math.floor((editingItem.currentOTSec % 3600) / 60);
-      const otS = editingItem.currentOTSec % 60;
+      const [otH, otM, otS] = formatSecondsToHHMMSS(editingItem.currentOTSec).split(':').map(Number);
       setInputOTHours(otH);
       setInputOTMinutes(otM);
       setInputOTSeconds(otS);

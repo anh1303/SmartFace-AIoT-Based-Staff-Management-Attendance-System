@@ -21,6 +21,7 @@ export const createEmployeeSchema = z.object({
 })
 
 export const updateEmployeeSchema = createEmployeeSchema.partial().extend({
+  expectedVersion: z.string().datetime().optional(),
   fingerprint_enrolled: z.boolean().optional(),
 })
 

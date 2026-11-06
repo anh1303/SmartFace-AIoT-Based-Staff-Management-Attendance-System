@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const db = vi.hoisted(() => ({
   $executeRaw: vi.fn(), $transaction: vi.fn(),
@@ -27,7 +27,13 @@ vi.mock('../../src/modules/attendance/index.js', () => ({ assertEditableDay: vi.
 import { assignOrUpdate } from '../../src/modules/shifts/shift.service.js'
 import { shiftTemplateSchema } from '../../src/modules/shifts/template.dto.js'
 
-beforeEach(() => { vi.clearAllMocks(); db.$transaction.mockImplementation(fn => fn(db)) })
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-04T08:00:00+07:00'))
+  vi.clearAllMocks()
+  db.$transaction.mockImplementation(fn => fn(db))
+})
+afterEach(() => vi.useRealTimers())
 describe('overnight shifts', () => {
   it('assigns an overnight shift on its starting work date', async () => {
     const assigned = await assignOrUpdate({ employee_id: 'employee1', date: '2026-11-10', shift_type: 'OTHER', start_time: '22:00', end_time: '06:00' }, 'admin', 'ADMIN')

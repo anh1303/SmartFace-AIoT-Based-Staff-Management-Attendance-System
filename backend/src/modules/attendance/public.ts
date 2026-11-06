@@ -6,3 +6,5 @@ export { isAttendanceDateLocked } from './attendance.lock.js'
 export { aggregateDailyAttendance } from './attendance.aggregation.js'
 export * from './attendance.contract.js'
 export { determinePunctuality } from './attendance.format.js'
+
+export { getDashboardAttendanceLogs, getReportAttendanceLogs, getReportAttendanceSummaries } from './attendance.report-queries.js'

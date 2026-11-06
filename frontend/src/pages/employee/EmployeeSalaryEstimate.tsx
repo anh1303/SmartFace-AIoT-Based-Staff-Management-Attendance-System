@@ -1,39 +1,27 @@
 import React, { useState } from 'react';
+import { Wallet } from 'lucide-react';
+import { FilterSelect, PageHeaderBanner } from '../../components/common';
 import { useApp } from '../../context/AppContext';
-import { PageHeaderBanner } from '../../components/common';
-import { PayslipBreakdown } from '@/features/payrolls';
-import { formatPayrollRateLabel } from '../../utils/payrollUtils';
+import { PayslipBreakdown } from '../../features/payrolls/components/PayslipBreakdown';
+import { getTodayVNString } from '../../utils/dateUtils';
+import { money, quantity } from './employeePresentation';
 
 export const EmployeeSalaryEstimate: React.FC = () => {
   const { currentUser, payroll, employees, isLoadingPayroll, payrollError } = useApp();
-  const employeeCode = currentUser?.employee_id;
-  const employee = employees.find(e => e.employee_id === employeeCode || e.id === employeeCode);
-  const myPayrolls = employeeCode ? payroll.filter(p => p.employee_id === employeeCode || p.employee_id === employee?.id) : [];
-  const now = new Date();
-  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const employeeId = currentUser?.employee_id;
+  const employee = employeeId ? employees.find(e => e.employee_id === employeeId || e.id === employeeId) : undefined;
+  const myPayrolls = employeeId ? payroll.filter(p => p.employee_id === employeeId || p.employee_id === employee?.id) : [];
+  const currentPeriod = getTodayVNString().slice(0, 7);
   const [selectedPeriod, setSelectedPeriod] = useState(currentPeriod);
-  const record = myPayrolls.find(p => (p.period || p.payroll_period) === selectedPeriod) ?? null;
-  const periods = Array.from(new Set([currentPeriod, selectedPeriod, ...myPayrolls.map(p => p.period || p.payroll_period).filter(Boolean) as string[]])).sort().reverse();
+  const record = myPayrolls.find(p => (p.period || p.payroll_period) === selectedPeriod);
+  const periods = Array.from(new Set([currentPeriod, ...myPayrolls.map(p => p.period || p.payroll_period).filter(Boolean) as string[]])).sort().reverse();
   const statuses = { PENDING: 'Chờ duyệt', CONFIRMED: 'Đã xác nhận', FINALIZED: 'Đã chốt', PAID: 'Đã thanh toán' };
-
-  return <div className="space-y-6">
-    <PageHeaderBanner title="Lương theo kỳ" subtitle="Thu nhập và các khoản đã được hệ thống tính cho đúng kỳ lương." actions={
-      <label className="sf-field">Kỳ lương<select className="sf-input" value={selectedPeriod} onChange={e => setSelectedPeriod(e.target.value)}>
-        {periods.map(period => <option key={period} value={period}>{period}</option>)}
-      </select></label>
-    }/>
-    {isLoadingPayroll ? <p className="sf-empty" role="status">Đang tải bảng lương…</p>
-      : payrollError ? <p className="sf-feedback error" role="alert">Không thể tải bảng lương: {payrollError.message}</p>
-      : !record ? <div className="sf-empty"><p className="font-semibold">Chưa tính lương kỳ {selectedPeriod}</p><p className="sf-secondary">Kết quả sẽ hiển thị sau khi kỳ lương được tính.</p></div>
-      : <section className="sf-panel p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Phiếu lương kỳ {selectedPeriod}</h2><span className="sf-badge">{statuses[record.status]}</span></div>
-        <dl className="grid sm:grid-cols-2 gap-4 text-sm">
-          <div><dt className="text-slate-500">Giờ công đã ghi</dt><dd>{record.total_working_hours ?? record.working_hours ?? 0} giờ</dd></div>
-          <div><dt className="text-slate-500">Đơn giá giờ trên phiếu</dt><dd>{Number(record.hourly_rate).toLocaleString('vi-VN')} ₫/h</dd></div>
-          <div><dt className="text-slate-500">Hệ số OT trên phiếu</dt><dd>{record.overtime_rate != null ? formatPayrollRateLabel(Number(record.overtime_rate), Number(record.hourly_rate)) : 'Chưa có hệ số xác định'}</dd></div>
-          <div><dt className="text-slate-500">Hệ số phạt trên phiếu</dt><dd>{record.late_penalty_rate != null ? formatPayrollRateLabel(Number(record.late_penalty_rate), Number(record.hourly_rate)) : 'Chưa có hệ số xác định'}</dd></div>
-        </dl>
-        <PayslipBreakdown record={record}/>
-      </section>}
+  return <div className="sf-employee-page space-y-7">
+    <PageHeaderBanner icon={<span className="sf-employee-title-icon"><Wallet size={22}/></span>} title="Bảng lương" actions={<FilterSelect label="Kỳ lương:" value={selectedPeriod} onChange={setSelectedPeriod} widthClass="w-[180px]" options={periods.map(period => ({ value: period, label: `Tháng ${period.split('-').reverse().join('/')}` }))}/>}/>
+    {isLoadingPayroll ? <p className="sf-empty" role="status">Đang tải bảng lương…</p> : payrollError ? <p className="sf-feedback error" role="alert">Không thể tải bảng lương: {payrollError.message}</p> : <>
+      <section className="py-3"><h2 className="sf-secondary uppercase text-sm">Thực lĩnh tạm tính</h2><p className="text-3xl font-semibold sf-money mt-3">{money(record?.net_salary)}</p><div className="flex items-center gap-3 mt-3">{record && <span className="sf-badge">{statuses[record.status]}</span>}<span className="sf-secondary">Kỳ {selectedPeriod.split('-').reverse().join('/')}</span></div></section>
+      <div className="grid grid-cols-2 gap-4"><section className="sf-panel p-4"><h2 className="sf-secondary">Giờ công</h2><p className="text-xl font-semibold mt-2">{quantity(record?.total_working_hours ?? record?.working_hours, 'giờ')}</p></section><section className="sf-panel p-4"><h2 className="sf-secondary">Đơn giá giờ</h2><p className="text-xl font-semibold mt-2">{money(record?.hourly_rate)}</p></section></div>
+      <section><h2 className="text-lg font-semibold mb-3">Chi tiết thu nhập</h2>{record ? <PayslipBreakdown record={record}/> : <p className="sf-empty">Chưa có dữ liệu bảng lương kỳ này.</p>}</section>
+    </>}
   </div>;
 };

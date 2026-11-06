@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
 import { createEmployeeSchema, updateEmployeeSchema } from './employee.dto.js';
 import * as service from './employee.service.js';
+import { z } from 'zod';
+import { announceDataChange } from '../operations/operation.gateway.js';
 
 
 export const list = async (req: Request, res: Response) => {
@@ -10,14 +12,18 @@ export const list = async (req: Request, res: Response) => {
 
 export const create = async (req: Request, res: Response) => {
   const body = createEmployeeSchema.parse(req.body);
-  const result = await service.createWithManagerCheck(body, req.user?.id, req.user?.role);
+  const key = req.header('Idempotency-Key');
+  const result = await service.createWithManagerCheck(body, req.user?.id, req.user?.role, key ? { key: z.string().uuid().parse(key), fingerprint: body } : undefined);
+  await announceDataChange('employees', [result.id], req.user?.id);
   successResponse(res, result, 'Employee created', 201);
 };
 
 export const update = async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const updates = updateEmployeeSchema.parse(req.body);
-  successResponse(res, await service.updateWithManagerCheck(id, updates, req.user), 'Employee updated');
+  const result = await service.updateWithManagerCheck(id, updates, req.user);
+  await announceDataChange('employees', [result.id], req.user?.id);
+  successResponse(res, result, 'Employee updated');
 };
 
 export const remove = async (req: Request, res: Response) => {

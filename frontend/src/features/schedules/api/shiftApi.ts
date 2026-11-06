@@ -1,5 +1,14 @@
 import { apiFetch } from '../../../api/client';
 import { WorkShift } from '../../../types';
+import type { Operation } from '../../operations/OperationsProvider';
+import { submitBackgroundCommand } from '../../operations/commandApi';
+
+export async function submitScheduleBatch(assignments: unknown[]) {
+  return submitBackgroundCommand('/api/shifts/batch', { assignments });
+}
+export async function submitScheduleCopy(command: unknown) {
+  return submitBackgroundCommand('/api/shifts/copy-week', command);
+}
 
 export async function fetchShiftsApi(): Promise<WorkShift[]> {
   const res = await apiFetch('/api/shifts');
@@ -17,6 +26,7 @@ export async function assignShiftApi(shiftData: Omit<WorkShift, 'shift_id'> & { 
       start_time: shiftData.start_time,
       end_time: shiftData.end_time,
       note: shiftData.note,
+      expectedVersion: shiftData.shift_id ? shiftData.version ?? 1 : null,
     }),
   });
   if (!res.success || !res.data?.shift_id) throw new Error(res.message || 'Chưa lưu được lịch làm việc');

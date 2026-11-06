@@ -28,6 +28,7 @@ export const FingerprintEnrollmentSection: React.FC<FingerprintEnrollmentSection
 }) => {
   return (
     <div className="space-y-6">
+      <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100" role="note">Chế độ mô phỏng: các bước lấy mẫu và điểm chất lượng chưa đến từ cảm biến thật. Nút lưu chỉ cập nhật trạng thái vân tay trên hệ thống.</p>
       <div className="grid md:grid-cols-2 gap-6">
         {/* Select Device & Finger */}
         <div className="space-y-4">

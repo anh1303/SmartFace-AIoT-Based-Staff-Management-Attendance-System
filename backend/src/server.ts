@@ -9,6 +9,11 @@ import { socketAuthMiddleware } from './sockets/socket.auth.js'
 import { initializeAttendanceGateway, startAttendanceCron, stopAttendanceCron } from './modules/attendance/index.js'
 import { initializeDeviceGateway, registerDeviceMqttHandlers } from './modules/devices/index.js'
 import { logger } from './common/logger.js'
+import { initializeOperationGateway } from './modules/operations/operation.gateway.js'
+import { startOperationWorker, stopOperationWorker, registerOperationHandler } from './modules/operations/operation.worker.js'
+import { executeShiftBatch } from './modules/shifts/shift-batch.service.js'
+import { executeEnrollment } from './modules/biometrics/biometric.jobs.js'
+import { executeAccountEmail } from './modules/employees/employee.jobs.js'
 
 const serverLogger = logger.child('Server')
 const shutdownLogger = logger.child('Shutdown')
@@ -26,10 +31,15 @@ io.use(socketAuthMiddleware)
 
 initializeAttendanceGateway(io)
 initializeDeviceGateway(io)
+initializeOperationGateway(io)
+registerOperationHandler('shifts.batch', executeShiftBatch)
+registerOperationHandler('biometric.enroll', executeEnrollment)
+registerOperationHandler('employee.email', executeAccountEmail)
 
 async function start() {
   // 11. Đảm bảo kết nối CSDL Prisma hoàn tất trước khi mở kết nối MQTT và nhận message
   await prisma.$connect()
+  startOperationWorker()
   serverLogger.info('Database connected successfully')
 
   connectMqtt()
@@ -62,6 +72,7 @@ async function gracefulShutdown(signal: string) {
   forceKillTimer.unref()
 
   try {
+    await stopOperationWorker()
     // 1. Close Socket.IO server & disconnect connected clients
     await new Promise<void>((resolve) => {
       io.close((err) => {

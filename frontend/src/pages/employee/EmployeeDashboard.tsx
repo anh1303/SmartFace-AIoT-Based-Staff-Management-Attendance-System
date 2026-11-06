@@ -1,463 +1,52 @@
-import { Avatar } from '../../components/common/Avatar';
-import { confidenceColor } from '../../utils/confidence';
-import React, { useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Bell, CalendarClock, CalendarCheck, Clock, LayoutDashboard, ScanFace, Timer, UserX, Wallet } from 'lucide-react';
+import { PageHeaderBanner } from '../../components/common';
 import { useApp } from '../../context/AppContext';
-import { formatVNTime, getTodayVNString, formatVNDateISO, getMonday } from '../../utils/dateUtils';
-import {
-  Clock,
-  CheckCircle2,
-  Calendar,
-  TrendingUp,
-  ScanFace,
-  Fingerprint,
-  ArrowUpRight,
-  FileText,
-  Briefcase,
-  ShieldCheck
-} from 'lucide-react';
-import { Modal } from '../../components/common/Modal';
+import { useShiftContext } from '../../context/ShiftContext';
+import { api } from '../../api/client';
+import type { NotificationItem } from '../../features/notifications';
+import { useEmployeeOverview } from '../../features/attendances/hooks/useEmployeeOverview';
+import { getTodayVNString, formatVNTime } from '../../utils/dateUtils';
+import { money, quantity, shiftNames } from './employeePresentation';
 
 export const EmployeeDashboard: React.FC = () => {
-  const { currentUser, workShifts, attendance, payroll, employees, bonusPenalty, showToast } = useApp();
-  const [explainModalOpen, setExplainModalOpen] = useState(false);
-  const [explainReason, setExplainReason] = useState('');
-  const [explainDate, setExplainDate] = useState(() => getTodayVNString());
-
-  const empCode = currentUser?.employee_id || '';
-  const currentEmp = empCode ? employees.find(e => e.employee_id === empCode || e.id === empCode) : null;
-
-  // Employee's upcoming shifts
-  const myShifts = empCode
-    ? workShifts
-        .filter(s => s.employee_id === empCode || (currentEmp && s.employee_id === currentEmp.id))
-        .sort((a, b) => a.date.localeCompare(b.date))
-    : [];
-
-  // Employee's recent attendance
-  const myAttendance = empCode
-    ? attendance
-        .filter(a => a.employee_id === empCode || (currentEmp && a.employee_id === currentEmp.id))
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    : [];
-
-  const today = getTodayVNString();
-  const latestPunch = myAttendance.find(a => a.timestamp && !Number.isNaN(Date.parse(a.timestamp)) && formatVNDateISO(a.timestamp) === today);
-  const todayShift = myShifts.find(s => s.date === today);
-  const weekStart = new Date(`${today}T00:00:00Z`);
-  weekStart.setUTCDate(weekStart.getUTCDate() - (weekStart.getUTCDay() + 6) % 7);
-  const weekStartDate = weekStart.toISOString().slice(0, 10);
-  weekStart.setUTCDate(weekStart.getUTCDate() + 7);
-  const weekEndDate = weekStart.toISOString().slice(0, 10);
-  const weekShifts = myShifts.filter(s => s.date >= weekStartDate && s.date < weekEndDate && s.shift_type !== 'OFF');
-  const upcomingShifts = myShifts.filter(s => s.date >= today && s.shift_type !== 'OFF').slice(0, 3);
-
-  // Distinct attendance dates
-  const attendedDates = Array.from(new Set(myAttendance.map(a => formatVNDateISO(a.timestamp))));
-  const workDaysCount = attendedDates.length;
-
-  // Current period payroll record
-  const currentPayroll = empCode
-    ? payroll.find(p => (p.employee_id === empCode || (currentEmp && p.employee_id === currentEmp.id)) && (p.period || p.payroll_period) === getTodayVNString().slice(0, 7)) || null
-    : null;
-  const netSalaryFormatted = currentPayroll
-    ? Number(currentPayroll.net_salary || 0).toLocaleString('vi-VN') + '₫'
-    : '—';
-
-  // Dynamic 7-day week rhythm
-  const monday = getMonday(new Date());
-  const dayNames = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
-
-  const weekRhythm = [0, 1, 2, 3, 4, 5, 6].map(offset => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + offset);
-    const dateStr = formatVNDateISO(d);
-    const dayLabel = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const dayShift = myShifts.find(s => s.date === dateStr);
-    const dayPunches = myAttendance.filter(a => formatVNDateISO(a.timestamp) === dateStr);
-    const inPunch = dayPunches.find(a => a.type === 'CHECK_IN');
-    const outPunch = dayPunches.find(a => a.type === 'CHECK_OUT');
-
-    let status = 'UPCOMING';
-    let inText = '--:--';
-    let outText = '--:--';
-
-    if (dayShift?.shift_type === 'OFF') {
-      status = 'OFF';
-    } else if (inPunch) {
-      const inPunc = inPunch.punctuality;
-      status = inPunc === 'ON_TIME' ? 'ON_TIME' : inPunc === 'LATE' ? 'LATE' : 'UPCOMING';
-      inText = formatVNTime(inPunch.timestamp, false);
-      outText = outPunch ? formatVNTime(outPunch.timestamp, false) : (dateStr === getTodayVNString() ? 'Đang ca...' : '--:--');
-    }
-
-    return {
-      day: dayNames[offset],
-      date: dayLabel,
-      fullDate: dateStr,
-      in: inText,
-      out: outText,
-      status,
-      type: dayShift?.shift_type === 'OFFICE_HOURS' ? 'Ca Chuẩn' : dayShift?.shift_type === 'MORNING' ? 'Ca Sáng' : dayShift?.shift_type === 'AFTERNOON' ? 'Ca Chiều' : dayShift?.shift_type === 'OTHER' ? 'Ca khác' : dayShift?.shift_type === 'OFF' ? 'Nghỉ ca' : 'Chưa có ca',
-    };
+  const { currentUser, employees, payroll, isLoadingPayroll, payrollError } = useApp();
+  const shifts = useShiftContext();
+  const employeeId = currentUser?.employee_id;
+  const employee = employeeId ? employees.find(e => e.employee_id === employeeId || e.id === employeeId) : undefined;
+  const overview = useEmployeeOverview(employeeId);
+  const notifications = useQuery({
+    queryKey: ['employeeNotifications', employeeId], enabled: !!employeeId,
+    queryFn: async () => {
+      const res = await api.get<NotificationItem[]>('/api/notifications');
+      if (!res.success || !Array.isArray(res.data)) throw new Error(res.message || 'Không tải được thông báo');
+      return res.data;
+    }, refetchInterval: 30000,
   });
-
-  const handleExplainSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Tích hợp gọi API gửi giải trình khi Backend hoàn thiện module yêu cầu nhân viên (/api/employee-requests hoặc /api/attendance/explanation).
-    // Hiện tại thông báo phản hồi giả lập giao diện cho nhân sự.
-    showToast('Chức năng gửi giải trình chưa có API tiếp nhận. Nội dung chưa được gửi.', 'warning');
-    setExplainModalOpen(false);
-    setExplainReason('');
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Top Greeting & Biometric Punch Status (Bento Header with Continuous Shifting Gradient & Floating Blobs) */}
-      <div className="bento-hero-gradient rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
-        {/* Ambient Floating & Morphing Blurred Blobs */}
-        <div className="absolute -top-14 -right-10 w-72 h-72 bg-gradient-to-br from-blue-500/30 to-fuchsia-500/25 dark:from-blue-600/35 dark:to-fuchsia-600/25 rounded-full blur-3xl pointer-events-none animate-blob-1" />
-        <div className="absolute -bottom-16 left-1/4 w-64 h-64 bg-gradient-to-tr from-indigo-500/30 to-blue-500/20 dark:from-indigo-600/30 dark:to-blue-600/20 rounded-full blur-3xl pointer-events-none animate-blob-2" />
-        <div className="absolute top-1/4 right-1/3 w-48 h-48 bg-gradient-to-r from-violet-400/25 to-pink-400/25 dark:from-violet-500/25 dark:to-pink-500/20 rounded-full blur-2xl pointer-events-none animate-blob-3" />
-
-        <div className="relative z-10 flex items-center gap-4">
-          <div className="relative">
-            <Avatar src={currentUser?.avatar || currentEmp?.avatar} name={currentUser?.full_name} size={56}/>
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-[#13162b] flex items-center justify-center">
-              <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-heading tracking-tight">
-                Xin chào, {currentUser?.full_name || currentEmp?.full_name || 'bạn'} 👋
-              </h1>
-              <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700/50">
-                {empCode}
-              </span>
-            </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 flex items-center gap-2">
-              <span>{currentUser?.department || currentEmp?.department || 'Nhân viên'}</span>
-              <span>•</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Mới nhất: {latestPunch ? `${latestPunch.type === 'CHECK_IN' ? 'Check-in' : 'Check-out'} ${formatVNTime(latestPunch.timestamp, false)}${latestPunch.punctuality === 'ON_TIME' ? ' (Đúng giờ)' : latestPunch.punctuality === 'LATE' || latestPunch.punctuality === 'EARLY_LEAVE' ? ' (Trễ/Sớm)' : ''}` : 'Chưa có lượt quẹt hôm nay'}
-              </span>
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-              Xác thực: {latestPunch ? <><span className={confidenceColor(latestPunch.verification_score)}>{latestPunch.verification_score != null ? `${(latestPunch.verification_score * 100).toFixed(1)}% Match` : 'Chưa có điểm'}</span> • {latestPunch.device_id || 'Chưa ghi nhận thiết bị'}</> : 'Chưa có dữ liệu'}
-            </p>
-          </div>
-        </div>
-
-        {/* Quick actions for employee */}
-        <div className="relative z-10 flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setExplainModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-white/80 dark:bg-[#181c38]/90 hover:bg-white dark:hover:bg-[#20254b] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-blue-200/80 dark:border-[#272d5a] backdrop-blur-sm transition-colors cursor-pointer shadow-xs"
-          >
-            <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>Soạn giải trình</span>
-          </button>
-          <div className="px-3.5 py-2 rounded-xl bg-blue-50/80 dark:bg-[#0f1224]/80 border border-blue-200/80 dark:border-[#272d5a] text-xs font-mono text-blue-600 dark:text-blue-400 flex items-center gap-1.5 shadow-xs">
-            <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-pulse" />
-            <span>Đã ghi nhận: {myAttendance.length} lượt</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4 Bento Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Hôm nay */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
-          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            Hôm nay {todayShift ? `(${todayShift.shift_type})` : ''}
-          </span>
-          <div className="mt-3">
-            <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
-              {todayShift ? `${todayShift.start_time} - ${todayShift.end_time}` : 'Chưa có ca'}
-            </div>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 uppercase font-mono border border-blue-200 dark:border-blue-700/50">
-                {todayShift?.work_day || '—'}
-              </span>
-              {todayShift?.note && <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[130px]">{todayShift.note}</span>}
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Tuần này */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
-          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            Lịch phân ca tuần
-          </span>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">{weekShifts.length}</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">ca đã đăng ký</span>
-            </div>
-            <div className="w-full bg-slate-100 dark:bg-[#0f1224] h-2 rounded-full mt-2.5 overflow-hidden border border-slate-200 dark:border-[#272d5a]">
-              <div className="bg-blue-600 h-full rounded-full" style={{ width: `${Math.min(100, (weekShifts.length / 7) * 100)}%` }} />
-            </div>
-            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-2 flex items-center gap-1 font-medium">
-              <ArrowUpRight className="w-3 h-3" /> Lịch đã ghi nhận
-            </p>
-          </div>
-        </div>
-
-        {/* Card 3: Công tháng */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
-          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            Ngày công tích lũy
-          </span>
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">{workDaysCount}</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">ngày có điểm danh</span>
-            </div>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 uppercase font-mono border border-emerald-200 dark:border-emerald-800/40">
-                {myAttendance.filter(a => a.punctuality === 'ON_TIME').length} lượt chuẩn giờ
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Lương tạm tính */}
-        <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-4 flex flex-col justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
-          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
-            Lương tạm tính kỳ này
-          </span>
-          <div className="mt-3">
-            <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
-              {netSalaryFormatted}
-            </div>
-            <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-2 font-medium">
-              Lương/giờ: {currentEmp?.hourly_rate != null ? `${Number(currentEmp.hourly_rate).toLocaleString('vi-VN')} ₫/h` : '—'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Week Attendance Rhythm Bento Card */}
-      <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-6 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
-              Nhịp điệu chấm công tuần này
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Tự động ghi nhận qua camera nhận diện khuôn mặt & vân tay</p>
-          </div>
-          <span className="text-xs font-mono text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-[#0f1224] px-3 py-1 rounded-xl border border-slate-200 dark:border-[#272d5a]">
-            {weekRhythm[0]?.date} - {weekRhythm[6]?.date}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          {weekRhythm.map((item, idx) => (
-            <div
-              key={idx}
-              className={`p-3.5 rounded-xl border text-xs transition-all ${item.status === 'ON_TIME'
-                ? 'bg-slate-50 dark:bg-[#0f1224] border-slate-200/80 dark:border-[#21264b] hover:border-blue-400 dark:hover:border-blue-600'
-                : item.status === 'LATE'
-                  ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-500/40'
-                  : item.status === 'OFF'
-                    ? 'bg-slate-50/40 dark:bg-[#0f1224]/40 border-slate-100 dark:border-[#21264b]/40 opacity-60'
-                    : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200/80 dark:border-[#21264b]'
-                }`}
-            >
-              <div className="flex justify-between items-center text-slate-400 text-[11px] mb-1">
-                <span>{item.day}</span>
-                <span className="font-mono">{item.date}</span>
-              </div>
-              <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">
-                {item.in}
-              </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                Ra: {item.out}
-              </p>
-              <div className="mt-2 pt-2 border-t border-slate-200/80 dark:border-[#21264b] flex items-center justify-between">
-                <span className="text-[10px] text-slate-400">{item.type}</span>
-                {item.status === 'ON_TIME' && (
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold font-mono">Đúng giờ</span>
-                )}
-                {item.status === 'LATE' && (
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold font-mono">Lệch ca</span>
-                )}
-                {item.status === 'OFF' && (
-                  <span className="text-[10px] text-slate-400 font-mono">Nghỉ ca</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Two-Column Bento Lower Section */}
-      <div className="grid lg:grid-cols-12 gap-4">
-        {/* Left Bento: Biometrics */}
-        <div className="lg:col-span-5 bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-6 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
-              Sinh trắc học cá nhân
-            </h2>
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-              <ShieldCheck className="w-4 h-4" /> Trạng thái đăng ký
-            </span>
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-              <ScanFace className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-900 dark:text-white">Khuôn mặt</p>
-              <span className="inline-block mt-1 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-                {currentEmp ? (currentEmp.face_enrolled ? 'Đã đăng ký' : 'Chưa đăng ký') : 'Chưa có dữ liệu'}
-              </span>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-              <Fingerprint className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-900 dark:text-white">Vân tay</p>
-              <span className="inline-block mt-1 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-                {currentEmp ? (currentEmp.fingerprint_enrolled ? 'Đã đăng ký' : 'Chưa đăng ký') : 'Chưa có dữ liệu'}
-              </span>
-            </div>
-          </div>
-
-          <div className="p-3 bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] rounded-xl text-xs text-slate-500 dark:text-slate-400">
-            <span className="font-semibold text-blue-600 dark:text-blue-400">Lưu ý an ninh:</span> Chỉ sử dụng tài khoản được cấp và giữ riêng thông tin truy cập của bạn.
-          </div>
-        </div>
-
-        {/* Right Bento: Upcoming shifts */}
-        <div className="lg:col-span-7 bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-6 flex flex-col justify-between shadow-xs">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
-                  Ca làm việc tiếp theo
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Lịch phân bổ từ Trưởng bộ phận</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {upcomingShifts.length === 0 && <p className="text-xs text-slate-500">Chưa có ca sắp tới</p>}
-              {upcomingShifts.map((shift, idx) => (
-                <div
-                  key={shift.shift_id || idx}
-                  className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center justify-between hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40 flex flex-col items-center justify-center font-mono text-xs">
-                      <span className="text-[10px] text-slate-400">T{Number(shift.date.split('-')[1])}</span>
-                      <span className="font-bold text-slate-900 dark:text-white">{shift.date.split('-')[2]}</span>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                        {shift.shift_type === 'OFFICE_HOURS'
-                          ? 'Ca Hành Chính'
-                          : shift.shift_type === 'MORNING'
-                            ? 'Ca Sáng'
-                            : shift.shift_type === 'AFTERNOON'
-                              ? 'Ca Chiều'
-                              : shift.shift_type === 'OTHER'
-                                ? 'Ca khác'
-                                : 'Nghỉ ca'}
-                        {shift.note ? ` • ${shift.note}` : ''}
-                      </p>
-                      <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                        {shift.start_time} - {shift.end_time} • {shift.department}
-                      </p>
-                    </div>
-                  </div>
-
-                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700/50 font-mono">
-                    ĐÃ PHÂN CA
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-200/80 dark:border-[#21264b] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span>Cần đổi ca hoặc báo vắng?</span>
-            <button
-              type="button"
-              onClick={() => setExplainModalOpen(true)}
-              className="text-blue-600 dark:text-blue-400 hover:underline font-medium cursor-pointer"
-            >
-              Soạn yêu cầu đổi ca &rarr;
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Modal giải trình / đổi ca */}
-      <Modal
-        isOpen={explainModalOpen}
-        onClose={() => setExplainModalOpen(false)}
-        title="Soạn nội dung giải trình / Đổi ca"
-        subtitle="Chưa có API tiếp nhận. Nội dung chưa được gửi đến quản lý."
-      >
-        <form onSubmit={handleExplainSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Chọn ngày cần giải trình</label>
-            <input
-              type="date"
-              value={explainDate}
-              onChange={e => setExplainDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Loại yêu cầu</label>
-            <select className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer">
-              <option className="bg-white dark:bg-[#13162b]">Quên chấm công (Điểm danh bù)</option>
-              <option className="bg-white dark:bg-[#13162b]">Giải trình đi muộn / Về sớm do công tác</option>
-              <option className="bg-white dark:bg-[#13162b]">Đăng ký đổi ca trực với đồng đội</option>
-              <option className="bg-white dark:bg-[#13162b]">Đăng ký tăng ca làm thêm (OT)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Lý do chi tiết & Minh chứng</label>
-            <textarea
-              rows={3}
-              required
-              value={explainReason}
-              onChange={e => setExplainReason(e.target.value)}
-              placeholder="Ghi rõ lý do và đính kèm thời gian dự kiến..."
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-slate-200 dark:border-[#21264b]">
-            <button
-              type="button"
-              onClick={() => setExplainModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-xs text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] border border-slate-200 dark:border-[#272d5a] cursor-pointer"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              disabled
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 cursor-pointer"
-            >
-              Chức năng gửi chưa được hỗ trợ
-            </button>
-          </div>
-        </form>
-      </Modal>
+  const data = overview.data;
+  const today = data?.through_date || getTodayVNString();
+  const period = today.slice(0, 7);
+  const own = (id: string) => !!employeeId && (id === employeeId || id === employee?.id);
+  const todayShifts = shifts.workShifts.filter(s => own(s.employee_id) && s.date === today);
+  const payslip = payroll.find(p => own(p.employee_id) && (p.period || p.payroll_period) === period);
+  const day = data?.today[0];
+  const loading = overview.isPending && overview.fetchStatus !== 'idle';
+  const total = (value: number | null | undefined, unit: string) => loading ? 'Đang tải…' : overview.isError ? '—' : quantity(value, unit);
+  const metrics = [
+    { title: 'Ca làm hôm nay', icon: CalendarClock, value: shifts.isLoading ? 'Đang tải…' : shifts.isError ? '—' : todayShifts.length ? todayShifts.map(s => shiftNames[s.shift_type]).join(', ') : 'Chưa phân ca', detail: todayShifts.length ? todayShifts.map(s => s.shift_type === 'OFF' ? 'Nghỉ ca' : `${s.start_time || '—'} – ${s.end_time || '—'}`).join(' · ') : 'Chưa có lịch làm việc' },
+    { title: 'Chấm công hôm nay', icon: ScanFace, value: loading ? 'Đang tải…' : overview.isError ? '—' : day ? `${day.first_check_in ? formatVNTime(day.first_check_in, false) : '—'} / ${day.last_check_out ? formatVNTime(day.last_check_out, false) : '—'}` : 'Chưa ghi nhận', detail: day ? `Vào / ra · Trễ / về sớm: ${quantity(day.late_early, 'giờ')}` : 'Chưa có lượt quẹt hôm nay' },
+    { title: 'Giờ tăng ca', icon: Timer, value: total(data?.overtime_hours, 'giờ'), detail: 'Tổng giờ tăng ca đã duyệt trong tháng đến hôm nay' },
+    { title: 'Giờ đi trễ / về sớm', icon: Clock, value: total(data?.late_early_hours, 'giờ'), detail: 'Tổng giờ trễ / về sớm trong tháng đến hôm nay' },
+    { title: 'Nghỉ làm không lý do', icon: UserX, value: total(data?.absent_days, 'ngày'), detail: 'Số ngày vắng được ghi nhận trong tháng đến hôm nay' },
+    { title: 'Công tháng này', icon: CalendarCheck, value: total(data?.work_days, 'ngày'), detail: `Ngày công được ghi nhận · ${period.split('-').reverse().join('/')}` },
+    { title: 'Lương tạm tính', icon: Wallet, value: isLoadingPayroll ? 'Đang tải…' : payrollError ? '—' : money(payslip?.net_salary), detail: payslip ? `Kỳ ${period.split('-').reverse().join('/')} · Theo phiếu lương đã lưu` : 'Chưa có dữ liệu lương kỳ hiện tại' },
+  ];
+  return <div className="sf-employee-page space-y-7">
+    <PageHeaderBanner icon={<span className="sf-employee-title-icon"><LayoutDashboard size={22}/></span>} title={`Xin chào, ${currentUser?.full_name || 'bạn'} 👋`} actions={<p className="sf-secondary">{new Date(`${today}T12:00:00+07:00`).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' })} · Nhân viên {employeeId || '—'}</p>}/>
+    {(overview.isError || shifts.isError || payrollError) && <p role="alert" className="sf-feedback error">Không tải đủ dữ liệu tổng quan. <button className="underline" onClick={() => { void overview.refetch(); shifts.refetchShifts(); }}>Thử tải lại công và lịch</button>{payrollError && <span> · Không tải được bảng lương.</span>}</p>}
+    <div className="sf-employee-overview">{metrics.map(({ title, icon: Icon, value, detail }) => <section className="sf-employee-metric" key={title}><h2><Icon size={19} aria-hidden="true"/>{title}</h2><p className="sf-employee-value">{value}</p><p className="sf-secondary">{detail}</p></section>)}
+      <section className="sf-employee-metric sf-employee-notification-panel"><h2><Bell size={19} aria-hidden="true"/>Thông báo</h2>{notifications.isPending && employeeId ? <p role="status" className="mt-4">Đang tải…</p> : notifications.isError ? <p role="alert" className="mt-4">Không tải được thông báo. <button className="underline" onClick={() => void notifications.refetch()}>Thử lại</button></p> : notifications.data?.length ? <ul className="sf-employee-notifications" tabIndex={0} aria-label="Danh sách thông báo">{notifications.data.map(item => <li key={item.id}><strong>{item.title}</strong><p className="sf-secondary">{item.message}</p><time className="sf-secondary" dateTime={item.timestamp}>{new Date(item.timestamp).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</time></li>)}</ul> : <p className="sf-secondary mt-4">Không có thông báo.</p>}</section>
     </div>
-  );
+  </div>;
 };

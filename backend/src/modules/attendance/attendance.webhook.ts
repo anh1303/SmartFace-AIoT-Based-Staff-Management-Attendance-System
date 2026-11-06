@@ -200,13 +200,13 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
   try {
     let attendanceRecord
     if (isCheckOut) {
-      attendanceRecord = await actions.checkOut(match.emp_id, `device:${device_id}`, undefined, { eventId: data.event_id, capturedAt, deviceId: device_id, verified: true, verificationScore: match.similarity, livenessScore: antispoof_score })
+      attendanceRecord = await actions.checkOut(match.emp_id, `device:${device_id}`, undefined, { eventId: data.event_id, capturedAt, deviceId: device_id, verified: true, verificationScore: match.similarity, livenessScore: antispoof_score, syncSummary: false })
     } else {
       attendanceRecord = await actions.checkIn({
         employeeId: match.emp_id,
         device_info: `device:${device_id}`,
         method: 'FACE',
-      }, undefined, { eventId: data.event_id, capturedAt, deviceId: device_id, verified: true, verificationScore: match.similarity, livenessScore: antispoof_score })
+      }, undefined, { eventId: data.event_id, capturedAt, deviceId: device_id, verified: true, verificationScore: match.similarity, livenessScore: antispoof_score, syncSummary: false })
     }
 
     if (attendanceRecord.status === 'FLAGGED' || attendanceRecord.access_denied) {

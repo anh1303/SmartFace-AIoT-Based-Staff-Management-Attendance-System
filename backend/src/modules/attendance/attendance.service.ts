@@ -403,6 +403,7 @@ type CaptureOptions = {
   isDevSimulation?: boolean
   reason?: string
   method?: AttendanceMethod
+  syncSummary?: boolean
 }
 
 async function recordAttendance(
@@ -568,18 +569,40 @@ async function recordAttendance(
   }, { timeout: 15000, maxWait: 10000 })
   // Raw logs are durable even if a summary calculation fails. A replay retries the same summaries.
   const updatedSummaries: Array<Record<string, unknown>> = []
-  for (const date of affected) {
-    const calculated = await aggregateDailyAttendance(Number(date.slice(5, 7)), Number(date.slice(0, 4)), employee.id, date)
-    updatedSummaries.push(...calculated.details)
+  const shouldSyncSummary = capture.syncSummary !== false
+
+  if (shouldSyncSummary) {
+    for (const date of affected) {
+      const calculated = await aggregateDailyAttendance(Number(date.slice(5, 7)), Number(date.slice(0, 4)), employee.id, date)
+      updatedSummaries.push(...calculated.details)
+    }
+  } else if (affected.length > 0) {
+    // Non-blocking background aggregation for edge/IoT webhooks to return sub-second response
+    setImmediate(async () => {
+      try {
+        for (const date of affected) {
+          await aggregateDailyAttendance(Number(date.slice(5, 7)), Number(date.slice(0, 4)), employee.id, date)
+        }
+        eventBus.publish('attendance:summary-updated', {
+          employeeId: employee.id,
+          workDate: vnDay(created.work_date || created.event_time),
+          summary: { employee_id: employee.employee_code, employee_user_id: employee.user_id, dates: affected },
+        })
+      } catch (err) {
+        console.error('[Attendance] Background aggregation error:', err)
+      }
+    })
   }
 
   const [formatted] = await formatAttendanceRecords([created])
   const result = { ...formatted, duplicate, access_denied: accessDenied, summaries: updatedSummaries, work_date: vnDay(created.work_date || created.event_time) }
-  eventBus.publish('attendance:summary-updated', {
-    employeeId: employee.id,
-    workDate: vnDay(created.work_date || created.event_time),
-    summary: { employee_id: employee.employee_code, employee_user_id: employee.user_id, dates: affected },
-  })
+  if (shouldSyncSummary) {
+    eventBus.publish('attendance:summary-updated', {
+      employeeId: employee.id,
+      workDate: vnDay(created.work_date || created.event_time),
+      summary: { employee_id: employee.employee_code, employee_user_id: employee.user_id, dates: affected },
+    })
+  }
   if (!duplicate) eventBus.publish(type === 'CHECK_IN' ? 'attendance:checked-in' : 'attendance:checked-out', {
     employeeId: employee.id,
     logId: String(created.id),

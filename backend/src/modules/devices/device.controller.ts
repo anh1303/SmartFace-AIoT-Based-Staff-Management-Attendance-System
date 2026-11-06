@@ -69,9 +69,7 @@ export const getMode = async (req: Request, res: Response) => {
 };
 
 export const settingsNotify = async (req: Request, res: Response) => {
-  if (process.env.TB_WEBHOOK_SECRET) {
-    assertDeviceWebhook(req);
-  }
+  assertDeviceWebhook(req);
   const updated = service.recordDeviceSettingsNotify(String(req.params.id), req.body);
   eventBus.publish('device:settings-updated', updated);
   successResponse(res, updated, 'Device settings notification received');

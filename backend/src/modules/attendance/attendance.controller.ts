@@ -39,25 +39,29 @@ export const statistics = async (req: Request, res: Response) => {
 export const checkIn = async (req: Request, res: Response) => {
   const body = checkInSchema.parse(req.body);
   const result = await service.checkIn(body, req.user, { eventId: body.event_id, reason: body.reason });
-  successResponse(res, result, 'Check-in recorded', 201);
+  successResponse(res, result, result.ignored ? result.message : 'Check-in recorded', result.ignored ? 200 : 201);
 };
 
 export const checkOut = async (req: Request, res: Response) => {
   const body = checkOutSchema.parse(req.body);
   const targetEmployeeId = body.employeeId || (body as any).employee_id;
   const result = await service.checkOut(targetEmployeeId, body.device_info, req.user, { eventId: body.event_id, reason: body.reason });
-  successResponse(res, result, 'Check-out recorded', 201);
+  successResponse(res, result, result.ignored ? result.message : 'Check-out recorded', result.ignored ? 200 : 201);
 };
 
 export const devSimulateFace = async (req: Request, res: Response) => {
   const body = devSimulateFaceScanSchema.parse(req.body);
   const result = await service.devSimulateFaceScan(body, req.user);
-  successResponse(res, result, 'Đã giả lập quét mặt thành công (Dev Mode)', 201);
+  successResponse(res, result, result.ignored ? result.message : 'Đã giả lập quét mặt thành công (Dev Mode)', result.ignored ? 200 : 201);
 };
 
 export const getDailySummaries = async (req: Request, res: Response) => {
   const query = { ...req.query } as Record<string, any>;
   successResponse(res, await service.getDailySummaries(query, req.user));
+};
+
+export const employeeOverview = async (req: Request, res: Response) => {
+  successResponse(res, await service.getEmployeeOverview(req.query, req.user));
 };
 
 export const aggregate = async (req: Request, res: Response) => {

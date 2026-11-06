@@ -5,8 +5,10 @@ import { Clock } from 'lucide-react';
 import { AttendanceRecord, Employee } from '../../../types';
 import { useApp } from '../../../context/AppContext';
 import { useAttendance, useAttendancePairs, useAttendanceSummaries } from '@/features/attendances';
+import { FilterSelect } from '../../../components/common/FilterSelect';
 
 interface EmployeeAttendanceTabProps {
+  expandedAdjustments?: boolean;
   currentEmp?: Employee;
   startDate: string;
   endDate: string;
@@ -23,6 +25,7 @@ interface EmployeeAttendanceTabProps {
 }
 
 export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
+  expandedAdjustments = false,
   currentEmp,
   startDate,
   endDate,
@@ -135,10 +138,10 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
         </div>
 
         {/* Filter Inputs Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-slate-100 dark:border-[#21264b]">
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100 dark:border-[#21264b]">
           {/* Start Date */}
-          <div>
-            <label htmlFor={`${fieldId}-start`} className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={`${fieldId}-start`} className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
               Từ ngày
             </label>
             <div className="relative">
@@ -155,8 +158,8 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
           </div>
 
           {/* End Date */}
-          <div>
-            <label htmlFor={`${fieldId}-end`} className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={`${fieldId}-end`} className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
               Đến ngày
             </label>
             <div className="relative">
@@ -173,41 +176,14 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
           </div>
 
           {/* Event Type Filter */}
-          <div>
-            <label htmlFor={`${fieldId}-type`} className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
-              Sự kiện
-            </label>
-            <select id={`${fieldId}-type`}
-              value={attendanceTypeFilter}
-              onChange={e => setAttendanceTypeFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="ALL">Tất cả sự kiện</option>
-              <option value="CHECK_IN">Vào ca</option>
-              <option value="CHECK_OUT">Hết ca</option>
-            </select>
-          </div>
+          <FilterSelect label="Sự kiện:" value={attendanceTypeFilter} onChange={setAttendanceTypeFilter} allLabel="Tất cả sự kiện" widthClass="w-[180px]" options={[{ value: 'CHECK_IN', label: 'Vào ca' }, { value: 'CHECK_OUT', label: 'Hết ca' }]}/>
 
           {/* Punctuality Status Filter */}
-          <div>
-            <label htmlFor={`${fieldId}-status`} className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
-              Trạng thái
-            </label>
-            <select id={`${fieldId}-status`}
-              value={attendanceStatusFilter}
-              onChange={e => setAttendanceStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="ON_TIME">Đúng giờ</option>
-              <option value="LATE">Đi muộn</option>
-              <option value="EARLY_LEAVE">Về sớm</option>
-            </select>
-          </div>
+          <FilterSelect label="Trạng thái:" value={attendanceStatusFilter} onChange={setAttendanceStatusFilter} allLabel="Tất cả trạng thái" widthClass="w-[180px]" options={[{ value: 'ON_TIME', label: 'Đúng giờ' }, { value: 'LATE', label: 'Đi muộn' }, { value: 'EARLY_LEAVE', label: 'Về sớm' }]}/>
         </div>
       </div>
 
-      {currentEmp && <details className="sf-panel p-4"><summary className="text-lg font-semibold">Các khoản thưởng phạt trong kỳ</summary><div className="mt-5"><AdjustmentReviewPanel period="ALL" startDate={startDate} endDate={endDate} employeeId={currentEmp.employee_id} workShifts={workShifts} /></div></details>}
+      {currentEmp && <details open={expandedAdjustments} className="sf-panel p-4"><summary className="text-lg font-semibold">Các khoản thưởng phạt trong kỳ</summary><div className="mt-5"><AdjustmentReviewPanel period="ALL" startDate={startDate} endDate={endDate} employeeId={currentEmp.employee_id} workShifts={workShifts} /></div></details>}
       <section className="space-y-3">
         <h3 className="font-bold text-slate-900 dark:text-white">Chi tiết các lượt vào / ra theo ngày</h3>
         <AttendanceLogFilterSelect value={logFilter} onChange={setLogFilter} />

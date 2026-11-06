@@ -1,5 +1,7 @@
-import { prisma } from '../../config/database.js';
-import { getEmployeeScope, type EmployeeActor } from '../employees/public.js';
+import { getReportAttendanceLogs, getReportAttendanceSummaries } from '../attendance/public.js';
+import { getReportShifts } from '../shifts/public.js';
+import { getReportPayrolls, getReportPayrollPeriods } from '../payroll/public.js';
+import { getEmployeeScope, getEmployeesForReporting, getActiveDepartmentsForReporting, type EmployeeActor } from '../employees/public.js';
 import { vnDay } from '../../common/utils.js';
 import type {
   MonthlyReportResponseDto,
@@ -41,24 +43,12 @@ export async function getMonthlyReport(
   const employeeScope = await getEmployeeScope(actor);
 
   // Query employees within scope
-  const employees = await prisma.employee.findMany({
-    where: {
-      AND: [employeeScope, { status: 'ACTIVE' }],
-    },
-    include: {
-      department: true,
-      position: true,
-    },
-    orderBy: [{ departmentId: 'asc' }, { employee_code: 'asc' }],
-  });
+  const employees = await getEmployeesForReporting(employeeScope);
 
   const employeeIds = employees.map((e) => e.id);
 
   // Departments list
-  const activeDepartments = await prisma.department.findMany({
-    where: { is_active: true },
-    orderBy: { name: 'asc' },
-  });
+  const activeDepartments = await getActiveDepartmentsForReporting();
 
   const departmentNamesSet = new Set<string>();
   activeDepartments.forEach((d) => departmentNamesSet.add(d.name));
@@ -71,82 +61,19 @@ export async function getMonthlyReport(
   const [attendanceLogs, dailySummaries, monthShifts, payrollRecords, distinctPeriods] =
     await Promise.all([
       // 1. Attendance logs in month
-      prisma.attendance_logs.findMany({
-        where: {
-          employee_id: { in: employeeIds },
-          event_time: {
-            gte: startUtc,
-            lte: endUtc,
-          },
-        },
-        select: {
-          id: true,
-          employee_id: true,
-          event_time: true,
-          type: true,
-          method: true,
-          verification_score: true,
-          status: true,
-        },
-        orderBy: { event_time: 'asc' },
-      }),
+      getReportAttendanceLogs(employeeIds, startUtc, endUtc),
 
       // 2. Daily summaries
-      prisma.daily_attendance_summary.findMany({
-        where: {
-          employee_id: { in: employeeIds },
-          work_date: {
-            gte: new Date(`${startDate}T00:00:00Z`),
-            lte: new Date(`${endDate}T00:00:00Z`),
-          },
-        },
-        select: {
-          employee_id: true,
-          work_date: true,
-          total_working_hours: true,
-          late_early: true,
-          overtime: true,
-          attendance_status: true,
-          review_status: true,
-        },
-      }),
+      getReportAttendanceSummaries(employeeIds, startDate, endDate),
 
       // 3. Employee shifts
-      prisma.employee_shifts.findMany({
-        where: {
-          employee_id: { in: employeeIds },
-          work_date: {
-            gte: new Date(`${startDate}T00:00:00Z`),
-            lte: new Date(`${endDate}T00:00:00Z`),
-          },
-          shift_type: { not: 'OFF' },
-        },
-        select: {
-          employee_id: true,
-          work_date: true,
-          shift_type: true,
-        },
-      }),
+      getReportShifts(employeeIds, startDate, endDate),
 
       // 4. Payroll records for this period
-      prisma.payrollRecord.findMany({
-        where: {
-          employeeId: { in: employeeIds },
-          payroll_period: selectedPeriod,
-        },
-        select: {
-          employeeId: true,
-          net_salary: true,
-          status: true,
-        },
-      }),
+      getReportPayrolls(employeeIds, selectedPeriod),
 
       // 5. Distinct periods for available period selector
-      prisma.payrollRecord.findMany({
-        select: { payroll_period: true },
-        distinct: ['payroll_period'],
-        orderBy: { payroll_period: 'desc' },
-      }),
+      getReportPayrollPeriods(),
     ]);
 
   // Available periods list

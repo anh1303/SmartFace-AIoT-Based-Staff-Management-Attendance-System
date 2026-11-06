@@ -1,351 +1,56 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, CalendarDays, Clock } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { getTodayVNString, formatVNDateISO, getMonday } from '../../utils/dateUtils';
-import {
-  Calendar,
-  Clock,
-  CheckCircle2,
-  Users,
-  ArrowLeftRight,
-  FileText,
-  ShieldCheck,
-  CalendarDays,
-  Sparkles,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
-import { Modal } from '../../components/common/Modal';
-import { PageHeaderBanner } from '../../components/common';
-import { Avatar } from '../../components/common/Avatar';
+import { useShiftContext } from '../../context/ShiftContext';
+import { FilterBar, SearchInput, PageHeaderBanner } from '../../components/common';
+import { getTodayVNString } from '../../utils/dateUtils';
+import { shiftNames, shortDate } from './employeePresentation';
+
+// Calendar arithmetic uses UTC dates so the browser timezone cannot move a work date.
+function moveDate(date: string, days: number) { const d = new Date(`${date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); }
+function monday(date: string) { return moveDate(date, -((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7)); }
 
 export const EmployeeSchedule: React.FC = () => {
-  const { currentUser, workShifts, employees, attendance, showToast } = useApp();
-  const [exchangeModalOpen, setExchangeModalOpen] = useState(false);
-  const [exchangeTargetEmp, setExchangeTargetEmp] = useState('');
-  const [exchangeDate, setExchangeDate] = useState(() => getTodayVNString());
-  const [exchangeReason, setExchangeReason] = useState('');
-
-  const [currentMonday, setCurrentMonday] = useState<Date>(() => getMonday(new Date()));
-
-  const handlePrevWeek = () => {
-    const prev = new Date(currentMonday);
-    prev.setDate(currentMonday.getDate() - 7);
-    setCurrentMonday(prev);
+  const { currentUser, employees } = useApp();
+  const { workShifts, isLoading, isError, refetchShifts } = useShiftContext();
+  const today = getTodayVNString();
+  const [selected, setSelected] = useState(today);
+  const [view, setView] = useState<'week' | 'month'>('week');
+  const [search, setSearch] = useState('');
+  const calendarRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const container = calendarRef.current;
+    const day = container?.querySelector<HTMLButtonElement>('[aria-pressed="true"]');
+    if (container && day) container.scrollLeft += day.getBoundingClientRect().left - container.getBoundingClientRect().left - (container.clientWidth - day.clientWidth) / 2;
+  }, [selected, view, isLoading]);
+  const employeeId = currentUser?.employee_id;
+  const employee = employeeId ? employees.find(e => e.employee_id === employeeId || e.id === employeeId) : undefined;
+  const ownShifts = workShifts.filter(s => !!employeeId && (s.employee_id === employeeId || s.employee_id === employee?.id));
+  const start = view === 'week' ? monday(selected) : monday(`${selected.slice(0, 7)}-01`);
+  const days = Array.from({ length: view === 'week' ? 7 : 42 }, (_, i) => moveDate(start, i));
+  const inPeriod = ownShifts.filter(s => view === 'week' ? s.date >= days[0] && s.date <= days[6] : s.date.slice(0, 7) === selected.slice(0, 7));
+  const matching = ownShifts.filter(s => `${shiftNames[s.shift_type]} ${s.start_time} ${s.end_time} ${s.note || ''} ${shortDate(s.date)} ${s.date}`.toLocaleLowerCase('vi-VN').includes(search.trim().toLocaleLowerCase('vi-VN')));
+  const selectedShifts = matching.filter(s => s.date === selected);
+  const navigate = (direction: number) => {
+    if (view === 'week') setSelected(moveDate(selected, direction * 7));
+    else { const date = new Date(`${selected.slice(0, 7)}-01T00:00:00Z`); date.setUTCMonth(date.getUTCMonth() + direction); setSelected(date.toISOString().slice(0, 10)); }
   };
-
-  const handleNextWeek = () => {
-    const next = new Date(currentMonday);
-    next.setDate(currentMonday.getDate() + 7);
-    setCurrentMonday(next);
-  };
-
-  const empCode = currentUser?.employee_id || '';
-
-  // Current employee's shifts
-  const myShifts = empCode ? workShifts.filter(s => s.employee_id === empCode) : [];
-  const myAttendance = empCode ? attendance.filter(a => a.employee_id === empCode) : [];
-
-  // Teammates in same department or on duty
-  const teammates = employees.filter(
-    e => (!empCode || e.employee_id !== empCode) && e.status === 'ACTIVE'
-  );
-
-  const handleExchangeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Tích hợp gọi API gửi yêu cầu đổi ca khi Backend hoàn thiện module yêu cầu nhân sự (/api/employee-requests hoặc /api/shifts/exchange).
-    // Hiện tại mô phỏng phản hồi giao diện thông báo thành công cho nhân viên.
-    showToast('Đã gửi yêu cầu đổi ca trực đến Quản lý xét duyệt!', 'success');
-    setExchangeModalOpen(false);
-    setExchangeReason('');
-  };
-
-  const dayNames = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ Nhật'];
-  const daysOfWeek = [0, 1, 2, 3, 4, 5, 6].map(offset => {
-    const d = new Date(currentMonday);
-    d.setDate(currentMonday.getDate() + offset);
-    const dateStr = formatVNDateISO(d);
-    const label = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
-    return {
-      name: dayNames[offset],
-      date: dateStr,
-      label,
-    };
-  });
-
-  const todayStr = getTodayVNString();
-  const weekShifts = daysOfWeek.map(d => myShifts.find(s => s.date === d.date)).filter(Boolean);
-  const totalHours = weekShifts.reduce((acc, s) => {
-    if (!s || s.shift_type === 'OFF') return acc;
-    if (s.shift_type === 'MORNING') return acc + 4;
-    if (s.shift_type === 'AFTERNOON') return acc + 5;
-    return acc + 8;
-  }, 0);
-
-  const completedShifts = weekShifts.filter(s => s && s.date <= todayStr && s.shift_type !== 'OFF').length;
-  const onTimeCount = myAttendance.filter(a => (a.punctuality || (a.status === 'VALID' ? 'ON_TIME' : a.status)) === 'ON_TIME').length;
-  const onTimeRate = myAttendance.length > 0 ? ((onTimeCount / myAttendance.length) * 100).toFixed(0) : '100';
-
-  return (
-    <div className="space-y-6">
-      {/* Bento Header Banner with Continuous Shifting Gradient & Floating Blobs */}
-      <PageHeaderBanner
-        title="Lịch trình làm việc & Phân bổ ca"
-        badge={
-          <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-mono font-medium border border-blue-200 dark:border-blue-700/50">
-            {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
-          </span>
-        }
-        actions={
-          <>
-            <div className="flex items-center bg-white/80 dark:bg-[#0f1224] border border-blue-200/80 dark:border-[#272d5a] rounded-xl p-1 shadow-inner backdrop-blur-sm">
-              <button
-                type="button"
-                onClick={handlePrevWeek}
-                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="px-3 text-xs font-mono text-slate-700 dark:text-slate-300 font-medium">
-                {daysOfWeek[0]?.label} - {daysOfWeek[6]?.label}
-              </span>
-              <button
-                type="button"
-                onClick={handleNextWeek}
-                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setExchangeModalOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-2 shadow-sm shadow-blue-500/20 transition-all cursor-pointer"
-            >
-              <ArrowLeftRight className="w-3.5 h-3.5" />
-              <span>Đổi ca trực</span>
-            </button>
-          </>
-        }
-      />
-
-      {/* 4 Bento Telemetry Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Tổng giờ tuần</span>
-          <div className="mt-2 text-2xl font-bold font-mono text-slate-900 dark:text-white">{totalHours.toFixed(1)}h</div>
-          <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-1">{weekShifts.length} ca đã phân bổ</p>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Số ca hoàn thành</span>
-          <div className="mt-2 text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{completedShifts} / {weekShifts.length} ca</div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{weekShifts.length > 0 ? `Đạt ${Math.round((completedShifts / weekShifts.length) * 100)}% tiến độ` : 'Chưa có ca trong tuần'}</p>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Tổng lượt quẹt</span>
-          <div className="mt-2 text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">{myAttendance.length} lượt</div>
-          <p className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-1">Ghi nhận qua AI Cam</p>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors shadow-xs">
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider">Tỷ lệ đúng giờ</span>
-          <div className="mt-2 text-2xl font-bold font-mono text-slate-900 dark:text-white">{onTimeRate}%</div>
-          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">{onTimeCount} lượt đúng giờ</p>
-        </div>
+  return <div className="sf-employee-page space-y-6">
+    <PageHeaderBanner icon={<span className="sf-employee-title-icon"><CalendarDays size={22}/></span>} title="Lịch làm việc" actions={
+      <div className="sf-employee-schedule-actions">
+        <div className="sf-employee-view-switch" aria-label="Chế độ lịch">{(['week', 'month'] as const).map(mode => <button key={mode} className="sf-button" aria-pressed={view === mode} onClick={() => setView(mode)}>{mode === 'week' ? 'Tuần' : 'Tháng'}</button>)}</div>
+        <div className="sf-employee-period-nav"><button className="sf-icon-button" aria-label={view === 'week' ? 'Tuần trước' : 'Tháng trước'} onClick={() => navigate(-1)}><ChevronLeft size={19}/></button><span className="font-semibold tabular-nums">{view === 'week' ? `${shortDate(days[0])} – ${shortDate(days[6])} / ${days[6].slice(0, 4)}` : selected.slice(0, 7).split('-').reverse().join('/')}</span><button className="sf-icon-button" aria-label={view === 'week' ? 'Tuần sau' : 'Tháng sau'} onClick={() => navigate(1)}><ChevronRight size={19}/></button></div>
+        <button className="sf-button" onClick={() => setSelected(today)}>Hôm nay</button>
       </div>
-
-      {/* Weekly Detailed Bento Grid */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] space-y-4 shadow-xs">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
-            Chi tiết các ca trong tuần ({daysOfWeek[0]?.label} - {daysOfWeek[6]?.label})
-          </h2>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Đồng bộ từ CSDL</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
-          {daysOfWeek.map((day) => {
-            const shift = myShifts.find(s => s.date === day.date);
-            const isToday = day.date === todayStr;
-            const isPast = day.date < todayStr;
-
-            return (
-              <div
-                key={day.date}
-                className={`p-4 rounded-xl border flex flex-col justify-between min-h-[190px] transition-all ${isToday
-                  ? 'bg-blue-50/60 dark:bg-blue-950/30 border-blue-400 dark:border-blue-500 shadow-sm shadow-blue-500/10 ring-1 ring-blue-400/40'
-                  : shift?.shift_type === 'OFF'
-                    ? 'bg-slate-50/50 dark:bg-[#0f1224]/50 border-slate-100 dark:border-[#21264b]/60 opacity-60'
-                    : 'bg-slate-50 dark:bg-[#0f1224] border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40'
-                  }`}
-              >
-                <div>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-xs font-semibold text-slate-900 dark:text-white">{day.name}</p>
-                      <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500">{day.label}</p>
-                    </div>
-                    {isToday && (
-                      <span className="text-[9px] bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded-md">
-                        HÔM NAY
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-3">
-                    <p className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                      {shift?.shift_type === 'OFFICE_HOURS'
-                        ? 'Ca Hành Chính'
-                        : shift?.shift_type === 'MORNING'
-                          ? 'Ca Sáng'
-                          : shift?.shift_type === 'AFTERNOON'
-                            ? 'Ca Chiều'
-                            : shift?.shift_type === 'OTHER'
-                              ? 'Ca khác'
-                              : 'Nghỉ Ca'}
-                    </p>
-                    {shift?.shift_type !== 'OFF' && (
-                      <p className="text-[11px] font-mono text-slate-700 dark:text-slate-300 mt-1">
-                        {shift?.start_time} - {shift?.end_time}
-                      </p>
-                    )}
-                    {shift?.note && (
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 italic truncate">
-                        {shift.note}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-200/80 dark:border-[#21264b]">
-                  {isPast ? (
-                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Đã qua
-                    </span>
-                  ) : isToday ? (
-                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                      <Clock className="w-3 h-3 animate-pulse" /> Đang ca
-                    </span>
-                  ) : shift?.shift_type === 'OFF' ? (
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
-                      Nghỉ tuần
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                      Sắp diễn ra
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Lower Section: Teammates on duty today */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] space-y-4 shadow-xs">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
-              Đồng đội cùng bộ phận & ca trực
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Danh sách nhân sự đang cùng làm việc tại trụ sở</p>
-          </div>
-          <span className="text-xs text-blue-600 dark:text-blue-400 font-mono">{teammates.length} đồng đội</span>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {teammates.map(emp => (
-            <div
-              key={emp.employee_id}
-              className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] hover:border-blue-300 dark:hover:border-blue-800/40 transition-colors flex items-center justify-between shadow-xs"
-            >
-              <div className="flex items-center gap-3">
-                <Avatar src={emp.avatar} name={emp.full_name} />
-                <div>
-                  <p className="text-xs font-semibold text-slate-900 dark:text-white">{emp.full_name}</p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">{emp.position}</p>
-                  <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400">{emp.department}</span>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
-                  {emp.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm ngưng'}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Exchange Shift Modal */}
-      <Modal
-        isOpen={exchangeModalOpen}
-        onClose={() => setExchangeModalOpen(false)}
-        title="Đăng ký Đổi ca trực / Làm thay"
-        subtitle="Yêu cầu cần được sự đồng ý của cả 2 bên và Trưởng bộ phận"
-      >
-        <form onSubmit={handleExchangeSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Chọn ngày cần đổi ca</label>
-            <input
-              type="date"
-              value={exchangeDate}
-              onChange={e => setExchangeDate(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Đồng đội muốn đổi ca cùng</label>
-            <select
-              value={exchangeTargetEmp}
-              onChange={e => setExchangeTargetEmp(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="" className="bg-white dark:bg-[#13162b]">-- Chọn đồng đội --</option>
-              {teammates.map(t => (
-                <option key={t.employee_id} value={t.employee_id} className="bg-white dark:bg-[#13162b]">
-                  {t.full_name} ({t.employee_id} - {t.department})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Lý do đổi ca</label>
-            <textarea
-              rows={3}
-              required
-              value={exchangeReason}
-              onChange={e => setExchangeReason(e.target.value)}
-              placeholder="Ghi rõ lý do (ví dụ: bận việc gia đình, đã thỏa thuận trực thay ngày 12/09)..."
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-slate-200 dark:border-[#21264b]">
-            <button
-              type="button"
-              onClick={() => setExchangeModalOpen(false)}
-              className="px-4 py-2 rounded-xl text-xs text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] border border-slate-200 dark:border-[#272d5a] cursor-pointer"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm shadow-blue-500/20 cursor-pointer"
-            >
-              Gửi yêu cầu đổi ca
-            </button>
-          </div>
-        </form>
-      </Modal>
-    </div>
-  );
+    }/>
+    <FilterBar><label className="w-full lg:w-auto"><span className="sr-only">Tìm ca làm việc</span><SearchInput value={search} onChange={setSearch} onClear={() => setSearch('')} placeholder="Tìm tên ca, ngày hoặc ghi chú…"/></label><label className="sf-employee-date-filter">Chọn ngày:<input className="sf-employee-date" type="date" value={selected} onChange={e => { if (e.target.value) setSelected(e.target.value); }}/></label></FilterBar>
+    {isLoading ? <p role="status">Đang tải lịch làm việc…</p> : isError ? <p className="sf-feedback error" role="alert">Không tải được lịch làm việc. <button className="underline" onClick={refetchShifts}>Thử lại</button></p> : <>
+      <p className="sf-secondary">Số ca được phân: <strong>{inPeriod.filter(s => s.shift_type !== 'OFF').length} ca</strong>{search && ` · ${matching.filter(s => inPeriod.includes(s)).length} kết quả tìm kiếm`}</p>
+      <div ref={calendarRef} className="sf-employee-calendar-scroll" tabIndex={0} role="region" aria-label="Lịch phân ca, cuộn ngang để xem đủ các ngày"><div className={`sf-employee-calendar ${view === 'month' ? 'is-month' : ''}`}>{days.map((date, index) => {
+        const shifts = matching.filter(s => s.date === date);
+        return <button key={date} className={`sf-employee-day ${date === selected ? 'selected' : ''} ${date === today ? 'today' : ''} ${view === 'month' && date.slice(0, 7) !== selected.slice(0, 7) ? 'outside' : ''}`} aria-pressed={date === selected} onClick={() => setSelected(date)}><span className="font-semibold">{['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][index % 7]}</span><time dateTime={date} className="sf-secondary">{shortDate(date)}</time>{shifts.length ? shifts.map(shift => <span className={`sf-employee-shift shift-${shift.shift_type.toLowerCase()}`} key={shift.shift_id}><strong>{shiftNames[shift.shift_type]}</strong>{shift.shift_type !== 'OFF' && <span>{shift.start_time || '—'} – {shift.end_time || '—'}</span>}</span>) : <span className="sf-secondary mt-3">{search ? 'Không khớp' : 'Trống'}</span>}</button>;
+      })}</div></div>
+      <section className="sf-panel p-5 space-y-4"><h2 className="font-semibold flex items-center gap-2"><CalendarDays size={19}/>Chi tiết {shortDate(selected)}/{selected.slice(0, 4)}</h2>{selectedShifts.length ? selectedShifts.map(shift => <div key={shift.shift_id} className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-medium">{shiftNames[shift.shift_type]}</h3>{shift.note && <p className="sf-secondary mt-1">{shift.note}</p>}</div>{shift.shift_type !== 'OFF' && <p className="inline-flex items-center gap-2"><Clock size={17}/>{shift.start_time || '—'} – {shift.end_time || '—'}</p>}</div>) : <p className="sf-secondary">{search ? 'Không có ca khớp với tìm kiếm trong ngày này.' : 'Chưa có ca làm việc được phân công.'}</p>}</section>
+    </>}
+  </div>;
 };

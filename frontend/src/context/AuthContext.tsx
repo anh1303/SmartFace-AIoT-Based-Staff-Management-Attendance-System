@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { UserSession, Role, Employee } from '../types';
-import { loginApi, logoutApi, meApi, DEFAULT_USERS } from '@/features/auth';
+import { loginApi, logoutApi, meApi, DEFAULT_USERS, faceLoginApi } from '@/features/auth';
 import { useToast } from './ToastContext';
 import { useOptionalNotifications } from '../features/notifications';
 import { logger } from '../utils/logger';
@@ -33,6 +33,7 @@ interface AuthContextType {
   isLoading: boolean;
   isLoggingOut: boolean;
   login: (identifier: string, password?: string, rememberMe?: boolean) => Promise<{ success: boolean; message?: string; role?: Role }>;
+  loginWithFace: (challengeId: string, frames: string[], signal?: AbortSignal) => Promise<{ success: boolean; message?: string; role?: Role }>;
   logout: () => Promise<void>;
   switchRole: (role: Role, employeesFallback?: Employee[]) => void;
   setCurrentUserSession: (session: UserSession | null) => void;
@@ -108,6 +109,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  const acceptSession = useCallback((session: UserSession, rememberMe: boolean) => {
+    queryClient.clear();
+    notifications?.clearAll(true);
+    bumpGlobalSession(session);
+    setCurrentUser(session);
+    setSessionId(globalSessionId);
+    sessionStorage.removeItem('userSession');
+    localStorage.removeItem('userSession');
+    (rememberMe ? localStorage : sessionStorage).setItem('userSession', JSON.stringify(session));
+  }, [queryClient, notifications]);
+
+  const loginWithFace = useCallback(async (challengeId: string, frames: string[], signal?: AbortSignal) => {
+    if (activeLogoutPromiseRef.current) { try { await activeLogoutPromiseRef.current; } catch { /* completed logout */ } }
+    const startingSession = globalSessionId;
+    try {
+      const { session, targetRole } = await faceLoginApi.login(challengeId, frames, signal);
+      if (signal?.aborted || startingSession !== globalSessionId) return { success: false, message: 'Lượt đăng nhập đã được hủy.' };
+      acceptSession(session, false);
+      return { success: true, role: targetRole };
+    } catch (failure) {
+      return { success: false, message: failure instanceof Error ? failure.message : 'Không thể đăng nhập bằng khuôn mặt.' };
+    }
+  }, [acceptSession]);
+
   const login = useCallback(async (identifier: string, password?: string, rememberMe = false) => {
     // If a logout is currently in flight, await it first so its Set-Cookie: token=; Max-Age=0
     // does not arrive later and delete this new login's session cookie.
@@ -126,21 +151,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      // Clear any prior user's cached queries and notifications before setting up new session
-      queryClient.clear();
-      notifications?.clearAll(true);
-
       const { session, targetRole } = await loginApi(identifier, password, rememberMe);
-      bumpGlobalSession(session);
-      setCurrentUser(session);
-      setSessionId(globalSessionId);
-
-      if (rememberMe) {
-        localStorage.setItem('userSession', JSON.stringify(session));
-      } else {
-        sessionStorage.setItem('userSession', JSON.stringify(session));
-        localStorage.removeItem('userSession');
-      }
+      acceptSession(session, rememberMe);
 
       return { success: true, role: targetRole };
     } catch (error: unknown) {
@@ -152,7 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       showToast(errMsg, 'error');
       return { success: false, message: errMsg };
     }
-  }, [queryClient, showToast, notifications]);
+  }, [acceptSession, showToast]);
 
   const logout = useCallback(async () => {
     if (activeLogoutPromiseRef.current) {
@@ -262,6 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: isInitializing,
         isLoggingOut,
         login,
+        loginWithFace,
         logout,
         switchRole,
         setCurrentUserSession,

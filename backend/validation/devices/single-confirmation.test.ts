@@ -74,7 +74,7 @@ describe('Single-confirmation attendance', () => {
 
   it.each(['CHECK_IN', 'CHECK_OUT'])('resolves AUTO to %s on its first confirmed request', async mode => {
     if (mode === 'CHECK_OUT') vi.mocked(prisma.attendance_logs.findFirst).mockResolvedValue({
-      type: 'CHECK_IN', event_time: new Date(Date.now() - 120_000),
+      type: 'CHECK_IN', event_time: new Date(Date.now() - 600_000),
     } as any)
     const writer = actions()
     expect(await processThingsBoardWebhook(payload('AUTO'), writer))
@@ -88,7 +88,7 @@ describe('Single-confirmation attendance', () => {
     } as any)
     const writer = actions()
     expect(await processThingsBoardWebhook(payload('AUTO'), writer))
-      .toMatchObject({ success: false, door_open: false, cooldown: true })
+      .toMatchObject({ success: true, ignored: true, door_open: false, cooldown: true })
     expect(writer.checkIn).not.toHaveBeenCalled()
     expect(writer.checkOut).not.toHaveBeenCalled()
   })

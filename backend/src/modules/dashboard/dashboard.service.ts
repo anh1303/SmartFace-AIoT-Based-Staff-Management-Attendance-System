@@ -1,6 +1,6 @@
-import { prisma } from '../../config/database.js';
-import { getEmployeeScope, type EmployeeActor } from '../employees/public.js';
-import { determinePunctuality } from '../attendance/public.js';
+import { getDashboardShifts } from '../shifts/public.js';
+import { getEmployeeScope, getEmployeesForReporting, type EmployeeActor } from '../employees/public.js';
+import { determinePunctuality, getDashboardAttendanceLogs } from '../attendance/public.js';
 import { formatShiftTime, formatVNDateISO, formatVNTime, vnDay } from '../../common/utils.js';
 import type {
   TodayDashboardResponseDto,
@@ -47,16 +47,7 @@ export async function getTodayDashboard(
   const employeeScope = await getEmployeeScope(actor);
 
   // 1. Employees in scope
-  const employees = await prisma.employee.findMany({
-    where: {
-      AND: [employeeScope, { status: 'ACTIVE' }],
-    },
-    include: {
-      department: true,
-      position: true,
-    },
-    orderBy: [{ departmentId: 'asc' }, { employee_code: 'asc' }],
-  });
+  const employees = await getEmployeesForReporting(employeeScope);
 
   const employeeIds = employees.map((e) => e.id);
   const empIdToInfoMap = new Map(
@@ -73,28 +64,23 @@ export async function getTodayDashboard(
 
   // 2. Query today shifts and attendance logs in parallel
   const [todayShifts, todayLogs] = await Promise.all([
-    prisma.employee_shifts.findMany({
-      where: {
-        employee_id: { in: employeeIds },
-        work_date: new Date(`${todayStr}T00:00:00Z`),
-        shift_type: { not: 'OFF' },
-      },
-      include: {
-        work_shifts: true,
-      },
-    }),
-    prisma.attendance_logs.findMany({
-      where: {
-        employee_id: { in: employeeIds },
-        event_time: {
-          gte: startUtc,
-          lte: endUtc,
-        },
-      },
-      orderBy: { event_time: 'desc' },
-      take: 500,
-    }),
+    getDashboardShifts(employeeIds, todayStr),
+    getDashboardAttendanceLogs(employeeIds, startUtc, endUtc),
   ]);
+
+  const shiftsByEmployee = new Map<string, typeof todayShifts>();
+  for (const shift of todayShifts) {
+    const shifts = shiftsByEmployee.get(shift.employee_id) || [];
+    shifts.push({
+      ...shift,
+      start_time: shift.start_time ?? shift.work_shifts?.start_time,
+      end_time: shift.end_time ?? shift.work_shifts?.end_time,
+    });
+    shiftsByEmployee.set(shift.employee_id, shifts);
+  }
+  const punctualityOf = (log: (typeof todayLogs)[number]) => determinePunctuality(
+    log.type, log.event_time, shiftsByEmployee.get(log.employee_id)
+  );
 
   // Scheduled employees
   const scheduledEmpIds = new Set(todayShifts.map((s) => s.employee_id));
@@ -134,14 +120,12 @@ export async function getTodayDashboard(
 
   // Punctuality statistics
   const scheduledCheckIns = todayCheckIns.filter((log) => scheduledEmpIds.has(log.employee_id));
-  const lateCount = scheduledCheckIns.filter((log) => determinePunctuality(
-    'CHECK_IN', log.event_time,
-    todayShifts.filter((shift) => shift.employee_id === log.employee_id).map((shift) => ({
-      ...shift,
-      start_time: shift.start_time ?? shift.work_shifts?.start_time,
-      end_time: shift.end_time ?? shift.work_shifts?.end_time,
-    }))
-  ) === 'LATE').length;
+  const earlyDepartureEmpIds = new Set(todayLogs.filter(
+    (log) => log.status === 'VALID' && log.type === 'CHECK_OUT' && punctualityOf(log) === 'EARLY_LEAVE'
+  ).map((log) => log.employee_id));
+  const lateCount = scheduledCheckIns.filter(
+    (log) => punctualityOf(log) === 'LATE' || earlyDepartureEmpIds.has(log.employee_id)
+  ).length;
   const onTimeCount = scheduledCheckIns.length - lateCount;
   const notCheckedInCount = workingEmployeesCount - scheduledCheckIns.length;
   const totalPunctuality = onTimeCount + lateCount + notCheckedInCount;
@@ -320,6 +304,7 @@ export async function getTodayDashboard(
   const recentLogsRaw = todayLogs.slice(0, 10);
   const recentLogs: DashboardRecentLogDto[] = recentLogsRaw.map((att) => {
     const empInfo = empIdToInfoMap.get(att.employee_id);
+    const punctuality = punctualityOf(att);
     let statusLabel = 'Đúng giờ';
     let statusStyle = 'bg-[#0c2a20] text-emerald-400 border border-emerald-800/80';
 
@@ -329,12 +314,15 @@ export async function getTodayDashboard(
     } else if (att.status === 'FLAGGED') {
       statusLabel = 'Cần xác minh';
       statusStyle = 'bg-[#2a1d0c] text-amber-400 border border-amber-800/80';
-    } else if (att.status === 'LATE') {
+    } else if (punctuality === 'LATE') {
       statusLabel = 'Đi muộn';
       statusStyle = 'bg-[#38101a] text-rose-400 border border-rose-800/80';
-    } else if (att.status === 'EARLY_LEAVE') {
+    } else if (punctuality === 'EARLY_LEAVE') {
       statusLabel = 'Về sớm';
       statusStyle = 'bg-[#38101a] text-rose-400 border border-rose-800/80';
+    } else if (punctuality === 'UNRECORDED') {
+      statusLabel = 'Chưa ghi nhận';
+      statusStyle = 'bg-slate-500/10 text-slate-400 border border-slate-500/20';
     }
 
     return {

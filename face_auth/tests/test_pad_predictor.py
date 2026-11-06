@@ -1,6 +1,9 @@
 """Tests for antispoof predictor and mathematical contracts."""
 
 import math
+from pathlib import Path
+import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, patch
 import numpy as np
@@ -10,17 +13,32 @@ from antispoof.predictor import AntiSpoofPredictor
 
 class TestPadMathAndPredictor(unittest.TestCase):
 
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.model_directory = Path(directory.name)
+
+    def model_file(self, name):
+        path = self.model_directory / name
+        path.write_bytes(b'unit-test-placeholder; model loading is mocked')
+        return str(path)
+
+    @staticmethod
+    def session(size, classes):
+        session = MagicMock()
+        session.get_inputs.return_value = [SimpleNamespace(name='input', shape=[1, 3, size, size])]
+        session.get_outputs.return_value = [SimpleNamespace(name='logits', shape=[1, classes])]
+        session.get_providers.return_value = ['CPUExecutionProvider']
+        return session
+
     def test_2class_pad_score_identity(self):
         """Verify 2-class pad_score equals exactly z0 - z1 and matches logit_threshold."""
         with patch("antispoof.predictor.load_model") as mock_load:
-            mock_session = MagicMock()
-            mock_input = MagicMock()
-            mock_input.shape = [1, 3, 128, 128]
-            mock_session.get_inputs.return_value = [mock_input]
+            mock_session = self.session(128, 2)
             mock_load.return_value = (mock_session, "input")
 
             predictor = AntiSpoofPredictor(
-                model_path="antispoof/models/smartface_pad_artifacts/minifasnet_v2se/deployment/best_model_quantized.onnx",
+                model_path=self.model_file('minifasnet_v2se_best_model_quantized.onnx'),
                 threshold=0.5,
             )
             self.assertAlmostEqual(predictor.logit_threshold, 0.0, places=6)
@@ -41,15 +59,12 @@ class TestPadMathAndPredictor(unittest.TestCase):
     def test_3class_logsumexp_softmax_equivalence(self):
         """Verify 3-class pad_score >= ln(p / (1-p)) is mathematically equivalent to P(REAL) >= p."""
         with patch("antispoof.predictor.load_model") as mock_load:
-            mock_session = MagicMock()
-            mock_input = MagicMock()
-            mock_input.shape = [1, 3, 224, 224]
-            mock_session.get_inputs.return_value = [mock_input]
+            mock_session = self.session(224, 3)
             mock_load.return_value = (mock_session, "input")
 
             for p in [0.3, 0.5, 0.7, 0.85]:
                 predictor = AntiSpoofPredictor(
-                    model_path="antispoof/models/smartface_pad_artifacts/E1_v0_mnv3_large/deployment/mnv3_large_3class_best.onnx",
+                    model_path=self.model_file('mnv3_large_3class_best.onnx'),
                     threshold=p,
                 )
                 expected_logit_thresh = math.log(p / (1.0 - p))
@@ -78,36 +93,32 @@ class TestPadMathAndPredictor(unittest.TestCase):
     def test_color_order_detection(self):
         """Verify BGR for MiniFASNet 128 and RGB for MobileNet 224."""
         with patch("antispoof.predictor.load_model") as mock_load:
-            mock_session = MagicMock()
-            mock_input = MagicMock()
-            mock_input.shape = [1, 3, 128, 128]
-            mock_session.get_inputs.return_value = [mock_input]
+            mock_session = self.session(128, 2)
             mock_load.return_value = (mock_session, "input")
 
             pred_minifas = AntiSpoofPredictor(
-                model_path="antispoof/models/smartface_pad_artifacts/minifasnet_v2se/deployment/best_model_quantized.onnx",
+                model_path=self.model_file('minifasnet_v2se_best_model_quantized.onnx'),
             )
             self.assertEqual(pred_minifas.color_order, "BGR")
             self.assertFalse(pred_minifas.convert_rgb)
 
-            mock_input.shape = [1, 3, 224, 224]
+            mock_load.return_value = (self.session(224, 3), "input")
             pred_mnv3 = AntiSpoofPredictor(
-                model_path="antispoof/models/smartface_pad_artifacts/E1_v0_mnv3_large/deployment/mnv3_large_3class_best.onnx",
+                model_path=self.model_file('mnv3_large_3class_best.onnx'),
             )
             self.assertEqual(pred_mnv3.color_order, "RGB")
             self.assertTrue(pred_mnv3.convert_rgb)
 
-    def test_default_bbox_expansion_factor(self):
-        with patch("antispoof.predictor.load_model") as mock_load:
-            mock_session = MagicMock()
-            mock_input = MagicMock()
-            mock_input.shape = [1, 3, 224, 224]
+    def test_honors_configured_bbox_expansion_factor(self):
+        with patch("antispoof.predictor.load_model") as mock_load, \
+                patch('antispoof.predictor._cfg.PAD_BBOX_EXPANSION_FACTOR', 1.73):
+            mock_session = self.session(224, 3)
             mock_load.return_value = (mock_session, "input")
 
             predictor = AntiSpoofPredictor(
-                model_path="antispoof/models/smartface_pad_artifacts/E1_v5_1_mnv3/deployment/mnv3_e1_preliminary_v5_1_best.onnx",
+                model_path=self.model_file('mnv3_e1_preliminary_v5_1_best.onnx'),
             )
-            self.assertEqual(predictor.bbox_expansion_factor, 1.55)
+            self.assertEqual(predictor.bbox_expansion_factor, 1.73)
 
 
 if __name__ == "__main__":

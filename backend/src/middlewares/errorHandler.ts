@@ -14,7 +14,10 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     const msg = fieldMsgs ? `Dữ liệu nhập không hợp lệ (${fieldMsgs})` : 'Dữ liệu nhập không hợp lệ'
     return errorResponse(res, msg, 422, error.flatten())
   }
-  if (error instanceof AppError) return errorResponse(res, error.message, error.statusCode, error.details)
+  if (error instanceof AppError) return errorResponse(res, error.message, error.statusCode, error.details, error.code)
+  // Body-parser errors may contain uploaded image data. Never send them to logs.
+  if (error?.type === 'entity.too.large') return errorResponse(res, 'Dữ liệu gửi lên quá lớn.', 413)
+  if (error?.type === 'entity.parse.failed') return errorResponse(res, 'Dữ liệu JSON không hợp lệ.', 400)
 
   const prismaCode = (error as { code?: string }).code
   if (prismaCode === 'P2000') {

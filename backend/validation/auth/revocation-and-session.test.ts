@@ -33,6 +33,7 @@ vi.mock('../../src/config/database.js', () => {
     },
     employee: {
       findFirst: vi.fn(),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     auditLog: {
       create: vi.fn(),

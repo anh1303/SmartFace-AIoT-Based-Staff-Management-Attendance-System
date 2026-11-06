@@ -50,20 +50,21 @@ class FaceDetector:
                 f"Không tìm thấy detection model (SCRFD) trong pack '{model_name}'."
             )
 
-    def detect(self, frame):
+    def detect(self, frame, *, min_face_size=None):
         # Có thể detect nhiều khuôn mặt; lọc mặt quá nhỏ trước khi tạo track.
         bboxes, kpss = self._model.detect(frame, max_num=0, metric="default")
 
         if bboxes is None or len(bboxes) == 0:
             return []
 
+        minimum = self.min_face_size if min_face_size is None else max(int(min_face_size), 0)
         detections = []
         for i in range(bboxes.shape[0]):
             x1, y1, x2, y2, score = bboxes[i]
 
-            if self.min_face_size > 0 and (
-                (x2 - x1) < self.min_face_size
-                or (y2 - y1) < self.min_face_size
+            if minimum > 0 and (
+                (x2 - x1) < minimum
+                or (y2 - y1) < minimum
             ):
                 continue
 

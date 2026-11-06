@@ -1,6 +1,9 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { TODAY_DASHBOARD_QUERY_KEY } from '../../src/features/dashboard/hooks/useDashboard'
+import type { TodayDashboardData } from '../../src/features/dashboard/api/dashboardApi'
 import { ManagerDashboard } from '../../src/pages/manager/ManagerDashboard'
 
 const { state, chart } = vi.hoisted(() => ({ state: { current: {} as any }, chart: { data: [] as any[] } }))
@@ -17,25 +20,36 @@ vi.mock('recharts', () => ({
 
 afterEach(() => vi.useRealTimers())
 describe('Manager dashboard arrivals', () => {
-  it('counts each employee once using the first valid arrival, even with re-entry or flagged scans', () => {
+  it('renders backend arrival totals instead of recalculating from local scans', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-11-02T14:00:00+07:00'))
-    const punch = (employee_id: string, time: string, punctuality: string, status = 'VALID') => ({
-      id: `${employee_id}-${time}`, employee_id, employee_name: employee_id,
-      timestamp: `2026-11-02T${time}+07:00`, type: 'CHECK_IN', status, raw_status: status, punctuality,
-    })
     state.current = {
       employees: ['NV-001', 'NV-002', 'NV-003'].map(employee_id => ({ employee_id, full_name: employee_id, status: 'ACTIVE', department: 'QA' })),
-      attendance: [
-        punch('NV-001', '13:00:00', 'LATE'), // Returning after lunch, deliberately supplied first.
-        punch('NV-002', '08:30:00', 'LATE'),
-        punch('NV-001', '08:00:00', 'ON_TIME'),
-        punch('NV-003', '07:55:00', 'ON_TIME', 'FLAGGED'),
-      ],
-      workShifts: ['NV-001', 'NV-002', 'NV-003'].map(employee_id => ({ employee_id, date: '2026-11-02', shift_type: 'OFFICE_HOURS', start_time: '08:00', end_time: '17:00' })),
+      attendance: [], workShifts: [],
       role: 'admin', currentUser: { role: 'admin' },
     }
-    renderToStaticMarkup(<ManagerDashboard />)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const dashboard: TodayDashboardData = {
+      dateStr: '2026-11-02', dateFormatted: 'T2, 02/11/2026',
+      kpis: { workingEmployeesCount: 3, totalEmployees: 3, checkInCount: 2, currentlyWorkingCount: 2, checkOutCount: 0 },
+      punctuality: {
+        onTimeCount: 1, lateCount: 1, notCheckedInCount: 1,
+        onTimePct: 33, latePct: 33, notCheckedInPct: 34,
+        donutData: [
+          { name: 'Đúng giờ', value: 1, color: '#10b981' },
+          { name: 'Đi muộn / về sớm', value: 1, color: '#f43f5e' },
+          { name: 'Chưa check-in', value: 1, color: '#a855f7' },
+        ],
+      },
+      shifts: [], departmentProgress: [], employeeList: [], recentLogs: [],
+      alerts: { overdueEmployees: [], upcomingShiftNotice: null },
+    }
+    client.setQueryData(TODAY_DASHBOARD_QUERY_KEY, dashboard)
+    try {
+      renderToStaticMarkup(<QueryClientProvider client={client}><ManagerDashboard /></QueryClientProvider>)
+    } finally {
+      client.clear()
+    }
     expect(chart.data.map(({ name, value }) => ({ name, value }))).toEqual([
       { name: 'Đúng giờ', value: 1 },
       { name: 'Đi muộn / về sớm', value: 1 },

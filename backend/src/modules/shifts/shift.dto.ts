@@ -25,6 +25,7 @@ export const assignShiftSchema = z
     start_time: z.string().optional(),
     end_time: z.string().optional(),
     note: z.string().optional(),
+    expectedVersion: z.number().int().positive().nullable().optional(),
   })
   .refine((d) => Boolean(d.employee_id || d.employeeId), {
     message: 'employee_id hoặc employeeId là bắt buộc',

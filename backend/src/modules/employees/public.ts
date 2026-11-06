@@ -20,3 +20,5 @@ export {
   findPositionByName,
 } from './employee.queries.js'
 export { generateUniqueEmployeeCode } from './employee.code.js'
+
+export { getEmployeesForReporting, getActiveDepartmentsForReporting } from './employees.report-queries.js'

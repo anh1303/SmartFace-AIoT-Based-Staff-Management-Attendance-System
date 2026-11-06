@@ -1,10 +1,12 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { useOperations } from '../../operations/OperationsProvider';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../../context/AppContext';
 import { useAuth } from '../../../context/AuthContext';
 import { isAnotherManager } from '../../../utils/permissionUtils';
 import { logger } from '../../../utils/logger';
-import { enrollFaceImagesApi, deleteEmployeeBiometricsApi, EnrollFaceResult } from '../api/biometricApi';
+import { enrollFaceJobApi, deleteEmployeeBiometricsApi, EnrollFaceResult } from '../api/biometricApi';
 import { Employee } from '../../../types';
 import { FacePhotoItem } from '../components/FaceEnrollmentSection';
 import { FingerprintStep } from '../components/FingerprintEnrollmentSection';
@@ -20,6 +22,8 @@ export interface UseBiometricEnrollmentOptions {
 
 export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = {}) {
   const { employees, updateEmployee, showToast } = useApp();
+  const queryClient = useQueryClient();
+  const { track } = useOperations();
   const { currentUser, role } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryEmpId = searchParams.get('employee_id') || searchParams.get('empId');
@@ -262,29 +266,11 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     }
     setAnalyzingFace(true);
     try {
-      const frontalPhoto = uploadedPhotos[0]?.url || currentEmp.avatar;
-      const imagesBase64 = uploadedPhotos.map((p) => p.url);
-
-      const result = await enrollFaceImagesApi(currentEmp.employee_id, imagesBase64);
-
-      updateEmployee(currentEmp.employee_id, {
-        avatar: frontalPhoto,
-      });
-
-      const total = result?.total_images ?? uploadedPhotos.length;
-      const detected = result?.detected_faces ?? result?.n_samples_used ?? uploadedPhotos.length;
-      const rate =
-        result?.extraction_rate ?? (total > 0 ? Math.round((detected / total) * 100) : 100);
-      const used = result?.n_samples_used ?? detected;
-
-      setEnrollResult(result);
+      showToast(`Đang tải ảnh khuôn mặt của ${currentEmp.full_name} lên máy chủ…`, 'info');
+      const job = await enrollFaceJobApi(currentEmp.employee_id, uploadedPhotos.map(photo => photo.url));
+      track(job);
       setFaceConfirmModal(false);
-      setResultModalOpen(true);
-
-      showToast(
-        `Đã trích xuất thành công ${detected}/${total} khung hình trong ảnh (Tỉ lệ: ${rate}%). Đã lưu ${used} vector khuôn mặt 512-D cho nhân viên ${currentEmp.full_name} (${currentEmp.employee_id})!`,
-        'success'
-      );
+      setUploadedPhotos([]);
     } catch (err: any) {
       biometricLogger.error('Error updating face biometrics:', err);
       showToast(
@@ -294,7 +280,7 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     } finally {
       setAnalyzingFace(false);
     }
-  }, [currentEmp, uploadedPhotos, isEnrollmentBlocked, getBlockedMessage, showToast, updateEmployee]);
+  }, [currentEmp, uploadedPhotos, isEnrollmentBlocked, getBlockedMessage, showToast, updateEmployee, track]);
 
   const handleSendIoTTrigger = useCallback(() => {
     if (isEnrollmentBlocked) {
@@ -318,21 +304,18 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     }, 1200);
   }, [isEnrollmentBlocked, getBlockedMessage, showToast]);
 
-  const handleConfirmFingerprintSave = useCallback(() => {
+  const handleConfirmFingerprintSave = useCallback(async () => {
     if (!currentEmp) return;
     if (isEnrollmentBlocked) {
       showToast(getBlockedMessage('lưu vân tay'), 'error');
       return;
     }
-    updateEmployee(currentEmp.employee_id, {
-      fingerprint_enrolled: true,
-    });
-    setFingerConfirmModal(false);
-    setFingerprintStep('IDLE');
-    showToast(
-      `Đã lưu mẫu vân tay ${selectedFinger} cho ${currentEmp.full_name} từ ${selectedDevice}!`,
-      'success'
-    );
+    try {
+      await updateEmployee(currentEmp.employee_id, { fingerprint_enrolled: true });
+      setFingerConfirmModal(false);
+      setFingerprintStep('IDLE');
+    } catch { /* The employee mutation reports the save failure and keeps the form open. */ }
+
   }, [currentEmp, isEnrollmentBlocked, getBlockedMessage, showToast, updateEmployee, selectedFinger, selectedDevice]);
 
   const currentManageEmp = useMemo(() => {
@@ -361,10 +344,10 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     }
 
     try {
+      showToast(`Đang xóa Face ID của ${emp.full_name}…`, 'info');
       await deleteEmployeeBiometricsApi(emp.employee_id);
-      updateEmployee(emp.employee_id, {
-        face_enrolled: false,
-      });
+      await queryClient.invalidateQueries({ queryKey: ['employees'] });
+      await queryClient.invalidateQueries({ queryKey: ['biometrics'] });
       showToast(
         `Đã xóa dữ liệu Face ID của nhân viên ${emp.full_name} (${emp.employee_id}) thành công!`,
         'success'
@@ -378,7 +361,7 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     }
   }, [currentUser, isManager, managerDept, role, showToast, updateEmployee]);
 
-  const handleDeleteFingerprint = useCallback((emp: Employee) => {
+  const handleDeleteFingerprint = useCallback(async (emp: Employee) => {
     const isSelfEmp = Boolean(
       emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
     );
@@ -398,13 +381,10 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
       return;
     }
 
-    updateEmployee(emp.employee_id, {
-      fingerprint_enrolled: false,
-    });
-    showToast(
-      `Đã xóa dữ liệu vân tay của nhân viên ${emp.full_name} (${emp.employee_id}) thành công!`,
-      'success'
-    );
+    try {
+      await updateEmployee(emp.employee_id, { fingerprint_enrolled: false });
+    } catch { /* Save failure is reported by the employee mutation. */ }
+
   }, [currentUser, isManager, managerDept, role, showToast, updateEmployee]);
 
   const handleStartEditFace = useCallback((emp: Employee) => {

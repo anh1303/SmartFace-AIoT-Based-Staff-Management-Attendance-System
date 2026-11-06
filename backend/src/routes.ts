@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { operationRouter } from './modules/operations/operation.routes.js';
 import { authRouter } from './modules/auth/index.js';
 import { employeeRouter, departmentRouter, positionRouter } from './modules/employees/index.js';
 import { attendanceRouter, notificationRouter } from './modules/attendance/index.js';
@@ -11,6 +12,7 @@ import { reportsRouter } from './modules/reports/index.js';
 import { dashboardRouter } from './modules/dashboard/index.js';
 
 export const apiRouter = Router();
+apiRouter.use('/operations', operationRouter);
 
 // Modular Feature-based API Routers
 apiRouter.use('/auth', authRouter);

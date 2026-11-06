@@ -35,11 +35,12 @@ vi.mock('../../src/config/database.js', () => {
     $executeRaw: vi.fn(async () => 1),
     attendanceAggregationState: { findUnique: vi.fn(async () => null) },
     $queryRaw: vi.fn(async () => [{
-      emp_id: state.employee?.id || '11111111-1111-4111-8111-111111111111',
+      employee_id: state.employee?.id || '11111111-1111-4111-8111-111111111111',
       employee_code: state.employee?.employee_code || 'NV-001',
       full_name: state.employee?.full_name || 'Nguyễn Văn A',
       avatar_url: null,
-      embedding_type: 'arcface',
+      status: 'ACTIVE',
+      embedding_type: 'CENTROID',
       similarity: 0.95,
     }]),
     employee: {

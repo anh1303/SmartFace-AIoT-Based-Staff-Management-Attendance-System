@@ -2,6 +2,7 @@ import React, { lazy } from 'react';
 import { RouteObject, Navigate } from 'react-router-dom';
 import { AppLayout } from '../components/layout/AppLayout';
 import { AuthGuard } from './guards/AuthGuard';
+import '../pages/employee/employee.css';
 
 const EmployeeDashboard = lazy(() =>
   import('../pages/employee/EmployeeDashboard').then(module => ({ default: module.EmployeeDashboard }))
@@ -18,8 +19,8 @@ const EmployeeAttendance = lazy(() =>
 const EmployeeSalaryEstimate = lazy(() =>
   import('../pages/employee/EmployeeSalaryEstimate').then(module => ({ default: module.EmployeeSalaryEstimate }))
 );
-const EmployeeSalaryHistory = lazy(() =>
-  import('../pages/employee/EmployeeSalaryHistory').then(module => ({ default: module.EmployeeSalaryHistory }))
+const EmployeeBiometrics = lazy(() =>
+  import('../pages/employee/EmployeeBiometrics').then(module => ({ default: module.EmployeeBiometrics }))
 );
 
 export const employeeRoutes: RouteObject = {
@@ -35,8 +36,10 @@ export const employeeRoutes: RouteObject = {
     { path: 'profile', element: <EmployeeProfile /> },
     { path: 'schedule', element: <EmployeeSchedule /> },
     { path: 'attendance', element: <EmployeeAttendance /> },
-    { path: 'salary-estimate', element: <EmployeeSalaryEstimate /> },
-    { path: 'salary-history', element: <EmployeeSalaryHistory /> },
+    { path: 'biometrics', element: <EmployeeBiometrics /> },
+    { path: 'payroll', element: <EmployeeSalaryEstimate /> },
+    { path: 'salary-estimate', element: <Navigate to="/app/employee/payroll" replace /> },
+    { path: 'salary-history', element: <Navigate to="/app/employee/payroll" replace /> },
   ],
 };
 

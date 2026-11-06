@@ -10,6 +10,9 @@ set "ROOT_DIR=%~dp0"
 cd /d "%ROOT_DIR%"
 
 set "FACE_AUTH_PYTHON=python"
+if exist "%ROOT_DIR%.venv\Scripts\python.exe" (
+    set "FACE_AUTH_PYTHON=%ROOT_DIR%.venv\Scripts\python.exe"
+)
 if exist "%ROOT_DIR%face_auth\.venv\Scripts\python.exe" (
     set "FACE_AUTH_PYTHON=%ROOT_DIR%face_auth\.venv\Scripts\python.exe"
 )

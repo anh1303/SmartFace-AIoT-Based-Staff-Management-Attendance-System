@@ -1,5 +1,6 @@
 import { Avatar } from '../../../components/common/Avatar';
 import React from 'react';
+import { useMutationState } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ScanFace, Fingerprint, Lock } from 'lucide-react';
 import { Employee } from '../../../types';
@@ -34,6 +35,8 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const { showToast } = useToast();
+  const creating = useMutationState({ filters: { mutationKey: ['employee-write', 'create'], status: 'pending' }, select: mutation => ({ id: mutation.mutationId, draft: mutation.state.variables as Employee }) });
+  const updating = useMutationState({ filters: { mutationKey: ['employee-write', 'update'], status: 'pending' }, select: mutation => (mutation.state.variables as { id: string }).id });
 
   const handleRowClick = (emp: Employee) => {
     if (isAnotherManager(emp, currentUser)) {
@@ -61,6 +64,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
         </TableHeadRow>
       </TableHead>
       <TableBody>
+        {creating.map(item => <TableRow key={`pending-${item.id}`}><TableCell colSpan={8}><span role="status">{item.draft.full_name} · Đang tạo nhân viên… Chưa thể phân lịch hoặc đăng ký sinh trắc học.</span></TableCell></TableRow>)}
         {filteredEmployees.length === 0 ? (
           <TableEmpty colSpan={8} message="Không tìm thấy nhân viên nào phù hợp." />
         ) : (
@@ -102,6 +106,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
                               title={emp.full_name}
                             >
                               {emp.full_name}
+                              {(updating.includes(emp.employee_id) || updating.includes(emp.id || '')) && <span className="ml-2 text-xs font-normal" role="status">Đang lưu…</span>}
                             </p>
                             {restricted && (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-1 py-0.2 rounded border border-amber-300/80 dark:border-amber-800/40">

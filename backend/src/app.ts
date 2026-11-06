@@ -18,6 +18,7 @@ app.use(
   })
 );
 app.use(cookieParser());
+app.use(['/api/auth/face-login', '/api/v1/auth/face-login'], express.json({ limit: '2200kb' }));
 app.use(express.json({ limit: '20mb' }));
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 

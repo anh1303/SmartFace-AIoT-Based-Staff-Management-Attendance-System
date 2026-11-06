@@ -8,21 +8,20 @@ import {
   TableRow,
   TableCell,
   TableEmpty,
+  FilterSelect,
 } from '../../../components/common';
 import { AttendanceEventBadge } from '../../../components/common/AttendanceEventBadge';
 import { AttendancePairItem } from '../hooks/useAttendancePairs';
 import { formatVNDateISO } from '../../../utils/dateUtils';
-import { formatSecondsToHHMMSS } from '../../../utils/timeUtils';
+import { formatSecondsToHHMMSS, parseTimeToSeconds } from '../../../utils/timeUtils';
 
 export type AttendanceLogFilter = 'ALL' | 'MATCHED' | 'COUNTED';
 export function AttendanceLogFilterSelect({ value, onChange }: { value: AttendanceLogFilter; onChange: (value: AttendanceLogFilter) => void }) {
-  return <label className="flex flex-wrap gap-2 items-center text-sm text-slate-800 dark:text-slate-100">Hiển thị lượt
-    <select aria-label="Lọc lượt chấm công" value={value} onChange={e => onChange(e.target.value as AttendanceLogFilter)} className="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2">
-      <option value="ALL">Tất cả lượt checkin / checkout</option>
-      <option value="MATCHED">Chỉ lượt ghép cặp hợp lệ</option>
-      <option value="COUNTED">Chỉ lượt được ghép cặp và tính giờ</option>
-    </select>
-  </label>;
+  return <FilterSelect label="Hiển thị lượt:" value={value} onChange={next => onChange(next as AttendanceLogFilter)} className="flex-wrap" widthClass="w-[280px] max-w-full" maxTruncateLen={45} options={[
+    { value: 'ALL', label: 'Tất cả lượt checkin / checkout' },
+    { value: 'MATCHED', label: 'Chỉ lượt ghép cặp hợp lệ' },
+    { value: 'COUNTED', label: 'Chỉ lượt được ghép cặp và tính giờ' },
+  ]}/>;
 }
 export const DEFAULT_ATTENDANCE_REASONS: Record<string, string> = {
   MISSING_CHECK_OUT: 'Thiếu lượt check-out',
@@ -46,6 +45,9 @@ export function AttendanceDayDetails({ item, filter, showFilter = true }: { item
   const intervals = mode === 'COUNTED' ? item.validIntervals.filter(p => p.counted) : item.validIntervals;
   const visibleIds = new Set(intervals.flatMap(p => [p.inId, p.outId]));
   const events = mode === 'ALL' ? item.rawEvents : item.rawEvents.filter(ev => visibleIds.has(ev.id));
+  const displayedEventIds = new Set(events.map(ev => ev.id));
+  const actualWorkSeconds = intervals.reduce((total, pair) =>
+    total + (pair.outId && displayedEventIds.has(pair.outId) ? parseTimeToSeconds(pair.durationStr) ?? 0 : 0), 0);
   const reason = (code: string) => item.reasonLabels?.[code] || DEFAULT_ATTENDANCE_REASONS[code] || (code === 'NO_SHIFT' ? 'Chưa phân ca' : 'Dữ liệu chấm công cần xác minh');
   const reviewText = item.reviewReason?.split(',').filter(Boolean).map(reason).join('; ');
 
@@ -187,6 +189,12 @@ export function AttendanceDayDetails({ item, filter, showFilter = true }: { item
                         className="!py-3 !px-3.5 align-middle bg-slate-50/60 dark:bg-[#181c38]/40 whitespace-nowrap"
                       >
                         <div className="space-y-1.5 text-xs whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-500 dark:text-slate-400 font-medium">Thời gian làm thực:</span>
+                            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
+                              {formatSecondsToHHMMSS(actualWorkSeconds)}
+                            </span>
+                          </div>
                           {/* Mục 1: Giờ làm */}
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-slate-500 dark:text-slate-400 font-medium">Giờ làm:</span>

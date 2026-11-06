@@ -49,6 +49,18 @@ tests/
 *.spec.js
 *.spec.jsx
 
+# Track the webcam spike regression suite without exposing unrelated test files.
+!face_auth/tests/
+face_auth/tests/*
+!face_auth/tests/test_face_login_spike.py
+!face_auth/tests/test_face_login_http.py
+!face_auth/tests/test_face_login_parity.py
+!backend/validation/auth/face-login*.test.ts
+!frontend/validation/auth/face-login*.test.ts
+!frontend/validation/auth/face-login*.test.tsx
+/.local/face-login-spike/
+/.local/face-login-browser/
+
 # Ngoại lệ: Cho phép lưu trữ kết quả kiểm thử mô hình trong smartface_pad_artifacts
 !**/smartface_pad_artifacts/**/test/
 !**/smartface_pad_artifacts/**/test/**

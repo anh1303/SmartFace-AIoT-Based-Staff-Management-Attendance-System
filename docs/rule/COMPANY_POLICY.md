@@ -6,7 +6,7 @@
 
 **Căn cứ:** hành vi của mã nguồn hiện tại trong workspace, bao gồm các thay đổi chưa commit. Đây là tài liệu mô tả hệ thống, không phải xác nhận một chính sách lao động hay quy định pháp luật.
 
-Tài liệu dùng từ **tự động** khi hệ thống tự làm; **đề xuất** khi hệ thống tạo khoản chờ quyết định; và **được duyệt** khi người có quyền đã xác nhận. Không đồng nhất ba việc này. Các ví dụ mặc định dùng ngày ca từ 29/10/2026, trừ khi ghi khác.
+Tài liệu dùng từ **tự động** khi hệ thống tự làm; **đề xuất** khi hệ thống tạo khoản chờ quyết định; và **được duyệt** khi ngày công đã được người có quyền hoặc tác vụ tự chốt xác nhận. Các ví dụ mặc định dùng ngày ca từ 29/10/2026, trừ khi ghi khác.
 
 ## 1. Luồng tổng thể
 
@@ -14,7 +14,7 @@ Tài liệu dùng từ **tự động** khi hệ thống tự làm; **đề xu�
 2. Ghi nhận lượt `CHECK_IN` và `CHECK_OUT`. Mỗi lượt được lưu riêng cùng thời điểm và trạng thái.
 3. Ghép các lượt hợp lệ thành cặp vào–ra, tính thời gian thực tế theo ca và tổng hợp ngày công.
 4. Hệ thống đánh dấu ngày bất thường, gửi cảnh báo thiếu lượt khi đủ điều kiện, tạo đề xuất OT hoặc phạt theo từng ngày.
-5. Quản lý kiểm tra ngày cần rà soát, điều chỉnh đề xuất khi cần và duyệt hoặc từ chối từng khoản.
+5. Quản lý kiểm tra ngày cần rà soát và điều chỉnh, duyệt theo ngày; tác vụ tự chốt cũng có thể duyệt ngày và các khoản khi đến hạn.
 6. Tính bảng lương tháng từ công ngày và các khoản đã duyệt; người có quyền chỉ sửa phụ cấp trên phiếu lương.
 7. Kiểm tra lại dữ liệu và chốt kỳ khi đủ điều kiện. Phiếu đã chốt không bị tính lại đè lên.
 
@@ -109,7 +109,7 @@ thời gian thực tế trong ca của ngày = tổng thời gian trong ca của
 | Trước 29/10/2026 | Ít nhất 1/2 độ dài ca, chính sách `2026-10-26-v5`. |
 | Từ 29/10/2026 | Ít nhất 2/3 độ dài ca, chính sách `2026-10-29-v6`. |
 
-Nếu đạt ngưỡng, công thường tự động bằng **cả độ dài ca**, sau đó làm tròn theo mục 6. Nếu dưới ngưỡng, công thường, OT tự đề xuất và giờ phạt trễ/sớm tự động đều bằng 0. Nếu có cặp nhưng dưới ngưỡng, ngày được đánh dấu cần rà soát; không tự coi là vắng hoàn toàn.
+Nếu đạt ngưỡng, công thường tự động bằng **cả độ dài ca**, sau đó làm tròn theo mục 6. Nếu dưới ngưỡng, công thường, OT tự đề xuất và giờ phạt trễ/sớm tự động đều bằng 0. Nếu có cặp nhưng dưới ngưỡng, ngày được đánh dấu cần rà soát; khi đến hạn tự chốt, ngày chưa xử lý có thể được chuyển thành vắng theo mục 7.
 
 Ví dụ ca 08:00–17:00 dài 9 giờ, ngưỡng 2/3 là 6 giờ. Đúng 6 giờ thực tế được ghi 9 giờ công thường; 5 giờ 59 phút 59 giây được ghi 0 giờ tự động và cần rà soát. Ca 4 giờ có ngưỡng 2 giờ 40 phút. Hai cặp trong cùng ngày được cộng phần thực tế trước khi so ngưỡng.
 
@@ -117,7 +117,7 @@ Nếu đạt ngưỡng dù có khoảng OUT→IN giữa ca, hệ thống vẫn g
 
 ### 5.2. OFF, chưa có ca và ca 0 giờ
 
-- **OFF:** lưu lượt nếu có; công thường và OT tự động bằng 0, không tự tạo phạt vắng. Người có quyền có thể đề xuất OT thủ công có lý do rồi duyệt riêng.
+- **OFF:** lưu lượt nếu có; công thường và OT tự động bằng 0, không tự tạo phạt vắng. Người có quyền có thể duyệt OT thủ công theo ngày với lý do.
 - **Chưa có ca:** không tự tính công, OT hay phạt vắng. Nếu có lượt, ngày cần rà soát; có thể phân ca rồi tổng hợp lại.
 - **Ca 0 giờ:** không tự tạo phạt vắng. Không suy ra một ca làm có độ dài dương từ hai mốc bằng nhau.
 
@@ -150,8 +150,8 @@ Ví dụ ca 08:00–17:00, chỉ có IN 08:00 và không có OUT:
 1. IN vẫn được lưu trong database, nhưng chưa tạo thành cặp hợp lệ.
 2. Từ 17:30, nếu các điều kiện cảnh báo ở mục 7.1 được đáp ứng, hệ thống tạo thông báo thiếu check-out.
 3. Không có cặp hợp lệ khác thì công thường tự động của ngày là **0 giờ**; OT và trễ/sớm tự động cũng là 0. Ngày được đánh dấu thiếu OUT/cần rà soát.
-4. Hệ thống **không tự tạo phạt vắng** cho ngày có lượt chưa hoàn chỉnh. Nếu không xử lý, trạng thái cần rà soát sẽ chặn khóa ngày hoặc chốt lương; không có bước tự chốt và tự trừ phạt vắng chỉ vì đã hết ngày.
-5. Quản lý xác minh theo quyền và căn cứ thực tế. Điều chỉnh ngày hiện hỗ trợ xử lý cờ rà soát và đề xuất OT/trễ-sớm có lý do; nó không tự tạo OUT quá khứ hoặc tự sửa công thường thành một số giờ giả. Nếu có quyết định bù tiền, phụ cấp trên phiếu lương có thể được điều chỉnh kèm lý do.
+4. Nếu chưa xử lý, từ 00:05 ngày kế tiếp và sau mốc kết thúc ca cộng 4 giờ OT, hệ thống tự chốt ca thiếu lượt thành nghỉ không lý do, duyệt ngày và khoản phạt vắng. Khi khóa ngày thủ công, Admin cũng có thể chốt ca thiếu lượt thành nghỉ không lý do.
+5. Quản lý xác minh theo quyền và căn cứ thực tế, mở khóa ngày nếu cần xử lý lại. Điều chỉnh ngày duyệt OT/trễ-sớm có lý do; không tạo OUT quá khứ hoặc tự sửa công thường thành một số giờ giả, và không duyệt khi ca chưa kết thúc. Nếu có quyết định bù tiền, phụ cấp trên phiếu lương có thể được điều chỉnh kèm lý do.
 
 Nếu đã có một hoặc nhiều cặp hợp lệ khác và còn một IN thiếu OUT, hệ thống tính điều kiện công từ các cặp hợp lệ đó, nhưng vẫn đánh dấu lượt đang mở để rà soát. Không lấy giờ ca làm OUT cho lượt thiếu.
 
@@ -162,10 +162,10 @@ Nếu đã có một hoặc nhiều cặp hợp lệ khác và còn một IN thi
 | Chỉ có OUT, không có IN | Không tạo cặp hoặc công từ OUT lẻ; cần rà soát. Sau hạn cảnh báo có thể gửi thiếu check-in. |
 | Không có IN và không có OUT | Sau khi ca kết thúc, đủ điều kiện có thể tạo ngày vắng và khoản phạt vắng chờ duyệt; sau 30 phút có thể gửi cảnh báo thiếu cả hai. |
 | Có IN và OUT nhưng cặp quá 24 giờ hoặc bị ngắt | Không coi là cặp hợp lệ; giữ log và yêu cầu rà soát. Không mặc nhiên coi việc có đủ hai loại lượt là có công. |
-| Có cặp hợp lệ nhưng dưới ngưỡng | Công thường, OT và trễ/sớm tự động bằng 0; cần rà soát, không tự phát sinh phạt vắng. |
+| Có cặp hợp lệ nhưng dưới ngưỡng | Công thường, OT và trễ/sớm tự động bằng 0; cần rà soát. Khi đến hạn tự chốt, ngày chưa xử lý có thể chuyển thành vắng và phát sinh phạt. |
 | Có log `FLAGGED` | Giữ log, đánh dấu cần rà soát; không dùng log này như lượt hợp lệ để tạo cặp. |
 | Không có ca nhưng có lượt | Không tự cấp công/OT hay phạt vắng; cần rà soát lịch và dữ liệu. |
-| OT thực tế trên 4 giờ | Đề xuất OT theo quy tắc, đồng thời gắn cờ cần rà soát; không tự cắt còn 4 giờ. |
+| OT thực tế trên 4 giờ | Giữ thời lượng gốc làm căn cứ, giới hạn số giờ OT đề xuất và được duyệt ở mức 4 giờ; gắn cờ vượt ngưỡng trước khi ngày được chốt. |
 
 ## 8. Tăng ca (OT)
 
@@ -183,7 +183,7 @@ Cần đồng thời có ca làm khác OFF, cặp hợp lệ, thời gian thực
 
 ### 8.2. Xử lý OT
 
-Mỗi nhân viên/ngày có khoản OT riêng. Quản lý có thể sửa số giờ đề xuất, kể cả lớn hơn số đo tự động để xử lý sự cố, nhưng phải có lý do; thao tác này không đồng nghĩa đã duyệt. Khoản sau đó cần được duyệt riêng. Chỉ giờ OT `APPROVED` được cộng vào lương; `REJECTED` không được cộng; `PENDING` chặn chốt. Đưa đề xuất về 0 có thể chuyển khoản không còn phát sinh thành `VOID`.
+Mỗi nhân viên/ngày có khoản OT riêng, tối đa 4 giờ được duyệt cho ngày đó. Quản lý có thể điều chỉnh OT có lý do sau khi ca kết thúc; thao tác điều chỉnh đồng thời duyệt ngày và các khoản liên quan. Khi tự chốt ngày hợp lệ, hệ thống tự duyệt OT theo mức tối đa này. Chỉ khoản `APPROVED` được tính vào lương; `PENDING` không được tính và chặn chốt lương.
 
 ## 9. Đi trễ, về sớm và vắng ca
 
@@ -191,7 +191,7 @@ Mỗi nhân viên/ngày có khoản OT riêng. Quản lý có thể sửa số g
 
 Chỉ tự xét khi đạt ngưỡng công của ngày. Hệ thống lấy IN đầu và OUT cuối của các cặp hợp lệ thuộc ngày để tính thời gian sau giờ bắt đầu và trước giờ kết thúc ca, giới hạn mỗi phần theo độ dài ca. Cộng trễ và sớm rồi làm tròn một lần. Nhãn đi trễ được áp dụng khi trễ **trên 15 phút**; ngưỡng nhãn không tự quyết định giờ phạt sau làm tròn.
 
-Ví dụ: trễ 20 phút được gắn nhãn trễ nhưng làm tròn giờ phạt còn 0; trễ 30 phút đề xuất 0,5 giờ; trễ 20 phút và về sớm 20 phút đề xuất 0,5 giờ. Khoản trễ/sớm phải được duyệt riêng; chỉ khoản `APPROVED` được trừ tiền.
+Ví dụ: trễ 20 phút được gắn nhãn trễ nhưng làm tròn giờ phạt còn 0; trễ 30 phút đề xuất 0,5 giờ; trễ 20 phút và về sớm 20 phút đề xuất 0,5 giờ. Khoản trễ/sớm được duyệt đồng bộ khi ngày công được duyệt; chỉ khoản `APPROVED` được trừ tiền.
 
 ### 9.2. Vắng hoàn toàn
 
@@ -201,7 +201,7 @@ Khoản vắng chỉ tự đề xuất khi đã có ca làm không phải OFF, t
 tiền phạt vắng đề xuất = làm tròn VNĐ(giờ ca chính xác × lương giờ × hệ số vắng)
 ```
 
-Hệ số mặc định là 2,0. Ví dụ ca 8 giờ, lương 100.000 đồng/giờ: đề xuất 8 × 100.000 × 2 = **1.600.000 đồng**. Khoản ở trạng thái `PENDING`, chỉ trừ khi `APPROVED`. Giờ ca tính khoản vắng là thời lượng chính xác, không phải giờ công đã làm tròn. Ngày chỉ có IN hoặc OUT không tự bị coi là vắng hoàn toàn như ví dụ này.
+Hệ số mặc định là 2,0. Ví dụ ca 8 giờ, lương 100.000 đồng/giờ: đề xuất 8 × 100.000 × 2 = **1.600.000 đồng**. Khoản được duyệt theo ngày và chỉ trừ khi `APPROVED`. Giờ ca tính khoản vắng là thời lượng chính xác, không phải giờ công đã làm tròn. Ngày thiếu lượt chưa được xử lý có thể được chốt thành vắng theo mục 7.2.
 
 ## 10. Sổ khoản theo ngày và quyết định duyệt
 
@@ -210,17 +210,17 @@ Hệ thống lưu riêng mỗi loại cho từng nhân viên/ngày: `OVERTIME` (
 | Trạng thái | Ý nghĩa | Tác động đến chốt/tính lương |
 |---|---|---|
 | `PENDING` | Đề xuất đang chờ quyết định. | Không tính vào lương; chặn chốt. |
-| `APPROVED` | Người có quyền duyệt. | Cộng OT hoặc trừ khoản phạt khi tính lại lương. |
-| `REJECTED` | Người có quyền từ chối. | Không cộng/trừ khoản đó. |
+| `APPROVED` | Được duyệt cùng ngày công, do người có quyền hoặc tác vụ tự chốt. | Cộng OT hoặc trừ khoản phạt khi tính lại lương. |
+| `REJECTED` | Trạng thái lịch sử của khoản đã từ chối. | Không cộng/trừ khoản đó. |
 | `VOID` | Căn cứ không còn phát sinh khoản. | Không tính tiền; khác với từ chối một khoản vẫn tồn tại. |
 
-Khi nguồn log, ca hoặc căn cứ ảnh hưởng một khoản thay đổi, hệ thống có thể hủy hiệu lực quyết định cũ, đưa khoản về chờ duyệt hoặc `VOID`, đồng thời ghi nhật ký. Quyết định không tự được giữ nếu căn cứ đã thay đổi. Khi duyệt, phiên bản cập nhật của khoản phải còn mới; nếu dữ liệu đã đổi, người dùng tải lại trước khi quyết định.
+Khi nguồn log, ca hoặc căn cứ ảnh hưởng một khoản thay đổi, hệ thống có thể hủy hiệu lực quyết định cũ, đưa khoản về chờ duyệt hoặc `VOID`, đồng thời ghi nhật ký. Các khoản được duyệt đồng bộ với ngày công; API không duyệt hay từ chối từng khoản độc lập.
 
 Điều chỉnh OT/trễ-sớm theo ngày phải có lý do và được ghi cùng dữ liệu ngày và nhật ký. Sau thay đổi hoặc quyết định duyệt, phải tính lại phiếu lương trước khi chốt. Sửa phụ cấp không tự xác nhận các khoản còn chờ hoặc dữ liệu công đã thay đổi.
 
 ## 11. Khóa ngày công
 
-Chỉ Admin được khóa/mở khóa ngày công toàn hệ thống. Trước khi khóa, hệ thống tổng hợp lại ngày và kiểm tra tình trạng tổng hợp, ca chưa kết thúc, ngày cần rà soát, thiếu phiên bản chính sách và các khoản OT/phạt đang chờ. Nếu còn vướng, thao tác bị từ chối.
+Chỉ Admin được khóa/mở khóa ngày công toàn hệ thống. Trước khi khóa, hệ thống tổng hợp lại ngày và kiểm tra tình trạng tổng hợp, ca chưa kết thúc và dữ liệu chờ tính lại. Khóa ngày duyệt các ngày chưa duyệt; ca thiếu lượt hoặc lỗi có thể được chuyển thành nghỉ không lý do và duyệt khoản phạt vắng.
 
 Ngày đã khóa giữ kết quả tổng hợp. Lượt đến sau vẫn được lưu, đánh dấu `FLAGGED` và có cảnh báo theo luồng ngày khóa; không tự thay kết quả. Muốn xử lý thay đổi công phải mở khóa theo quyền, tổng hợp lại và xử lý các quyết định bị ảnh hưởng. Phiếu lương đã chốt của nhân viên cũng ngăn sửa công theo quy trình thông thường cho kỳ đó.
 

@@ -22,6 +22,7 @@ export const assignShift = async (req: Request, res: Response) => {
       start_time: body.start_time,
       end_time: body.end_time,
       note: body.note,
+      expectedVersion: body.expectedVersion,
     },
     req.user
   );

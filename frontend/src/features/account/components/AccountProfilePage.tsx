@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { User, Camera, Check } from 'lucide-react';
-import { profileApi, meApi, type AccountProfile, type ProfileInput } from '@/features/auth';
+import { profileApi, meApi, PasswordReauthentication, type AccountProfile, type ProfileInput } from '@/features/auth';
 import { useAuth, getActiveSessionId, getActiveUsername } from '../../../context/AuthContext';
 import { PageHeaderBanner } from '../../../components/common/PageHeaderBanner';
 import { PasswordForm } from './PasswordForm';
@@ -97,6 +97,7 @@ function ProfileEditor({ profile, username }: { profile: AccountProfile; usernam
         <label className="sf-field">Số điện thoại<input className="sf-input" type="tel" maxLength={20} pattern="[+0-9 ().-]*" value={draft.phone} autoComplete="tel" disabled={update.isPending} onChange={e => { setDraft({ ...draft, phone: e.target.value }); setSaved(false); }}/></label>
       </div>
       {update.isError && <div className="sf-feedback error" role="alert">{update.error.message} <button className="underline" onClick={() => save(draft, avatar)}>Thử lưu lại</button></div>}
+      {update.isError && (update.error as { code?: string }).code === 'PASSWORD_REQUIRED' && <PasswordReauthentication onComplete={() => { update.reset(); save(draft, avatar); }}/>}
       {validationError && <div className="sf-feedback error" role="alert">{validationError}</div>}
       {saved && <div className="sf-feedback" role="status"><Check size={17}/>Đã lưu thông tin.</div>}
       <div className="sf-footer"><button type="button" className="sf-button primary" disabled={update.isPending || imageBusy} onClick={() => save(draft)}>{update.isPending ? 'Đang lưu…' : 'Lưu'}</button></div>

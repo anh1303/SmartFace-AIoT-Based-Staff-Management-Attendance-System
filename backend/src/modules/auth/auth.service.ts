@@ -11,6 +11,8 @@ import { createEmployee, findDepartmentByIdOrCode, findPositionByName } from '..
 import { logAction } from '../audit-logs/public.js'
 import type { z } from 'zod'
 import type { loginSchema, registerSchema } from './auth.dto.js'
+import { faceSessionAllowed } from './face-login/face-login.policy.js'
+import { hasFaceLoginTemplate } from '../biometrics/public.js'
 
 function safeUser(user: {
   id: string
@@ -51,10 +53,42 @@ function safeUser(user: {
   }
 }
 
-const tokenFor = (user: ReturnType<typeof safeUser>, tokenVersion: number = 1) => {
+const tokenFor = (user: ReturnType<typeof safeUser>, tokenVersion: number = 1, method: 'pwd' | 'face' = 'pwd') => {
   // Profile images belong in API responses; embedding them can exceed browser cookie limits.
   const { avatar: _avatar, ...claims } = user
-  return jwt.sign({ ...claims, tv: tokenVersion }, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] })
+  return jwt.sign({ ...claims, tv: tokenVersion, amr: [method] }, env.JWT_SECRET,
+    { expiresIn: method === 'face' ? '30m' : env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] })
+}
+
+export async function assertFaceSession(amr: unknown, employeeId: string | null | undefined, role: string) {
+  if (!faceSessionAllowed(amr, role, env.FACE_LOGIN_ENABLED)
+    || (Array.isArray(amr) && amr.includes('face') && (!employeeId || !(await hasFaceLoginTemplate(employeeId))))) {
+    throw AppError.unauthorized('Phiên đăng nhập khuôn mặt đã hết hiệu lực. Vui lòng đăng nhập bằng mật khẩu.')
+  }
+}
+
+export async function createFaceSession(employeeId: string) {
+  const user = await prisma.user.findFirst({ where: { employees: { id: employeeId } },
+    include: { roles: true, employees: { include: { department: true, position: true } } } })
+  const profile = user?.profile && typeof user.profile === 'object' ? user.profile as Record<string, unknown> : {}
+  if (!user?.is_active || user.employees?.status !== 'ACTIVE') {
+    throw AppError.unauthorized('Không thể xác thực khuôn mặt. Vui lòng thử lại hoặc đăng nhập bằng mật khẩu.')
+  }
+  await assertFaceSession(['face'], user.employees.id, user.roles.role_name)
+  const safe = safeUser(user)
+  return { user: safe, accessToken: tokenFor(safe, Number(profile.token_version || 1), 'face') }
+}
+
+export async function passwordSession(userId: string, password: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId },
+    include: { roles: true, employees: { include: { department: true, position: true } } } })
+  if (!user?.is_active || !(await bcrypt.compare(password, user.passwordHash))
+    || (user.employees && ['INACTIVE', 'TERMINATED'].includes(user.employees.status))) {
+    throw AppError.unauthorized('Mật khẩu không đúng hoặc tài khoản không còn hoạt động.')
+  }
+  const profile = user.profile && typeof user.profile === 'object' ? user.profile as Record<string, unknown> : {}
+  const safe = safeUser(user)
+  return { user: safe, accessToken: tokenFor(safe, Number(profile.token_version || 1)) }
 }
 
 export async function login(input: z.infer<typeof loginSchema>) {
@@ -309,6 +343,7 @@ export async function verifyAndLoadActiveUser(token: string) {
     role?: string
     tv?: number
     iat?: number
+    amr?: string[]
   }
 
   if (!decoded?.id) {
@@ -346,6 +381,10 @@ export async function verifyAndLoadActiveUser(token: string) {
   const profile = (user.profile && typeof user.profile === 'object') ? (user.profile as Record<string, unknown>) : {}
   const currentTv = typeof profile.token_version === 'number' ? profile.token_version : 1
   const tokenTv = typeof decoded.tv === 'number' ? decoded.tv : 1
+  await assertFaceSession(decoded.amr, user.employees?.id, user.roles.role_name)
+  if (decoded.amr?.includes('face') && user.employees?.status !== 'ACTIVE') {
+    throw AppError.unauthorized('Phiên đăng nhập khuôn mặt đã hết hiệu lực. Vui lòng đăng nhập bằng mật khẩu.')
+  }
   if (tokenTv < currentTv) {
     throw new AppError(401, 'Phiên đăng nhập đã hết hạn hoặc mật khẩu đã thay đổi. Vui lòng đăng nhập lại.')
   }
@@ -360,7 +399,7 @@ export async function verifyAndLoadActiveUser(token: string) {
 
   const safe = safeUser(user)
   const { avatar: _avatar, ...authUser } = safe
-  return authUser
+  return { ...authUser, amr: decoded.amr }
 }
 
 /**

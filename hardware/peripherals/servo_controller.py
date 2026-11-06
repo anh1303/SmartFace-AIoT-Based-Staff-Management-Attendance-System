@@ -97,7 +97,9 @@ class ServoController:
 
         - detach_after_move=True: Ngắt xung PWM (servo.angle = None) sau 0.6s quay để triệt tiêu
           nhiệt lượng cuộn dây, chống rung lắc (jitter) và chống sụt áp nguồn 5V (theo dht11_servo.py).
-        - max_hold_seconds: Giới hạn thời gian mở tối đa (mặc định 10s) chống kẹt cổng vô hạn khi test tại bàn.
+          Khi đóng cửa, tự động re-arm PWM tại góc mở và lướt mượt về 0° qua các góc trung gian để
+          triệt tiêu hoàn toàn hiện tượng PWM Re-attach Glitch (khựng/nhích ngược) và chống sụt áp tức thời.
+        - max_hold_seconds: Giới hạn thời gian mở tối đa chống kẹt cổng vô hạn khi test tại bàn.
         """
         if not self.enabled or self._stopping.is_set():
             return
@@ -157,6 +159,14 @@ class ServoController:
             finally:
                 try:
                     print('[SERVO] Đóng cổng: 0°')
+                    if detach_after_move:
+                        # 1. Khóa và ổn định xung PWM tại góc mở hiện tại (30ms) để triệt tiêu cú giật Re-attach Glitch
+                        self.set_angle(target_angle)
+                        time.sleep(0.03)
+                        # 2. Quét mượt về 0° qua các nấc trung gian để motor tăng tốc đều, không khựng và chống sụt áp
+                        for a in (60.0, 30.0):
+                            self.set_angle(a)
+                            time.sleep(0.03)
                     self.set_angle(0.0)
                     if on_state_change:
                         on_state_change(self.door_state)

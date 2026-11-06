@@ -73,7 +73,6 @@ class ServoPresenceTests(unittest.TestCase):
     def test_max_hold_seconds_and_detach_after_move(self):
         commands = self.run_gate(lambda now: True, max_hold_seconds=8.0, detach_after_move=True)
         self.assertEqual(commands[0][1], 90)
-        self.assertIsNone(commands[1][1])
         closed = next(t for t, angle in commands if angle == 0)
         self.assertGreaterEqual(closed, 8.6)
         self.assertLess(closed, 9.0)

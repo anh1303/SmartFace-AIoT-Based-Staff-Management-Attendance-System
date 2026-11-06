@@ -116,12 +116,9 @@ class ServoController:
                 self.set_angle(target_angle)
                 if on_state_change:
                     on_state_change(self.door_state)
-                # Cho motor quay đến góc đích rồi ngắt xung PWM chống nóng motor và sụt áp nếu detach_after_move
-                move_time = 0.6 if detach_after_move else 1.0
+                # Cho motor quay đến góc đích
+                move_time = 0.6
                 time.sleep(move_time)
-                if detach_after_move:
-                    self.set_angle(None)
-                    print('[SERVO] 🔌 Đã ngắt xung PWM sau khi mở -> Bánh răng giữ vị trí, motor nghỉ mát.')
 
                 if is_person_present_fn is None:
                     self._stopping.wait(max(0.0, open_seconds - move_time))
@@ -159,19 +156,12 @@ class ServoController:
             finally:
                 try:
                     print('[SERVO] Đóng cổng: 0°')
-                    if detach_after_move:
-                        # 1. Khóa và ổn định xung PWM tại góc mở hiện tại (30ms) để triệt tiêu cú giật Re-attach Glitch
-                        self.set_angle(target_angle)
-                        time.sleep(0.03)
-                        # 2. Quét mượt về 0° qua các nấc trung gian để motor tăng tốc đều, không khựng và chống sụt áp
-                        for a in (60.0, 30.0):
-                            self.set_angle(a)
-                            time.sleep(0.03)
                     self.set_angle(0.0)
                     if on_state_change:
                         on_state_change(self.door_state)
                     time.sleep(1.0)
                     self.set_angle(None)
+                    print('[SERVO] 🔌 Đã đóng cổng 0° và ngắt xung PWM -> Motor nghỉ mát, 0 power.')
                 finally:
                     self._lock.release()
 

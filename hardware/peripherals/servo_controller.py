@@ -43,12 +43,21 @@ class ServoController:
     def _init_hardware(self):
         try:
             from gpiozero import AngularServo
+            pin_factory = None
+            try:
+                from gpiozero.pins.pigpio import PiGPIOFactory
+                pin_factory = PiGPIOFactory()
+                print("[SERVO] Sử dụng pigpio DMA Hardware PWM (triệt tiêu 100% jitter).")
+            except Exception:
+                pin_factory = None
+
             self._servo = AngularServo(
                 self.pin,
                 min_angle=0,
                 max_angle=180,
                 min_pulse_width=self.min_pulse_width,
                 max_pulse_width=self.max_pulse_width,
+                pin_factory=pin_factory,
             )
             # Khởi tạo vị trí 0 độ, sau đó ngắt xung để chống giật
             self._servo.angle = 0
@@ -116,9 +125,12 @@ class ServoController:
                 self.set_angle(target_angle)
                 if on_state_change:
                     on_state_change(self.door_state)
-                # Cho motor quay đến góc đích
-                move_time = 0.6
+                # Cho motor quay đến góc đích rồi ngắt xung nếu detach_after_move để triệt tiêu rung lắc tại góc 90°
+                move_time = 0.6 if detach_after_move else 1.0
                 time.sleep(move_time)
+                if detach_after_move:
+                    self.set_angle(None)
+                    print('[SERVO] 🔌 Đã ngắt xung PWM tại 90° -> Triệt tiêu rung lắc, motor nghỉ mát.')
 
                 if is_person_present_fn is None:
                     self._stopping.wait(max(0.0, open_seconds - move_time))
@@ -156,6 +168,10 @@ class ServoController:
             finally:
                 try:
                     print('[SERVO] Đóng cổng: 0°')
+                    if detach_after_move:
+                        # Ổn định lại xung tại 90° (80ms) trước khi kéo về 0° để triệt tiêu glitch giật ngược
+                        self.set_angle(target_angle)
+                        time.sleep(0.08)
                     self.set_angle(0.0)
                     if on_state_change:
                         on_state_change(self.door_state)

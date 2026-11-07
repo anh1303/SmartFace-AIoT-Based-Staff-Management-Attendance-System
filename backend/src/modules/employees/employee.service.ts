@@ -229,7 +229,7 @@ export async function create(data: {
         phone: data.phone || null,
         hourly_rate: rate,
         avatar_url: data.avatar_url ?? data.avatar ?? null,
-        fingerprint_enrolled: Boolean(data.fingerprint_enrolled),
+        fingerprint_enrolled: false,
       },
       include: employeeInclude,
     })
@@ -356,7 +356,7 @@ export async function update(
         : {}),
       ...(rateVal !== undefined ? { hourly_rate: rateVal } : {}),
       ...(rateVal !== undefined && rateVal !== Number(existing.hourly_rate ?? 0) ? { hourly_rate_history: recordHourlyRateChange(existing, rateVal, ratePeriod) } : {}),
-      ...(data.fingerprint_enrolled !== undefined ? { fingerprint_enrolled: data.fingerprint_enrolled } : {}),
+
     },
     include: employeeInclude,
   })
@@ -645,6 +645,11 @@ export async function getByIdWithManagerCheck(
     'Quản lý không có quyền xem thông tin chi tiết của quản lý khác'
   );
   return get(id);
+}
+
+export async function setFingerprintEnrolledStatus(employeeId: string, enrolled: boolean, tx?: Prisma.TransactionClient) {
+  const client = tx || prisma
+  return client.employee.update({ where: { id: employeeId }, data: { fingerprint_enrolled: enrolled } })
 }
 
 export {

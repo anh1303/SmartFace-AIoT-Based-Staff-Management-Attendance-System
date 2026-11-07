@@ -6,12 +6,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({
   employees: [{ id: 'e1', employee_id: 'NV1', full_name: 'An', department: 'IT', status: 'ACTIVE', face_enrolled: false }],
+  confirmFingerprint: vi.fn(),
   update: vi.fn(), toast: vi.fn(), enroll: vi.fn(), remove: vi.fn(), track: vi.fn(),
 }));
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => ({ employees: state.employees, updateEmployee: state.update, showToast: state.toast }) }));
 vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: { employee_id: 'ADMIN' } }) }));
 vi.mock('../../src/features/operations/OperationsProvider', () => ({ useOperations: () => ({ track: state.track }) }));
 vi.mock('../../src/features/biometrics/api/biometricApi', () => ({ enrollFaceJobApi: state.enroll, deleteEmployeeBiometricsApi: state.remove }));
+vi.mock('../../src/features/biometrics/hooks/useFingerprintEnrollment', () => ({ useFingerprintEnrollment: () => ({ step: 'VERIFIED', session: { match_score: 132 }, devices: [], confirm: state.confirmFingerprint, start: vi.fn(), cancel: vi.fn() }) }));
 import { useBiometricEnrollment } from '../../src/features/biometrics/hooks/useBiometricEnrollment';
 let model: ReturnType<typeof useBiometricEnrollment>, root: Root, host: HTMLDivElement, client: QueryClient;
 function Probe() { model = useBiometricEnrollment(); return <p>{model.analyzingFace ? 'Đang tải ảnh' : 'Sẵn sàng'}</p>; }
@@ -35,12 +37,12 @@ it('tracks an accepted face job without claiming enrollment completed or issuing
   expect(state.toast.mock.calls.some(call => call[1] === 'success')).toBe(false);
 });
 it('keeps the fingerprint confirmation open until the save is confirmed', async () => {
-  let resolve!: () => void; state.update.mockReturnValue(new Promise<void>(r => { resolve = r; }));
+  let resolve!: (value: boolean) => void; state.confirmFingerprint.mockReturnValue(new Promise<boolean>(r => { resolve = r; }));
   await act(async () => model.setFingerConfirmModal(true));
   let pending: Promise<void>;
   await act(async () => { pending = model.handleConfirmFingerprintSave(); });
   expect(model.fingerConfirmModal).toBe(true);
-  await act(async () => { resolve(); await pending; });
+  await act(async () => { resolve(true); await pending; });
   expect(model.fingerConfirmModal).toBe(false);
 });
 it('deletes faces through the biometric endpoint without sending an ineffective employee flag update', async () => {

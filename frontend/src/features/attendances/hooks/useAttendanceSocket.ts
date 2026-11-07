@@ -49,7 +49,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
 
       // Đồng bộ các sự kiện gần nhất hôm nay vào Live Event feed
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_BASE || ''}/api/attendance?limit=5`, { credentials: 'include' });
+        const res = await fetch(`${import.meta.env.VITE_API_BASE || ''}/api/attendance?limit=5&compact=true`, { credentials: 'include' });
         if (res.ok) {
           const json = await res.json();
           const items = Array.isArray(json) ? json : (json.data || []);

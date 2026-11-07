@@ -1,3 +1,5 @@
+import { useFingerprintEnrollment } from './useFingerprintEnrollment';
+import { apiFetch } from '../../../api/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOperations } from '../../operations/OperationsProvider';
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -90,11 +92,9 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
 
   // Fingerprint Device Trigger State
   const [selectedDevice, setSelectedDevice] = useState<string>(
-    'FaceCam-01 (Máy chấm công Face_ID Vào ca)'
+    ''
   );
   const [selectedFinger, setSelectedFinger] = useState<string>('Ngón trỏ phải (Right Index)');
-  const [fingerprintStep, setFingerprintStep] = useState<FingerprintStep>('IDLE');
-  const [fingerQualityScore, setFingerQualityScore] = useState<number | null>(null);
   const [fingerConfirmModal, setFingerConfirmModal] = useState<boolean>(false);
 
   // Biometrics Management Popup Modal state for a specific employee
@@ -104,8 +104,6 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
   useEffect(() => {
     setUploadedPhotos([]);
     setAnalyzingFace(false);
-    setFingerprintStep('IDLE');
-    setFingerQualityScore(null);
   }, [selectedEmpId]);
 
   const currentEmp = useMemo(() => {
@@ -127,6 +125,10 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     isManager && managerDept && currentEmp && currentEmp.department?.toLowerCase() !== managerDept.toLowerCase()
   );
   const isEnrollmentBlocked = role !== 'admin' && (isSelf || isOtherMgr || isDiffDept || !currentEmp);
+
+  const fingerprint = useFingerprintEnrollment(currentEmp?.id || currentEmp?.employee_id, isEnrollmentBlocked, showToast);
+  const fingerprintStep = fingerprint.step;
+  const fingerQualityScore = fingerprint.session?.match_score ?? null;
 
   const getBlockedMessage = useCallback((action: string = 'cập nhật') => {
     if (!currentEmp) return 'Vui lòng chọn nhân viên cần thực hiện!';
@@ -282,41 +284,10 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     }
   }, [currentEmp, uploadedPhotos, isEnrollmentBlocked, getBlockedMessage, showToast, updateEmployee, track]);
 
-  const handleSendIoTTrigger = useCallback(() => {
-    if (isEnrollmentBlocked) {
-      showToast(getBlockedMessage('lấy mẫu vân tay'), 'error');
-      return;
-    }
-    // TODO: Tích hợp thiết bị phần cứng thật thông qua MQTT broker / WebSocket bridge hoặc endpoint /api/devices/:id/trigger-fingerprint.
-    // Hiện tại Backend Express chỉ lưu cờ `fingerprint_enrolled` (Boolean) trên CSDL nhân viên, chưa có module giao tiếp
-    // trực tiếp phần cứng sinh trắc học vân tay thời gian thực, do đó các bước lấy mẫu (WAITING_TOUCH -> CAPTURED -> VERIFIED)
-    // được mô phỏng Client-side phục vụ kiểm thử trải nghiệm người dùng (UX Simulation).
-    setFingerprintStep('SENDING');
-    setTimeout(() => {
-      setFingerprintStep('WAITING_TOUCH');
-      setTimeout(() => {
-        setFingerprintStep('CAPTURED');
-        setTimeout(() => {
-          setFingerprintStep('VERIFIED');
-          setFingerQualityScore(98.5);
-        }, 1000);
-      }, 2000);
-    }, 1200);
-  }, [isEnrollmentBlocked, getBlockedMessage, showToast]);
-
-  const handleConfirmFingerprintSave = useCallback(async () => {
-    if (!currentEmp) return;
-    if (isEnrollmentBlocked) {
-      showToast(getBlockedMessage('lưu vân tay'), 'error');
-      return;
-    }
-    try {
-      await updateEmployee(currentEmp.employee_id, { fingerprint_enrolled: true });
-      setFingerConfirmModal(false);
-      setFingerprintStep('IDLE');
-    } catch { /* The employee mutation reports the save failure and keeps the form open. */ }
-
-  }, [currentEmp, isEnrollmentBlocked, getBlockedMessage, showToast, updateEmployee, selectedFinger, selectedDevice]);
+  const handleSendIoTTrigger = () => fingerprint.start(selectedDevice, selectedFinger);
+  const handleConfirmFingerprintSave = async () => {
+    try { if (await fingerprint.confirm()) setFingerConfirmModal(false); } catch { /* Inline error retains the confirm dialog. */ }
+  };
 
   const currentManageEmp = useMemo(() => {
     if (!manageModalEmployee) return null;
@@ -382,8 +353,15 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     }
 
     try {
+      await apiFetch(`/api/biometrics/${emp.id || emp.employee_id}/fingerprint`, { method: 'DELETE' });
       await updateEmployee(emp.employee_id, { fingerprint_enrolled: false });
-    } catch { /* Save failure is reported by the employee mutation. */ }
+      await queryClient.invalidateQueries({ queryKey: ['employees'] });
+      await queryClient.invalidateQueries({ queryKey: ['biometrics'] });
+      await queryClient.invalidateQueries({ queryKey: ['fingerprint-current'] });
+      showToast('Đã thu hồi vân tay; Pi sẽ xóa mẫu khi kết nối.', 'success');
+    } catch (err: any) {
+      showToast(`Thu hồi vân tay thất bại: ${err?.message || 'Lỗi kết nối máy chủ'}`, 'error');
+    }
 
   }, [currentUser, isManager, managerDept, role, showToast, updateEmployee]);
 
@@ -498,7 +476,9 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     selectedFinger,
     setSelectedFinger,
     fingerprintStep,
-    setFingerprintStep,
+    fingerprintDevices: fingerprint.devices,
+    fingerprintError: fingerprint.error || fingerprint.devicesError,
+    handleCancelFingerprint: fingerprint.cancel,
     fingerQualityScore,
     fingerConfirmModal,
     setFingerConfirmModal,

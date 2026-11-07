@@ -19,13 +19,28 @@ export const tbWebhook = async (req: Request, res: Response) => {
   const originName = req.headers['x-device-name'];
   const deviceId = rawData?.device_id;
   if (!deviceId || (originName && originName !== deviceId)) {
-    return res.status(400).json({ success: false, message: 'Tên thiết bị không khớp originator ThingsBoard' });
+    return res.status(200).json({ success: false, matched: false, door_open: false, message: 'Tên thiết bị không khớp originator ThingsBoard' });
   }
-  const result = await service.handleThingsBoardWebhook({
-    ...rawData,
-    device_id: deviceId,
-  });
-  res.status(200).json(compactAttendanceRpcResponse(result));
+  try {
+    const result = await service.handleThingsBoardWebhook({
+      ...rawData,
+      device_id: deviceId,
+    });
+    res.status(200).json(compactAttendanceRpcResponse(result));
+  } catch (error: any) {
+    const status = error.statusCode || 400;
+    const message = error.message || 'Lỗi xử lý xác thực điểm danh';
+    // Always return HTTP 200 to ThingsBoard REST Call node so ThingsBoard forwards the RPC response
+    // back to the edge device instead of timing out on Failure branch.
+    res.status(200).json({
+      success: false,
+      matched: false,
+      door_open: false,
+      event_id: rawData?.event_id,
+      code: status,
+      message,
+    });
+  }
 };
 
 export const list = async (req: Request, res: Response) => {

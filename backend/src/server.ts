@@ -1,3 +1,4 @@
+import { initializeFingerprintGateway } from './modules/biometrics/fingerprint.gateway.js'
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'
 // Server entry point
@@ -31,6 +32,7 @@ io.use(socketAuthMiddleware)
 
 initializeAttendanceGateway(io)
 initializeDeviceGateway(io)
+initializeFingerprintGateway(io)
 initializeOperationGateway(io)
 registerOperationHandler('shifts.batch', executeShiftBatch)
 registerOperationHandler('biometric.enroll', executeEnrollment)

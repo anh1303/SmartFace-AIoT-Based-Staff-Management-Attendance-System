@@ -129,9 +129,12 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
 
   useEffect(() => {
     fetchSettings();
+    // Fallback polling dự phòng khi socket mất kết nối (chu kỳ 60s thay vì 5s liên tục)
     const pollTimer = setInterval(() => {
-      fetchSettings();
-    }, 5000);
+      if (!socketRef.current?.connected) {
+        fetchSettings();
+      }
+    }, 60000);
     return () => clearInterval(pollTimer);
   }, [fetchSettings]);
 

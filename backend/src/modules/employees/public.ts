@@ -20,5 +20,6 @@ export {
   findPositionByName,
 } from './employee.queries.js'
 export { generateUniqueEmployeeCode } from './employee.code.js'
+export { setFingerprintEnrolledStatus } from './employee.service.js'
 
 export { getEmployeesForReporting, getActiveDepartmentsForReporting } from './employees.report-queries.js'

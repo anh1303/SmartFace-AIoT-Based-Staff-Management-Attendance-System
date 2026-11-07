@@ -1,197 +1,93 @@
-import React from 'react';
-import { Fingerprint, Radio, Send, CheckCheck, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Fingerprint, Trash2 } from 'lucide-react';
+import type { FingerprintDevice } from '../hooks/useFingerprintEnrollment';
+import { useAuth } from '../../../context/AuthContext';
+import { apiFetch } from '../../../api/client';
 
-export type FingerprintStep = 'IDLE' | 'SENDING' | 'WAITING_TOUCH' | 'CAPTURED' | 'VERIFIED';
-
-interface FingerprintEnrollmentSectionProps {
-  selectedDevice: string;
-  onSelectDevice: (device: string) => void;
-  selectedFinger: string;
-  onSelectFinger: (finger: string) => void;
-  fingerprintStep: FingerprintStep;
-  fingerQualityScore: number | null;
-  disabled?: boolean;
-  onSendIoTTrigger: () => void;
-  onOpenConfirmModal: () => void;
+export type FingerprintStep = 'IDLE' | 'SENDING' | 'QUEUED' | 'WAITING_TOUCH_1' | 'LIFT_FINGER' | 'WAITING_TOUCH_2' | 'VERIFIED' | 'SYNCING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'EXPIRED';
+const labels: Record<FingerprintStep,string> = {
+  IDLE: 'Chọn Pi và bắt đầu lấy mẫu', SENDING: 'Đang gửi yêu cầu…', QUEUED: 'Đang chờ Pi sẵn sàng',
+  WAITING_TOUCH_1: 'Đặt ngón tay lên kính — lần 1', LIFT_FINGER: 'Nhấc hẳn ngón tay khỏi kính',
+  WAITING_TOUCH_2: 'Đặt lại cùng ngón tay — lần 2', VERIFIED: 'Hai mẫu khớp; chờ xác nhận lưu',
+  SYNCING: 'Đang đồng bộ xuống Pi; mẫu cũ vẫn có hiệu lực', COMPLETED: 'Đã lưu và đồng bộ thành công',
+  FAILED: 'Lấy mẫu thất bại — kiểm tra thiết bị và thử lại', CANCELLED: 'Phiên đã hủy', EXPIRED: 'Phiên đã hết hạn',
+};
+interface Props {
+  selectedDevice: string; onSelectDevice: (value: string) => void;
+  selectedFinger?: string; onSelectFinger?: (value: string) => void;
+  fingerprintStep: FingerprintStep; fingerQualityScore: number | null;
+  devices: FingerprintDevice[]; error?: string | null; disabled?: boolean;
+  hasEnrolledFingerprint?: boolean;
+  onDeleteFingerprint?: () => void;
+  onSendIoTTrigger: () => void; onOpenConfirmModal: () => void; onCancel: () => void;
 }
-
-export const FingerprintEnrollmentSection: React.FC<FingerprintEnrollmentSectionProps> = ({
-  selectedDevice,
-  onSelectDevice,
-  selectedFinger,
-  onSelectFinger,
-  fingerprintStep,
-  fingerQualityScore,
-  disabled = false,
-  onSendIoTTrigger,
-  onOpenConfirmModal,
-}) => {
-  return (
-    <div className="space-y-6">
-      <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100" role="note">Chế độ mô phỏng: các bước lấy mẫu và điểm chất lượng chưa đến từ cảm biến thật. Nút lưu chỉ cập nhật trạng thái vân tay trên hệ thống.</p>
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Select Device & Finger */}
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Chọn thiết bị Edge IoT ghi nhận:
-            </label>
-            <select
-              value={selectedDevice}
-              onChange={(e) => onSelectDevice(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
-            >
-              <option value="FaceCam-01 (Máy chấm công Face_ID Vào ca)">
-                FaceCam-01 (Máy chấm công Face_ID Vào ca)
-              </option>
-              <option value="FaceCam-02 (Máy chấm công Face_ID Tan ca)">
-                FaceCam-02 (Máy chấm công Face_ID Tan ca)
-              </option>
-              <option value="Fingerprint-01 (Máy chấm công vân tay Vào ca)">
-                Fingerprint-01 (Máy chấm công vân tay Vào ca)
-              </option>
-              <option value="Fingerprint-02 (Máy chấm công vân tay Tan ca)">
-                Fingerprint-02 (Máy chấm công vân tay Tan ca)
-              </option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Vị trí ngón tay lấy mẫu:
-            </label>
-            <select
-              value={selectedFinger}
-              onChange={(e) => onSelectFinger(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-[#0f1224] border border-slate-200 dark:border-[#272d5a] rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
-            >
-              <option value="Ngón trỏ phải (Right Index)">
-                Ngón trỏ phải (Right Index) - Khuyên dùng
-              </option>
-              <option value="Ngón cái phải (Right Thumb)">
-                Ngón cái phải (Right Thumb)
-              </option>
-              <option value="Ngón trỏ trái (Left Index)">
-                Ngón trỏ trái (Left Index)
-              </option>
-              <option value="Ngón cái trái (Left Thumb)">
-                Ngón cái trái (Left Thumb)
-              </option>
-            </select>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-2 text-xs text-slate-500 dark:text-slate-400">
-            <p className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <Radio className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              Giao thức IoT Sensor:
-            </p>
-            <p>
-              • Lệnh điều khiển gửi qua MQTT topic:{' '}
-              <code className="text-emerald-600 dark:text-emerald-400 font-mono">
-                edge/devices/fap30/enroll
-              </code>
-            </p>
-            <p>• Độ phân giải cảm biến: 500 DPI optical FAP30 với công nghệ chống vân tay giả Silicon.</p>
-          </div>
-
-          {/* Trigger IoT Signal Button */}
-          <button
-            type="button"
-            disabled={
-              disabled ||
-              fingerprintStep === 'SENDING' ||
-              fingerprintStep === 'WAITING_TOUCH' ||
-              fingerprintStep === 'CAPTURED'
-            }
-            onClick={onSendIoTTrigger}
-            className={`w-full py-3 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all ${
-              disabled ||
-              fingerprintStep === 'SENDING' ||
-              fingerprintStep === 'WAITING_TOUCH' ||
-              fingerprintStep === 'CAPTURED'
-                ? 'bg-slate-300 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 cursor-pointer'
-            }`}
-            title={disabled ? 'Không thể tự cập nhật dữ liệu nhận diện của bản thân' : undefined}
-          >
-            <Send className="w-4 h-4" />
-            <span>Gửi tín hiệu tới thiết bị để lấy mẫu (IoT Trigger)</span>
+export const FingerprintEnrollmentSection: React.FC<Props> = props => {
+  const { role } = useAuth();
+  const [acceptance, setAcceptance] = useState(false);
+  const [configMessage, setConfigMessage] = useState('');
+  const busy = !['IDLE','COMPLETED','FAILED','CANCELLED','EXPIRED'].includes(props.fingerprintStep);
+  const device = props.devices.find(d => d.device_id === props.selectedDevice);
+  const online = Boolean(device && Date.now() - +new Date(device.last_seen) < 30_000 && device.ready);
+  const available = online && (device?.wak_verified || device?.polling_fallback);
+  async function configure(data: Record<string,boolean>) {
+    setConfigMessage('');
+    try {
+      await apiFetch(`/api/biometrics/fingerprint-devices/${props.selectedDevice}`, { method: 'PATCH', body: JSON.stringify(data) });
+      setConfigMessage('Đã cập nhật cấu hình; chờ Pi nhận thay đổi.');
+    } catch (e: any) { setConfigMessage(e.message); }
+  }
+  return <div className="space-y-5">
+    <div className="grid md:grid-cols-2 gap-5">
+      <div className="space-y-4">
+        <label className="block text-sm">Pi ghi nhận
+          <select className="block w-full mt-2 rounded-lg border p-2 bg-white dark:bg-slate-900" disabled={busy || props.disabled}
+            value={props.selectedDevice} onChange={e => props.onSelectDevice(e.target.value)}>
+            <option value="">Chọn Pi đã kết nối cảm biến</option>
+            {props.devices.map(d => <option key={d.device_id} value={d.device_id}>{d.device_id} — {d.capacity} mẫu {d.ready ? '' : '(chưa sẵn sàng)'}</option>)}
+          </select>
+        </label>
+        <p className="text-sm text-slate-500">Đăng ký hai lần cùng một ngón tay bất kỳ, nhấc tay giữa hai lần. Pi tạm dừng chấm công trong lúc đăng ký. Mẫu chỉ dùng tại Pi được chọn.</p>
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          <button className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-40 transition-colors" disabled={props.disabled || busy || !available}
+            onClick={props.onSendIoTTrigger}>
+            {props.hasEnrolledFingerprint ? 'Đăng ký lại vân tay mới' : 'Bắt đầu lấy mẫu thật'}
           </button>
-        </div>
-
-        {/* Device Feedback HUD */}
-        <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-[#21264b] text-xs">
-              <span className="font-mono text-slate-500 dark:text-slate-400 font-medium">
-                TRẠNG THÁI KẾT NỐI THIẾT BỊ
-              </span>
-              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                ONLINE
-              </span>
-            </div>
-
-            <div className="mt-6 text-center space-y-3">
-              <div
-                className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center border-2 transition-all ${
-                  fingerprintStep === 'IDLE'
-                    ? 'border-slate-300 dark:border-slate-700 text-slate-400'
-                    : fingerprintStep === 'SENDING'
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400 animate-pulse'
-                    : fingerprintStep === 'WAITING_TOUCH'
-                    ? 'border-amber-400 text-amber-500 animate-bounce'
-                    : 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40'
-                }`}
-              >
-                <Fingerprint className="w-10 h-10" />
-              </div>
-
-              <div>
-                <p className="text-sm font-bold text-slate-900 dark:text-white font-heading">
-                  {fingerprintStep === 'IDLE' && 'Thiết bị đang ở chế độ chờ'}
-                  {fingerprintStep === 'SENDING' && 'Đang gửi gói tin IoT kích hoạt cảm biến...'}
-                  {fingerprintStep === 'WAITING_TOUCH' && 'Đèn cảm biến bật sáng - Chờ nhân viên đặt ngón tay...'}
-                  {fingerprintStep === 'CAPTURED' && 'Đã đọc vân tay 500 DPI - Đang phân tích...'}
-                  {fingerprintStep === 'VERIFIED' && 'Lấy mẫu thành công! NFIQ 2.0: 98.5%'}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {fingerprintStep === 'VERIFIED'
-                    ? `Mẫu đã sẵn sàng lưu cho ${selectedFinger}`
-                    : `Mục tiêu: ${selectedDevice}`}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Quality score badge */}
-          {fingerQualityScore && fingerprintStep === 'VERIFIED' && (
-            <div className="mt-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 text-xs flex items-center justify-between">
-              <span className="flex items-center gap-1.5 font-semibold">
-                <CheckCheck className="w-4 h-4" />
-                Chuẩn FAP30 500DPI hợp lệ
-              </span>
-              <span className="font-mono font-bold">Điểm: {fingerQualityScore}/100</span>
-            </div>
+          {props.hasEnrolledFingerprint && props.onDeleteFingerprint && (
+            <button
+              type="button"
+              className="rounded-lg border border-red-500/40 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 px-3.5 py-2 text-sm font-medium disabled:opacity-40 flex items-center gap-1.5 transition-colors cursor-pointer"
+              disabled={props.disabled || busy}
+              onClick={props.onDeleteFingerprint}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Xóa vân tay</span>
+            </button>
           )}
         </div>
       </div>
-
-      {/* Explicit Confirm Button for Fingerprint */}
-      <div className="pt-4 border-t border-slate-100 dark:border-[#21264b] flex justify-end">
-        <button
-          type="button"
-          disabled={disabled || fingerprintStep !== 'VERIFIED'}
-          onClick={onOpenConfirmModal}
-          className={`px-6 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 transition-all ${
-            fingerprintStep === 'VERIFIED' && !disabled
-              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm shadow-emerald-600/20 cursor-pointer'
-              : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
-          }`}
-        >
-          <Check className="w-4 h-4" />
-          <span>Xác nhận lưu mẫu vân tay vào hồ sơ</span>
-        </button>
+      <div className="rounded-xl border p-5 space-y-3" aria-live="polite">
+        <p className="text-sm">{online ? 'Pi đang kết nối' : 'Pi chưa sẵn sàng hoặc mất kết nối'}</p>
+        <Fingerprint className={`h-12 w-12 ${online ? 'text-emerald-600' : 'text-slate-400'}`} />
+        <p className="font-semibold">{labels[props.fingerprintStep]}</p>
+        {props.fingerQualityScore !== null && <p>Điểm so khớp hai mẫu: <strong>{props.fingerQualityScore}</strong></p>}
+        {device && !device.attendance_enabled && <p className="text-sm text-amber-600">Vân tay đang ở chế độ thử nghiệm, chưa được phép mở cửa/chấm công thật.</p>}
+        {device && !device.wak_verified && !device.polling_fallback && <p className="text-sm">Cần kiểm tra WAK/Vt: chạm rồi nhấc tay để Pi xác nhận tín hiệu.</p>}
+        {props.error && props.fingerprintStep === 'FAILED' && <p role="alert" className="text-red-600 text-sm">{props.error}</p>}
+        {busy && <button className="underline text-sm" onClick={props.onCancel} disabled={props.disabled || props.fingerprintStep === 'SENDING'}>Hủy phiên</button>}
       </div>
     </div>
-  );
+    <button className="rounded-lg bg-emerald-600 text-white px-4 py-2 disabled:opacity-40" onClick={props.onOpenConfirmModal}
+      disabled={props.disabled || props.fingerprintStep !== 'VERIFIED'}>Xác nhận lưu mẫu</button>
+    {role === 'admin' && device && <details className="border rounded-lg p-3 text-sm space-y-3">
+      <summary>Cấu hình vận hành vân tay</summary>
+      <p>Chỉ bật sử dụng thật sau nghiệm thu: 18/20 lượt ngón đúng trong 5 giây, từ chối 20/20 ngón khác, đủ 20 chu kỳ WAK và không timeout UART.</p>
+      <label className="block"><input type="checkbox" checked={acceptance} onChange={e => setAcceptance(e.target.checked)} /> Tôi xác nhận thiết bị đã đạt các kiểm thử trên.</label>
+      <button className="border rounded p-2 mr-2 disabled:opacity-40" disabled={!device.attendance_enabled && !acceptance}
+        onClick={() => configure({ attendance_enabled: !device.attendance_enabled, acceptance_verified: true })}>
+        {device.attendance_enabled ? 'Tắt điểm danh vân tay' : 'Bật điểm danh vân tay'}</button>
+      <button className="border rounded p-2" onClick={() => configure({ polling_fallback: !device.polling_fallback })}>
+        {device.polling_fallback ? 'Tắt đọc định kỳ dự phòng' : 'Bật đọc định kỳ khi WAK lỗi'}</button>
+      {configMessage && <p role="status">{configMessage}</p>}
+    </details>}
+  </div>;
 };

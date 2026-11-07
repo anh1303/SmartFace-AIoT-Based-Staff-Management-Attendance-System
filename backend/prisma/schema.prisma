@@ -100,6 +100,8 @@ model Position {
 }
 
 model Employee {
+  fingerprint_templates FingerprintTemplate[]
+  fingerprint_sessions FingerprintSession[]
   enrollment_receipts FaceEnrollmentReceipt[]
   id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   employee_code            String                     @unique @db.VarChar(50)
@@ -454,4 +456,66 @@ model WebhookAlertDedup {
 
   @@index([expires_at])
   @@map("webhook_alert_dedup")
+}
+
+model FingerprintTemplate {
+  id            String @id @default(uuid()) @db.Uuid
+  employee_id   String @db.Uuid
+  device_id     String
+  revision      Int
+  finger_name   String
+  ciphertext    Bytes
+  checksum      String @db.VarChar(64)
+  match_score   Int
+  sensor_model  String @default("ZA620_M5")
+  status        String @default("PENDING")
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  employee      Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  bindings      FingerprintBinding[]
+  @@unique([employee_id, revision])
+  @@map("fingerprint_templates")
+}
+model FingerprintBinding {
+  id          String @id @default(uuid()) @db.Uuid
+  template_id String @unique @db.Uuid
+  device_id   String
+  slot        Int
+  state       String @default("PENDING")
+  error       String?
+  synced_at   DateTime? @db.Timestamptz(6)
+  template    FingerprintTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
+  @@unique([device_id, slot])
+  @@map("fingerprint_bindings")
+}
+model FingerprintSession {
+  id             String @id @default(uuid()) @db.Uuid
+  employee_id    String @db.Uuid
+  owner_id       String @db.Uuid
+  device_id      String
+  finger_name    String
+  key            String @db.Uuid
+  confirm_key    String? @db.Uuid
+  status         String @default("QUEUED")
+  match_score    Int?
+  ciphertext     Bytes?
+  checksum       String?
+  template_id    String? @db.Uuid
+  error          String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  expires_at     DateTime @db.Timestamptz(6)
+  employee       Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  @@unique([owner_id, key])
+  @@map("fingerprint_sessions")
+}
+model FingerprintDevice {
+  device_id          String @id
+  capacity           Int
+  ready              Boolean @default(false)
+  roundtrip_verified Boolean @default(false)
+  wak_verified       Boolean @default(false)
+  attendance_enabled Boolean @default(false)
+  polling_fallback   Boolean @default(false)
+  last_seen          DateTime @default(now()) @db.Timestamptz(6)
+  error              String?
+  @@map("fingerprint_devices")
 }

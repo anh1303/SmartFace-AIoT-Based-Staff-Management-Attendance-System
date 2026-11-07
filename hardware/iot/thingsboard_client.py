@@ -203,7 +203,9 @@ class ThingsBoardClient:
                 self._deliver(info, payload)
             elif topic.startswith('v1/devices/me/rpc/request/') and isinstance(payload, dict):
                 method, params = payload.get('method'), payload.get('params')
-                if method == 'getMode':
+                if method == 'fingerprintWake':
+                    response = self.on_action_request(method, params or {}) if self.on_action_request else {'success': False}
+                elif method == 'getMode':
                     response = {
                         'mode': self.current_mode,
                         'checkin_active': self.current_mode == 'CHECK_IN',
@@ -410,6 +412,23 @@ class ThingsBoardClient:
                 'callback': on_result, 'deadline': time.monotonic() + self.rpc_timeout, 'attempts': 1}
         with self._lock:
             if len(self._pending_rpc_callbacks) >= 4: return -1
+            self._rpc_request_id = self._rpc_request_id % (2 ** 31 - 2) + 1
+            request_id = str(self._rpc_request_id)
+            self._pending_rpc_callbacks[request_id] = info
+            if not self._publish(request_id, info):
+                self._pending_rpc_callbacks.pop(request_id, None)
+                return -1
+        return int(request_id)
+
+    def send_fingerprint_rpc(self, scan, on_result):
+        if not self.connected or not self.client or scan.get('device_id') != self.device_id:
+            return -1
+        info = {'payload': json.dumps({'method': 'verify_fingerprint', 'params': scan}),
+                'event_id': scan['event_id'], 'callback': on_result,
+                'deadline': time.monotonic() + self.rpc_timeout, 'attempts': 1}
+        with self._lock:
+            if len(self._pending_rpc_callbacks) >= 4:
+                return -1
             self._rpc_request_id = self._rpc_request_id % (2 ** 31 - 2) + 1
             request_id = str(self._rpc_request_id)
             self._pending_rpc_callbacks[request_id] = info

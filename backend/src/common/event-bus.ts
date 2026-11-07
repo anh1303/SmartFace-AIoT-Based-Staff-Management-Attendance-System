@@ -1,6 +1,8 @@
 import { EventEmitter } from 'node:events'
 
 export interface DomainEvents {
+  'fingerprint:progress': { owner_id: string; id: string; employee_id: string; device_id: string; finger_name: string; status: string; match_score: number | null; error: string | null; expires_at: Date }
+
   'attendance:checked-in': {
     employeeId: string
     logId: string

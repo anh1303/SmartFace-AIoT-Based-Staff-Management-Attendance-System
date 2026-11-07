@@ -1,3 +1,4 @@
+import { requireFingerprintBinding, assertNoFingerprintMaintenance, type FingerprintScan } from '../biometrics/fingerprint.attendance.js'
 import { aggregateDailyAttendance } from './attendance.aggregation.js'
 import { attendanceIntervalRemaining, attendanceIntervalMessage } from './attendance.interval.js'
 export { aggregateDailyAttendance } from './attendance.aggregation.js'
@@ -404,6 +405,7 @@ export async function adjustAttendance(
 }
 
 type CaptureOptions = {
+  fingerprint?: FingerprintScan
   eventId?: string
   capturedAt?: number
   verificationScore?: number
@@ -453,6 +455,8 @@ async function recordAttendance(
       await assertCanManageEmployee(requester, employee.id, tx)
     }
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`employee:${employee.id}`}))`
+    if (capture.deviceId) await assertNoFingerprintMaintenance(tx, capture.deviceId)
+    if (capture.fingerprint) await requireFingerprintBinding(tx, capture.fingerprint, employee.id)
     const currentEmployee = await findEmployeeWageProfile(employee.id, tx)
     if (!currentEmployee || currentEmployee.status !== 'ACTIVE') throw AppError.forbidden('Nhân viên không ở trạng thái ACTIVE')
     if (eventKey) {
@@ -498,7 +502,8 @@ async function recordAttendance(
     const isEmployeeReopened = Boolean(existingDaySummary && (existingDaySummary as any).reopened_at !== null)
     const isDayBlockedForEmployee = Boolean(lockedDay?.is_locked && !isEmployeeReopened)
     const isBlocked = Boolean(closedPeriod || isDayBlockedForEmployee || (isApprovedDay && !isEmployeeReopened))
-    const recordedMethod = capture.verified
+    const recordedMethod = capture.fingerprint
+      ? 'FINGERPRINT' : capture.verified
       ? 'FACE'
       : (capture.method && capture.method !== 'FACE' ? capture.method : 'MANUAL')
     const created = await tx.attendance_logs.create({
@@ -1759,3 +1764,18 @@ export async function auditAttendancePolicyDiscrepancies(
  * Public Module API: Kiểm tra ngày làm việc có bị khóa công (attendance_locks) hay không
  */
 export { isAttendanceDateLocked } from './attendance.lock.js'
+
+export async function findAttendanceLogByEventKey(eventKey: string) {
+  return prisma.attendance_logs.findUnique({ where: { event_key: eventKey } })
+}
+
+export async function findRecentValidAttendanceLog(employeeId: string, sinceDate: Date, untilDate: Date) {
+  return prisma.attendance_logs.findFirst({
+    where: {
+      employee_id: employeeId,
+      status: 'VALID',
+      event_time: { gte: sinceDate, lte: untilDate },
+    },
+    orderBy: [{ event_time: 'desc' }, { id: 'desc' }],
+  })
+}

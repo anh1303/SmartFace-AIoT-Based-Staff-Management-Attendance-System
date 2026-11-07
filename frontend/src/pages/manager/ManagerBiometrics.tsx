@@ -56,6 +56,9 @@ export const ManagerBiometrics: React.FC = () => {
     selectedFinger,
     setSelectedFinger,
     fingerprintStep,
+    fingerprintDevices,
+    fingerprintError,
+    handleCancelFingerprint,
     fingerQualityScore,
     fingerConfirmModal,
     setFingerConfirmModal,
@@ -223,8 +226,18 @@ export const ManagerBiometrics: React.FC = () => {
                     selectedFinger={selectedFinger}
                     onSelectFinger={setSelectedFinger}
                     fingerprintStep={fingerprintStep}
+                    devices={fingerprintDevices}
+                    error={fingerprintError}
+                    onCancel={handleCancelFingerprint}
                     fingerQualityScore={fingerQualityScore}
                     disabled={isEnrollmentBlocked}
+                    hasEnrolledFingerprint={Boolean(currentEmp?.fingerprint_enrolled)}
+                    onDeleteFingerprint={() => {
+                      if (!currentEmp) return;
+                      if (window.confirm(`Bạn có chắc chắn muốn xóa dữ liệu vân tay của nhân viên ${currentEmp.full_name} (${currentEmp.employee_id}) không? Mẫu vân tay sẽ được thu hồi và xóa khỏi thiết bị.`)) {
+                        void handleDeleteFingerprint(currentEmp);
+                      }
+                    }}
                     onSendIoTTrigger={handleSendIoTTrigger}
                     onOpenConfirmModal={() => setFingerConfirmModal(true)}
                   />

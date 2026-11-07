@@ -33,6 +33,7 @@ vi.mock('../../src/modules/attendance/index.js', async (importOriginal) => {
 vi.mock('../../src/config/database.js', () => {
   const db: any = {
     $executeRaw: vi.fn(async () => 1),
+    fingerprintSession: { findFirst: vi.fn(async () => null) },
     attendanceAggregationState: { findUnique: vi.fn(async () => null) },
     $queryRaw: vi.fn(async () => [{
       employee_id: state.employee?.id || '11111111-1111-4111-8111-111111111111',

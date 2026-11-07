@@ -1,3 +1,4 @@
+import { processFingerprintAttendance } from '../biometrics/fingerprint.attendance.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { eventBus } from '../../common/event-bus.js'
@@ -18,10 +19,15 @@ export interface ThingsBoardWebhookPayload {
   event_kind?: string
   recognition_id?: string
   expected_employee_id?: string
+  binding_id?: string
+  slot?: number
+  revision?: number
+  match_score?: number
   client_timestamp?: number | string
 }
 
 export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload, actions: { checkIn: typeof import('./attendance.service.js').checkIn; checkOut: typeof import('./attendance.service.js').checkOut }) {
+  if (data.event_kind === 'FINGERPRINT_SCAN') return processFingerprintAttendance(data, actions)
   const { device_id, mode, antispoof_score } = data
   const normalizedRequestedMode = (mode && mode !== 'OFF' && mode !== 'IDLE' ? mode : 'AUTO').toUpperCase()
   if (!device_id || !['CHECK_IN', 'CHECK_OUT', 'AUTO'].includes(normalizedRequestedMode)) throw AppError.badRequest('device_id/mode không hợp lệ')

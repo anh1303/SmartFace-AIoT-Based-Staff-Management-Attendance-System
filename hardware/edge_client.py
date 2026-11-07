@@ -33,6 +33,8 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 load_dotenv()
 import config as vision
+from attendance_coordinator import AttendanceCoordinator
+from peripherals.fingerprint_worker import FingerprintWorker
 from attendance_feedback import AttendanceFeedbackGuard, is_accepted_attendance
 
 
@@ -243,6 +245,9 @@ def main(args=None):
     print("=======================================================\n")
 
     result_queue = queue.SimpleQueue()
+    feedback_queue = queue.SimpleQueue()
+    attendance_coordinator = AttendanceCoordinator()
+    fingerprint_worker = None
 
     # Quản lý cài đặt ngoại vi, âm thanh & động cơ servo mở cửa
     current_show_fps = vision.SHOW_FPS
@@ -365,6 +370,8 @@ def main(args=None):
             audio_manager.set_mute(current_is_muted)
 
     def on_action_request(action: str, params: dict):
+        if action == "fingerprintWake":
+            return fingerprint_worker.wake() if fingerprint_worker else {"success": False}
         if action == "playTestSound":
             bt_info = get_bluetooth_info()
             target_mac = bt_info.get("address", "")
@@ -455,6 +462,26 @@ def main(args=None):
         on_settings_change=on_settings_change,
         on_action_request=on_action_request,
     )
+
+    fingerprint_worker = FingerprintWorker(DEVICE_ID, attendance_coordinator,
+        tb_client.send_fingerprint_rpc, lambda: current_mode, feedback_queue.put)
+
+    def submit_face(embedding, pad_score, mode, submission, captured_at, event_kind, expected_employee):
+        # Capture immutable request parameters for retry, even after tracking resets.
+        recognition_id = uuid.uuid4().hex
+        def callback(response):
+            attendance_coordinator.response(submission[2], response, resend)
+            result_queue.put((submission, response))
+            if not response.get('verification_only'):
+                feedback_queue.put(response)
+        def resend():
+            return tb_client.send_scan_rpc(embedding, pad_score, mode, on_result=callback,
+                event_id=submission[2], captured_at=captured_at, event_kind=event_kind,
+                recognition_id=recognition_id, expected_employee_id=expected_employee)
+        request = resend()
+        if request < 0:
+            attendance_coordinator.finish(submission[2])
+        return request
 
     # 2. Khởi tạo Pipeline AI: Detector + Tracker + AntiSpoof + Embedder
     print("[AI] Đang nạp các mô hình ONNX...")
@@ -572,8 +599,12 @@ def main(args=None):
                                    max(vision.MATCH_THRESHOLD, vision.RECOGNITION_CACHE_THRESHOLD))
     try:
         tb_client.start()
+        fingerprint_worker.start()
         print("\n[RUNNING] Hệ thống đang chạy. Nhấn Ctrl+C để dừng.\n")
         while True:
+            attendance_coordinator.tick()
+            while not feedback_queue.empty():
+                on_attendance_result(feedback_queue.get())
             if mode_generation != last_mode_generation:
                 attendance_latch = False
                 last_submission = None
@@ -839,6 +870,7 @@ def main(args=None):
                             track.employee_id = None
                         key = (track.track_id, *scope)
                         if (track.track_id == last_active_track_id and not attendance_latch
+                                and not attendance_coordinator.busy and not fingerprint_worker.maintenance
                                 and track.missing_frames == 0 and track.last_pad_score is not None
                                 and not track.pad_invalid_reason):
                             recognition_eligible[key] = track
@@ -882,7 +914,7 @@ def main(args=None):
             for result in recognition_worker.poll():
                 track = recognition_eligible.get(result.key)
                 if (track is None or result.key[2:] != (current_mode, mode_generation, presence_generation)
-                        or attendance_latch or not is_awake):
+                        or attendance_latch or not is_awake or attendance_coordinator.busy or fingerprint_worker.maintenance):
                     continue
                 if result.error:
                     track.last_recognition_time = time.monotonic()
@@ -908,13 +940,10 @@ def main(args=None):
                 event_kind = 'CONFIRMED_SCAN' if commit else 'VERIFY_ONLY'
                 submission = (track.track_id, result.key[2], event_id, result.key[3], result.key[4], result.key[1], event_kind)
                 track.scan_captured_at = captured_at
-                req_id = tb_client.send_scan_rpc(
-                    result.embedding, pad_score, result.key[2],
-                    on_result=lambda response, token=submission: result_queue.put((token, response)),
-                    event_id=event_id, captured_at=captured_at,
-                    event_kind=event_kind, recognition_id=uuid.uuid4().hex,
-                    expected_employee_id=expected_employee if commit else None,
-                )
+                if not attendance_coordinator.begin('face', event_id):
+                    continue
+                req_id = submit_face(result.embedding.copy(), pad_score, result.key[2], submission,
+                    captured_at, event_kind, expected_employee if commit else None)
                 if req_id > 0:
                     last_submission = submission
                     last_submission_embedding = result.embedding.copy()
@@ -1013,7 +1042,6 @@ def main(args=None):
                             tr.verification_generation += 1
                             tr.scan_scope = (tr.verification_generation, *frame_mode)
 
-                on_attendance_result(response)
                 if not is_final_success:
                     attendance_latch = False
                     if not response.get('uncertain'):
@@ -1109,6 +1137,7 @@ def main(args=None):
     except KeyboardInterrupt:
         print("\n[STOP] Đang dừng Pi Edge Client...")
     finally:
+        fingerprint_worker.close()
         stopped = recognition_worker.close()
         print(f"[Recognition worker] stopped={stopped}")
         if cap is not None:

@@ -239,8 +239,8 @@
         "configurationVersion": 0,
         "configuration": {
           "scriptLang": "TBEL",
-          "jsScript": "return msg.method == 'verify_face' && msg.params != null;",
-          "tbelScript": "return msg.method == 'verify_face' && msg.params != null;"
+          "jsScript": "return (msg.method == 'verify_face' || msg.method == 'verify_fingerprint') && msg.params != null;",
+          "tbelScript": "return (msg.method == 'verify_face' || msg.method == 'verify_fingerprint') && msg.params != null;"
         },
         "externalId": null,
         "additionalInfo": {

@@ -1,3 +1,4 @@
+import { fingerprintManagementRouter } from './fingerprint.routes.js';
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth.middleware.js';
 import { authorize } from '../../middlewares/rbac.middleware.js';
@@ -11,6 +12,7 @@ import { successResponse } from '../../common/response.js';
 
 export const biometricRouter = Router();
 
+biometricRouter.use(fingerprintManagementRouter);
 biometricRouter.use(authenticate);
 biometricRouter.post('/:employeeId/enroll-jobs', authorize('ADMIN', 'MANAGER'), requirePasswordAuth, asyncHandler(async (req, res) => {
   const key = z.string().uuid().parse(req.header('Idempotency-Key'));

@@ -222,18 +222,17 @@ export const FingerprintConfirmModal: React.FC<FingerprintConfirmModalProps> = (
       <div className="space-y-4">
         <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] text-xs text-slate-700 dark:text-slate-300 space-y-2">
           <p className="font-semibold text-slate-900 dark:text-white">
-            Xác nhận ghi đè mẫu sinh trắc vân tay
+            Xác nhận lưu và đồng bộ mẫu vân tay
           </p>
           <p className="text-slate-500 dark:text-slate-400">
-            Vị trí ngón: <strong className="text-slate-900 dark:text-white">{selectedFinger}</strong>
+            Phương thức: <strong className="text-slate-900 dark:text-white">Vân tay sinh trắc học</strong>
           </p>
           <p className="text-slate-500 dark:text-slate-400">
             Thiết bị ghi nhận:{' '}
             <strong className="text-slate-900 dark:text-white">{selectedDevice}</strong>
           </p>
           <p className="text-slate-500 dark:text-slate-400">
-            Chỉ số chất lượng NFIQ:{' '}
-            <strong className="text-emerald-600 dark:text-emerald-400">98.5/100 (Rất tốt)</strong>
+            Mẫu cũ chỉ được thay thế khi Pi xác nhận đồng bộ mẫu mới thành công.
           </p>
         </div>
 

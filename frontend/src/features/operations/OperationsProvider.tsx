@@ -33,7 +33,7 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
   const query = useQuery({ queryKey: key, enabled: Boolean(userId), queryFn: async ({ signal }) => {
     const response = await apiFetch<Operation[]>('/api/operations', { signal });
     return response.data || [];
-  }, refetchInterval: 3000, staleTime: 0, retry: 1 });
+  }, refetchInterval: (q) => (q.state.data?.some(active) ? 4000 : false), staleTime: 30000, retry: 1 });
   const jobs = userId ? query.data || [] : [];
   const writes = useMutationState({ filters: { mutationKey: ['employee-write'], status: 'pending' }, select: mutation => ({ id: mutation.mutationId, variables: mutation.state.variables as any, kind: mutation.options.mutationKey?.[1] }) });
   const track = useCallback((job: Operation) => {

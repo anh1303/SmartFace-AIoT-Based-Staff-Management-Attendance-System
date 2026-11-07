@@ -28,7 +28,7 @@ class UltrasonicSensor:
         max_distance: float = 100.0,
         trigger_distance: float = 20.0,
         poll_interval: float = 0.08,
-        window_size: int = 3,
+        window_size: int = 7,
         debounce_duration: float = 0.5,
         name: str = "ULTRASONIC",
     ):
@@ -114,17 +114,17 @@ class UltrasonicSensor:
                 GPIO.output(self.trig_pin, False)
 
                 # 2. Chờ Echo lên mức HIGH (Timeout 25ms)
-                start_wait = time.monotonic()
+                start_wait = time.perf_counter()
                 pulse_start = start_wait
                 while GPIO.input(self.echo_pin) == 0:
-                    pulse_start = time.monotonic()
+                    pulse_start = time.perf_counter()
                     if pulse_start - start_wait > 0.025:
                         return None  # Timeout không thấy phản hồi
 
                 # 3. Chờ Echo xuống mức LOW (Timeout 25ms)
                 pulse_end = pulse_start
                 while GPIO.input(self.echo_pin) == 1:
-                    pulse_end = time.monotonic()
+                    pulse_end = time.perf_counter()
                     if pulse_end - pulse_start > 0.025:
                         return None  # Timeout xung quá dài
 

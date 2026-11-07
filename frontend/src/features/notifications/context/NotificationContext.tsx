@@ -74,7 +74,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       } catch { /* Keep local notifications if the server is temporarily unavailable. */ }
     };
     void poll();
-    const timer = window.setInterval(() => void poll(), 5000);
+    const timer = window.setInterval(() => void poll(), 60000);
     return () => { disposed = true; window.clearInterval(timer); };
   }, []);
 

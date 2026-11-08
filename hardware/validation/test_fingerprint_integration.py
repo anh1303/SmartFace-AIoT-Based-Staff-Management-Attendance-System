@@ -104,6 +104,63 @@ if __name__=='__main__':unittest.main()
 
 
 class WorkerSyncTests(unittest.TestCase):
+    def test_cold_start_recovers_all_assigned_bindings_not_just_active_employees(self):
+        inactive = self.binding()
+        inactive['id'] = 'inactive-binding'
+        active = dict(self.binding(), id='active-binding', slot=3)
+        encoded = inactive.pop('template_b64')
+        active.pop('template_b64')
+        w = self.worker(inactive)
+        w.manifest['bindings'].append(active)
+        w._http.return_value = {'revision': 1, 'checksum': inactive['checksum'], 'template_b64': encoded}
+        w.sensor.load_template.return_value = 0
+        w.sensor.upload_template.return_value = bytes(512)
+        w._sync()
+        self.assertEqual(w._verified, {'inactive-binding', 'active-binding'})
+        self.assertEqual(w._http.call_count, 4)  # each download and ack completes
+
+    def test_v2_refresh_keeps_the_health_heartbeat(self):
+        w = self.worker(self.binding())
+        w.sensor.is_connected = True
+        w._http.return_value = {'manifest_version': 2, 'bindings': [], 'session': None, 'device': {}}
+        w._refresh(force=True)
+        path, body = w._http.call_args.args
+        self.assertEqual(path, '/manifest')
+        self.assertEqual(body['manifest_version'], 2)
+        self.assertTrue(body['ready'])
+        self.assertEqual(body['capacity'], 300)
+
+    def test_download_rejects_a_changed_revision_without_writing_flash(self):
+        b = self.binding()
+        payload = {'template_b64': b.pop('template_b64'), 'revision': 99, 'checksum': b['checksum']}
+        w = self.worker(b)
+        w._http.return_value = payload
+        with self.assertRaises(RuntimeError):
+            w._sync()
+        w.sensor.store_template.assert_not_called()
+        self.assertNotIn(b['id'], w._verified)
+
+    def test_metadata_only_manifest_downloads_once_then_reuses_verified_flash(self):
+        b = self.binding()
+        payload = {'template_b64': b.pop('template_b64'), 'revision': b['revision'], 'checksum': b['checksum']}
+        w = self.worker(b)
+        w._http.return_value = payload
+        w.sensor.load_template.return_value = 0
+        w.sensor.upload_template.return_value = bytes(512)
+        w._sync()
+        w._sync()
+        w._http.assert_any_call('/bindings/binding-a/template', {'revision': b['revision'], 'checksum': b['checksum']})
+        self.assertEqual(w._http.call_count, 2)  # one download + one ack
+        w.sensor.store_template.assert_not_called()
+
+    def test_revoked_metadata_never_downloads_a_template(self):
+        b = self.binding()
+        b.pop('template_b64')
+        b['state'] = 'REVOKED'
+        w = self.worker(b)
+        w._sync()
+        w._http.assert_called_once_with('/bindings/binding-a/ack', {'deleted': True})
+
     def worker(self, binding):
         from peripherals.fingerprint_worker import FingerprintWorker
         w=FingerprintWorker('PI_A',AttendanceCoordinator(),Mock(),lambda:'AUTO',Mock())

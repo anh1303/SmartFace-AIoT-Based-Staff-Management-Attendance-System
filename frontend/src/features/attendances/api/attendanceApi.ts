@@ -28,17 +28,18 @@ export interface PaginatedAttendanceResponse {
 
 /**
  * Lấy danh sách nhật ký chấm công.
- * Hỗ trợ phân trang liên tục hoặc tự động nạp tiếp các trang (auto-paginate)
- * để lịch sử không bị dừng âm thầm ở mốc 5.000 bản ghi.
+ * Mặc định chỉ tải một trang; fetchAllPages dành cho màn hình cần đủ khoảng ngày hoặc export.
  */
 export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promise<AttendanceRecordList> {
-  // Compact responses omit repeated photos, so larger pages avoid serial 100-row round trips.
-  const pageSize = Number(params?.limit) || 5000;
-  let currentPage = Number(params?.page) || 1;
+  // Full-range consumers opt in; ordinary screens fetch exactly one small page.
+  const maximum = params?.fetchAllPages ? 5000 : 200;
+  const pageSize = Math.min(maximum, Math.max(1, Math.floor(Number(params?.limit) || (params?.fetchAllPages ? 5000 : 50))));
+  let currentPage = Math.max(1, Math.floor(Number(params?.page) || 1));
 
   const buildUrl = (page: number, limit: number | string) => {
     const searchParams = new URLSearchParams();
     searchParams.set('compact', 'true');
+    if (params?.fetchAllPages) searchParams.set('fetchAllPages', 'true');
     if (params?.startDate) searchParams.append('startDate', params.startDate);
     if (params?.endDate) searchParams.append('endDate', params.endDate);
     if (params?.date) searchParams.append('date', params.date);
@@ -49,17 +50,17 @@ export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promis
     return `/api/attendance?${searchParams.toString()}`;
   };
 
-  // Nếu người dùng yêu cầu 1 trang cụ thể (kèm page parameter cụ thể mà không fetchAllPages)
-  if (params?.page !== undefined && !params.fetchAllPages) {
+  // Không tự tải tiếp các trang khi một sự kiện realtime làm query chạy lại.
+  if (!params?.fetchAllPages) {
     const res = await apiFetch(buildUrl(currentPage, pageSize));
     if (res.success && Array.isArray(res.data)) {
       const records: AttendanceRecordList = res.data;
       records.totalLoaded = records.length;
+      records.isTruncated = records.length === pageSize;
+      if (records.isTruncated) params?.onTruncated?.(records.length);
       return records;
     }
-    const emptyRecords: AttendanceRecordList = [];
-    emptyRecords.totalLoaded = 0;
-    return emptyRecords;
+    throw new Error(res.message || 'Unable to load attendance page');
   }
 
   // Tự động phân trang tiếp để nạp trọn vẹn lịch sử không bị ngắt ở 5000 bản ghi
@@ -71,19 +72,7 @@ export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promis
       break;
     }
     allRecords.push(...res.data);
-    // Nếu số lượng bản ghi trả về ít hơn pageSize, đã hết dữ liệu
-    if (res.data.length < pageSize || (!params?.fetchAllPages && allRecords.length >= 50000)) {
-      if (!params?.fetchAllPages && allRecords.length >= 50000 && res.data.length >= pageSize) {
-        allRecords.isTruncated = true;
-        console.warn(
-          '[AttendanceApi] Data limit of 50,000 records reached. Additional server records were truncated. Please provide a startDate/endDate range filter.'
-        );
-        if (params?.onTruncated) {
-          params.onTruncated(allRecords.length);
-        }
-      }
-      break;
-    }
+    if (res.data.length < pageSize) break;
     currentPage++;
   }
 
@@ -97,8 +86,8 @@ export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promis
 export async function fetchAttendancePaginatedApi(
   params?: FetchAttendanceParams
 ): Promise<PaginatedAttendanceResponse> {
-  const pageSize = Number(params?.limit) || 50;
-  const page = Number(params?.page) || 1;
+  const pageSize = Math.min(200, Math.max(1, Math.floor(Number(params?.limit) || 50)));
+  const page = Math.max(1, Math.floor(Number(params?.page) || 1));
 
   const searchParams = new URLSearchParams();
   searchParams.set('compact', 'true');
@@ -111,7 +100,8 @@ export async function fetchAttendancePaginatedApi(
   searchParams.append('page', String(page));
 
   const res = await apiFetch(`/api/attendance?${searchParams.toString()}`);
-  const records: AttendanceRecord[] = res.success && Array.isArray(res.data) ? res.data : [];
+  if (!res.success || !Array.isArray(res.data)) throw new Error(res.message || 'Unable to load attendance page');
+  const records: AttendanceRecord[] = res.data;
 
   return {
     data: records,

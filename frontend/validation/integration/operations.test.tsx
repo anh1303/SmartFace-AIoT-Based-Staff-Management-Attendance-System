@@ -7,10 +7,10 @@ const toast = vi.hoisted(() => vi.fn());
 vi.mock('../../src/context/ToastContext', () => ({ useToast: () => ({ showToast: toast }) }));
 vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'user1', employee_id: 'NV1' } }) }));
 vi.mock('socket.io-client', () => ({ io: () => ({ on: vi.fn(), disconnect: vi.fn() }) }));
-import { OperationsProvider } from '../../src/features/operations/OperationsProvider';
+import { OperationsProvider, OperationsPanel } from '../../src/features/operations/OperationsProvider';
 import { apiFetch } from '../../src/api/client';
 vi.mock('../../src/api/client', () => ({ apiFetch: vi.fn() }));
-it('keeps a visible progress panel while navigating and announces a partial failure', async () => {
+it('shows progress in the notification panel across navigation and colors each status', async () => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -18,10 +18,18 @@ it('keeps a visible progress panel while navigating and announces a partial fail
   vi.mocked(apiFetch).mockResolvedValue({ success: true, data: [job] } as any);
   await act(async () => root.render(<QueryClientProvider client={client}><OperationsProvider><main>Lịch</main></OperationsProvider></QueryClientProvider>));
   await act(async () => { await new Promise(r => setTimeout(r, 20)); });
-  expect(host.textContent).toContain('2/7'); expect(host.textContent).toContain('Đang xử lý');
+  await act(async () => root.render(<QueryClientProvider client={client}><OperationsProvider><main>Lịch</main><OperationsPanel /></OperationsProvider></QueryClientProvider>));
+  expect(host.textContent).toContain('2/7'); expect(host.textContent).toContain('Đang thực hiện');
+  expect(host.querySelector('.text-blue-700')?.textContent).toContain('Đang thực hiện');
   await act(async () => root.render(<QueryClientProvider client={client}><OperationsProvider><main>Nhân viên</main></OperationsProvider></QueryClientProvider>));
+  await act(async () => root.render(<QueryClientProvider client={client}><OperationsProvider><main>Nhân viên</main><OperationsPanel /></OperationsProvider></QueryClientProvider>));
   expect(host.textContent).toContain('2/7');
   await act(async () => { client.setQueryData(['operations', 'NV1'], [{ ...job, revision: 2, status: 'partially_succeeded', progress: { total: 7, completed: 7, succeeded: 6, failed: 1, skipped: 0 } }]); await new Promise(r => setTimeout(r, 20)); });
-  expect(host.textContent).toContain('1 lỗi'); expect(toast).toHaveBeenCalledWith(expect.stringContaining('1 lỗi'), 'warning');
+  expect(host.textContent).not.toContain('Xem kết quả từng mục'); expect(host.querySelector('aside')).toBeNull();
+  expect(host.textContent).toContain('Lỗi'); expect(host.textContent).toContain('1 lỗi'); expect(toast).toHaveBeenCalledWith(expect.stringContaining('1 lỗi'), 'warning');
+  expect(host.querySelector('.text-red-700')?.textContent).toContain('Lỗi');
+  await act(async () => { client.setQueryData(['operations', 'NV1'], [{ ...job, revision: 3, status: 'succeeded', progress: { total: 7, completed: 7, succeeded: 7, failed: 0, skipped: 0 } }]); await new Promise(r => setTimeout(r, 20)); });
+  expect(host.querySelector('.text-green-700')?.textContent).toBe('Đã thành công');
+  expect(host.textContent).not.toContain('0 bỏ qua');
   act(() => root.unmount()); client.clear(); host.remove();
 });

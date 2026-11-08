@@ -145,7 +145,22 @@ export async function revokeFingerprint(actor: EmployeeActor, value: string) {
 const lastDeviceSeenWrite = new Map<string, number>()
 const cachedDeviceState = new Map<string, any>()
 
-export async function fingerprintManifest(deviceId: string, health: any) {
+const publicSessionSelect = { id: true, employee_id: true, device_id: true, finger_name: true,
+  status: true, match_score: true, error: true, expires_at: true } as const
+
+export async function fingerprintTemplateForDevice(deviceId: string, bindingId: string, revision: number, checksum: string) {
+  // Assigned templates must recover even for inactive employees; attendance independently checks ACTIVE.
+  const binding = await prisma.fingerprintBinding.findFirst({
+    where: { id: bindingId, device_id: deviceId, state: { in: ['PENDING', 'SYNCED'] },
+      template: { status: { in: ['PENDING', 'ACTIVE'] }, revision, checksum } },
+    select: { template: { select: { ciphertext: true, revision: true, checksum: true } } },
+  })
+  if (!binding) throw AppError.notFound('Fingerprint template unavailable')
+  return { revision: binding.template.revision, checksum: binding.template.checksum,
+    template_b64: decryptPayload(binding.template.ciphertext, env.BIOMETRIC_ENCRYPTION_KEY).template_b64 }
+}
+
+export async function fingerprintManifest(deviceId: string, health: any, version: 1 | 2 = 1) {
   const now = Date.now()
   const lastWrite = lastDeviceSeenWrite.get(deviceId) || 0
   const cached = cachedDeviceState.get(deviceId)
@@ -167,13 +182,18 @@ export async function fingerprintManifest(deviceId: string, health: any) {
     } else {
       device = cached
     }
-    const session = await tx.fingerprintSession.findFirst({ where: { device_id: deviceId, status: { in: liveSessionStates } } })
-    const bindings = await tx.fingerprintBinding.findMany({ where: { device_id: deviceId }, include: { template: true } })
+    const session = await tx.fingerprintSession.findFirst({ where: { device_id: deviceId, status: { in: liveSessionStates } }, select: publicSessionSelect })
+    const bindings = version === 2
+      ? await tx.fingerprintBinding.findMany({ where: { device_id: deviceId }, select: { id: true, slot: true, template_id: true, state: true,
+          template: { select: { employee_id: true, revision: true, checksum: true } } } })
+      : await tx.fingerprintBinding.findMany({ where: { device_id: deviceId }, include: { template: true } })
     return { device: { polling_fallback: device?.polling_fallback ?? false, attendance_enabled: device?.attendance_enabled ?? false },
+      ...(version === 2 ? { manifest_version: 2 } : {}),
       session: session ? publicFingerprintSession(session) : null,
       bindings: bindings.map(b => ({ id: b.id, slot: b.slot, template_id: b.template_id, employee_id: b.template.employee_id,
         revision: b.template.revision, checksum: b.template.checksum, state: b.state,
-        template_b64: b.state !== 'REVOKED' ? decryptPayload(b.template.ciphertext, env.BIOMETRIC_ENCRYPTION_KEY).template_b64 : undefined })) }
+        ...(version === 1 && b.state !== 'REVOKED' && 'ciphertext' in b.template && Buffer.isBuffer(b.template.ciphertext)
+          ? { template_b64: decryptPayload(b.template.ciphertext, env.BIOMETRIC_ENCRYPTION_KEY).template_b64 } : {}) })) }
   })
 }
 const nextStates: Record<string, string[]> = {

@@ -114,9 +114,10 @@ export async function list(
   }
 
   const isGetAll = query.limit === 'all' || query.all === 'true' || query.all === true
-  const page = Math.max(1, Number(query.page) || 1)
-  const defaultLimit = 5000
-  const limit = isGetAll ? 50000 : Math.min(50000, Math.max(1, Number(query.limit) || defaultLimit))
+  const page = Math.max(1, Math.floor(Number(query.page) || 1))
+  const fullRange = query.fetchAllPages === 'true' || query.fetchAllPages === true
+  const defaultLimit = fullRange ? 5000 : 50
+  const limit = isGetAll ? 50000 : Math.min(fullRange ? 5000 : 200, Math.max(1, Math.floor(Number(query.limit) || defaultLimit)))
   const skip = isGetAll ? 0 : (page - 1) * limit
 
   const logs = await prisma.attendance_logs.findMany({
@@ -124,7 +125,7 @@ export async function list(
     include: query.compact === 'true'
       ? { employees: { select: { ...attendanceInclude.employees.select, avatar_url: false } } }
       : attendanceInclude,
-    orderBy: { event_time: 'desc' },
+    orderBy: [{ event_time: 'desc' }, { id: 'desc' }],
     skip: skip > 0 ? skip : undefined,
     take: limit,
   })
@@ -426,8 +427,8 @@ async function recordAttendance(
   capture: CaptureOptions = {}
 ) {
   const employee = requester?.role === 'EMPLOYEE' && requester.id
-    ? await findEmployeeByUserId(requester.id)
-    : await findEmployeeByIdOrCode(employeeId)
+    ? await findEmployeeByUserId(requester.id, undefined, 'identity')
+    : await findEmployeeByIdOrCode(employeeId, undefined, 'identity')
   if (!employee) throw AppError.notFound('Employee not found')
   if (requester?.role?.toUpperCase() === 'MANAGER') {
     if (employee.user_id && requester.id && employee.user_id === requester.id) {

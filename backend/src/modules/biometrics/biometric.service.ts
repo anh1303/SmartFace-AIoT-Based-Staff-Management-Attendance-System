@@ -187,10 +187,12 @@ export type FaceMatchCandidate = {
  */
 export async function findBestFaceMatch(
   vecLiteral: string,
-  tx?: Prisma.TransactionClient
+  tx?: Prisma.TransactionClient,
+  options: { includeAvatar?: boolean } = {}
 ): Promise<FaceMatchCandidate | null> {
   const client = tx ?? prisma
   const currentModelVersion = env.FACE_AUTH_MODEL_VERSION
+  const avatar = Prisma.raw(options.includeAvatar === false ? 'NULL::text' : 'e.avatar_url')
 
   const rows: Array<{
     employee_id: string
@@ -203,7 +205,7 @@ export async function findBestFaceMatch(
   }> = await client.$queryRaw`
     SELECT
       f.employee_id,
-      e.employee_code, e.full_name, e.avatar_url, e.status,
+      e.employee_code, e.full_name, ${avatar} AS avatar_url, e.status,
       f.embedding_type,
       (1 - (f.embedding <=> ${vecLiteral}::vector))::float AS similarity
     FROM face_embeddings f

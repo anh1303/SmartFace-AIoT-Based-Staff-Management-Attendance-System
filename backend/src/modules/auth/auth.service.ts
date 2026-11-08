@@ -1,4 +1,5 @@
 import { storedProfile } from './profile.dto.js';
+import { readAuthUser } from './auth.read.js'
 import type { Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
@@ -26,7 +27,7 @@ function safeUser(user: {
     email: string | null
     position?: { name?: string | null; id?: number } | string | null
     positionId?: number | null
-    avatar_url: string | null
+    avatar_url?: string | null
     department: { name: string } | null
   } | null
 }) {
@@ -352,18 +353,7 @@ export async function verifyAndLoadActiveUser(token: string) {
 
   let user: any = null
   try {
-    user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: {
-        roles: true,
-        employees: {
-          include: {
-            department: true,
-            position: true,
-          },
-        },
-      },
-    })
+    user = await readAuthUser(decoded.id)
   } catch {
     throw new AppError(401, 'Invalid user ID in token')
   }

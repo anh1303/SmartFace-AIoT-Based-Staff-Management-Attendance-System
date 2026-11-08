@@ -57,7 +57,7 @@ export async function recognizeLogin(frames: string[]) {
     const norm = Math.hypot(...embedding)
     if (!Number.isFinite(norm) || norm < 1e-12) throw AppError.unauthorized(FACE_LOGIN_FAILURE)
     const literal = '[' + embedding.map(value => (value / norm).toFixed(8)).join(',') + ']'
-    const candidate = await findBestFaceMatch(literal)
+    const candidate = await findBestFaceMatch(literal, undefined, { includeAvatar: false })
     if (!candidate || !Number.isFinite(candidate.similarity) || candidate.similarity < (env.FACE_MATCH_THRESHOLD || 0.45)
         || (employeeId && candidate.emp_id !== employeeId)) throw AppError.unauthorized(FACE_LOGIN_FAILURE)
     employeeId = candidate.emp_id

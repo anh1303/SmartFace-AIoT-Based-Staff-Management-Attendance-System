@@ -1,3 +1,7 @@
+// Keep these behavioral tests independent of the auth SQL adapter (covered by auth-projection.test).
+vi.mock('../../src/modules/auth/auth.read.js', () => ({ readAuthUser: async (id: string) => {
+  return prisma.user.findUnique({ where: { id } })
+} }))
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import jwt from 'jsonwebtoken'
 import { authenticate } from '../../src/middlewares/auth.middleware.js'

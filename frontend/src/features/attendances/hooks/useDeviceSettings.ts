@@ -104,6 +104,7 @@ export const playBrowserChime = () => {
 
 export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
   const { role } = useAuth();
+  const [actionError, setActionError] = useState('');
   const canManage = role === 'admin' || role === 'manager';
 
   const [settings, setSettings] = useState<DeviceSettings>(DEFAULT_SETTINGS);
@@ -132,7 +133,7 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
     // Fallback polling dự phòng khi socket mất kết nối (chu kỳ 60s thay vì 5s liên tục)
     const pollTimer = setInterval(() => {
       if (!socketRef.current?.connected) {
-        fetchSettings();
+        void fetchSettings();
       }
     }, 60000);
     return () => clearInterval(pollTimer);
@@ -180,7 +181,7 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
       }));
 
       try {
-        setIsUpdating(true);
+        setIsUpdating(true); setActionError('');
         await apiFetch(`/api/devices/${deviceId}/settings`, {
           method: 'PATCH',
           body: JSON.stringify(patch),
@@ -188,7 +189,9 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
       } catch (err) {
         console.error('[useDeviceSettings] Lỗi khi cập nhật cài đặt:', err);
         // Rollback nếu cần
-        fetchSettings();
+        await fetchSettings();
+        setActionError(err instanceof Error ? err.message : 'Không lưu được cấu hình.');
+        throw err;
       } finally {
         setIsUpdating(false);
       }
@@ -208,7 +211,7 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
       }
 
       debounceTimerRef.current = setTimeout(() => {
-        patchSettings({ volume: vol, isMuted: vol === 0 });
+        void patchSettings({ volume: vol, isMuted: vol === 0 }).catch(() => {});
       }, 180);
     },
     [patchSettings]
@@ -217,26 +220,26 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
   // 5. Toggle Mute
   const toggleMute = useCallback(() => {
     const nextMuted = !settings.isMuted;
-    patchSettings({ isMuted: nextMuted });
+    return patchSettings({ isMuted: nextMuted });
   }, [settings.isMuted, patchSettings]);
 
   // 6. Toggle FPS LCD
   const toggleFps = useCallback(() => {
     const nextFps = !settings.showFps;
-    patchSettings({ showFps: nextFps });
+    return patchSettings({ showFps: nextFps });
   }, [settings.showFps, patchSettings]);
 
   // 7. Toggle Camera Stream
   const toggleStream = useCallback(() => {
     const nextStream = !settings.streamEnabled;
-    patchSettings({ streamEnabled: nextStream });
+    return patchSettings({ streamEnabled: nextStream });
   }, [settings.streamEnabled, patchSettings]);
 
   // 7b. Cập nhật số khuôn mặt được nhận diện tối đa trên 1 khung hình (MAX_FACES_PER_FRAME)
   const setMaxFaces = useCallback(
     (count: number) => {
       const clamped = Math.max(1, Math.min(10, Math.round(count)));
-      patchSettings({ maxFaces: clamped });
+      return patchSettings({ maxFaces: clamped });
     },
     [patchSettings]
   );
@@ -248,14 +251,14 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
         method: 'POST',
       });
     } catch (err) {
-      console.warn('[useDeviceSettings] Gửi test audio xuống thiết bị:', err);
+      throw err;
     }
   }, [deviceId]);
 
   // 9. Kết nối lại loa Bluetooth
   const reconnectBluetooth = useCallback(async () => {
     try {
-      setIsUpdating(true);
+      setIsUpdating(true); setActionError('');
       const res = await apiFetch<DeviceSettings['bluetooth']>(
         `/api/devices/${deviceId}/actions/bluetooth-reconnect`,
         { method: 'POST' }
@@ -269,6 +272,7 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
       return true;
     } catch (err) {
       console.error('[useDeviceSettings] Lỗi khi kết nối lại Bluetooth:', err);
+      setActionError(err instanceof Error ? err.message : 'Thiết bị chưa xác nhận thao tác.');
       return false;
     } finally {
       setIsUpdating(false);
@@ -288,6 +292,7 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
       return [];
     } catch (err) {
       console.error('[useDeviceSettings] Lỗi khi quét Wi-Fi:', err);
+      setActionError(err instanceof Error ? err.message : 'Không quét được thiết bị.');
       return [];
     }
   }, [deviceId]);
@@ -305,6 +310,7 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
       return [];
     } catch (err) {
       console.error('[useDeviceSettings] Lỗi khi quét Bluetooth:', err);
+      setActionError(err instanceof Error ? err.message : 'Không quét được thiết bị.');
       return [];
     }
   }, [deviceId]);
@@ -313,7 +319,7 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
   const connectBluetooth = useCallback(
     async (device: BluetoothDevice): Promise<boolean> => {
       try {
-        setIsUpdating(true);
+        setIsUpdating(true); setActionError('');
         const res = await apiFetch<DeviceSettings['bluetooth']>(
           `/api/devices/${deviceId}/actions/bluetooth-connect`,
           {
@@ -337,6 +343,7 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
         return false;
       } catch (err) {
         console.error('[useDeviceSettings] Lỗi khi đổi thiết bị Bluetooth:', err);
+        setActionError(err instanceof Error ? err.message : 'Thiết bị chưa xác nhận thao tác.');
         return false;
       } finally {
         setIsUpdating(false);
@@ -349,7 +356,7 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
   const disconnectBluetooth = useCallback(
     async (deviceAddr?: string): Promise<boolean> => {
       try {
-        setIsUpdating(true);
+        setIsUpdating(true); setActionError('');
         const res = await apiFetch<DeviceSettings['bluetooth']>(
           `/api/devices/${deviceId}/actions/bluetooth-disconnect`,
           {
@@ -371,6 +378,7 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
         return false;
       } catch (err) {
         console.error('[useDeviceSettings] Lỗi khi ngắt kết nối Bluetooth:', err);
+        setActionError(err instanceof Error ? err.message : 'Thiết bị chưa xác nhận thao tác.');
         return false;
       } finally {
         setIsUpdating(false);
@@ -380,6 +388,7 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
   );
 
   return {
+    actionError,
     canManage,
     settings,
     isLoading,

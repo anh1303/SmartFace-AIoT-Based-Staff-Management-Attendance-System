@@ -63,9 +63,9 @@ export const ManagerReports: React.FC = () => {
 
   const handleExport = (format: 'excel' | 'pdf') => {
     if (format === 'excel') {
-      void exportMonthlyExcel(reportData, isManager)
-        .then(saved => { if (saved) showToast('Đã lưu báo cáo Excel.', 'success'); })
-        .catch(() => showToast('Không thể lưu báo cáo.', 'error'));
+      return exportMonthlyExcel(reportData, isManager)
+        .then(saved => { if (saved) showToast('Đã lưu báo cáo Excel.', 'success', "Xuất báo cáo thành công"); })
+        .catch(() => showToast('Không thể lưu báo cáo.', 'error', "Không thể xuất báo cáo"));
     } else {
       printMonthlyReport(reportData, isManager, chartRef.current);
     }

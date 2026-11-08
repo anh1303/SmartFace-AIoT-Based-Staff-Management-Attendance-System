@@ -97,7 +97,8 @@ describe('employeeExport utility', () => {
 
     expect(showToast).toHaveBeenCalledWith(
       'Không có dữ liệu nhân viên để xuất Excel!',
-      'warning'
+      'error',
+      'Không thể xuất danh sách nhân viên'
     );
     expect(XLSX.writeFile).not.toHaveBeenCalled();
   });

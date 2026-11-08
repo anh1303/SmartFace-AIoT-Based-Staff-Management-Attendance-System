@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React, { useRef, useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -40,6 +41,6 @@ export const Sidebar: React.FC<{
      <NavLink to="/" onClick={onClose} className="sf-nav-link"><ExternalLink size={18}/>Trang giới thiệu</NavLink>
    </>}
  </nav>
- <div className="sf-user"><Avatar src={currentUser?.avatar} size={36}/><div className="min-w-0 flex-1"><p className="font-semibold text-sm truncate">{currentUser?.full_name}</p><p className="text-xs text-slate-500">{role === 'admin' ? 'Quản trị viên' : role === 'manager' ? 'Quản lý' : 'Nhân viên'}</p></div><button className="sf-icon-button" aria-label="Đăng xuất" disabled={isLoggingOut} onClick={async () => { if (isLoggingOut) return; try { await logout(); } finally { navigate('/login'); } }}><LogOut size={18}/></button></div>
+ <div className="sf-user"><Avatar src={currentUser?.avatar} size={36}/><div className="min-w-0 flex-1"><p className="font-semibold text-sm truncate">{currentUser?.full_name}</p><p className="text-xs text-slate-500">{role === 'admin' ? 'Quản trị viên' : role === 'manager' ? 'Quản lý' : 'Nhân viên'}</p></div><ActionButton busyLabel="Đang đăng xuất…" className="sf-icon-button" aria-label="Đăng xuất" disabled={isLoggingOut} onClick={async () => { if (isLoggingOut) return; try { await logout(); } finally { navigate('/login'); } }}><LogOut size={18}/></ActionButton></div>
  </aside></>;
 };

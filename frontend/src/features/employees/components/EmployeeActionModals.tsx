@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { AlertTriangle } from 'lucide-react';
@@ -60,14 +61,14 @@ export const ConfirmDeleteEmployeeModal: React.FC<ConfirmDeleteEmployeeModalProp
           >
             Hủy bỏ
           </button>
-          <button
+          <ActionButton busyLabel="Đang xóa…"
             type="button"
             onClick={() => onConfirmDelete(employee)}
             className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-md transition-colors cursor-pointer flex items-center gap-1.5"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
             <span>Xác nhận xóa vĩnh viễn</span>
-          </button>
+          </ActionButton>
         </div>
       </div>
     </Modal>
@@ -136,13 +137,13 @@ export const ConfirmStatusEmployeeModal: React.FC<ConfirmStatusEmployeeModalProp
           >
             Hủy bỏ
           </button>
-          <button
+          <ActionButton busyLabel={employee.status === 'ACTIVE' ? 'Đang vô hiệu hóa…' : 'Đang kích hoạt…'}
             type="button"
             onClick={() => onConfirmToggle(employee)}
             className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-xs cursor-pointer"
           >
             Xác nhận thay đổi
-          </button>
+          </ActionButton>
         </div>
       </div>
     </Modal>

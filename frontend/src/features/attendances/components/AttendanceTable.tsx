@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import { AttendanceDayDetails } from './AttendanceDayDetails';
 import { confidenceColor } from '../../../utils/confidence';
 import React, { useState } from 'react';
@@ -306,7 +307,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                     className="py-2.5 px-1.5 align-middle text-center border-b border-slate-200 dark:border-[#202752] bg-white dark:bg-[#0f1224]"
                   >
                     {item.isApproved ? (
-                      <button
+                      <ActionButton busyLabel="Đang mở khóa…"
                         type="button"
                         onClick={() => onUnlockEmployee?.(item)}
                         className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#181c38] dark:hover:bg-[#20254b] border border-slate-200 dark:border-[#272d5a] text-xs font-semibold text-amber-700 dark:text-amber-400 transition-all cursor-pointer group whitespace-nowrap"
@@ -315,7 +316,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                       >
                         <Unlock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                         <span>Mở khóa</span>
-                      </button>
+                      </ActionButton>
                     ) : (
                       <button
                         type="button"

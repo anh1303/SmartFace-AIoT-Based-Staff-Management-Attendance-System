@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React from 'react';
 import {
   Building2,
@@ -167,7 +168,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
             >
               Hủy
             </button>
-            <button
+            <ActionButton busyLabel="Đang thêm…"
               type="button"
               disabled={savingAddDept}
               onClick={handleSaveNewDept}
@@ -179,7 +180,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                 <Check className="w-3.5 h-3.5" />
               )}
               <span>Lưu vào CSDL</span>
-            </button>
+            </ActionButton>
           </div>
         </div>
       )}
@@ -257,7 +258,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                     >
                       Hủy
                     </button>
-                    <button
+                    <ActionButton busyLabel="Đang lưu…"
                       type="button"
                       disabled={savingEditDept}
                       onClick={() => handleSaveEditDept(dept.id)}
@@ -269,7 +270,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                         <Check className="w-3.5 h-3.5" />
                       )}
                       <span>Lưu thay đổi</span>
-                    </button>
+                    </ActionButton>
                   </div>
                 </div>
               );
@@ -363,7 +364,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                       >
                         Hủy
                       </button>
-                      <button
+                      <ActionButton busyLabel="Đang xóa…"
                         type="button"
                         disabled={isDeleting}
                         onClick={() => handleExecuteDeleteDept(dept.id)}
@@ -375,7 +376,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                           <Trash2 className="w-3.5 h-3.5" />
                         )}
                         <span>Xác nhận xóa</span>
-                      </button>
+                      </ActionButton>
                     </div>
                   </div>
                 )}

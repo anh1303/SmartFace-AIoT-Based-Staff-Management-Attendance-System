@@ -44,12 +44,12 @@ export function usePayroll() {
     mutationFn: (period: string) => generatePayrollApi(period),
     onSuccess: (_records, period) => {
       setSelectedPeriod(period);
-      showToast(`Đã tính toán bảng lương kỳ ${period} từ CSDL`, 'success');
+      showToast(`Đã tính lại bảng lương kỳ ${period}. Kiểm tra số liệu trước khi chốt lương.`, 'success', "Tính bảng lương thành công");
       queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (err: Error, period) => {
-      showToast(`Lỗi khi tính toán bảng lương kỳ ${period}: ${err.message || ''}`, 'error');
+      showToast(`Lỗi khi tính toán bảng lương kỳ ${period}: ${err.message || ''}`, 'error', "Không thể tính bảng lương");
     },
   });
 
@@ -61,44 +61,44 @@ export function usePayroll() {
       queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (err: Error) => {
-      showToast(`Lỗi khi cập nhật phiếu lương: ${err.message || ''}`, 'error');
+      showToast(`Lỗi khi cập nhật phiếu lương: ${err.message || ''}`, 'error', "Không thể cập nhật phiếu lương");
     },
   });
 
   const finalizePayrollPeriodMutation = useMutation({
     mutationFn: (period: string) => finalizePayrollPeriodApi(period),
     onSuccess: (_data, period) => {
-      showToast(`Đã chốt bảng lương kỳ ${period} trong CSDL`, 'success');
+      showToast(`Đã chốt bảng lương kỳ ${period}. Các phiếu thuộc phạm vi được chốt đã được khóa chỉnh sửa.`, 'success', "Chốt bảng lương thành công");
       queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (err: Error, period) => {
-      showToast(`Lỗi khi chốt bảng lương kỳ ${period}: ${err.message || ''}`, 'error');
+      showToast(`Lỗi khi chốt bảng lương kỳ ${period}: ${err.message || ''}`, 'error', "Không thể chốt bảng lương");
     },
   });
 
   const unlockPayrollPeriodMutation = useMutation({
     mutationFn: (period: string) => unlockPayrollPeriodApi(period),
     onSuccess: (_records, period) => {
-      showToast(`Đã mở khoá bảng lương kỳ ${period} trong CSDL`, 'warning');
+      showToast(`Đã mở khóa bảng lương kỳ ${period} để chỉnh sửa. Các phiếu đã quyết toán sớm vẫn giữ khóa.`, 'success', "Mở khóa bảng lương thành công");
       queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (err: Error, period) => {
-      showToast(`Lỗi khi mở khoá bảng lương kỳ ${period}: ${err.message || ''}`, 'error');
+      showToast(`Lỗi khi mở khoá bảng lương kỳ ${period}: ${err.message || ''}`, 'error', "Không thể mở khóa bảng lương");
     },
   });
 
   const updateBonusPenaltyMutation = useMutation({
     mutationFn: (data: Partial<Omit<BonusPenaltyPolicy, 'id'>>) => updateBonusPenaltyApi(data),
-    onSuccess: () => {
-      showToast('Cập nhật chính sách thưởng/phạt vào CSDL thành công', 'success');
+    onSuccess: (_result, data) => {
+      showToast(`Đã lưu chính sách thưởng/phạt cho kỳ ${data.effective_period || selectedPeriod}.`, 'success', 'Cập nhật chính sách lương thành công');
       queryClient.invalidateQueries({ queryKey: BONUS_PENALTY_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (err: Error) => {
-      showToast(`Lỗi khi cập nhật chính sách thưởng/phạt: ${err.message || ''}`, 'error');
+      showToast(`Lỗi khi cập nhật chính sách thưởng/phạt: ${err.message || ''}`, 'error', "Không thể cập nhật chính sách lương");
     },
   });
 
@@ -112,8 +112,8 @@ export function usePayroll() {
     generatePayroll: (period: string) => generatePayrollMutation.mutateAsync(period),
     updatePayrollItem: (id: string, updates: PayrollItemUpdates) =>
       updatePayrollItemMutation.mutateAsync({ id, updates }),
-    finalizePayrollPeriod: (period: string) => finalizePayrollPeriodMutation.mutate(period),
-    unlockPayrollPeriod: (period: string) => unlockPayrollPeriodMutation.mutate(period),
+    finalizePayrollPeriod: (period: string) => finalizePayrollPeriodMutation.mutateAsync(period),
+    unlockPayrollPeriod: (period: string) => unlockPayrollPeriodMutation.mutateAsync(period),
     updateBonusPenalty: (data: Partial<Omit<BonusPenaltyPolicy, 'id'>>) => updateBonusPenaltyMutation.mutateAsync(data),
   };
 }

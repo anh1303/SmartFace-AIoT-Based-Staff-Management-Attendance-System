@@ -1,9 +1,8 @@
 import { apiFetch } from '../../../api/client';
-import type { Operation } from '../../operations/OperationsProvider';
-import { submitBackgroundCommand } from '../../operations/commandApi';
+import { submitAndWait } from '../../operations/commandApi';
 
 export async function enrollFaceJobApi(employeeId: string, images: string[]) {
-  return submitBackgroundCommand(`/api/biometrics/${employeeId}/enroll-jobs`, { images });
+  return submitAndWait(`/api/biometrics/${employeeId}/enroll-jobs`, { images });
 }
 
 export interface BiometricSample {

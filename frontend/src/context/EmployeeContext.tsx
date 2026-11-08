@@ -10,8 +10,8 @@ export interface EmployeeContextType {
   refetchEmployees: () => void;
   addEmployee: (emp: Omit<Employee, 'created_at' | 'updated_at'>) => Promise<unknown>;
   updateEmployee: (id: string, updates: Partial<Employee>) => Promise<unknown>;
-  deleteEmployee: (id: string) => void;
-  toggleEmployeeStatus: (id: string) => void;
+  deleteEmployee: (id: string) => Promise<unknown>;
+  toggleEmployeeStatus: (id: string) => Promise<void>;
 }
 
 const EmployeeContext = createContext<EmployeeContextType | undefined>(undefined);

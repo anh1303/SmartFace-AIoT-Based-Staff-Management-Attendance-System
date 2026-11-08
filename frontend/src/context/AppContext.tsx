@@ -33,8 +33,8 @@ export interface AppContextType {
   employees: Employee[];
   addEmployee: (emp: Omit<Employee, 'created_at' | 'updated_at'>) => Promise<unknown>;
   updateEmployee: (id: string, updates: Partial<Employee>) => Promise<unknown>;
-  deleteEmployee: (id: string) => void;
-  toggleEmployeeStatus: (id: string) => void;
+  deleteEmployee: (id: string) => Promise<unknown>;
+  toggleEmployeeStatus: (id: string) => Promise<void>;
 
   // Shifts
   workShifts: WorkShift[];
@@ -60,7 +60,7 @@ export interface AppContextType {
 
   // Toasts
   toasts: ToastMessage[];
-  showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning', title?: string) => void;
   removeToast: (id: string) => void;
 }
 

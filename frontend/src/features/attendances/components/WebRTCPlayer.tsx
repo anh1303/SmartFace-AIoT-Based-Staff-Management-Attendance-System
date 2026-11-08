@@ -18,7 +18,7 @@ interface WebRTCPlayerProps {
   deviceName?: string;
   currentMode?: 'CHECK_IN' | 'CHECK_OUT' | 'AUTO' | 'OFF' | null;
   onModeChange?: (newMode: 'CHECK_IN' | 'CHECK_OUT' | 'AUTO' | 'OFF') => void;
-  showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning', title?: string) => void;
 }
 
 export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = (props) => {
@@ -317,16 +317,16 @@ const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
             : nextMode === 'CHECK_OUT'
             ? 'Đã bật chế độ: Check-out (Tan ca)'
             : 'Đã tắt chế độ điểm danh (Chờ cảm biến siêu âm)',
-          'success'
-        );
+          'success',
+          "Chuyển chế độ thiết bị thành công");
       } else {
         showToast?.(
           res.message || 'Lệnh đã gửi nhưng Raspberry Pi chưa phản hồi xác nhận (ACK). Vui lòng kiểm tra thiết bị.',
-          'warning'
-        );
+          'warning',
+          "Chưa xác nhận được chế độ thiết bị");
       }
     } catch (err: any) {
-      showToast?.(`Lỗi chuyển chế độ: ${err.message}`, 'error');
+      showToast?.(`Lỗi chuyển chế độ: ${err.message}`, 'error', "Chưa xác nhận được chế độ thiết bị");
     } finally {
       setIsSwitchingMode(false);
     }

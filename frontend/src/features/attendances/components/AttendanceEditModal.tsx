@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Clock, AlertTriangle, Loader2 } from 'lucide-react';
@@ -115,6 +116,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
   };
 
   const handleSave = async () => {
+    if (isSubmitting) return;
     const totalInputLESec = editingItem.isOffDay ? 0 : (inputLEHours || 0) * 3600 + (inputLEMinutes || 0) * 60 + (inputLESeconds || 0);
     const totalInputOTSec = (inputOTHours || 0) * 3600 + (inputOTMinutes || 0) * 60 + (inputOTSeconds || 0);
 
@@ -326,7 +328,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
           >
             Hủy
           </button>
-          <button
+          <ActionButton busyLabel="Đang lưu…"
             type="button"
             onClick={handleSave}
             disabled={isSubmitting}
@@ -334,7 +336,7 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
           >
             {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             <span>{isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
-          </button>
+          </ActionButton>
         </div>
       </div>
     </div>

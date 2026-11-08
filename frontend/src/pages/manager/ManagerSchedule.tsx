@@ -1,4 +1,7 @@
 import { useOperations } from '../../features/operations/OperationsProvider';
+import { OperationFailedError, UncertainWriteError, submitAndWait } from '../../features/operations/commandApi';
+import type { Operation } from '../../features/operations/OperationsProvider';
+import { ActionButton } from '../../components/common/ActionFeedback';
 import { submitScheduleBatch, submitScheduleCopy } from '../../features/schedules/api/shiftApi';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -22,7 +25,9 @@ import { getMonday, formatDateToYYYYMMDD, getISOWeekNumber, getTodayVNString } f
 import { useDepartmentPositions } from '@/features/employees';
 
 export const ManagerSchedule: React.FC = () => {
-  const { track, jobs } = useOperations();
+  const { jobs } = useOperations();
+  const [pendingCommand, setPendingCommand] = useState<(() => Promise<Operation>) | null>(null);
+  const [failedJob, setFailedJob] = useState<Operation | null>(null);
   const scheduleBusy = jobs.some(job => job.type === 'shifts.batch' && ['queued', 'running'].includes(job.status));
   const employeeState = useEmployeeContext();
   const shiftState = useShiftContext();
@@ -112,7 +117,7 @@ export const ManagerSchedule: React.FC = () => {
 
   const handleGoCurrentWeek = () => {
     setCurrentMonday(getMonday(new Date()));
-    showToast('Đã chuyển về tuần làm việc hiện tại!', 'info');
+    showToast('Đã chuyển về tuần làm việc hiện tại!', 'info', "Chuyển tuần làm việc");
   };
 
   const handleDateSelect = (dateString: string) => {
@@ -140,7 +145,7 @@ export const ManagerSchedule: React.FC = () => {
   });
 
   const handleCellClick = (empId: string, empName: string, date: string, dayLabel: string) => {
-    if (scheduleBusy) { showToast('Lịch đang được cập nhật nền. Vui lòng chờ kết quả.', 'warning'); return; }
+    if (scheduleBusy) { showToast('Lịch đang được cập nhật nền. Vui lòng chờ kết quả.', 'error', "Không thể chỉnh sửa ca làm việc"); return; }
     const todayVN = getTodayVNString();
     const isPast = date < todayVN;
 
@@ -148,18 +153,18 @@ export const ManagerSchedule: React.FC = () => {
 
     if (!isPast) {
       if (targetEmp?.status === 'INACTIVE') {
-        showToast(`Nhân viên ${empName} đang ở trạng thái TẠM NGƯNG, không thể phân bổ hoặc chỉnh sửa ca làm việc!`, 'warning');
+        showToast(`Nhân viên ${empName} đang ở trạng thái TẠM NGƯNG, không thể phân bổ hoặc chỉnh sửa ca làm việc!`, 'error', "Không thể chỉnh sửa ca làm việc");
         return;
       }
 
       if (role !== 'admin') {
         const isSelf = currentUser && (empId === currentUser.employee_id || targetEmp?.email === currentUser.email);
         if (isSelf) {
-          showToast('Không ai được tự phân ca hoặc sửa ca làm việc của chính mình. Vui lòng liên hệ Admin phê duyệt!', 'warning');
+          showToast('Không ai được tự phân ca hoặc sửa ca làm việc của chính mình. Vui lòng liên hệ Admin phê duyệt!', 'error', "Không thể chỉnh sửa ca làm việc");
           return;
         }
         if (isAnotherManager(targetEmp, currentUser)) {
-          showToast(`Quản lý không có quyền phân ca hoặc sửa đổi ca làm việc của Quản lý khác (${empName})!`, 'warning');
+          showToast(`Quản lý không có quyền phân ca hoặc sửa đổi ca làm việc của Quản lý khác (${empName})!`, 'error', "Không thể chỉnh sửa ca làm việc");
           return;
         }
       }
@@ -190,12 +195,12 @@ export const ManagerSchedule: React.FC = () => {
   };
 
   const handleShiftSave = async (e: React.FormEvent) => {
-    if (scheduleBusy) { e.preventDefault(); showToast('Lịch đang được cập nhật nền. Vui lòng chờ kết quả trước khi sửa tiếp.', 'warning'); return; }
+    if (scheduleBusy) { e.preventDefault(); showToast('Lịch đang được cập nhật nền. Vui lòng chờ kết quả trước khi sửa tiếp.', 'error', "Không thể phân công ca làm việc"); return; }
     e.preventDefault();
     if (!editingShift) return;
 
     if (editingShift.isPast) {
-      showToast('Không thể thay đổi ca làm việc của ngày trong quá khứ!', 'warning');
+      showToast('Không thể thay đổi ca làm việc của ngày trong quá khứ!', 'error', "Không thể phân công ca làm việc");
       return;
     }
 
@@ -203,7 +208,7 @@ export const ManagerSchedule: React.FC = () => {
       const s = modalStartTime?.trim();
       const endT = modalEndTime?.trim();
       if (!s || !endT || s === endT) {
-        showToast('Giờ bắt đầu và kết thúc phải khác nhau. Giờ kết thúc sớm hơn thuộc ngày hôm sau.', 'error');
+        showToast('Giờ bắt đầu và kết thúc phải khác nhau. Giờ kết thúc sớm hơn thuộc ngày hôm sau.', 'error', "Không thể phân công ca làm việc");
         return;
       }
     }
@@ -227,18 +232,19 @@ export const ManagerSchedule: React.FC = () => {
       note: modalNote,
     });
 
-    setEditingShift(null);showToast('Đã lưu lịch làm việc.','success');
-    } catch(error) {setShiftError((error as Error).message||'Chưa lưu được ca.');} finally {setSaving(false);}
+    showToast(`Đã ${editingShift.shift ? 'cập nhật' : 'phân công'} ${({ MORNING: 'ca sáng', AFTERNOON: 'ca chiều', OFFICE_HOURS: 'ca hành chính', OTHER: 'ca tùy chỉnh', OFF: 'nghỉ ca' })[modalShiftType]} cho ${emp?.full_name || editingShift.employeeId} (${editingShift.employeeId}) vào ngày ${editingShift.date.split('-').reverse().join('/')}.`, 'success', editingShift.shift ? 'Cập nhật ca làm việc thành công' : 'Phân công ca làm việc thành công');
+    setEditingShift(null);
+    } catch(error) { const reason = (error as Error).message || 'Chưa lưu được ca.'; setShiftError(reason); showToast(`${emp?.full_name || editingShift.employeeId}, ngày ${editingShift.date.split('-').reverse().join('/')}: ${reason} Kiểm tra lịch và chọn ca phù hợp trước khi lưu lại.`, 'error', 'Không thể phân công ca làm việc'); } finally {setSaving(false);}
   };
 
 
 
   // Bulk shift assignment submission
   const handleBulkSubmit = async (e: React.FormEvent) => {
-    if (scheduleBusy) { e.preventDefault(); showToast('Lịch đang được cập nhật. Vui lòng chờ tác vụ hoàn tất.', 'warning'); return; }
+    if (scheduleBusy) { e.preventDefault(); showToast('Lịch đang được cập nhật. Vui lòng chờ tác vụ hoàn tất.', 'error', "Không thể phân công ca làm việc"); return; }
     e.preventDefault();
     if (bulkDays.length === 0) {
-      showToast('Vui lòng chọn ít nhất 1 ngày trong tuần để áp dụng ca!', 'warning');
+      showToast('Vui lòng chọn ít nhất 1 ngày trong tuần để áp dụng ca!', 'error', "Không thể phân công ca làm việc");
       return;
     }
 
@@ -246,7 +252,7 @@ export const ManagerSchedule: React.FC = () => {
       const s = bulkStartTime?.trim();
       const endT = bulkEndTime?.trim();
       if (!s || !endT || s === endT) {
-        showToast('Giờ bắt đầu và kết thúc phải khác nhau. Giờ kết thúc sớm hơn thuộc ngày hôm sau.', 'error');
+        showToast('Giờ bắt đầu và kết thúc phải khác nhau. Giờ kết thúc sớm hơn thuộc ngày hôm sau.', 'error', "Không thể phân công ca làm việc");
         return;
       }
     }
@@ -268,7 +274,7 @@ export const ManagerSchedule: React.FC = () => {
     }
 
     if (targetEmps.length === 0) {
-      showToast('Không có nhân sự hợp lệ nào để phân ca (đã loại trừ tài khoản cá nhân và Quản lý khác)!', 'warning');
+      showToast('Không có nhân sự hợp lệ nào để phân ca (đã loại trừ tài khoản cá nhân và Quản lý khác)!', 'error', "Không thể phân công ca làm việc");
       return;
     }
 
@@ -279,31 +285,34 @@ export const ManagerSchedule: React.FC = () => {
       return { employee_id: emp.employee_id, date, shift_type: bulkShiftType, start_time: bulkStartTime, end_time: bulkEndTime, note: bulkNote, expectedVersion: existing ? existing.version ?? 1 : null };
     }));
     setSaving(true); setShiftError('');
-    showToast('Đang gửi yêu cầu phân lịch…', 'info');
-    try { track(await submitScheduleBatch(assignments)); setBulkModalOpen(false); }
-    catch (error) { const message = error instanceof Error ? error.message : 'Chưa gửi được yêu cầu'; setShiftError(message); showToast(message, 'error'); }
+    const command = () => submitScheduleBatch(assignments);
+    setPendingCommand(() => command);
+    try { await command(); setPendingCommand(null); setFailedJob(null); await shiftState.refetchShifts(); setBulkModalOpen(false); showToast(`Đã phân công ${assignments.length} ô lịch cho ${targetEmps.length} nhân viên, từ ${startLabel} đến ${endLabel}.`, 'success', 'Phân công ca làm việc thành công'); }
+    catch (error) { const message = error instanceof Error ? error.message : 'Chưa gửi được yêu cầu'; setShiftError(message); if (error instanceof OperationFailedError) setFailedJob(error.operation); if (!(error instanceof UncertainWriteError)) setPendingCommand(null); showToast(message, 'error', "Không thể phân công ca làm việc"); }
     finally { setSaving(false); }
   };
 
   const handleCopyPreviousWeek = async () => {
-    if (scheduleBusy || saving) { showToast('Lịch đang được cập nhật. Vui lòng chờ tác vụ hoàn tất.', 'warning'); return; }
+    if (scheduleBusy || saving) { showToast('Lịch đang được cập nhật. Vui lòng chờ tác vụ hoàn tất.', 'error', "Không thể sao chép lịch làm việc"); return; }
     const prevMonday = new Date(currentMonday); prevMonday.setDate(prevMonday.getDate() - 7);
     const targets = employees.filter(emp => emp.status === 'ACTIVE' && (role === 'admin' || (emp.department === managerDept && emp.employee_id !== currentUser?.employee_id && !isAnotherManager(emp, currentUser))));
-    if (!targets.length) { showToast('Không có nhân viên phù hợp để sao chép lịch.', 'warning'); return; }
+    if (!targets.length) { showToast('Không có nhân viên phù hợp để sao chép lịch.', 'error', "Không thể sao chép lịch làm việc"); return; }
     const expectedTargetVersions: Record<string, number | null> = {};
     for (const emp of targets) for (const day of daysOfWeek) {
       const shift = workShifts.find(s => s.employee_id === emp.employee_id && s.date === day.date);
       expectedTargetVersions[`${emp.employee_id}:${day.date}`] = shift ? shift.version ?? 1 : null;
     }
-    setSaving(true); showToast('Đang gửi yêu cầu sao chép lịch tuần trước…', 'info');
-    try { track(await submitScheduleCopy({ sourceMonday: formatDateToYYYYMMDD(prevMonday), targetMonday: formatDateToYYYYMMDD(currentMonday), employeeIds: targets.map(e => e.employee_id), expectedTargetVersions })); }
-    catch (error) { showToast(error instanceof Error ? error.message : 'Chưa gửi được yêu cầu sao chép', 'error'); }
+    setSaving(true); setShiftError('');
+    const command = () => submitScheduleCopy({ sourceMonday: formatDateToYYYYMMDD(prevMonday), targetMonday: formatDateToYYYYMMDD(currentMonday), employeeIds: targets.map(e => e.employee_id), expectedTargetVersions });
+    setPendingCommand(() => command);
+    try { await command(); setPendingCommand(null); setFailedJob(null); await shiftState.refetchShifts(); showToast(`Đã sao chép lịch tuần trước cho ${targets.length} nhân viên, từ ${startLabel} đến ${endLabel}.`, 'success', 'Sao chép lịch làm việc thành công'); }
+    catch (error) { const message = error instanceof Error ? error.message : 'Chưa sao chép được lịch'; setShiftError(message); if (error instanceof OperationFailedError) setFailedJob(error.operation); if (!(error instanceof UncertainWriteError)) setPendingCommand(null); showToast(message, 'error', "Không thể sao chép lịch làm việc"); }
     finally { setSaving(false); }
   };
 
   const handleExportExcel = (format: 'excel' | 'pdf') => {
     if (!canExport) return;
-    exportScheduleToExcel({
+    return exportScheduleToExcel({
       format,
       filteredEmployees,
       daysOfWeek,
@@ -315,13 +324,30 @@ export const ManagerSchedule: React.FC = () => {
     });
   };
 
+  const resumeAction = pendingCommand && shiftError ? <ActionButton busyLabel="Đang kiểm tra…" className="sf-button mt-3" onClick={async () => {
+    setSaving(true);
+    try { const result = await pendingCommand(); setPendingCommand(null); setShiftError(''); setFailedJob(null); await shiftState.refetchShifts(); setBulkModalOpen(false); showToast(`Đã xác nhận lưu ${result.progress.succeeded} ô lịch; ${result.progress.skipped} ô được bỏ qua.`, 'success', 'Lưu lịch làm việc thành công'); }
+    catch (error) { if (error instanceof OperationFailedError) { setFailedJob(error.operation); setPendingCommand(null); } setShiftError(error instanceof Error ? error.message : 'Chưa xác định kết quả.'); }
+    finally { setSaving(false); }
+  }}>Kiểm tra kết quả yêu cầu đã gửi</ActionButton> : null;
+
+  const retryAction = failedJob ? <ActionButton busyLabel="Đang thử lại…" disabled={saving} className="sf-button mt-3" onClick={async () => {
+        setSaving(true);
+        try {
+          await submitAndWait(`/api/operations/${failedJob.jobId}/retry`, {});
+          setFailedJob(null); setShiftError(''); await shiftState.refetchShifts(); setBulkModalOpen(false);
+          showToast('Đã lưu các ca thử lại.', 'success', "Phân công lại ca làm việc thành công");
+        } catch (error) { if (error instanceof OperationFailedError) setFailedJob(error.operation); throw error; }
+        finally { setSaving(false); }
+      }}>Thử lại các ca lỗi</ActionButton> : null;
+
   const canExport = !employeeState.isLoading && !employeeState.isError && !shiftState.isLoading && !shiftState.isError && employeesWithScheduledShifts(filteredEmployees, daysOfWeek, workShifts).length > 0;
 
   return (
     <div className="space-y-6">
       {/* 1. Header with week navigator, bulk & copy actions */}
       <ScheduleHeader
-        busy={saving}
+        busy={saving || Boolean(pendingCommand)}
         currentMonday={currentMonday}
         weekNumber={weekNumber}
         startLabel={startLabel}
@@ -331,11 +357,13 @@ export const ManagerSchedule: React.FC = () => {
         onGoCurrentWeek={handleGoCurrentWeek}
         onDateSelect={handleDateSelect}
         onCopyPreviousWeek={handleCopyPreviousWeek}
-        onOpenBulkModal={() => {setShiftError('');setBulkModalOpen(true);}}
+        onOpenBulkModal={() => {setShiftError('');setFailedJob(null);setBulkModalOpen(true);}}
         onExportExcel={handleExportExcel}
         canExport={canExport}
       />
 
+      {shiftError && !bulkModalOpen && !editingShift && <p role="alert" className="sf-feedback error">{shiftError}</p>}
+      {!bulkModalOpen && (resumeAction || retryAction)}
       {/* 2. Filters */}
       <ScheduleWeekNavigator
         searchTerm={searchTerm}
@@ -382,6 +410,7 @@ export const ManagerSchedule: React.FC = () => {
 
       {/* 6. Bulk Shift Assignment Modal */}
       <BulkShiftModal
+        failureActions={resumeAction || retryAction}
         isOpen={bulkModalOpen}
         isSubmitting={saving}
         error={shiftError}

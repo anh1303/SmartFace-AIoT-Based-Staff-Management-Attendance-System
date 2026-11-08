@@ -1,3 +1,4 @@
+import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
@@ -48,13 +49,13 @@ export function PasswordForm() {
   ];
   return <section id="security" className="sf-panel p-5 sm:p-6">
     <h2 className="text-lg font-semibold flex gap-2 items-center"><Lock size={19}/>Tài khoản & mật khẩu</h2>
-    <form className="space-y-4 mt-5" onSubmit={e => {
+    <ActionForm className="space-y-4 mt-5" onSubmit={e => {
       e.preventDefault(); checkSequence.current++; setValidation(''); setCurrentError(''); mutation.reset();
       if (next !== confirm) { setValidation('Mật khẩu nhập lại không khớp.'); return; }
       if (next.length < 8 || !/[a-z]/.test(next) || !/[A-Z]/.test(next) || !/[0-9]/.test(next) || !/[^A-Za-z0-9\s]/.test(next)) { setValidation('Mật khẩu mới chưa đáp ứng yêu cầu.'); return; }
       if (new TextEncoder().encode(next).length > 72) { setValidation('Mật khẩu tối đa 72 byte.'); return; }
       if (next === current) { setValidation('Mật khẩu mới cần khác mật khẩu hiện tại.'); return; }
-      mutation.mutate();
+      return mutation.mutateAsync();
     }}>
       {fields.map((field, index) => <label className="sf-field" key={field.label}>{field.label}
         <div className="relative"><input className="sf-input w-full pr-12" required type={visible[index] ? 'text' : 'password'} autoComplete={field.autocomplete} placeholder={field.placeholder} value={field.value} disabled={mutation.isPending} aria-invalid={index === 0 && Boolean(currentError)} onBlur={index === 0 ? e => { void verifyCurrent(e.target.value); } : undefined} onChange={e => { if (index === 0) { checkSequence.current++; setCurrentError(''); } field.set(e.target.value); setValidation(''); mutation.reset(); }}/>
@@ -64,7 +65,7 @@ export function PasswordForm() {
       </label>)}
       <p className="sf-secondary">Mật khẩu mới cần ít nhất 8 ký tự, gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt.</p>
       {(validation || mutation.isError) && <div role="alert" className="text-sm font-semibold text-rose-600 dark:text-rose-400">{validation || mutation.error?.message}</div>}
-      <div className="sf-footer"><button className="sf-button primary" disabled={mutation.isPending}>{mutation.isPending ? 'Đang đổi mật khẩu…' : 'Đổi mật khẩu'}</button></div>
-    </form>
+      <div className="sf-footer"><ActionButton type="submit" busyLabel="Đang đổi mật khẩu…" className="sf-button primary" disabled={mutation.isPending}>{mutation.isPending ? 'Đang đổi mật khẩu…' : 'Đổi mật khẩu'}</ActionButton></div>
+    </ActionForm>
   </section>;
 }

@@ -42,8 +42,8 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
     if (isAnotherManager(emp, currentUser)) {
       showToast(
         `Quản lý không có quyền xem trang chi tiết của Quản lý khác (${emp.full_name})!`,
-        'warning'
-      );
+        'error',
+        "Không thể xem hồ sơ nhân viên");
       return;
     }
     navigate(`/app/manager/employee-detail?id=${emp.employee_id}`);

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { apiFetch } from '../../../api/client';
-import { useAuth } from '../../../context/AuthContext';
+import type { Employee } from '../../../types';
+import { useAuth, getActiveSessionId } from '../../../context/AuthContext';
 import type { FingerprintStep } from '../components/FingerprintEnrollmentSection';
 
 export interface FingerprintSession {
@@ -14,7 +15,7 @@ export interface FingerprintDevice {
   capacity: number; attendance_enabled: boolean; polling_fallback: boolean; last_seen: string; error: string | null;
 }
 const terminal = ['COMPLETED','CANCELLED','EXPIRED','FAILED'];
-export function useFingerprintEnrollment(employeeId: string | undefined, blocked: boolean, toast: (message: string, type: any) => void) {
+export function useFingerprintEnrollment(employeeId: string | undefined, blocked: boolean, toast: (message: string, type: any, title?: string) => void) {
   const { currentUser } = useAuth();
   const client = useQueryClient();
   const storageKey = `fingerprint-session:${currentUser?.username}:${employeeId}`;
@@ -82,7 +83,7 @@ export function useFingerprintEnrollment(employeeId: string | undefined, blocked
       sessionStorage.setItem(forEmployee, result.id);
       if (latest.current === forEmployee) setSessionId(result.id);
       requestKey.current = null;
-    } catch (e: any) { toast(e.message || 'Chưa xác nhận được phiên lấy mẫu; gửi lại để kiểm tra cùng yêu cầu.', 'error'); }
+    } catch (e: any) { toast(e.message || 'Chưa xác nhận được phiên lấy mẫu; gửi lại để kiểm tra cùng yêu cầu.', 'error', "Không thể lấy mẫu vân tay"); }
     finally { setSending(false); }
   }
   async function confirm() {
@@ -92,15 +93,34 @@ export function useFingerprintEnrollment(employeeId: string | undefined, blocked
     const idempotency = sessionStorage.getItem(confirmKey) || crypto.randomUUID();
     sessionStorage.setItem(confirmKey, idempotency);
     try {
-      await apiFetch(`/api/biometrics/${employeeId}/fingerprint/sessions/${session.data.id}/confirm`, { method: 'POST', headers: { 'Idempotency-Key': idempotency } });
+      const activeSession = getActiveSessionId();
+      let result = (await apiFetch<FingerprintSession>(`/api/biometrics/${employeeId}/fingerprint/sessions/${session.data.id}/confirm`, { method: 'POST', headers: { 'Idempotency-Key': idempotency } })).data!;
+      const deadline = Date.now() + 180_000;
+      let failures = 0;
+      while (result.status === 'SYNCING') {
+        if (getActiveSessionId() !== activeSession) throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng tải lại dữ liệu.');
+        if (Date.now() > deadline) throw new Error('Pi chưa xác nhận đồng bộ. Mẫu cũ vẫn có hiệu lực; thử xác nhận lại để kiểm tra phiên hiện tại.');
+        await new Promise(resolve => window.setTimeout(resolve, 1500));
+        try {
+          result = (await apiFetch<FingerprintSession>(`/api/biometrics/${employeeId}/fingerprint/sessions/${session.data.id}`)).data!;
+          failures = 0;
+        } catch {
+          if (++failures >= 3) throw new Error('Mất kết nối khi chờ Pi. Thử xác nhận lại để kiểm tra phiên hiện tại.');
+        }
+      }
+      if (getActiveSessionId() !== activeSession) throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng tải lại dữ liệu.');
+      if (result.status !== 'COMPLETED') throw new Error(result.error || 'Chưa đồng bộ được mẫu vân tay. Vui lòng kiểm tra thiết bị.');
       sessionStorage.removeItem(storageKey);
       sessionStorage.removeItem(confirmKey);
       setSessionId(null);
       await client.invalidateQueries({ queryKey: key });
       await client.invalidateQueries({ queryKey: ['fingerprint-current', currentUser?.username, employeeId] });
-      toast('Đã xác nhận mẫu; đang chờ Pi đồng bộ. Mẫu cũ tiếp tục có hiệu lực.', 'info');
+      await client.invalidateQueries({ queryKey: ['employees'] });
+      await client.invalidateQueries({ queryKey: ['biometrics'] });
+      const employee = client.getQueryData<Employee[]>(['employees'])?.find(e => e.id === employeeId || e.employee_id === employeeId);
+      toast(`Đã lưu và đồng bộ vân tay ${session.data.finger_name} của ${employee?.full_name || employeeId} (${employee?.employee_id || employeeId}) trên thiết bị ${session.data.device_id}.`, 'success', "Lưu vân tay thành công");
       return true;
-    } catch (e: any) { toast(e.message, 'error'); throw e; }
+    } catch (e: any) { toast(e.message, 'error', "Không thể lưu vân tay"); throw e; }
     finally { setSending(false); }
   }
   async function cancel() {
@@ -112,7 +132,7 @@ export function useFingerprintEnrollment(employeeId: string | undefined, blocked
       setSessionId(null);
       await client.invalidateQueries({ queryKey: key });
       await client.invalidateQueries({ queryKey: ['fingerprint-current', currentUser?.username, employeeId] });
-    } catch (e: any) { toast(e.message, 'error'); }
+    } catch (e: any) { toast(e.message, 'error', "Không thể hủy phiên vân tay"); }
     finally { setSending(false); }
   }
   function reset() {

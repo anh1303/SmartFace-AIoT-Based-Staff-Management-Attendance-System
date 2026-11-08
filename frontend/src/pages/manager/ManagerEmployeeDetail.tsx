@@ -94,15 +94,15 @@ export const ManagerEmployeeDetail: React.FC = () => {
     if (isDifferentDepartment(emp, currentUser)) {
       showToast(
         'Quản lý chỉ có quyền xem thông tin nhân viên thuộc phòng ban mình phụ trách!',
-        'warning'
-      );
+        'error',
+        "Không thể xem hồ sơ nhân viên");
       return;
     }
     if (isAnotherManager(emp, currentUser)) {
       showToast(
         `Quản lý không có quyền xem thông tin chi tiết của Quản lý khác (${emp.full_name})!`,
-        'warning'
-      );
+        'error',
+        "Không thể xem hồ sơ nhân viên");
       return;
     }
     setSelectedEmpCode(emp.employee_id);
@@ -207,10 +207,9 @@ export const ManagerEmployeeDetail: React.FC = () => {
         hourly_rate: Number(editEmployee.hourly_rate),
         fingerprint_enrolled: editEmployee.fingerprint_enrolled,
       });
-      showToast(`Đã cập nhật thông tin nhân viên ${editEmployee.full_name} thành công`, 'success');
       setEditEmployee(null);
     } catch {
-      showToast('Có lỗi xảy ra khi cập nhật thông tin nhân viên', 'error');
+      // The employee mutation reports the specific failure and keeps this form open.
     }
   };
 

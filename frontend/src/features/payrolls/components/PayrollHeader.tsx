@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import { ReportExportButton, type ReportFormat } from '@/components/common/ReportExportButton';
 import React from 'react';
 import { Calendar, Sparkles, Lock, Unlock, Download, Banknote } from 'lucide-react';
@@ -13,7 +14,7 @@ interface PayrollHeaderProps {
   onCalculatePayroll: () => void;
   onOpenFinalizeModal: () => void;
   onOpenUnlockModal: () => void;
-  onExportCSV: (format: ReportFormat) => void;
+  onExportCSV: (format: ReportFormat) => unknown;
   canExport?: boolean;
 }
 
@@ -61,7 +62,7 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
       }
       actions={
         <div className="flex flex-wrap items-center justify-start lg:justify-end gap-2.5">
-            <button
+            <ActionButton busyLabel="Đang tính lương…"
               type="button"
               disabled={isCalculating || isFinalized}
               onClick={onCalculatePayroll}
@@ -74,7 +75,7 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
             >
               <Sparkles className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : 'text-amber-300'}`} />
               <span>{isCalculating ? 'Đang tổng hợp...' : 'Tính lại lương'}</span>
-            </button>
+            </ActionButton>
 
             {isFinalized ? (
               role === 'admin' ? (

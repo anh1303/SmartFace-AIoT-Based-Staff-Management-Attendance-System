@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -53,7 +54,7 @@ export const FaceConfirmModal: React.FC<FaceConfirmModalProps> = ({
           >
             Hủy bỏ
           </button>
-          <button
+          <ActionButton busyLabel="Đang lưu Face ID…"
             type="button"
             disabled={analyzingFace}
             onClick={onConfirm}
@@ -71,7 +72,7 @@ export const FaceConfirmModal: React.FC<FaceConfirmModalProps> = ({
             ) : (
               <span>Xác nhận lưu thay đổi</span>
             )}
-          </button>
+          </ActionButton>
         </div>
       </div>
     </Modal>
@@ -244,13 +245,13 @@ export const FingerprintConfirmModal: React.FC<FingerprintConfirmModalProps> = (
           >
             Hủy bỏ
           </button>
-          <button
+          <ActionButton busyLabel="Đang đồng bộ…"
             type="button"
             onClick={onConfirm}
             className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm shadow-emerald-600/20 cursor-pointer"
           >
             Xác nhận lưu mẫu vân tay
-          </button>
+          </ActionButton>
         </div>
       </div>
     </Modal>

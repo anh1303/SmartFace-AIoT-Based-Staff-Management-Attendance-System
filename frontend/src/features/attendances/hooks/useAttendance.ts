@@ -27,7 +27,7 @@ export function useAttendance(params?: FetchAttendanceParams) {
       pendingRefresh = setTimeout(() => {
         pendingRefresh = undefined;
         refresh();
-        showToast('Chấm công vừa được cập nhật. Đang đồng bộ dữ liệu các trang.', 'info');
+        showToast('Chấm công vừa được cập nhật. Đang đồng bộ dữ liệu các trang.', 'info', "Cập nhật chấm công");
       }, 50);
     };
     socket.on('connect', refresh);
@@ -64,17 +64,17 @@ export function useAttendance(params?: FetchAttendanceParams) {
     mutationFn: (record: Omit<AttendanceRecord, 'attendance_id'>) => addAttendanceApi(record),
     onSuccess: (result) => {
       if (result?.ignored) {
-        showToast(result.message || 'Lượt chấm công gần đây đã được ghi nhận. Đã bỏ qua lượt quét lặp.', 'info');
+        showToast(result.message || 'Lượt chấm công gần đây đã được ghi nhận. Đã bỏ qua lượt quét lặp.', 'info', "Chấm công");
         return;
       }
-      showToast('Điểm danh thành công', 'success');
+      showToast('Điểm danh thành công', 'success', "Chấm công thành công");
       queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
       queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (error: Error) => {
-      showToast(`Lỗi khi điểm danh: ${error.message || 'Không thể kết nối đến máy chủ'}`, 'error');
+      showToast(`Lỗi khi điểm danh: ${error.message || 'Không thể kết nối đến máy chủ'}`, 'error', "Không thể chấm công");
     },
   });
 

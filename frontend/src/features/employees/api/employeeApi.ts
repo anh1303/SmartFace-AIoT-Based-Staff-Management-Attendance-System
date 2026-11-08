@@ -106,7 +106,7 @@ export async function createEmployeeApi(newEmp: Omit<Employee, 'created_at' | 'u
       sessionStorage.removeItem(request.storageKey);
       return { employee: mapEmployee(res.data), emailStatus: 'queued' };
     } catch {
-      throw new UncertainWriteError('Chưa xác định nhân viên đã được tạo hay chưa. Kiểm tra bảng Hoạt động trước khi thử lại; gửi lại cùng nội dung sẽ dùng lại mã yêu cầu.');
+      throw new UncertainWriteError('Chưa xác định nhân viên đã được tạo hay chưa. Thử lại cùng nội dung để kiểm tra bằng mã yêu cầu cũ, tránh tạo trùng.');
     }
   }
 }

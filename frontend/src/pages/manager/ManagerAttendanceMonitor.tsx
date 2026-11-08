@@ -169,7 +169,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     const hasWorkShift = !item.isUnassigned;
     const hasScanData = item.hasCheckedIn || item.hasCheckedOut || item.rawEvents.length > 0;
     if (!hasWorkShift && !hasScanData && !item.isOffDay && item.currentOTSec === 0) {
-      showToast('Không có dữ liệu ca hoặc chấm công để điều chỉnh', 'warning');
+      showToast('Không có dữ liệu ca hoặc chấm công để điều chỉnh', 'error', "Không thể cập nhật chấm công");
       return;
     }
     setEditingItem({
@@ -229,23 +229,27 @@ export const ManagerAttendanceMonitor: React.FC = () => {
       if (!confirmed) return;
     }
 
+    const completedDates: string[] = [];
     try {
       for (const d of dates) {
         await toggleLockAsync(d, targetLockState);
+        completedDates.push(d);
       }
       refetchSummaries();
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi cập nhật trạng thái chốt ca', 'error');
+      const message = `Đã xử lý ${completedDates.length}/${dates.length} ngày. ${err.message || 'Chưa cập nhật được ngày tiếp theo.'} Vui lòng kiểm tra trạng thái trước khi thử lại.`;
+      showToast(message, 'error', "Không thể cập nhật trạng thái ngày công");
+      throw new Error(message);
     }
   };
 
   const handleExportCSV = (format: 'excel' | 'pdf') => {
     if (!canExport) {
-      showToast('Chỉ xuất sau khi đã chốt ca và dữ liệu sẵn sàng', 'warning');
+      showToast('Chỉ xuất sau khi đã chốt ca và dữ liệu sẵn sàng', 'error', "Không thể xuất báo cáo");
       return;
     }
     const dateLabel = startDate === endDate ? startDate : `${startDate}_den_${endDate}`;
-    exportAttendanceToCSV(employeePairs, dateLabel, showToast, format);
+    return exportAttendanceToCSV(employeePairs, dateLabel, showToast, format);
   };
 
   const handleSaveAdjustments = async (payload: {
@@ -257,7 +261,8 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   }) => {
     // Đợi API thành công rồi mới báo thành công; nếu lỗi sẽ ném ra để Modal giữ form
     await adjustAttendance(payload);
-    showToast('Đã lưu dữ liệu điều chỉnh chấm công vào CSDL thành công', 'success');
+    const employee = employees.find(e => e.employee_id === payload.employeeId || e.id === payload.employeeId);
+    showToast(`Đã điều chỉnh ngày công ${payload.date.split('-').reverse().join('/')} của ${employee?.full_name || payload.employeeId} (${payload.employeeId}): tăng ca ${payload.overtime} giờ, trễ/về sớm ${payload.late_early} giờ. Lý do: ${payload.reason}`, 'success', 'Điều chỉnh chấm công thành công');
   };
 
   const handleUnlockEmployee = async (item: AttendancePairItem) => {
@@ -269,7 +274,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
         });
         refetchSummaries();
       } catch (err: any) {
-        showToast(err.message || 'Không thể mở khóa ngày công', 'error');
+        showToast(err.message || 'Không thể mở khóa ngày công', 'error', "Không thể mở khóa ngày công");
       }
     }
   };

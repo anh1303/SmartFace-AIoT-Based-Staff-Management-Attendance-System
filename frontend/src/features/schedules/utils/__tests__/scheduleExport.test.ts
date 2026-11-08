@@ -188,7 +188,8 @@ describe('scheduleExport utility', () => {
 
     expect(showToast).toHaveBeenCalledWith(
       'Không có dữ liệu nhân viên để xuất Excel!',
-      'warning'
+      'error',
+      'Không thể xuất lịch làm việc'
     );
     expect(XLSX.writeFile).not.toHaveBeenCalled();
   });

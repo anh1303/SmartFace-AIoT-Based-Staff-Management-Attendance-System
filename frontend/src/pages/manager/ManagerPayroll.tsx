@@ -100,7 +100,7 @@ export const ManagerPayroll: React.FC = () => {
 
   const handleOpenPolicyModal = async () => {
     if (role !== 'admin') {
-      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error');
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error', "Không thể tải chính sách lương");
       return;
     }
     try {
@@ -116,14 +116,14 @@ export const ManagerPayroll: React.FC = () => {
       });
       setIsPolicyModalOpen(true);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Không tải được chính sách', 'error');
+      showToast(error instanceof Error ? error.message : 'Không tải được chính sách', 'error', "Không thể tải chính sách lương");
     }
   };
 
   const handleSavePolicy = async (e: React.FormEvent) => {
     e.preventDefault();
     if (role !== 'admin') {
-      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error');
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error', "Không thể cập nhật chính sách lương");
       setIsPolicyModalOpen(false);
       return;
     }
@@ -218,7 +218,7 @@ export const ManagerPayroll: React.FC = () => {
 
   const handleOpenEdit = (record: PayrollRecord) => {
     if (record.status !== 'PENDING') {
-      showToast('Bảng lương kỳ này đã bị Khóa. Cần mở khóa kỳ trước khi sửa phiếu lương!', 'warning');
+      showToast('Bảng lương kỳ này đã bị Khóa. Cần mở khóa kỳ trước khi sửa phiếu lương!', 'error', "Không thể chỉnh sửa phiếu lương");
       return;
     }
     const emp = employees.find((e) => e.employee_id === record.employee_id);
@@ -227,15 +227,15 @@ export const ManagerPayroll: React.FC = () => {
         emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
       );
       if (isSelf) {
-        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error');
+        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error', "Không thể chỉnh sửa phiếu lương");
         return;
       }
       if (isAnotherManager(emp, currentUser)) {
-        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error');
+        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error', "Không thể chỉnh sửa phiếu lương");
         return;
       }
       if (isDifferentDepartment(emp, currentUser)) {
-        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error');
+        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error', "Không thể chỉnh sửa phiếu lương");
         return;
       }
     }
@@ -253,7 +253,7 @@ export const ManagerPayroll: React.FC = () => {
     if (!editingItem) return;
 
     if (editingItem.record.status !== 'PENDING') {
-      showToast(`Không thể chỉnh sửa phiếu lương ở trạng thái ${editingItem.record.status}. Chỉ có thể chỉnh sửa khi ở trạng thái PENDING (Chờ duyệt)!`, 'error');
+      showToast(`Không thể chỉnh sửa phiếu lương ở trạng thái ${editingItem.record.status}. Chỉ có thể chỉnh sửa khi ở trạng thái PENDING (Chờ duyệt)!`, 'error', "Không thể cập nhật phiếu lương");
       return;
     }
 
@@ -263,15 +263,15 @@ export const ManagerPayroll: React.FC = () => {
         emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
       );
       if (isSelf) {
-        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error');
+        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error', "Không thể cập nhật phiếu lương");
         return;
       }
       if (isAnotherManager(emp, currentUser)) {
-        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error');
+        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error', "Không thể cập nhật phiếu lương");
         return;
       }
       if (isDifferentDepartment(emp, currentUser)) {
-        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error');
+        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error', "Không thể cập nhật phiếu lương");
         return;
       }
     }
@@ -280,18 +280,18 @@ export const ManagerPayroll: React.FC = () => {
       setIsSavingItem(true);
       await updatePayrollItem(editingItem.record.payroll_id, buildPayrollItemUpdates(editingItem));
 
-      showToast(`Đã lưu thay đổi bảng lương cho ${editingItem.empName}!`, 'success');
+      showToast(`Đã cập nhật phụ cấp của ${editingItem.empName} (${editingItem.record.employee_id}) trong kỳ ${selectedPeriod}. Lý do: ${editingItem.reason}`, 'success', "Cập nhật phiếu lương thành công");
       setEditingItem(null);
     } catch (err: any) {
       payrollLogger.error('Lỗi khi cập nhật phiếu lương:', err);
-      showToast(err.message || 'Lỗi khi cập nhật phiếu lương', 'error');
+      showToast(`${editingItem.empName} (${editingItem.record.employee_id}), kỳ ${selectedPeriod}: ${err.message || 'Chưa lưu được phiếu lương.'} Kiểm tra trạng thái kỳ lương trước khi lưu lại.`, 'error', "Không thể cập nhật phiếu lương");
     } finally {
       setIsSavingItem(false);
     }
   };
 
-  const handleFinalizeConfirm = () => {
-    finalizePayrollPeriod(selectedPeriod);
+  const handleFinalizeConfirm = async () => {
+    await finalizePayrollPeriod(selectedPeriod);
     setConfirmFinalizeOpen(false);
   };
 
@@ -304,22 +304,22 @@ export const ManagerPayroll: React.FC = () => {
         cutoffDate,
         reason,
       });
-      showToast(`Đã quyết toán sớm bảng lương cho nhân viên ${earlySettlementRecord.employee_name || earlySettlementRecord.employee_id}!`, 'success');
+      showToast(`Đã quyết toán sớm kỳ ${selectedPeriod} cho ${earlySettlementRecord.employee_name || earlySettlementRecord.employee_id} (${earlySettlementRecord.employee_id}) đến ngày ${cutoffDate.split('-').reverse().join('/')}. Lý do: ${reason}`, 'success', "Quyết toán lương sớm thành công");
       setEarlySettlementRecord(null);
       await generatePayroll(selectedPeriod);
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi quyết toán sớm', 'error');
+      showToast(err.message || 'Lỗi khi quyết toán sớm', 'error', "Không thể quyết toán lương sớm");
       throw err;
     }
   };
 
-  const handleUnlockConfirm = () => {
+  const handleUnlockConfirm = async () => {
     if (role !== 'admin') {
-      showToast('Chỉ Quản trị viên (Admin) mới có quyền mở khóa bảng lương!', 'error');
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền mở khóa bảng lương!', 'error', "Không thể mở khóa bảng lương");
       setConfirmUnlockOpen(false);
       return;
     }
-    unlockPayrollPeriod(selectedPeriod);
+    await unlockPayrollPeriod(selectedPeriod);
     setConfirmUnlockOpen(false);
   };
 
@@ -336,11 +336,11 @@ export const ManagerPayroll: React.FC = () => {
 
   const handleExportCSV = (format: 'excel' | 'pdf') => {
     if (!canExport) {
-      showToast('Chỉ xuất Excel khi kỳ lương đã chốt và dữ liệu đã sẵn sàng.', 'warning');
+      showToast('Chỉ xuất Excel khi kỳ lương đã chốt và dữ liệu đã sẵn sàng.', 'error', "Không thể xuất báo cáo");
       return;
     }
     if (allPeriodRecords.length === 0) {
-      showToast(`Kỳ ${selectedPeriod} chưa có dữ liệu bảng lương để xuất Excel!`, 'warning');
+      showToast(`Kỳ ${selectedPeriod} chưa có dữ liệu bảng lương để xuất Excel!`, 'error', "Không thể xuất báo cáo");
       return;
     }
 
@@ -385,14 +385,14 @@ export const ManagerPayroll: React.FC = () => {
       ];
     });
 
-    void exportToExcel({
+    return exportToExcel({
       format,
       sheetName: `Kỳ lương ${selectedPeriod}`,
       headers,
       rows,
       fileName: `Bang_luong_chi_tiet_ky_${selectedPeriod}.xlsx`,
-    }).then(saved => { if (saved) showToast(`Đã lưu báo cáo bảng lương kỳ ${selectedPeriod} sang file Excel (.xlsx)!`, 'success'); })
-      .catch(() => showToast('Không thể lưu báo cáo.', 'error'));
+    }).then(saved => { if (saved) showToast(`Đã lưu báo cáo bảng lương kỳ ${selectedPeriod} sang file Excel (.xlsx)!`, 'success', "Xuất báo cáo thành công"); })
+      .catch(() => showToast('Không thể lưu báo cáo.', 'error', "Không thể xuất báo cáo"));
   };
 
   return (

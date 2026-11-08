@@ -11,6 +11,7 @@ import sys
 from typing import List, Optional
 from uuid import UUID
 import cv2
+from enrollment.avatar import enrollment_avatar
 import numpy as np
 from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel, Field
@@ -129,6 +130,7 @@ def enroll_faces(req: EnrollRequest):
             return receipt
 
     embeddings = []
+    avatar_image = None
     failed_count = 0
     failures = {"decode": 0, "no_face": 0, "multiple_faces": 0, "alignment": 0, "embedding": 0}
 
@@ -171,6 +173,8 @@ def enroll_faces(req: EnrollRequest):
         emb = embedder.embed_aligned(aligned)
         if emb is not None:
             embeddings.append(emb)
+            if req.operation_id and avatar_image is None:
+                avatar_image = img.copy()
         else:
             failures["embedding"] += 1
             failed_count += 1
@@ -215,7 +219,7 @@ def enroll_faces(req: EnrollRequest):
             save_individuals=True,
             operation_id=str(req.operation_id) if req.operation_id else None,
             operation_result=result,
-            avatar_url=req.images_base64[0] if req.operation_id else None,
+            avatar_url=enrollment_avatar(avatar_image) if req.operation_id else None,
         )
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))

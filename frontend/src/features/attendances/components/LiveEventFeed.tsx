@@ -57,9 +57,6 @@ export const LiveEventFeed: React.FC<LiveEventFeedProps> = ({
           <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400 dark:text-slate-500">
             <Clock className="w-8 h-8 mb-2 opacity-40 animate-pulse" />
             <p className="text-xs font-medium">Đang chờ lượt quét khuôn mặt từ camera...</p>
-            <p className="text-[10px] text-slate-400 mt-1 max-w-[200px]">
-              Dữ liệu điểm danh từ Raspberry Pi sẽ xuất hiện tự động tại đây ngay lập tức.
-            </p>
           </div>
         ) : (
           events.map((evt) => {

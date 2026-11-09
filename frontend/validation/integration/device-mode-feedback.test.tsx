@@ -11,7 +11,7 @@ vi.mock('../../src/features/devices/components/DeviceKioskSettingsPanel', () => 
 vi.mock('../../src/features/devices', async () => {
   const { confirmsRequestedMode } = await import('../../src/features/devices/deviceModeState');
   const device = { id: 'pi', name: 'Pi', location: 'Sảnh', status: 'ONLINE', lastSeen: null };
-  return { confirmsRequestedMode, validDeviceIp: () => true, useDeviceRealtime: () => {}, deviceApi: {
+  return { confirmsRequestedMode, DeviceKioskSettingsPanel: () => null, validDeviceIp: () => true, useDeviceRealtime: () => {}, deviceApi: {
     list: async () => [device], get: async () => device, setMode: state.send,
     mode: async () => ({ deviceId: 'pi', mode: state.ack ? 'CHECK_IN' : 'AUTO', confirmed: state.ack, lastUpdated: new Date().toISOString() }),
   } };

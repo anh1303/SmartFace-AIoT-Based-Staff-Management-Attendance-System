@@ -5,7 +5,7 @@ import { Employee } from '../../../types';
 import { useToast } from '../../../context/ToastContext';
 import { getActiveSessionId } from '../../../context/AuthContext';
 import { ApiError } from '../../../api/client';
-import { UncertainWriteError } from '../../operations/commandApi';
+import { UncertainWriteError } from '../../operations';
 
 export const EMPLOYEES_QUERY_KEY = ['employees'];
 

@@ -11,6 +11,7 @@ import { requirePasswordAuth } from '../../src/modules/auth/face-login/require-p
 import { prisma } from '../../src/config/database.js'
 import { hasFaceLoginTemplate } from '../../src/modules/biometrics/public.js'
 import { refreshSocketScope } from '../../src/sockets/socket.auth.js'
+import { configureAuthBiometrics } from '../../src/modules/auth/auth.biometrics-port.js'
 
 vi.mock('../../src/config/database.js', () => ({ prisma: { user: { findFirst: vi.fn(), findUnique: vi.fn() } } }))
 vi.mock('bcryptjs', () => ({ default: { compare: vi.fn() } }))
@@ -22,6 +23,7 @@ const user = () => ({ id: 'user-a', username: 'employee-a', is_active: true,
 
 describe('Face sessions and sensitive actions', () => {
   beforeEach(() => { vi.clearAllMocks(); env.FACE_LOGIN_ENABLED = true
+    configureAuthBiometrics({ hasFaceLoginTemplate } as any)
     vi.mocked(prisma.user.findFirst).mockResolvedValue(user() as any)
     vi.mocked(prisma.user.findUnique).mockResolvedValue(user() as any)
     vi.mocked(hasFaceLoginTemplate).mockResolvedValue(true)

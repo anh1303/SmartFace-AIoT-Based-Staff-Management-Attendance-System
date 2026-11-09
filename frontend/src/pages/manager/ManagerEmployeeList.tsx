@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { useEmployeeContext } from '../../context/EmployeeContext';
 import { Employee } from '../../types';
 import {
@@ -26,10 +27,9 @@ export const ManagerEmployeeList: React.FC = () => {
     updateEmployee,
     deleteEmployee,
     toggleEmployeeStatus,
-    showToast,
-    role,
-    currentUser,
-  } = useApp();
+  } = employeeState;
+  const { showToast } = useToast();
+  const { role, currentUser } = useAuth();
 
   const isManager = role === 'manager';
   const managerDept = currentUser?.department;

@@ -85,3 +85,6 @@ it('deletes faces through the biometric endpoint without sending an ineffective 
   expect(state.remove).toHaveBeenCalledWith('NV1'); expect(state.update).not.toHaveBeenCalled();
   expect(state.toast).toHaveBeenCalledWith(expect.stringContaining('Đã xóa'), 'success', 'Xóa Face ID thành công');
 });
+
+vi.mock('../../src/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ employees: state.employees, updateEmployee: state.update }) }));
+vi.mock('../../src/context/ToastContext', () => ({ useToast: () => ({ showToast: state.toast }) }));

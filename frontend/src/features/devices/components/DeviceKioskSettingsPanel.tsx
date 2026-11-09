@@ -28,7 +28,7 @@ import {
 import {
   useDeviceSettings,
   BluetoothDevice,
-} from '../../attendances/hooks/useDeviceSettings';
+} from '../../attendances';
 
 interface DeviceKioskSettingsPanelProps {
   deviceId: string;

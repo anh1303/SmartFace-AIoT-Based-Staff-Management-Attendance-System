@@ -1,12 +1,12 @@
-import { useApp } from '../../../context/AppContext';
+import { usePayrollContext } from '../../../context/PayrollContext';
 import { useShiftContext } from '../../../context/ShiftContext';
-import { useAttendanceSummaries } from '../../attendances/hooks/useAttendanceSummaries';
+import { useAttendanceSummaries } from '../../attendances';
 import { getTodayVNString } from '../../../utils/dateUtils';
 import { Employee } from '../../../types';
 import { calculateMonthlyAverages } from '../utils/monthlyAverages';
 
 export function EmployeeMonthlyAverages({ employee }: { employee: Employee }) {
-  const { payroll, isLoadingPayroll, payrollError } = useApp();
+  const { payroll, isLoadingPayroll, payrollError } = usePayrollContext();
   const shifts = useShiftContext();
   const attendance = useAttendanceSummaries(undefined, undefined, employee.employee_id);
   const belongsToEmployee = (id: string) => id === employee.employee_id || id === employee.id;

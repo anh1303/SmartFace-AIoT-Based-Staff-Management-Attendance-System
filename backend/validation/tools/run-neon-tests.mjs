@@ -1,27 +1,31 @@
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import { PrismaClient } from '@prisma/client'
-import { assertIsolatedNeonTestDatabase } from '../../src/__tests__/helpers/cloud-test-db.mjs'
+import { assertIsolatedNeonTestDatabase, assertTestingNeonEndpoint } from '../../src/__tests__/helpers/cloud-test-db.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const settings = dotenv.parse(readFileSync(path.join(root, '.env.testing')))
 const source = new URL(settings.DIRECT_URL)
-if (source.protocol !== 'postgresql:' || source.hostname !== 'ep-round-breeze-b3p8jbri.c-4.ap-southeast-1.aws.neon.tech' ||
-    source.pathname !== '/neondb' || source.searchParams.get('sslmode') !== 'require' || source.searchParams.get('channel_binding') !== 'require') {
-  throw new Error('The configured Neon testing endpoint is not recognised')
+const applicationSettings = [process.env]
+for (const file of [path.join(root, '.env'), path.join(root, '..', '.env.compose')]) {
+  if (existsSync(file)) applicationSettings.push(dotenv.parse(readFileSync(file)))
 }
+const forbiddenHosts = applicationSettings.flatMap(settings => Object.values(settings).flatMap(value => {
+  try { const url = new URL(value); return ['postgres:', 'postgresql:'].includes(url.protocol) ? [url.hostname] : [] } catch { return [] }
+}))
+const testingHost = assertTestingNeonEndpoint(settings.DIRECT_URL, forbiddenHosts)
 const database = `smartface_test_${randomBytes(8).toString('hex')}`
 const testUrl = new URL(source)
 testUrl.pathname = `/${database}`
 const env = { ...process.env, DATABASE_URL: testUrl.toString(), DIRECT_URL: testUrl.toString(), NODE_ENV: 'test', RUN_POLICY_DB_TESTS: '1', RUN_SOCKET_TESTS: '1',
   JWT_SECRET: 'isolated-neon-test-secret-at-least-32-characters', MQTT_DEVICE_SECRET: 'isolated-neon-mqtt-secret-at-least-32-characters',
   BIOMETRIC_ENCRYPTION_KEY: 'isolated-neon-biometric-key-at-least-32-characters', ENABLE_MQTT: 'false', SMTP_HOST: '', SMTP_USER: '', SMTP_PASS: '',
-  FACE_AUTH_URL: 'http://127.0.0.1:1', TB_HOST: '', LOG_LEVEL: 'silent' }
-assertIsolatedNeonTestDatabase(env.DATABASE_URL, env.DIRECT_URL)
+  FACE_AUTH_URL: 'http://127.0.0.1:1', TB_HOST: '', LOG_LEVEL: 'silent', SMARTFACE_TEST_NEON_HOST: testingHost }
+assertIsolatedNeonTestDatabase(env.DATABASE_URL, env.DIRECT_URL, testingHost)
 const output = path.join(root, 'tmp/neon-test-results', database)
 mkdirSync(output, { recursive: true })
 env.NEON_TEST_RESULTS_DIR = output
@@ -31,6 +35,14 @@ const suites = files.length ? files : [
   'validation/attendance/attendance.integration.test.ts',
   'validation/payroll/adjustments.integration.test.ts',
   'validation/attendance/attendance.safety.integration.test.ts',
+  'validation/attendance/attendance.races.integration.test.ts',
+  'validation/attendance/attendance.scale.integration.test.ts',
+  'validation/attendance/auto-close.scale.integration.test.ts',
+  'validation/attendance/workflow.regression.integration.test.ts',
+  'validation/attendance/alert-dedup.integration.test.ts',
+  'validation/attendance/missing-scan-alert.integration.test.ts',
+  'validation/payroll/approval-aggregation.regression.test.ts',
+  'validation/payroll/payroll.scale.integration.test.ts',
   'validation/integration/business-rules.integration.test.ts',
   'validation/integration/ui-extension.integration.test.ts',
   'src/__tests__/integration/employee-account-creation.test.ts',
@@ -43,7 +55,7 @@ try {
   await admin.$executeRawUnsafe(`CREATE DATABASE "${database}"`)
   created = true
   for (const [index, file] of suites.entries()) {
-    assertIsolatedNeonTestDatabase(env.DATABASE_URL, env.DIRECT_URL)
+    assertIsolatedNeonTestDatabase(env.DATABASE_URL, env.DIRECT_URL, testingHost)
     const migrate = spawnSync(process.execPath, ['node_modules/prisma/build/index.js', 'migrate', 'reset', '--force', '--skip-seed', '--skip-generate'],
       { cwd: root, env, encoding: 'utf8', timeout: 300000 })
     writeFileSync(path.join(output, `migration-${index}.log`), String(migrate.stdout ?? '') + String(migrate.stderr ?? ''))
@@ -65,7 +77,7 @@ try {
 } finally {
   try {
     if (created) {
-      assertIsolatedNeonTestDatabase(testUrl.toString(), testUrl.toString())
+      assertIsolatedNeonTestDatabase(testUrl.toString(), testUrl.toString(), testingHost)
       await admin.$executeRawUnsafe(`DROP DATABASE "${database}" WITH (FORCE)`)
       console.log('Temporary Neon test database removed.')
     }

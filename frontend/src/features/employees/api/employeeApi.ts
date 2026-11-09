@@ -1,6 +1,6 @@
 import { apiFetch } from '../../../api/client';
 import { Employee } from '../../../types';
-import { commandKey, definitiveFailure, UncertainWriteError } from '../../operations/commandApi';
+import { commandKey, definitiveFailure, UncertainWriteError } from '../../operations';
 
 interface RawEmployee {
   id: string;

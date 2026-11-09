@@ -4,6 +4,7 @@ import { Modal } from '../../../components/common/Modal';
 import { Check } from 'lucide-react';
 import { PayrollRecord } from '../../../types';
 import type { PayrollItemUpdates } from '../api/payrollApi';
+import { previewPayrollItemApi } from '../api/payrollApi';
 
 export interface EditingPayrollItem {
   record: PayrollRecord;
@@ -34,17 +35,25 @@ interface PayrollItemEditModalProps {
 
 export const PayrollItemEditModal: React.FC<PayrollItemEditModalProps> = ({ editingItem: item, onClose, onChangeEditingItem: change, onConfirmSave, selectedPeriod, absenceLabel, isSubmitting = false }) => {
   const [allowanceInput, setAllowanceInput] = useState('');
+  const [preview, setPreview] = useState<{ amount?: number; error?: string; loading?: boolean }>({});
   useEffect(() => {
     setAllowanceInput(item ? String(item.allowance) : '');
   }, [item?.record.payroll_id]);
+  useEffect(() => {
+    let active = true;
+    setPreview({});
+    if (!item || allowanceInput === '' || !item.record.updated_at || !Number.isFinite(item.allowance) || item.allowance < 0) return;
+    setPreview({ loading: true });
+    const timer = window.setTimeout(() => {
+      previewPayrollItemApi(item.record.payroll_id, item.allowance, item.record.updated_at!).then(
+        result => { if (active) setPreview({ amount: result.net_salary }); },
+        error => { if (active) setPreview({ error: error instanceof Error ? error.message : 'Không thể xem trước lương' }); },
+      );
+    }, 300);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [item?.record.payroll_id, item?.record.updated_at, item?.allowance, allowanceInput]);
   if (!item) return null;
   const record = item.record;
-  const breakdown = record.breakdown;
-  const estimatedNet = breakdown
-    ? Math.max(0, Math.round(breakdown.base_salary + breakdown.overtime_pay - breakdown.late_early_deduction - breakdown.absence_deduction + item.allowance))
-    : record.net_salary > 0 || item.allowance === record.allowance
-      ? Math.max(0, record.net_salary + item.allowance - (record.allowance ?? 0))
-      : null;
   return <Modal isOpen onClose={() => { if (!isSubmitting) onClose(); }} title="Điều chỉnh phụ cấp" subtitle={`${item.empName} · ${record.employee_id} · Kỳ ${selectedPeriod}`} maxWidth="2xl">
     <ActionForm onSubmit={onConfirmSave} className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -55,7 +64,7 @@ export const PayrollItemEditModal: React.FC<PayrollItemEditModalProps> = ({ edit
         <label className="sf-field">Nghỉ làm không lý do<input className="sf-input" value={absenceLabel} readOnly /></label>
       </div>
       <label className="sf-field">Phụ cấp<div className="relative"><input className="sf-input text-lg font-semibold pr-10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" type="number" step={50000} min={0} required value={allowanceInput} disabled={isSubmitting} onChange={e => { setAllowanceInput(e.target.value); if (e.target.value !== '') change({ ...item, allowance: Number(e.target.value) }); }}/><span aria-hidden="true" className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 pointer-events-none">đ</span></div></label>
-      <label className="sf-field">Thực lĩnh dự kiến sau điều chỉnh<input className="sf-input font-semibold" value={allowanceInput === '' ? '—' : estimatedNet == null ? 'Chưa đủ dữ liệu để tính' : `${estimatedNet.toLocaleString('vi-VN')} ₫`} readOnly /></label>
+      <label className="sf-field">Thực lĩnh dự kiến sau điều chỉnh<input className="sf-input font-semibold" value={allowanceInput === '' ? '—' : preview.loading ? 'Đang tính…' : preview.error || (preview.amount == null ? 'Chưa đủ dữ liệu để tính' : `${preview.amount.toLocaleString('vi-VN')} ₫`)} readOnly /></label>
       <label className="sf-field">Lý do điều chỉnh:<textarea className="sf-input" required minLength={3} maxLength={2000} rows={2} value={item.reason} disabled={isSubmitting} onChange={e => change({ ...item, reason: e.target.value })} placeholder="Nêu lý do để lưu vết điều chỉnh…"/></label>
       <div className="sf-footer"><button type="button" disabled={isSubmitting} className="sf-button" onClick={onClose}>Hủy bỏ</button><ActionButton type="submit" busyLabel="Đang lưu…" className="sf-button primary" disabled={isSubmitting}><Check size={16}/>{isSubmitting ? 'Đang lưu thay đổi…' : 'Xác nhận cập nhật bảng lương'}</ActionButton></div>
     </ActionForm>

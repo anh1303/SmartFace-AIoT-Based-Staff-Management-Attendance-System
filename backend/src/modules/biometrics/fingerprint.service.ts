@@ -6,7 +6,7 @@ import { AppError } from '../../common/AppError.js'
 import { encryptPayload, decryptPayload } from '../../common/biometric-crypto.js'
 import { eventBus } from '../../common/event-bus.js'
 import { assertCanManageEmployee, findEmployeeByIdOrCode, setFingerprintEnrolledStatus, type EmployeeActor } from '../employees/public.js'
-import { triggerDeviceAction } from '../devices/device.service.js'
+import { triggerDeviceAction } from '../devices/public.js'
 
 export const liveSessionStates = ['QUEUED', 'WAITING_TOUCH_1', 'LIFT_FINGER', 'WAITING_TOUCH_2', 'VERIFIED', 'SYNCING']
 const collectingStates = liveSessionStates.filter(s => s !== 'SYNCING')

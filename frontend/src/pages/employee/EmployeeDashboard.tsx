@@ -2,16 +2,20 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Bell, CalendarClock, CalendarCheck, Clock, LayoutDashboard, ScanFace, Timer, UserX, Wallet } from 'lucide-react';
 import { PageHeaderBanner } from '../../components/common';
-import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
+import { usePayrollContext } from '../../context/PayrollContext';
 import { useShiftContext } from '../../context/ShiftContext';
 import { api } from '../../api/client';
 import type { NotificationItem } from '../../features/notifications';
-import { useEmployeeOverview } from '../../features/attendances/hooks/useEmployeeOverview';
+import { useEmployeeOverview } from '../../features/attendances';
 import { getTodayVNString, formatVNTime } from '../../utils/dateUtils';
 import { money, quantity, shiftNames } from './employeePresentation';
 
 export const EmployeeDashboard: React.FC = () => {
-  const { currentUser, employees, payroll, isLoadingPayroll, payrollError } = useApp();
+  const { currentUser } = useAuth();
+  const { employees } = useEmployeeContext();
+  const { payroll, isLoadingPayroll, payrollError } = usePayrollContext();
   const shifts = useShiftContext();
   const employeeId = currentUser?.employee_id;
   const employee = employeeId ? employees.find(e => e.employee_id === employeeId || e.id === employeeId) : undefined;

@@ -7,6 +7,7 @@ import { env } from './config/env.js';
 import { errorHandler, notFound } from './middlewares/errorHandler.js';
 import { successResponse } from './common/response.js';
 import { apiRouter } from './routes.js';
+import './composition.js';
 
 export const app = express();
 

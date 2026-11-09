@@ -9,3 +9,4 @@ export * from './components/ReportsBreakdownAndLeaderboard';
 export * from './components/ExportReportsModal';
 export * from './api/reportsApi';
 export * from './hooks/useMonthlyReport';
+export * from './utils/monthlyReportExport';

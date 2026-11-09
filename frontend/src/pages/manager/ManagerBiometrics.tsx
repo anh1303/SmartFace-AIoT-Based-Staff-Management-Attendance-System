@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useDepartmentPositions } from '@/features/employees';
 import { ScanFace, Fingerprint, AlertTriangle } from 'lucide-react';
@@ -19,7 +19,7 @@ import {
 } from '@/features/biometrics';
 
 export const ManagerBiometrics: React.FC = () => {
-  const { employees } = useApp();
+  const { employees } = useEmployeeContext();
   const { currentUser, role } = useAuth();
   const [, setSearchParams] = useSearchParams();
 

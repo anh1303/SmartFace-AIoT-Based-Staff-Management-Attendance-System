@@ -1,5 +1,5 @@
 import { apiFetch } from '../../../api/client';
-import { submitAndWait } from '../../operations/commandApi';
+import { submitAndWait } from '../../operations';
 
 export async function enrollFaceJobApi(employeeId: string, images: string[]) {
   return submitAndWait(`/api/biometrics/${employeeId}/enroll-jobs`, { images });

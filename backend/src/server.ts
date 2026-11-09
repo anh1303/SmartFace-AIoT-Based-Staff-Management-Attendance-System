@@ -6,15 +6,17 @@ import { app } from './app.js'
 import { env } from './config/env.js'
 import { prisma } from './config/database.js'
 import { connectMqtt, disconnectMqtt } from './config/mqtt.js'
-import { socketAuthMiddleware } from './sockets/socket.auth.js'
+import { socketAuthMiddleware, refreshSocketScope } from './sockets/socket.auth.js'
 import { initializeAttendanceGateway, startAttendanceCron, stopAttendanceCron } from './modules/attendance/index.js'
 import { initializeDeviceGateway, registerDeviceMqttHandlers } from './modules/devices/index.js'
 import { logger } from './common/logger.js'
 import { initializeOperationGateway } from './modules/operations/operation.gateway.js'
-import { startOperationWorker, stopOperationWorker, registerOperationHandler } from './modules/operations/operation.worker.js'
+import { startOperationWorker, stopOperationWorker, registerOperationHandler, setOperationActorLookup } from './modules/operations/operation.worker.js'
 import { executeShiftBatch } from './modules/shifts/shift-batch.service.js'
 import { executeEnrollment } from './modules/biometrics/biometric.jobs.js'
 import { executeAccountEmail } from './modules/employees/employee.jobs.js'
+import { findEmployeeByIdOrCode } from './modules/employees/public.js'
+import { findAuthUserById } from './modules/auth/public.js'
 
 const serverLogger = logger.child('Server')
 const shutdownLogger = logger.child('Shutdown')
@@ -33,7 +35,8 @@ io.use(socketAuthMiddleware)
 initializeAttendanceGateway(io)
 initializeDeviceGateway(io)
 initializeFingerprintGateway(io)
-initializeOperationGateway(io)
+initializeOperationGateway(io, findEmployeeByIdOrCode, { authenticate: socketAuthMiddleware, refresh: refreshSocketScope })
+setOperationActorLookup(id => findAuthUserById(id, { includeRoles: true }))
 registerOperationHandler('shifts.batch', executeShiftBatch)
 registerOperationHandler('biometric.enroll', executeEnrollment)
 registerOperationHandler('employee.email', executeAccountEmail)

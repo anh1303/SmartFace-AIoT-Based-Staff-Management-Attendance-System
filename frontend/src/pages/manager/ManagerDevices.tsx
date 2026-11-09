@@ -17,7 +17,7 @@ import {
   type DeviceStatus,
   type AttendanceMode,
 } from '@/features/devices';
-import { DeviceKioskSettingsPanel } from '../../features/devices/components/DeviceKioskSettingsPanel';
+import { DeviceKioskSettingsPanel } from '../../features/devices';
 
 const labels = { ONLINE: 'Trực tuyến', OFFLINE: 'Ngoại tuyến', MAINTENANCE: 'Bảo trì' };
 const time = (value: string | null) => value ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Chưa ghi nhận';

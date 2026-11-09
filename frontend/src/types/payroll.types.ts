@@ -32,6 +32,7 @@ export interface PayrollRecord {
   total_overtime: number;
   total_late_early: number;
   total_absence_penalty?: number;
+  approved_absence_count?: number | null;
   allowance: number;
   net_salary: number;
   status: PayrollStatus;

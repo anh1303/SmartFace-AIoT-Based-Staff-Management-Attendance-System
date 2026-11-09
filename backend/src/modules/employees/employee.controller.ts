@@ -3,7 +3,7 @@ import { successResponse } from '../../common/response.js';
 import { createEmployeeSchema, updateEmployeeSchema } from './employee.dto.js';
 import * as service from './employee.service.js';
 import { z } from 'zod';
-import { announceDataChange } from '../operations/operation.gateway.js';
+import { announceDataChange } from '../operations/public.js';
 
 
 export const list = async (req: Request, res: Response) => {

@@ -7,13 +7,12 @@ import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
 import { AppError } from '../../common/AppError.js'
 import { USER_ROLES } from '../../common/constants.js'
-import { generateUniqueEmployeeCode, findEmployeeByEmail } from '../employees/employee.code.js'
-import { createEmployee, findDepartmentByIdOrCode, findPositionByName } from '../employees/public.js'
+import { generateUniqueEmployeeCode, findEmployeeByEmail, createEmployee, findDepartmentByIdOrCode, findPositionByName } from '../employees/public.js'
 import { logAction } from '../audit-logs/public.js'
 import type { z } from 'zod'
 import type { loginSchema, registerSchema } from './auth.dto.js'
 import { faceSessionAllowed } from './face-login/face-login.policy.js'
-import { hasFaceLoginTemplate } from '../biometrics/public.js'
+import { authBiometrics } from './auth.biometrics-port.js'
 
 function safeUser(user: {
   id: string
@@ -63,7 +62,7 @@ const tokenFor = (user: ReturnType<typeof safeUser>, tokenVersion: number = 1, m
 
 export async function assertFaceSession(amr: unknown, employeeId: string | null | undefined, role: string) {
   if (!faceSessionAllowed(amr, role, env.FACE_LOGIN_ENABLED)
-    || (Array.isArray(amr) && amr.includes('face') && (!employeeId || !(await hasFaceLoginTemplate(employeeId))))) {
+    || (Array.isArray(amr) && amr.includes('face') && (!employeeId || !(await authBiometrics().hasFaceLoginTemplate(employeeId))))) {
     throw AppError.unauthorized('Phiên đăng nhập khuôn mặt đã hết hiệu lực. Vui lòng đăng nhập bằng mật khẩu.')
   }
 }

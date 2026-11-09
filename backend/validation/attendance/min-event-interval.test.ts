@@ -1,3 +1,6 @@
+import { configureAttendancePayroll } from '../../src/modules/attendance/attendance.payroll-port.js'
+import * as payrollIntegration from '../../src/modules/payroll/public.js'
+configureAttendancePayroll(payrollIntegration)
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({ rows: [] as any[], locks: [] as string[], locked: false, seconds: 600 }))

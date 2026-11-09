@@ -14,7 +14,7 @@ import { eventBus } from '../../src/common/event-bus.js'
 import { encryptPayload } from '../../src/common/biometric-crypto.js'
 import { publicFingerprintSession, confirmFingerprintSession, cancelFingerprintSession, fingerprintProgress,
   acknowledgeFingerprintBinding, fingerprintManifest, fingerprintTemplateForDevice, startFingerprintSession } from '../../src/modules/biometrics/fingerprint.service.js'
-import { processFingerprintAttendance } from '../../src/modules/biometrics/fingerprint.attendance.js'
+import { processFingerprintAttendance } from '../../src/modules/attendance/attendance.fingerprint.js'
 const actor = { id: 'admin-a', role: 'ADMIN' }
 const session = () => ({ id: 'session-a', employee_id: 'employee-a', owner_id: 'admin-a', device_id: 'PI_A',
   finger_name: 'Index', key: 'request-a', status: 'VERIFIED', match_score: 132, confirm_key: null, template_id: null,

@@ -3,7 +3,7 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { logAction } from '../audit-logs/public.js'
 import { env } from '../../config/env.js'
-import { assertNoEnrollment } from '../operations/operation.service.js'
+import { assertNoEnrollment } from '../operations/public.js'
 import { findEmployeeByIdOrCode, assertCanManageEmployee, type EmployeeActor } from '../employees/public.js'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

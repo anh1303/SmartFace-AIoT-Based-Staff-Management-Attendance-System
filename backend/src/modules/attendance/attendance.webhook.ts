@@ -1,4 +1,4 @@
-import { processFingerprintAttendance } from '../biometrics/fingerprint.attendance.js'
+import { processFingerprintAttendance } from './attendance.fingerprint.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { eventBus } from '../../common/event-bus.js'

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { confidenceColor } from '../../utils/confidence';
 import { useSearchParams } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { useShiftContext } from '../../context/ShiftContext';
 import { useEmployeeContext } from '../../context/EmployeeContext';
 import { getTodayVNString } from '../../utils/dateUtils';
@@ -27,7 +28,7 @@ import {
 import { AttendanceRecord } from '../../types';
 import { ChevronLeft, ChevronRight, RefreshCw, FileText } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchAttendanceApi } from '@/features/attendances/api/attendanceApi';
+import { fetchAttendanceApi } from '@/features/attendances';
 
 const useSafeSearchParams = () => {
   try {
@@ -42,7 +43,10 @@ const useSafeSearchParams = () => {
 export const ManagerAttendanceMonitor: React.FC = () => {
   const shiftState = useShiftContext();
   const employeeState = useEmployeeContext();
-  const { employees, workShifts, showToast, role, currentUser } = useApp();
+  const { employees } = employeeState;
+  const { workShifts } = shiftState;
+  const { showToast } = useToast();
+  const { role, currentUser } = useAuth();
   const isManager = role === 'manager';
   const managerDept = currentUser?.department;
 

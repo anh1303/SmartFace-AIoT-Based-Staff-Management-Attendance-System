@@ -1,10 +1,8 @@
-import { useOperations } from '../../features/operations/OperationsProvider';
-import { OperationFailedError, UncertainWriteError, submitAndWait } from '../../features/operations/commandApi';
-import type { Operation } from '../../features/operations/OperationsProvider';
+import { useOperations, OperationFailedError, UncertainWriteError, submitAndWait, type Operation } from '../../features/operations';
 import { ActionButton } from '../../components/common/ActionFeedback';
-import { submitScheduleBatch, submitScheduleCopy } from '../../features/schedules/api/shiftApi';
+import { submitScheduleBatch, submitScheduleCopy } from '../../features/schedules';
 import React, { useState, useMemo, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useToast } from '../../context/ToastContext';
 import { useEmployeeContext } from '../../context/EmployeeContext';
 import { useShiftContext } from '../../context/ShiftContext';
 import { useAuth } from '../../context/AuthContext';
@@ -31,7 +29,9 @@ export const ManagerSchedule: React.FC = () => {
   const scheduleBusy = jobs.some(job => job.type === 'shifts.batch' && ['queued', 'running'].includes(job.status));
   const employeeState = useEmployeeContext();
   const shiftState = useShiftContext();
-  const { employees, workShifts, assignOrUpdateShift, showToast } = useApp();
+  const { employees } = employeeState;
+  const { workShifts, assignOrUpdateShift } = shiftState;
+  const { showToast } = useToast();
   const { currentUser, role } = useAuth();
   const isManager = role === 'manager';
   const managerDept = currentUser?.department;

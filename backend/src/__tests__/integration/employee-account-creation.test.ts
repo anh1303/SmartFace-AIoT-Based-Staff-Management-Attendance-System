@@ -1,5 +1,5 @@
 import { assertIsolatedNeonTestDatabase } from '../helpers/cloud-test-db.mjs'
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, beforeAll } from 'vitest';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../config/database.js';
 import * as employeeService from '../../modules/employees/employee.service.js';
@@ -10,6 +10,7 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
 const suite = enabled ? describe : describe.skip;
 
 suite('Integration Test: Tự động khởi tạo tài khoản & gửi email khi thêm nhân viên', () => {
+  beforeAll(async () => { await import('../../app.js') });
   const testIdsToCleanup: string[] = [];
 
   afterAll(async () => {

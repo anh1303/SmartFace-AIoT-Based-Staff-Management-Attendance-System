@@ -3,7 +3,8 @@ import { apiFetch } from '../../../api/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useApp } from '../../../context/AppContext';
+import { useEmployeeContext } from '../../../context/EmployeeContext';
+import { useToast } from '../../../context/ToastContext';
 import { useAuth, getActiveSessionId } from '../../../context/AuthContext';
 import { isAnotherManager } from '../../../utils/permissionUtils';
 import { logger } from '../../../utils/logger';
@@ -22,7 +23,8 @@ export interface UseBiometricEnrollmentOptions {
 }
 
 export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = {}) {
-  const { employees, updateEmployee, showToast } = useApp();
+  const { employees, updateEmployee } = useEmployeeContext();
+  const { showToast } = useToast();
   const queryClient = useQueryClient();
   const { currentUser, role } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();

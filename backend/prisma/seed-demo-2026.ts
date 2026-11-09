@@ -1,3 +1,4 @@
+import '../src/composition.js'
 /** Explicitly authorized demo reset: Sep/Oct/Nov 2026 only. Default is a dry run. */
 import 'dotenv/config'
 import { writeFileSync } from 'node:fs'

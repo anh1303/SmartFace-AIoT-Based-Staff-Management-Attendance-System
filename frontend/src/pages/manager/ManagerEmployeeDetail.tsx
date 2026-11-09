@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
+import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { Users, ShieldAlert, Lock } from 'lucide-react';
 import { Employee, PayrollRecord } from '../../types';
@@ -23,8 +24,8 @@ export const ManagerEmployeeDetail: React.FC = () => {
   const {
     employees,
     updateEmployee,
-    showToast
-  } = useApp();
+  } = useEmployeeContext();
+  const { showToast } = useToast();
 
   const { currentUser, role } = useAuth();
   const navigate = useNavigate();

@@ -8,6 +8,7 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
 ;(enabled ? describe : describe.skip)('attendance workflow regressions on PostgreSQL', () => {
   let db: any, attendance: any
   beforeAll(async () => {
+    await import('../../src/composition.js')
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-03T01:00:00+07:00'))
     db = (await import('../../src/config/database.js')).prisma
@@ -39,6 +40,7 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
     const date = '2026-10-04'; vi.setSystemTime(new Date(`${date}T09:00:00+07:00`))
     const { employee, workDate } = await setup(date)
     await attendance.checkIn({ employeeId: employee.id }, undefined, { capturedAt: +new Date(`${date}T08:00:00+07:00`) })
+    await db.attendance_logs.updateMany({ where: { employee_id: employee.id }, data: { created_at: new Date(`${date}T09:00:00+07:00`) } })
     await expect(attendance.adjustAttendance({ employeeId: employee.id, date, overtime: 0, late_early: 0, reason: 'review' }, undefined, 'ADMIN')).rejects.toThrow()
     vi.setSystemTime(new Date(`${date}T17:00:00+07:00`))
     expect((await attendance.checkOut(employee.id, 'gate', undefined, { capturedAt: Date.now() })).status).toBe('VALID')
@@ -78,10 +80,10 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
     for (const row of [missing, overtime]) await attendance.aggregateDailyAttendance(10, 2026, row.employee.id, date)
     await attendance.autoCloseDueAttendance(new Date('2026-10-09T01:00:00+07:00'))
     const missedDay = await db.daily_attendance_summary.findUniqueOrThrow({ where: { employee_id_work_date: { employee_id: missing.employee.id, work_date: missing.workDate } } })
-    const penalty = await db.attendanceAdjustment.findFirstOrThrow({ where: { employee_id: missing.employee.id, kind: 'ABSENCE' } })
+    const penalty = await db.attendanceAdjustment.findFirstOrThrow({ where: { employee_id: missing.employee.id, kind: 'LATE_EARLY' } })
     const overtimeDay = await db.daily_attendance_summary.findUniqueOrThrow({ where: { employee_id_work_date: { employee_id: overtime.employee.id, work_date: overtime.workDate } } })
-    expect(missedDay).toMatchObject({ attendance_status: 'ABSENT', review_status: 'APPROVED' })
-    expect(penalty.status).toBe('APPROVED'); expect(Number(penalty.amount)).toBe(1800000)
+    expect(missedDay).toMatchObject({ attendance_status: 'INCOMPLETE', review_status: 'APPROVED' })
+    expect(penalty.status).toBe('APPROVED'); expect(Number(penalty.hours)).toBe(9)
     expect(overtimeDay.overtime_seconds).toBe(18000); expect(Number(overtimeDay.overtime)).toBe(4); expect(overtimeDay.review_status).toBe('APPROVED')
   })
   it('records and calculates an overnight shift on its start date across months', async () => {

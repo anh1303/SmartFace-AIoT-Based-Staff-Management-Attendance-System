@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useApp } from '../../../context/AppContext';
+import { useAttendanceContext } from '../../../context/AttendanceContext';
 import { Employee } from '../../../types';
 import { formatVNDateISO } from '../../../utils/dateUtils';
 
@@ -26,7 +26,7 @@ export interface AttendanceStats {
  */
 export function useEmployeeAttendanceDetail(options: UseEmployeeAttendanceDetailOptions) {
   const { currentEmp, startDate = '', endDate = '', attendanceTypeFilter = 'ALL', attendanceStatusFilter = 'ALL' } = options;
-  const { attendance } = useApp();
+  const { attendance } = useAttendanceContext();
 
   // 1. Filtered Attendance Logs
   const employeeAttendanceLogs = useMemo(() => {

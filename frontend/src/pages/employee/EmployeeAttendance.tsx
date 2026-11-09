@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Clock } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
-import { EmployeeAttendanceTab } from '../../features/employees/components/EmployeeAttendanceTab';
+import { useAuth } from '../../context/AuthContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
+import { EmployeeAttendanceTab } from '../../features/employees';
 import { PageHeaderBanner } from '../../components/common';
 import { getTodayVNString } from '../../utils/dateUtils';
 import type { Employee } from '../../types';
 
 export const EmployeeAttendance: React.FC = () => {
-  const { currentUser, employees } = useApp();
+  const { currentUser } = useAuth();
+  const { employees } = useEmployeeContext();
   const [params] = useSearchParams();
   const today = getTodayVNString();
   const [startDate, setStartDate] = useState(params.get('date') || `${today.slice(0, 7)}-01`);

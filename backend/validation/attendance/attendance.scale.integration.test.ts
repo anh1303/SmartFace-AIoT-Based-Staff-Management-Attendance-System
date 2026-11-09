@@ -12,11 +12,14 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
   let db: any, attendance: any, shifts: any, admin: any
   let loadEmployees: any[]
   beforeAll(async () => {
+    await import('../../src/composition.js')
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-11-02T12:00:00+07:00'))
     db = (await import('../../src/config/database.js')).prisma
     attendance = await import('../../src/modules/attendance/attendance.service.js')
     shifts = await import('../../src/modules/shifts/shift.service.js')
+    const { configureShiftAttendance } = await import('../../src/modules/shifts/shift.attendance-port.js')
+    configureShiftAttendance(await import('../../src/modules/attendance/public.js'))
     await ensureTestPayrollPolicy(db)
     const role = await db.roles.findUnique({ where: { role_name: 'ADMIN' } })
     admin = await db.user.create({ data: { username: `scale-${randomUUID().slice(0, 8)}`, passwordHash: 'test-only', role_id: role.id } })
@@ -35,6 +38,7 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
   })
 
   it('measures five simultaneous shift changes with 100 employees and 1,000 scans', async () => {
+    vi.setSystemTime(new Date('2026-10-20T23:00:00+07:00'))
     const prefix = randomUUID().slice(0, 8)
     await db.employee.createMany({ data: Array.from({ length: 100 }, (_, i) => ({ employee_code: `LOAD-${prefix}-${i}`, full_name: `Load ${i}`, createdAt: new Date('2026-10-01T00:00:00Z') })) })
     const employees = await db.employee.findMany({ where: { employee_code: { startsWith: `LOAD-${prefix}-` } } })

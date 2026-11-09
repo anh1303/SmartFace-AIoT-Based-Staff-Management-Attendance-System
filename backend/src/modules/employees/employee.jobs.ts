@@ -2,9 +2,9 @@ import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
 import { AppError } from '../../common/AppError.js'
 import { sendAccountCredentialsEmail } from '../../common/email.service.js'
-import { stagedInput } from '../operations/operation.service.js'
-import { currentActor } from '../operations/operation.worker.js'
-import type { OperationRow } from '../operations/operation.contract.js'
+import { stagedInput } from '../operations/public.js'
+import { currentActor } from '../operations/public.js'
+import type { OperationRow } from '../operations/public.js'
 
 export async function executeAccountEmail(job: OperationRow) {
   await currentActor(job.owner_id)

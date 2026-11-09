@@ -39,6 +39,18 @@ describe('Integration & Security Test (API, Authorization & Error Handling)', ()
     expect(res.body.message).toMatch(/Authentication token is required/i)
   })
 
+  it('keeps device fingerprint routes protected after composing the routers', async () => {
+    const res = await request(app).post('/api/devices/PI_TEST/fingerprint/manifest').send({})
+    expect(res.status).toBe(401)
+    expect(res.body.message).toMatch(/device credentials/i)
+  })
+
+  it('does not allow an employee to preview another payroll', async () => {
+    const token = jwt.sign({ id: 'user-emp-1', role: 'EMPLOYEE', username: 'employee1' }, env.JWT_SECRET)
+    const res = await request(app).post('/api/payroll/1/preview').set('Authorization', `Bearer ${token}`).send({ allowance: 0, updated_at: '2026-10-29T00:00:00.000Z' })
+    expect(res.status).toBe(403)
+  })
+
   it('Yêu cầu với Token giả/hết hạn sẽ bị từ chối với 401', async () => {
     const res = await request(app)
       .get('/api/employees')

@@ -9,6 +9,7 @@ import {
   generatePayrollSchema,
   updatePayrollSchema,
   earlySettlementSchema,
+  previewPayrollSchema,
 } from './payroll.dto.js';
 
 export const getBonusPenalty = async (req: Request, res: Response) => {
@@ -43,6 +44,10 @@ export const updateItem = async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const updates = updatePayrollSchema.parse(req.body);
   successResponse(res, await service.updateItem(id, updates, req.user), 'Payroll updated');
+};
+
+export const previewItem = async (req: Request, res: Response) => {
+  successResponse(res, await service.previewItem(req.params.id as string, previewPayrollSchema.parse(req.body), req.user));
 };
 
 export const finalizePeriod = async (req: Request, res: Response) => {

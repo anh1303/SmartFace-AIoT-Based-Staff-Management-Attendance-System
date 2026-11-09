@@ -7,6 +7,7 @@ const enabled = process.env.RUN_POLICY_DB_TESTS === '1'
 if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.env.DIRECT_URL)
 ;(enabled ? describe : describe.skip)('payroll at expected scale', () => {
   it('generates monthly payroll for 100 employees', async () => {
+    await import('../../src/composition.js')
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-02T12:00:00+07:00'))
     const db = (await import('../../src/config/database.js')).prisma
     try {

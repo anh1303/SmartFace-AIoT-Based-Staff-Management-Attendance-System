@@ -9,7 +9,7 @@ import { UncertainWriteError } from '../../operations';
 
 export const EMPLOYEES_QUERY_KEY = ['employees'];
 
-export function useEmployees() {
+export function useEmployees(enabled = true) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const pendingIds = useRef(new Set<string>());
@@ -17,6 +17,7 @@ export function useEmployees() {
 
   const query = useQuery({
     queryKey: EMPLOYEES_QUERY_KEY,
+    enabled,
     queryFn: fetchEmployeesApi,
     staleTime: 1000 * 60 * 5, // 5 minutes cache
     retry: 1,

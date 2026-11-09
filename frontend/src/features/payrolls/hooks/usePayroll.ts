@@ -17,7 +17,7 @@ export const PAYROLL_QUERY_KEY = ['payroll'];
 export const BONUS_PENALTY_QUERY_KEY = ['bonusPenalty'];
 export type { PayrollItemUpdates };
 
-export function usePayroll() {
+export function usePayroll(enabled = true) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -28,6 +28,7 @@ export function usePayroll() {
 
   const payrollQuery = useQuery({
     queryKey: PAYROLL_QUERY_KEY,
+    enabled,
     queryFn: fetchPayrollApi,
     staleTime: 1000 * 60 * 5,
     retry: 1,
@@ -35,6 +36,7 @@ export function usePayroll() {
 
   const bonusPenaltyQuery = useQuery({
     queryKey: [...BONUS_PENALTY_QUERY_KEY, selectedPeriod],
+    enabled,
     queryFn: () => fetchBonusPenaltyApi(selectedPeriod),
     staleTime: 1000 * 60 * 10,
     retry: 1,

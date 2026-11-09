@@ -181,9 +181,6 @@ function DeviceForm({
                     />
                     Đặt thiết bị ở trạng thái bảo trì
                 </label>
-                <p className="sf-secondary">
-                    Địa chỉ IP được Pi tự động báo cáo theo mạng Wi-Fi thực tế. Trạng thái trực tuyến do hệ thống ghi nhận.
-                </p>
                 {(validation || error) && (
                     <div className="sf-feedback error" role="alert">
                         {error || validation}

@@ -57,7 +57,7 @@ export function FaceLoginModal({ onClose, onSuccess }: { onClose: () => void; on
       const challenge = await faceLoginApi.challenge(signal);
       setMessage('Nhìn thẳng và giữ khuôn mặt trong khung.');
       for (let index = 0; index < 8; index++) {
-        await cameraDelay(350, signal);
+        await cameraDelay(200, signal);
         if (!video.current || Date.now() >= challenge.expiresAt) throw new Error('Lượt nhận diện đã hết hạn. Vui lòng thử lại.');
         frames.push(captureJpeg(video.current));
       }
@@ -80,7 +80,10 @@ export function FaceLoginModal({ onClose, onSuccess }: { onClose: () => void; on
       <div className="relative aspect-video overflow-hidden rounded-xl bg-slate-950">
         <video ref={video} autoPlay muted playsInline aria-label="Hình ảnh camera đăng nhập" className="h-full w-full object-contain"/>
         {!ready && <div className="absolute inset-0 flex items-center justify-center text-slate-300"><Camera size={40} aria-hidden="true"/></div>}
-        {ready && <div aria-hidden="true" className="pointer-events-none absolute inset-y-[12%] inset-x-[30%] rounded-[50%] border-2 border-white/80"/>}
+        {ready && <>
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-slate-950/25 backdrop-blur-sm" style={{ maskImage: 'radial-gradient(ellipse 20% 38% at center, transparent 98%, black 100%)', WebkitMaskImage: 'radial-gradient(ellipse 20% 38% at center, transparent 98%, black 100%)' }}/>
+          <div aria-hidden="true" className="pointer-events-none absolute inset-y-[12%] inset-x-[30%] rounded-[50%] border-2 border-white/80"/>
+        </>}
       </div>
       <p role="status" aria-live="polite" className="text-sm leading-6">{message}</p>
       {error && <div role="alert" className="sf-feedback error">{error}</div>}

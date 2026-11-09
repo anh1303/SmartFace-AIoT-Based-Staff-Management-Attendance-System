@@ -8,12 +8,13 @@ export const SHIFTS_QUERY_KEY = ['shifts'];
 /**
  * Feature Hook: Quản lý lịch ca làm việc và phân ca nhân sự.
  */
-export function useShifts() {
+export function useShifts(enabled = true) {
   const queryClient = useQueryClient();
 
 
   const query = useQuery({
     queryKey: SHIFTS_QUERY_KEY,
+    enabled,
     queryFn: fetchShiftsApi,
     staleTime: 1000 * 60 * 5,
     retry: 1,

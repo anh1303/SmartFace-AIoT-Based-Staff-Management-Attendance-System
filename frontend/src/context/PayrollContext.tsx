@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { usePayroll, type PayrollItemUpdates } from '../features/payrolls/hooks/usePayroll';
 import { PayrollRecord, BonusPenaltyPolicy } from '../types';
+import { useAuth } from './AuthContext';
 
 export interface PayrollContextType {
   payroll: PayrollRecord[];
@@ -19,7 +20,8 @@ export interface PayrollContextType {
 const PayrollContext = createContext<PayrollContextType | undefined>(undefined);
 
 export const PayrollProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const payrollHook = usePayroll();
+  const { currentUser, isInitializing } = useAuth();
+  const payrollHook = usePayroll(Boolean(currentUser) && !isInitializing);
 
   const value = useMemo<PayrollContextType>(() => ({
     payroll: payrollHook.payroll,

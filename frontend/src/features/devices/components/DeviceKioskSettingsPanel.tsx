@@ -680,9 +680,6 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
               })}
             </div>
 
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Khi thay đổi, giá trị sẽ được áp dụng ngay lập tức cho pipeline AI trên Raspberry Pi và tự động lưu vào file <code className="font-mono">hardware/.env</code>.
-            </p>
           </div>
         </div>
       </div>

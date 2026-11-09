@@ -26,6 +26,19 @@ it('does not treat an accepted request as a saved result', async () => {
   expect(request).toHaveBeenCalledWith('/api/operations/job');
   expect(result.status).toBe('succeeded');
 });
+it('checks the confirmed job promptly when its update event arrives', async () => {
+  vi.useFakeTimers();
+  try {
+    request.mockResolvedValueOnce({ data: job }).mockResolvedValueOnce({ data: { ...job, status: 'succeeded' } });
+    const result = waitForOperation(job);
+    await Promise.resolve();
+    await Promise.resolve();
+    window.dispatchEvent(new CustomEvent('smartface:operation-updated', { detail: { jobId: job.jobId } }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(request).toHaveBeenCalledTimes(2);
+    await expect(result).resolves.toMatchObject({ status: 'succeeded' });
+  } finally { vi.useRealTimers(); }
+});
 it('preserves the operation and item errors when a batch only partly succeeds', async () => {
   const partial = { ...job, status: 'partially_succeeded', progress: { ...job.progress, completed: 2, succeeded: 1, failed: 1 }, items: [{ item_key: 'NV1:2026-11-09', status: 'failed', error: 'Lịch đã thay đổi' }] };
   request.mockResolvedValueOnce({ data: partial });

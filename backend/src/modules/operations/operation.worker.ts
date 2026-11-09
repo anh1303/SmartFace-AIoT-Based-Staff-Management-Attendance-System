@@ -12,6 +12,7 @@ export const registerOperationHandler = (type: string, handler: Handler) => { ha
 let timer: ReturnType<typeof setInterval> | undefined
 let busy = false
 let stopping = false
+let wakePending = false
 let lookupActor: ((id: string) => Promise<{ id: string; is_active: boolean; roles: { role_name: string } } | null>) | undefined
 export function setOperationActorLookup(lookup: NonNullable<typeof lookupActor>) { lookupActor = lookup }
 
@@ -47,7 +48,16 @@ export async function runOperationTick() {
     if (states[0]?.status !== 'running') await prisma.$executeRaw`DELETE FROM background_operation_inputs WHERE operation_id = ${job.id}::uuid`
     await announceOperation(job.owner_id, job.id)
   } catch { logger.error('Unable to poll background operations') }
-  finally { if (heartbeat) clearInterval(heartbeat); busy = false }
+  finally {
+    if (heartbeat) clearInterval(heartbeat)
+    busy = false
+    if (wakePending && !stopping) { wakePending = false; void runOperationTick() }
+  }
+}
+export function wakeOperationWorker() {
+  if (!timer || stopping) return
+  if (busy) { wakePending = true; return }
+  void runOperationTick()
 }
 export async function currentActor(ownerId: string) {
   if (!lookupActor) throw AppError.forbidden('Chưa cấu hình xác thực tác vụ')
@@ -64,5 +74,7 @@ export function startOperationWorker() {
 export async function stopOperationWorker() {
   stopping = true
   if (timer) clearInterval(timer)
+  timer = undefined
+  wakePending = false
   // Active DB work keeps its lease; interrupted work is recovered by the next worker.
 }

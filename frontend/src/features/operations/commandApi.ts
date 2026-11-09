@@ -19,21 +19,37 @@ export async function waitForOperation(initial: Operation): Promise<Operation> {
   const deadline = Date.now() + 10 * 60_000;
   let job = initial;
   let failures = 0;
+  let changed = false;
+  let wake: (() => void) | undefined;
+  const onUpdate = (event: Event) => {
+    if ((event as CustomEvent<{ jobId: string }>).detail?.jobId !== initial.jobId) return;
+    changed = true;
+    wake?.();
+  };
+  window.addEventListener('smartface:operation-updated', onUpdate);
+  try {
   while (job.status === 'queued' || job.status === 'running') {
     if (getActiveSessionId() !== session) throw new UncertainWriteError('Phiên đăng nhập đã thay đổi. Vui lòng tải lại dữ liệu.');
     if (Date.now() > deadline) throw new UncertainWriteError('Chưa xác định kết quả. Thử lại cùng nội dung để tiếp tục kiểm tra yêu cầu đã gửi.');
     try {
+      changed = false;
       const response = await apiFetch<Operation>(`/api/operations/${job.jobId}`);
       if (!response.data) throw new Error('Thiếu kết quả thao tác');
       job = response.data; failures = 0;
     } catch (error) {
       if (definitiveFailure(error) || ++failures >= 3) throw new UncertainWriteError('Chưa kết nối được để xác nhận kết quả. Thử lại cùng nội dung để kiểm tra, không tạo yêu cầu mới.');
     }
-    if (job.status === 'queued' || job.status === 'running') await new Promise(resolve => window.setTimeout(resolve, 1500));
+    if ((job.status === 'queued' || job.status === 'running') && !changed) await new Promise<void>(resolve => {
+      const timer = window.setTimeout(() => { wake = undefined; resolve(); }, 1500);
+      wake = () => { window.clearTimeout(timer); wake = undefined; resolve(); };
+    });
   }
   if (getActiveSessionId() !== session) throw new UncertainWriteError('Phiên đăng nhập đã thay đổi. Vui lòng tải lại dữ liệu.');
   if (job.status !== 'succeeded') throw new OperationFailedError(job);
   return job;
+  } finally {
+    window.removeEventListener('smartface:operation-updated', onUpdate);
+  }
 }
 
 // Keep only the job ID while the outcome is unknown, so retries resume the original write.

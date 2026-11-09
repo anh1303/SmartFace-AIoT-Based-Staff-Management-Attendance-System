@@ -39,7 +39,10 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
       for (const domain of ['employees', 'shifts', 'attendance', 'attendanceSummaries', 'dashboard']) void client.invalidateQueries({ queryKey: [domain] });
     };
     const refresh = () => { void client.invalidateQueries({ queryKey: ['operations', userId] }); refreshData(); };
-    socket.on('connect', refresh); socket.on('operation.updated', refresh);
+    socket.on('connect', refresh); socket.on('operation.updated', (event: { jobId: string }) => {
+      window.dispatchEvent(new CustomEvent('smartface:operation-updated', { detail: event }));
+      refresh();
+    });
     socket.on('data.changed', (event: { domain: string; message: string }) => {
       void client.invalidateQueries({ queryKey: [event.domain] });
       if (event.domain === 'biometrics') void client.invalidateQueries({ queryKey: ['employees'] });

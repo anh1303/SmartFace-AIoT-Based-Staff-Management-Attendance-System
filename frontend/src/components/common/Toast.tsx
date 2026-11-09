@@ -1,6 +1,7 @@
 import React from 'react';
 import { useToast } from '../../context/ToastContext';
 import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
+import { NotificationContent } from '../../features/notifications/components/NotificationContent';
 
 export const ToastContainer: React.FC = () => {
   const { toasts, removeToast } = useToast();
@@ -20,8 +21,7 @@ export const ToastContainer: React.FC = () => {
           icon = <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />;
           borderClass = 'border-rose-200 bg-rose-50/95 text-rose-950 dark:border-rose-500/30 dark:bg-[#271317]/95 dark:text-rose-100 shadow-md';
         } else if (toast.type === 'warning') {
-          icon = <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />;
-          borderClass = 'border-amber-200 bg-amber-50/95 text-amber-950 dark:border-amber-500/30 dark:bg-[#291e0f]/95 dark:text-amber-100 shadow-md';
+          icon = <AlertTriangle className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />;
         }
 
         return (
@@ -29,12 +29,13 @@ export const ToastContainer: React.FC = () => {
             key={toast.id}
             className={`pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-xl border backdrop-blur-md transition-all duration-300 transform translate-y-0 ${borderClass}`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-start gap-3 min-w-0 flex-1">
               {icon}
-              <span className="text-sm font-medium">{toast.message}</span>
+              <NotificationContent title={toast.title || toast.message} description={toast.message} type={toast.type}/>
             </div>
             <button
               type="button"
+              aria-label="Đóng thông báo"
               onClick={() => removeToast(toast.id)}
               className="text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors p-1 cursor-pointer"
             >

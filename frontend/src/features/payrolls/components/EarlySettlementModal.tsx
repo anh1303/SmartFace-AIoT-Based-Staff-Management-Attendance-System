@@ -1,3 +1,4 @@
+import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React, { useEffect, useState } from 'react';
 import { previewEarlySettlementApi, type EarlySettlementPreview } from '../api/payrollApi';
 import { Modal } from '../../../components/common/Modal';
@@ -82,7 +83,7 @@ export const EarlySettlementModal: React.FC<EarlySettlementModalProps> = ({
       title="Quyết toán lương sớm cho nhân viên"
       subtitle={`Nhân viên: ${employeeName} (${record.employee_id}) · Kỳ ${selectedPeriod}`}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <ActionForm onSubmit={handleSubmit} className="space-y-4">
         <div className="p-3.5 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-xl text-xs text-blue-900 dark:text-blue-200 flex items-start gap-3">
           <UserCheck className="w-5 h-5 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
           <div className="space-y-1">
@@ -155,15 +156,15 @@ export const EarlySettlementModal: React.FC<EarlySettlementModalProps> = ({
           >
             Hủy bỏ
           </button>
-          <button
+          <ActionButton busyLabel={preview ? "Đang quyết toán…" : "Đang kiểm tra…"}
             type="submit"
             disabled={isSubmitting || preview?.blocked}
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-sm shadow-blue-500/20 cursor-pointer flex items-center gap-1.5"
           >
             {isSubmitting ? 'Đang xử lý...' : preview ? 'Xác nhận quyết toán sớm' : 'Xem trước quyết toán'}
-          </button>
+          </ActionButton>
         </div>
-      </form>
+      </ActionForm>
     </Modal>
   );
 };

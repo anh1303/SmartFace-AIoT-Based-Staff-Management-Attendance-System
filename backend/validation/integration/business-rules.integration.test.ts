@@ -9,14 +9,17 @@ const suite = enabled ? describe : describe.skip
 suite('Business payroll rules in isolated PostgreSQL', () => {
   let db: any, payroll: any, employees: any, attendance: any, shifts: any, admin: any
   const prefix = randomUUID().slice(0, 8)
-  const employee = (name: string) => db.employee.create({ data: { employee_code: `BIZ-${prefix}-${name}`, full_name: name, hourly_rate: 50000 } })
+  const employee = (name: string) => db.employee.create({ data: { employee_code: `BIZ-${prefix}-${name}`, full_name: name, hourly_rate: 50000, createdAt: new Date('2026-01-01T00:00:00Z') } })
   beforeAll(async () => {
+    await import('../../src/app.js')
     db = (await import('../../src/config/database.js')).prisma
     await ensureTestPayrollPolicy(db)
     payroll = await import('../../src/modules/payroll/payroll.service.js')
     employees = await import('../../src/modules/employees/employee.service.js')
     attendance = await import('../../src/modules/attendance/attendance.service.js')
     shifts = await import('../../src/modules/shifts/shift.service.js')
+    const { configureShiftAttendance } = await import('../../src/modules/shifts/shift.attendance-port.js')
+    configureShiftAttendance(await import('../../src/modules/attendance/public.js'))
     const role = await db.roles.upsert({ where: { role_name: 'ADMIN' }, create: { role_name: 'ADMIN' }, update: {} })
     const user = await db.user.create({ data: { username: `biz-${prefix}`, passwordHash: 'test-only', role_id: role.id } })
     admin = { id: user.id, role: 'ADMIN' }
@@ -33,6 +36,19 @@ suite('Business payroll rules in isolated PostgreSQL', () => {
     await expect(payroll.finalizeEarlySettlement(input, admin.id, 'ADMIN')).rejects.toThrow(/sau ngày quyết toán/)
     expect((await db.employee.findUnique({ where: { id: emp.id } })).status).toBe('ACTIVE')
     expect(await db.attendance_logs.count({ where: { employee_id: emp.id } })).toBe(1)
+  })
+
+  it('previews an allowance without writing and saves the same net salary', async () => {
+    const emp = await employee('preview')
+    const [record] = await payroll.generate('2026-10', emp.id, admin.id, admin)
+    const before = await db.payrollRecord.findUniqueOrThrow({ where: { id: BigInt(record.id) } })
+    const preview = await payroll.previewItem(record.id, { allowance: 234567, updated_at: before.updated_at.toISOString() }, admin)
+    const unchanged = await db.payrollRecord.findUniqueOrThrow({ where: { id: before.id } })
+    expect(Number(unchanged.allowance)).toBe(Number(before.allowance))
+    vi.setSystemTime(new Date(Date.now() + 1000))
+    const saved = await payroll.updateItem(record.id, { allowance: 234567, reason: 'Integration test', updated_at: before.updated_at.toISOString() }, admin)
+    expect(saved.net_salary).toBe(preview.net_salary)
+    await expect(payroll.previewItem(record.id, { allowance: 0, updated_at: before.updated_at.toISOString() }, admin)).rejects.toMatchObject({ statusCode: 409 })
   })
 
   it('rolls back wage finalization, termination and future shift deletion if the audit insert fails', async () => {
@@ -61,6 +77,7 @@ suite('Business payroll rules in isolated PostgreSQL', () => {
     await shifts.assignOrUpdate({ employee_id: emp.id, date, shift_type: 'OTHER', start_time: '20:00', end_time: '04:00' }, admin.id, 'ADMIN')
     const capture = { deviceId: `TEST_NIGHT_${prefix}`, eventId: `night-in-${prefix}`, capturedAt: +new Date(`${date}T20:00:00+07:00`) }
     await attendance.checkIn({ employeeId: emp.id }, undefined, capture)
+    await db.attendance_logs.updateMany({ where: { employee_id: emp.id }, data: { created_at: new Date(`${date}T20:00:00+07:00`) } })
     vi.setSystemTime(new Date('2026-10-30T04:00:00+07:00'))
     await attendance.checkOut(emp.id, undefined, undefined, { ...capture, eventId: `night-out-${prefix}`, capturedAt: +new Date('2026-10-30T04:00:00+07:00') })
     const assignment = await db.employee_shifts.findFirst({ where: { employee_id: emp.id } })
@@ -71,6 +88,7 @@ suite('Business payroll rules in isolated PostgreSQL', () => {
     await attendance.aggregateDailyAttendance(10, 2026, emp.id)
     const summary = await db.daily_attendance_summary.findUnique({ where: { employee_id_work_date: { employee_id: emp.id, work_date: new Date(`${date}T00:00:00Z`) } } })
     expect(Number(summary.total_working_hours)).toBe(8)
+    await attendance.adjustAttendance({ employeeId: emp.id, date, late_early: 0, overtime: 0, reason: 'Review overnight shift' }, admin.id, 'ADMIN')
     expect((await payroll.generate('2026-10', emp.id, admin.id, admin))[0].total_working_hours).toBe(8)
   })
 
@@ -86,6 +104,7 @@ suite('Business payroll rules in isolated PostgreSQL', () => {
     const summary = await db.daily_attendance_summary.findUnique({ where: { employee_id_work_date: { employee_id: emp.id, work_date: new Date('2026-10-31T00:00:00Z') } } })
     expect(Number(summary.total_working_hours)).toBe(8)
     expect(summary.requires_review).toBe(false)
+    await attendance.adjustAttendance({ employeeId: emp.id, date: '2026-10-31', late_early: 0, overtime: 0, reason: 'Review overnight shift' }, admin.id, 'ADMIN')
     expect((await payroll.generate('2026-10', emp.id, admin.id, admin))[0].total_working_hours).toBe(8)
   })
 })

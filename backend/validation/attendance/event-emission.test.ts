@@ -1,3 +1,6 @@
+import { configureAttendancePayroll } from '../../src/modules/attendance/attendance.payroll-port.js'
+import * as payrollIntegration from '../../src/modules/payroll/public.js'
+configureAttendancePayroll(payrollIntegration)
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { randomUUID } from 'node:crypto'
 

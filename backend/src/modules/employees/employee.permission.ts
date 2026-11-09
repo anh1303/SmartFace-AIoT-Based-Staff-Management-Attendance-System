@@ -45,12 +45,12 @@ export async function getEmployeeScope(
       OR department_id = (SELECT department_id FROM employees WHERE user_id::text = ${actor.id})
       ORDER BY id FOR UPDATE`;
   }
-  const self = await client.employee.findFirst({ where: { user_id: actor.id } });
+  const self = await client.employee.findFirst({ where: { user_id: actor.id }, select: { id: true, departmentId: true } });
   if (!self) return { id: { in: [] } };
   if (role === 'EMPLOYEE' || !self.departmentId) return { id: { in: mode === 'read' ? [self.id] : [] } };
   const colleagues = await client.employee.findMany({
     where: { departmentId: self.departmentId },
-    include: { position: true, department: true, users: { include: { roles: true } } },
+    select: { id: true, position: { select: { name: true, level: true } }, department: { select: { name: true } }, users: { select: { roles: { select: { role_name: true } } } } },
   });
   const ids = colleagues.filter(employee => employee.id !== self.id && !isEmployeeManager(employee)).map(employee => employee.id);
   if (mode === 'read') ids.push(self.id);
@@ -64,14 +64,14 @@ export async function assertCanAccessEmployeeDetail(
 ) {
   const scope = await getEmployeeScope(actor);
   if (actor?.role?.toUpperCase() === 'ADMIN') return;
-  const target = await prisma.employee.findFirst({ where: { AND: [scope, buildIdOrCodeWhere(targetIdOrCode)] } });
+  const target = await prisma.employee.findFirst({ where: { AND: [scope, buildIdOrCodeWhere(targetIdOrCode)] }, select: { id: true } });
   if (!target) throw AppError.forbidden(forbiddenMessage);
 }
 
 export async function assertCanManageEmployee(actor: EmployeeActor | undefined, targetIdOrCode: string, tx?: Prisma.TransactionClient) {
   const scope = await getEmployeeScope(actor, 'manage', tx);
   if (actor?.role?.toUpperCase() === 'ADMIN') return;
-  const target = await (tx ?? prisma).employee.findFirst({ where: { AND: [scope, buildIdOrCodeWhere(targetIdOrCode)] } });
+  const target = await (tx ?? prisma).employee.findFirst({ where: { AND: [scope, buildIdOrCodeWhere(targetIdOrCode)] }, select: { id: true } });
   if (!target) throw AppError.forbidden('Employee management denied');
 }
 

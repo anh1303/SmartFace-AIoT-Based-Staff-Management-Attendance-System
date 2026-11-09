@@ -33,8 +33,8 @@ vi.mock('../../src/context/AppContext', () => ({
     showToast: vi.fn(),
   }),
 }));
-vi.mock('../../src/context/ShiftContext', () => ({ useShiftContext: () => ({ isLoading: false, isError: false }) }));
-vi.mock('../../src/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ isLoading: false, isError: false }) }));
+vi.mock('../../src/context/ShiftContext', async () => { const app = await import('../../src/context/AppContext'); return ({ useShiftContext: () => ({ ...app.useApp(), isLoading: false, isError: false }) }) });
+vi.mock('../../src/context/EmployeeContext', async () => { const app = await import('../../src/context/AppContext'); return ({ useEmployeeContext: () => ({ ...app.useApp(), isLoading: false, isError: false }) }) });
 
 vi.mock('../../src/features/employees', () => ({
   useDepartmentPositions: () => ({ departmentOptions: [], positionOptions: [] }),
@@ -160,3 +160,6 @@ it('initializes ManagerAttendanceMonitor with date and employee search filter fr
     host.remove();
   }
 });
+
+vi.mock('../../src/context/ToastContext', async () => { const app = await import('../../src/context/AppContext'); return { useToast: () => app.useApp() }; });
+vi.mock('../../src/context/AuthContext', async () => { const app = await import('../../src/context/AppContext'); return { useAuth: () => app.useApp() }; });

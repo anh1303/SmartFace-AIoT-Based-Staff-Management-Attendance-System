@@ -5,7 +5,6 @@ import type { OperationRow } from './operation.contract.js'
 import { safeError } from './operation.service.js'
 import { announceOperation } from './operation.gateway.js'
 import { AppError } from '../../common/AppError.js'
-import { findAuthUserById } from '../auth/public.js'
 
 type Handler = (job: OperationRow) => Promise<void>
 const handlers = new Map<string, Handler>()
@@ -13,6 +12,9 @@ export const registerOperationHandler = (type: string, handler: Handler) => { ha
 let timer: ReturnType<typeof setInterval> | undefined
 let busy = false
 let stopping = false
+let wakePending = false
+let lookupActor: ((id: string) => Promise<{ id: string; is_active: boolean; roles: { role_name: string } } | null>) | undefined
+export function setOperationActorLookup(lookup: NonNullable<typeof lookupActor>) { lookupActor = lookup }
 
 export async function claimOperation(): Promise<OperationRow | undefined> {
   const token = randomUUID()
@@ -46,10 +48,20 @@ export async function runOperationTick() {
     if (states[0]?.status !== 'running') await prisma.$executeRaw`DELETE FROM background_operation_inputs WHERE operation_id = ${job.id}::uuid`
     await announceOperation(job.owner_id, job.id)
   } catch { logger.error('Unable to poll background operations') }
-  finally { if (heartbeat) clearInterval(heartbeat); busy = false }
+  finally {
+    if (heartbeat) clearInterval(heartbeat)
+    busy = false
+    if (wakePending && !stopping) { wakePending = false; void runOperationTick() }
+  }
+}
+export function wakeOperationWorker() {
+  if (!timer || stopping) return
+  if (busy) { wakePending = true; return }
+  void runOperationTick()
 }
 export async function currentActor(ownerId: string) {
-  const user = await findAuthUserById(ownerId, { includeRoles: true })
+  if (!lookupActor) throw AppError.forbidden('Chưa cấu hình xác thực tác vụ')
+  const user = await lookupActor(ownerId)
   if (!user?.is_active) throw AppError.forbidden('Tài khoản thực hiện tác vụ đã bị vô hiệu hóa.')
   if (!['ADMIN', 'MANAGER'].includes(user.roles.role_name.toUpperCase())) throw AppError.forbidden('Quyền quản lý đã thay đổi. Tác vụ không được thực hiện.')
   return { id: user.id, role: user.roles.role_name.toUpperCase() }
@@ -62,5 +74,7 @@ export function startOperationWorker() {
 export async function stopOperationWorker() {
   stopping = true
   if (timer) clearInterval(timer)
+  timer = undefined
+  wakePending = false
   // Active DB work keeps its lease; interrupted work is recovered by the next worker.
 }

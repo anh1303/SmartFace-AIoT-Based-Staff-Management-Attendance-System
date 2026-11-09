@@ -146,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!identifier || !password) {
       const errMsg = 'Vui lòng nhập đầy đủ thông tin đăng nhập';
-      showToast(errMsg, 'error');
+      showToast(errMsg, 'error', "Không thể đăng nhập");
       return { success: false, message: errMsg };
     }
 
@@ -161,7 +161,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const errMsg = err.message === 'Invalid username/email or password'
         ? 'Tài khoản hoặc mật khẩu không chính xác!'
         : (err.message || 'Xác thực thất bại! Vui lòng thử lại.');
-      showToast(errMsg, 'error');
+      showToast(errMsg, 'error', "Không thể đăng nhập");
       return { success: false, message: errMsg };
     }
   }, [acceptSession, showToast]);
@@ -200,7 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Ignore network errors on logout
       }
 
-      showToast('Đã đăng xuất khỏi hệ thống', 'info');
+      showToast('Đã đăng xuất khỏi hệ thống', 'info', "Đăng xuất");
     })();
 
     activeLogoutPromiseRef.current = logoutPromise;
@@ -215,7 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const switchRole = useCallback((newRole: Role, employeesFallback: Employee[] = []) => {
     // 2. Lock switchRole in production builds using import.meta.env.DEV
     if (!import.meta.env.DEV) {
-      showToast('Tính năng chuyển đổi vai trò chỉ khả dụng ở môi trường Development!', 'warning');
+      showToast('Tính năng chuyển đổi vai trò chỉ khả dụng ở môi trường Development!', 'error', "Không thể chuyển vai trò");
       return;
     }
 
@@ -225,7 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (newRole === 'admin') {
       setCurrentUser(DEFAULT_USERS.admin);
       sessionStorage.setItem('userSession', JSON.stringify(DEFAULT_USERS.admin));
-      showToast('[DEV ONLY] Đã chuyển đổi sang vai trò: Quản trị viên (Admin)', 'info');
+      showToast('[DEV ONLY] Đã chuyển đổi sang vai trò: Quản trị viên (Admin)', 'info', "Chuyển vai trò");
       return;
     }
 
@@ -253,7 +253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(DEFAULT_USERS[newRole]);
       sessionStorage.setItem('userSession', JSON.stringify(DEFAULT_USERS[newRole]));
     }
-    showToast(`[DEV ONLY] Đã chuyển đổi sang giao diện: ${newRole === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Employee)'}`, 'info');
+    showToast(`[DEV ONLY] Đã chuyển đổi sang giao diện: ${newRole === 'manager' ? 'Quản lý (Manager)' : 'Nhân viên (Employee)'}`, 'info', "Chuyển vai trò");
   }, [showToast]);
 
   const setCurrentUserSession = useCallback((session: UserSession | null) => {

@@ -28,6 +28,10 @@ export const updatePayrollSchema = z.object({
   updated_at: z.string().datetime().optional(),
   allowance: z.number().finite().min(0).max(1000000000000),
 }).strict()
+export const previewPayrollSchema = z.object({
+  allowance: z.number().finite().min(0).max(1000000000000),
+  updated_at: z.string().datetime(),
+}).strict()
 
 export type UpdateBonusPenaltyDto = z.infer<typeof updateBonusPenaltySchema>
 export type GeneratePayrollDto = z.infer<typeof generatePayrollSchema>

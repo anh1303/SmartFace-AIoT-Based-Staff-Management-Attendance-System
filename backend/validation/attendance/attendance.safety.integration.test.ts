@@ -1,6 +1,6 @@
 import { assertIsolatedNeonTestDatabase } from '../../src/__tests__/helpers/cloud-test-db.mjs'
 import { randomUUID } from 'node:crypto'
-import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest'
+import { beforeAll, beforeEach, afterAll, describe, it, expect, vi } from 'vitest'
 import { ensureTestPayrollPolicy } from '../payroll/policy-fixture.js'
 const enabled = process.env.RUN_POLICY_DB_TESTS === '1'
 if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.env.DIRECT_URL)
@@ -11,15 +11,19 @@ suite('Financial and review safety in PostgreSQL', () => {
   const employee = (name: string, extra = {}) => db.employee.create({data:{employee_code:`SAFE-${prefix}-${name}`,full_name:name,hourly_rate:100000,createdAt:new Date('2026-09-01T00:00:00Z'),...extra}})
   const raw = (emp: any,type: string,date: string,time: string) => db.attendance_logs.create({data:{employee_id:emp.id,type,event_time:new Date(`${date}T${time}+07:00`),status:'VALID',method:'MANUAL'}})
   beforeAll(async () => {
+    await import('../../src/composition.js')
     vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-09-30T23:00:00+07:00'))
     db = (await import('../../src/config/database.js')).prisma
     await ensureTestPayrollPolicy(db)
     attendance = await import('../../src/modules/attendance/attendance.service.js')
     payroll = await import('../../src/modules/payroll/payroll.service.js')
     shifts = await import('../../src/modules/shifts/shift.service.js')
+    const { configureShiftAttendance } = await import('../../src/modules/shifts/shift.attendance-port.js')
+    configureShiftAttendance(await import('../../src/modules/attendance/public.js'))
     const role = await db.roles.upsert({where:{role_name:'ADMIN'},create:{role_name:'ADMIN'},update:{}})
     admin = await db.user.create({data:{username:`safe-${prefix}`,passwordHash:'test-only',role_id:role.id}})
   })
+  beforeEach(() => vi.setSystemTime(new Date('2026-09-30T23:00:00+07:00')))
   afterAll(async () => {vi.useRealTimers();if(db) await db.$disconnect()})
   it('does not fall back to 176 hours or retain stale zero OT/late', async () => {
     const emp = await employee('zero')
@@ -31,6 +35,7 @@ suite('Financial and review safety in PostgreSQL', () => {
   })
   it('keeps OFF events unpaid, supports manual OT, and changes the shift FK', async () => {
     const emp = await employee('off'), date = '2026-09-12'
+    vi.setSystemTime(new Date(`${date}T23:00:00+07:00`))
     const assigned = await shifts.assignOrUpdateWithPermissionCheck({employee_id:emp.id,date,shift_type:'OFF'}, {id:admin.id,role:'ADMIN'})
     await raw(emp,'CHECK_IN',date,'08:00:00');await raw(emp,'CHECK_OUT',date,'20:00:00')
     await attendance.aggregateDailyAttendance(9,2026,emp.id)
@@ -59,6 +64,7 @@ suite('Financial and review safety in PostgreSQL', () => {
   })
   it('rolls back OT adjustment if its audit insert fails', async () => {
     const emp = await employee('audit'),date='2026-09-15'
+    vi.setSystemTime(new Date(`${date}T23:00:00+07:00`))
     await shifts.assignOrUpdateWithPermissionCheck({employee_id:emp.id,date,shift_type:'OFF'}, {id:admin.id,role:'ADMIN'})
     await raw(emp,'CHECK_IN',date,'08:00:00');await raw(emp,'CHECK_OUT',date,'10:00:00')
     await attendance.aggregateDailyAttendance(9,2026,emp.id)

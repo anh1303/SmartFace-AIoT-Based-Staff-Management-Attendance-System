@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React from 'react';
 import {
   Briefcase,
@@ -174,7 +175,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
             >
               Hủy
             </button>
-            <button
+            <ActionButton busyLabel="Đang thêm…"
               type="button"
               disabled={savingAddPos}
               onClick={handleSaveNewPos}
@@ -186,7 +187,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
                 <Check className="w-3.5 h-3.5" />
               )}
               <span>Lưu vào CSDL</span>
-            </button>
+            </ActionButton>
           </div>
         </div>
       )}
@@ -288,7 +289,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
                     >
                       Hủy
                     </button>
-                    <button
+                    <ActionButton busyLabel="Đang lưu…"
                       type="button"
                       disabled={savingEditPos}
                       onClick={() => handleSaveEditPos(pos.id)}
@@ -300,7 +301,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
                         <Check className="w-3.5 h-3.5" />
                       )}
                       <span>Lưu thay đổi</span>
-                    </button>
+                    </ActionButton>
                   </div>
                 </div>
               );
@@ -396,7 +397,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
                       >
                         Hủy
                       </button>
-                      <button
+                      <ActionButton busyLabel="Đang xóa…"
                         type="button"
                         disabled={isDeleting}
                         onClick={() => handleExecuteDeletePos(pos.id)}
@@ -408,7 +409,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
                           <Trash2 className="w-3.5 h-3.5" />
                         )}
                         <span>Xác nhận xóa</span>
-                      </button>
+                      </ActionButton>
                     </div>
                   </div>
                 )}

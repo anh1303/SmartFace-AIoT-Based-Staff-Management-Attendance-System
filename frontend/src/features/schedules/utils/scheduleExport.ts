@@ -11,7 +11,7 @@ export interface ExportScheduleOptions {
   startLabel: string;
   endLabel: string;
   format?: 'excel' | 'pdf';
-  showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning', title?: string) => void;
 }
 
 export const employeesWithScheduledShifts = (employees: Employee[], days: DayOfWeekItem[], shifts: WorkShift[]): Employee[] => {
@@ -143,10 +143,10 @@ export const exportScheduleToExcel = ({
   endLabel,
   showToast,
   format = 'excel',
-}: ExportScheduleOptions): void => {
+}: ExportScheduleOptions): Promise<unknown> | undefined => {
   const scheduledEmployees = employeesWithScheduledShifts(filteredEmployees, daysOfWeek, workShifts);
   if (scheduledEmployees.length === 0) {
-    showToast?.(filteredEmployees.length === 0 ? 'Không có dữ liệu nhân viên để xuất Excel!' : 'Không có nhân viên có ca làm việc trong tuần để xuất Excel!', 'warning');
+    showToast?.(filteredEmployees.length === 0 ? 'Không có dữ liệu nhân viên để xuất Excel!' : 'Không có nhân viên có ca làm việc trong tuần để xuất Excel!', 'error', "Không thể xuất lịch làm việc");
     return;
   }
 
@@ -162,14 +162,14 @@ export const exportScheduleToExcel = ({
   const safeEnd = endLabel.replace(/[\/\\]/g, '-');
   const filename = `Lich_lam_viec_Tuan_${weekNumber}_${safeStart}_${safeEnd}.xlsx`;
 
-  void exportToExcel({
+  return exportToExcel({
     format,
     sheetName: `Tuần ${weekNumber}`,
     headers,
     rows,
     fileName: filename,
     colWidths,
-  }).then(saved => { if (saved) showToast?.(`Đã lưu lịch làm việc Tuần ${weekNumber} (${startLabel} - ${endLabel}) sang file Excel!`, 'success'); })
-    .catch(() => showToast?.('Không thể lưu báo cáo.', 'error'));
+  }).then(saved => { if (saved) showToast?.(`Đã lưu lịch làm việc Tuần ${weekNumber} (${startLabel} - ${endLabel}) sang file Excel!`, 'success', "Xuất lịch làm việc thành công"); })
+    .catch(() => showToast?.('Không thể lưu báo cáo.', 'error', "Không thể xuất lịch làm việc"));
 };
 

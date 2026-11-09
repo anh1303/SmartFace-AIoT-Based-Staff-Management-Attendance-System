@@ -11,6 +11,7 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
   const date = '2026-10-02', period = '2026-10'
   const at = (time: string) => +new Date(`${date}T${time}+07:00`)
   beforeAll(async () => {
+    await import('../../src/composition.js')
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(`${date}T22:00:00+07:00`))
     db = (await import('../../src/config/database.js')).prisma
     service = await import('../../src/modules/attendance/attendance.service.js')
@@ -71,12 +72,18 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
     expect(summary.review_status).toBe('APPROVED')
   })
   it('deduplicates concurrent transport retries but keeps distinct INs', async () => {
+    vi.setSystemTime(new Date(at('08:00:00')))
     const capture = { eventId:'same-event-1234',capturedAt:at('08:00:00'),deviceId:`TEST_PI_${emp.id}` }
     const results = await Promise.all([service.checkIn({employeeId:emp.id},undefined,capture),service.checkIn({employeeId:emp.id},undefined,capture)])
     expect(results[0].id).toBe(results[1].id)
     expect(await db.attendance_logs.count({where:{employee_id:emp.id}})).toBe(1)
+    await db.attendance_logs.updateMany({ where: { employee_id: emp.id }, data: { created_at: new Date(at('08:00:00')) } })
+    vi.setSystemTime(new Date(at('09:00:00')))
     await service.checkIn({employeeId:emp.id},undefined,{...capture,eventId:'next-event-1234',capturedAt:at('09:00:00')})
+    await db.attendance_logs.updateMany({ where: { employee_id: emp.id, event_time: new Date(at('09:00:00')) }, data: { created_at: new Date(at('09:00:00')) } })
+    vi.setSystemTime(new Date(at('18:10:00')))
     await service.checkOut(emp.id,undefined,undefined,{...capture,eventId:'out-event-1234',capturedAt:at('18:10:00')})
+    vi.setSystemTime(new Date(`${date}T22:00:00+07:00`))
     const summary = await db.daily_attendance_summary.findFirst({where:{employee_id:emp.id}})
     expect(Number(summary.total_working_hours)).toBe(9.5);expect(Number(summary.overtime)).toBe(0)
     expect(summary.overtime_seconds).toBe(2400);expect(Number(summary.overtime_candidate_hours)).toBe(0.5);expect(summary.overtime_status).toBe('PENDING')
@@ -119,6 +126,7 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
     await db.$executeRaw`INSERT INTO face_embeddings (employee_id, embedding, model_version, embedding_type)
       VALUES (${employee.id}::uuid, ${vector}::vector, 'buffalo_s', 'CENTROID')`
     for (const [mode, time] of [['CHECK_IN','08:12:00'], ['CHECK_OUT','17:45:00']]) {
+      vi.setSystemTime(new Date(at(time)))
       const event = randomUUID()
       const payload = {device_id:'FACE_CONFIRM_PI',mode,event_id:event,client_timestamp:at(time),antispoof_score:.9,embedding}
       const before = await db.attendance_logs.count({where:{employee_id:employee.id}})
@@ -132,6 +140,7 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
       const commit = {...payload,event_kind:'CONFIRMED_SCAN',recognition_id:event+'-3',expected_employee_id:employee.id}
       expect(await service.handleThingsBoardWebhook(commit)).toMatchObject({success:true,matched:true})
       expect(await db.attendance_logs.count({where:{employee_id:employee.id}})).toBe(before+1)
+      await db.attendance_logs.updateMany({ where: { employee_id: employee.id, event_time: new Date(at(time)) }, data: { created_at: new Date(at(time)) } })
       expect(await service.handleThingsBoardWebhook(commit)).toMatchObject({success:true,matched:true})
       expect(await db.attendance_logs.count({where:{employee_id:employee.id}})).toBe(before+1)
     }

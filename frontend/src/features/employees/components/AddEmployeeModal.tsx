@@ -1,3 +1,4 @@
+import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React, { useMemo } from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { useAuth } from '../../../context/AuthContext';
@@ -71,7 +72,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       title="Thêm nhân viên mới"
       maxWidth="lg"
     >
-      <form onSubmit={onSubmit} className="space-y-4">
+      <ActionForm onSubmit={onSubmit} className="space-y-4">
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -194,14 +195,14 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
           >
             Hủy
           </button>
-          <button
+          <ActionButton busyLabel="Đang thêm…"
             type="submit"
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-xs transition-all cursor-pointer"
           >
             Lưu nhân viên mới
-          </button>
+          </ActionButton>
         </div>
-      </form>
+      </ActionForm>
     </Modal>
   );
 };

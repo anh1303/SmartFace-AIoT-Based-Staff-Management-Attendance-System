@@ -2,10 +2,10 @@ import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
 import { AppError } from '../../common/AppError.js'
 import { assertCanManageEmployee, findEmployeeByIdOrCode } from '../employees/public.js'
-import { enqueueOperation, assertNoEnrollment, stagedInput } from '../operations/operation.service.js'
-import type { OperationRow } from '../operations/operation.contract.js'
-import { currentActor } from '../operations/operation.worker.js'
-import { announceDataChange } from '../operations/operation.gateway.js'
+import { enqueueOperation, assertNoEnrollment, stagedInput } from '../operations/public.js'
+import type { OperationRow } from '../operations/public.js'
+import { currentActor } from '../operations/public.js'
+import { announceDataChange } from '../operations/public.js'
 
 export async function submitEnrollment(code: string, images: string[], actor: { id: string; role: string }, key: string) {
   if (env.FACE_AUTH_INTERNAL_KEY.length < 32) throw AppError.conflict('Máy chủ chưa cấu hình FACE_AUTH_INTERNAL_KEY để xử lý khuôn mặt nền.')

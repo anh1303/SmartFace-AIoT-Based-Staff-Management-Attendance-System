@@ -7,7 +7,7 @@ export * from './components/PayrollActionModals';
 export * from './components/EarlySettlementModal';
 export * from './components/PayslipBreakdown';
 export * from './components/AdjustmentReviewPanel';
-export * from './payrollAttendance';
 export * from './hooks/useEmployeePayrollDetail';
 export * from './hooks/usePayroll';
 export * from './api/payrollApi';
+export * from './payrollExportEligibility';

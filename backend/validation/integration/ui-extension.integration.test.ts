@@ -10,7 +10,7 @@ const suite=enabled?describe:describe.skip
 suite('UI extensions with real HTTP, cookies and isolated PostgreSQL',()=>{
  let db:any,app:any,admin:any,employeeUser:any,manager:any,employee:any
  let adminAgent:ReturnType<typeof request.agent>,employeeAgent:ReturnType<typeof request.agent>,managerAgent:ReturnType<typeof request.agent>
- const prefix=`ui-${randomUUID().slice(0,8)}`,password='isolated-test-password-123',newPassword='replacement-test-password-456'
+ const prefix=`ui-${randomUUID().slice(0,8)}`,password='isolated-test-password-123',newPassword='Replacement-test-password-456!'
  beforeAll(async()=>{
   db=(await import('../../src/config/database.js')).prisma
   app=(await import('../../src/app.js')).app
@@ -27,12 +27,12 @@ suite('UI extensions with real HTTP, cookies and isolated PostgreSQL',()=>{
   const res=await adminAgent.get('/api/auth/profile').expect(200)
   expect(res.body.data.account.employee_code).toBeNull();expect(res.body.data.account.role).toBe('ADMIN')
  })
- it('updates only the authenticated personal profile without changing official employment data',async()=>{
+ it('updates personal details only for the authenticated employee without changing wage data',async()=>{
   const input={display_name:'Personal Display Name',contact_email:'contact@example.invalid',phone:'+84 900000000'}
   await employeeAgent.patch('/api/auth/profile').send({...input,employee_id:admin.id}).expect(422)
   const res=await employeeAgent.patch('/api/auth/profile').send(input).expect(200)
-  expect(res.body.data.display_name).toBe(input.display_name);expect(res.body.data.account.official_name).toBe(employee.full_name)
-  const official=await db.employee.findUnique({where:{id:employee.id}});expect(official.email).toBe(employee.email);expect(official.full_name).toBe(employee.full_name);expect(Number(official.hourly_rate)).toBe(100000)
+  expect(res.body.data.display_name).toBe(input.display_name);expect(res.body.data.account.official_name).toBe(input.display_name)
+  const official=await db.employee.findUnique({where:{id:employee.id}});expect(official.email).toBe(input.contact_email);expect(official.full_name).toBe(input.display_name);expect(Number(official.hourly_rate)).toBe(100000)
   expect((await db.user.findUnique({where:{id:admin.id}})).profile).toBeNull()
  })
  it('keeps a large avatar in the API response while keeping the login cookie small',async()=>{

@@ -25,9 +25,12 @@ vi.mock('../../src/modules/employees/index.js', () => ({
 vi.mock('../../src/modules/attendance/public.js', () => ({ assertEditableDay: vi.fn(), aggregateDailyAttendance: vi.fn(), isAttendanceDateLocked: vi.fn(async () => false), invalidateDailySummaryForShiftChange: vi.fn() }))
 vi.mock('../../src/modules/attendance/index.js', () => ({ assertEditableDay: vi.fn(), aggregateDailyAttendance: vi.fn(), isAttendanceDateLocked: vi.fn(async () => false), invalidateDailySummaryForShiftChange: vi.fn() }))
 import { assignOrUpdate } from '../../src/modules/shifts/shift.service.js'
+import { configureShiftAttendance } from '../../src/modules/shifts/shift.attendance-port.js'
+import * as attendance from '../../src/modules/attendance/public.js'
 import { shiftTemplateSchema } from '../../src/modules/shifts/template.dto.js'
 
 beforeEach(() => {
+  configureShiftAttendance(attendance)
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-11-04T08:00:00+07:00'))
   vi.clearAllMocks()
@@ -38,6 +41,9 @@ describe('overnight shifts', () => {
   it('assigns an overnight shift on its starting work date', async () => {
     const assigned = await assignOrUpdate({ employee_id: 'employee1', date: '2026-11-10', shift_type: 'OTHER', start_time: '22:00', end_time: '06:00' }, 'admin', 'ADMIN')
     expect(assigned).toMatchObject({ date: '2026-11-10', start_time: '22:00', end_time: '06:00', shift_type: 'OTHER' })
+    expect(attendance.assertEditableDay).toHaveBeenCalledWith(db, '2026-11-10', 'employee1')
+    expect(attendance.invalidateDailySummaryForShiftChange).toHaveBeenCalledWith('employee1', expect.any(Date), db)
+    expect(attendance.aggregateDailyAttendance).toHaveBeenCalledWith(11, 2026, 'employee1', '2026-11-10', undefined, db)
   })
   it('accepts overnight reusable templates', () => {
     expect(shiftTemplateSchema.safeParse({ name: 'Ca đêm', start_time: '22:00', end_time: '06:00' }).success).toBe(true)

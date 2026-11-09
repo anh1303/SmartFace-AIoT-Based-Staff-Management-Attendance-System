@@ -43,7 +43,7 @@ it('reports an ignored repeat scan instead of claiming a new attendance event wa
   try {
     await act(async () => root.render(<QueryClientProvider client={client}><AppPage /></QueryClientProvider>));
     await act(async () => { attendance.addAttendanceRecord({ employee_id: 'NV1' } as any); await new Promise(r => setTimeout(r, 20)); });
-    expect(state.toast).toHaveBeenCalledWith('Bỏ qua lượt quét lặp; chờ 540s.', 'info');
+    expect(state.toast).toHaveBeenCalledWith('Bỏ qua lượt quét lặp; chờ 540s.', 'info', 'Chấm công');
     expect(state.toast.mock.calls.some(call => call[1] === 'success')).toBe(false);
   } finally { act(() => root.unmount()); client.clear(); host.remove(); }
 });

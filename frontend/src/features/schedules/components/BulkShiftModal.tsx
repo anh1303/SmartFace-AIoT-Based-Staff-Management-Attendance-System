@@ -1,3 +1,4 @@
+import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
@@ -31,6 +32,7 @@ interface BulkShiftModalProps {
   onSubmit: (e: React.FormEvent) => void;
   isSubmitting?: boolean;
   error?: string;
+  failureActions?: React.ReactNode;
 }
 
 export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
@@ -59,6 +61,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
   onSubmit,
   isSubmitting=false,
   error,
+  failureActions,
 }) => {
   const departmentList = React.useMemo(() => {
     if (departments && departments.length > 0) {
@@ -80,7 +83,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
       subtitle={`Áp dụng cho Tuần ${weekNumber} (${startLabel} - ${endLabel})`}
       maxWidth="lg"
     >
-      <form onSubmit={onSubmit} className="space-y-4"><fieldset disabled={isSubmitting} className="space-y-4">
+      <ActionForm onSubmit={onSubmit} className="space-y-4"><fieldset disabled={isSubmitting} className="space-y-4">
         {/* Target Selection */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Đối tượng áp dụng</label>
@@ -276,9 +279,9 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
           >
             Hủy
           </button>
-          <button
+          <ActionButton busyLabel="Đang lưu…"
             type="submit"
-            disabled={isTimeInvalid}
+            disabled={isTimeInvalid || Boolean(failureActions)}
             className={`px-5 py-2 rounded-xl text-xs font-semibold text-white shadow-sm flex items-center gap-1.5 transition-all ${
               isTimeInvalid
                 ? 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60'
@@ -287,9 +290,10 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
           >
             <Sparkles className="w-4 h-4" />
             <span>Áp dụng phân ca ngay</span>
-          </button>
+          </ActionButton>
         </div>
-      </fieldset></form>
+      </fieldset></ActionForm>
+      {failureActions}
     </Modal>
   );
 };

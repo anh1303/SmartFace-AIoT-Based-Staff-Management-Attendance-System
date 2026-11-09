@@ -1,7 +1,7 @@
 import React from 'react';
 import { LayoutDashboard } from 'lucide-react';
 import { PageHeaderBanner } from '../../components/common';
-import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   useDashboardToday,
   DashboardSummaryKpis,
@@ -13,7 +13,7 @@ import {
 } from '@/features/dashboard';
 
 export const ManagerDashboard: React.FC = () => {
-  const { role, currentUser } = useApp();
+  const { role, currentUser } = useAuth();
   const isAdmin =
     role === 'admin' ||
     currentUser?.role === 'admin' ||

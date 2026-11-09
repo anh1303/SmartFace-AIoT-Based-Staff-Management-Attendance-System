@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useDepartmentPositions } from '@/features/employees';
 import { ScanFace, Fingerprint, AlertTriangle } from 'lucide-react';
@@ -19,7 +19,7 @@ import {
 } from '@/features/biometrics';
 
 export const ManagerBiometrics: React.FC = () => {
-  const { employees } = useApp();
+  const { employees } = useEmployeeContext();
   const { currentUser, role } = useAuth();
   const [, setSearchParams] = useSearchParams();
 
@@ -235,7 +235,7 @@ export const ManagerBiometrics: React.FC = () => {
                     onDeleteFingerprint={() => {
                       if (!currentEmp) return;
                       if (window.confirm(`Bạn có chắc chắn muốn xóa dữ liệu vân tay của nhân viên ${currentEmp.full_name} (${currentEmp.employee_id}) không? Mẫu vân tay sẽ được thu hồi và xóa khỏi thiết bị.`)) {
-                        void handleDeleteFingerprint(currentEmp);
+                        return handleDeleteFingerprint(currentEmp);
                       }
                     }}
                     onSendIoTTrigger={handleSendIoTTrigger}

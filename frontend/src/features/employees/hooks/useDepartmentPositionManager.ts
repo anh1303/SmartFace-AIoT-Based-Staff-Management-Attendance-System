@@ -84,7 +84,7 @@ export function useDepartmentPositionManager({
       setDepartments(deptData);
       setPositions(posData);
     } catch {
-      showToast('Không thể tải dữ liệu phòng ban & chức vụ từ máy chủ', 'error');
+      showToast('Không thể tải dữ liệu phòng ban & chức vụ từ máy chủ', 'error', "Không thể tải phòng ban và chức vụ");
     } finally {
       setLoading(false);
     }
@@ -125,7 +125,7 @@ export function useDepartmentPositionManager({
   const handleSaveNewDept = async () => {
     const trimmed = newDeptName.trim();
     if (!trimmed) {
-      showToast('Vui lòng nhập tên phòng ban', 'warning');
+      showToast('Vui lòng nhập tên phòng ban', 'error', "Không thể thêm phòng ban");
       return;
     }
 
@@ -136,7 +136,7 @@ export function useDepartmentPositionManager({
         department_code: newDeptCode.trim() || undefined,
         description: newDeptDesc.trim() || undefined,
       });
-      showToast(`Đã thêm phòng ban "${created.name}" thành công vào CSDL`, 'success');
+      showToast(`Đã thêm phòng ban "${created.name}" thành công vào CSDL`, 'success', "Thêm phòng ban thành công");
       setIsAddingDept(false);
       setNewDeptName('');
       setNewDeptCode('');
@@ -144,7 +144,7 @@ export function useDepartmentPositionManager({
       await loadData();
       onChanged?.();
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi tạo phòng ban mới', 'error');
+      showToast(err.message || 'Lỗi khi tạo phòng ban mới', 'error', "Không thể thêm phòng ban");
     } finally {
       setSavingAddDept(false);
     }
@@ -161,7 +161,7 @@ export function useDepartmentPositionManager({
   const handleSaveEditDept = async (id: number) => {
     const trimmed = editDeptName.trim();
     if (!trimmed) {
-      showToast('Tên phòng ban không được để trống', 'warning');
+      showToast('Tên phòng ban không được để trống', 'error', "Không thể cập nhật phòng ban");
       return;
     }
 
@@ -171,12 +171,12 @@ export function useDepartmentPositionManager({
         name: trimmed,
         description: editDeptDesc.trim() || undefined,
       });
-      showToast(`Đã cập nhật phòng ban "${updated.name}" trên CSDL`, 'success');
+      showToast(`Đã cập nhật phòng ban "${updated.name}" trên CSDL`, 'success', "Cập nhật phòng ban thành công");
       setEditingDeptId(null);
       await loadData();
       onChanged?.();
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi cập nhật phòng ban', 'error');
+      showToast(err.message || 'Lỗi khi cập nhật phòng ban', 'error', "Không thể cập nhật phòng ban");
     } finally {
       setSavingEditDept(false);
     }
@@ -186,12 +186,12 @@ export function useDepartmentPositionManager({
     setDeletingDeptId(id);
     try {
       await deleteDepartmentApi(id);
-      showToast('Đã xóa phòng ban khỏi cơ sở dữ liệu', 'success');
+      showToast(`Đã xóa phòng ban ${departments.find(d => d.id === id)?.name || id}.`, 'success', 'Xóa phòng ban thành công');
       setDeleteConfirmDept(null);
       await loadData();
       onChanged?.();
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi xóa phòng ban', 'error');
+      showToast(err.message || 'Lỗi khi xóa phòng ban', 'error', "Không thể xóa phòng ban");
     } finally {
       setDeletingDeptId(null);
     }
@@ -201,7 +201,7 @@ export function useDepartmentPositionManager({
   const handleSaveNewPos = async () => {
     const trimmed = newPosName.trim();
     if (!trimmed) {
-      showToast('Vui lòng nhập tên chức vụ', 'warning');
+      showToast('Vui lòng nhập tên chức vụ', 'error', "Không thể thêm chức vụ");
       return;
     }
 
@@ -212,14 +212,14 @@ export function useDepartmentPositionManager({
         department_id: newPosDeptId || (departments[0]?.id ?? undefined),
         level: newPosLevel,
       });
-      showToast(`Đã thêm chức vụ "${created.name}" thành công vào CSDL`, 'success');
+      showToast(`Đã thêm chức vụ "${created.name}" thành công vào CSDL`, 'success', "Thêm chức vụ thành công");
       setIsAddingPos(false);
       setNewPosName('');
       setNewPosLevel('EMPLOYEE');
       await loadData();
       onChanged?.();
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi tạo chức vụ mới', 'error');
+      showToast(err.message || 'Lỗi khi tạo chức vụ mới', 'error', "Không thể thêm chức vụ");
     } finally {
       setSavingAddPos(false);
     }
@@ -237,7 +237,7 @@ export function useDepartmentPositionManager({
   const handleSaveEditPos = async (id: number) => {
     const trimmed = editPosName.trim();
     if (!trimmed) {
-      showToast('Tên chức vụ không được để trống', 'warning');
+      showToast('Tên chức vụ không được để trống', 'error', "Không thể cập nhật chức vụ");
       return;
     }
 
@@ -248,12 +248,12 @@ export function useDepartmentPositionManager({
         department_id: editPosDeptId || undefined,
         level: editPosLevel,
       });
-      showToast(`Đã cập nhật chức vụ "${updated.name}" trên CSDL`, 'success');
+      showToast(`Đã cập nhật chức vụ "${updated.name}" trên CSDL`, 'success', "Cập nhật chức vụ thành công");
       setEditingPosId(null);
       await loadData();
       onChanged?.();
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi cập nhật chức vụ', 'error');
+      showToast(err.message || 'Lỗi khi cập nhật chức vụ', 'error', "Không thể cập nhật chức vụ");
     } finally {
       setSavingEditPos(false);
     }
@@ -263,12 +263,12 @@ export function useDepartmentPositionManager({
     setDeletingPosId(id);
     try {
       await deletePositionApi(id);
-      showToast('Đã xóa chức vụ khỏi cơ sở dữ liệu', 'success');
+      showToast(`Đã xóa chức vụ ${positions.find(p => p.id === id)?.name || id}.`, 'success', 'Xóa chức vụ thành công');
       setDeleteConfirmPos(null);
       await loadData();
       onChanged?.();
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi xóa chức vụ', 'error');
+      showToast(err.message || 'Lỗi khi xóa chức vụ', 'error', "Không thể xóa chức vụ");
     } finally {
       setDeletingPosId(null);
     }

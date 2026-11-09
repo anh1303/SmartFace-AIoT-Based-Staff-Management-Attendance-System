@@ -1,9 +1,10 @@
-import { AttendanceDayDetails, AttendanceLogFilterSelect, type AttendanceLogFilter } from '../../attendances/components/AttendanceDayDetails';
-import { AdjustmentReviewPanel } from '../../payrolls/components/AdjustmentReviewPanel';
+import { AttendanceDayDetails, AttendanceLogFilterSelect, type AttendanceLogFilter } from '../../attendances';
+import { AdjustmentReviewPanel } from '../../payrolls';
 import React, { useMemo, useState, useId } from 'react';
 import { Clock } from 'lucide-react';
 import { AttendanceRecord, Employee } from '../../../types';
-import { useApp } from '../../../context/AppContext';
+import { useShiftContext } from '../../../context/ShiftContext';
+import { useEmployeeContext } from '../../../context/EmployeeContext';
 import { useAttendance, useAttendancePairs, useAttendanceSummaries } from '@/features/attendances';
 import { FilterSelect } from '../../../components/common/FilterSelect';
 
@@ -40,7 +41,8 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
   setAttendanceStatusFilter,
   employeeAttendanceLogs
 }) => {
-  const { workShifts, employees } = useApp();
+  const { workShifts } = useShiftContext();
+  const { employees } = useEmployeeContext();
   const fieldId=useId();
   const [logFilter, setLogFilter] = useState<AttendanceLogFilter>('ALL');
   const logsQuery = useAttendance({ employeeId: currentEmp?.employee_id, startDate: startDate || undefined, endDate: endDate || undefined, fetchAllPages: true });

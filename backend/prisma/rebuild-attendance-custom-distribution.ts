@@ -1,3 +1,4 @@
+import '../src/composition.js'
 import { prisma } from '../src/config/database.js'
 import { aggregateDailyAttendance, createAttendanceSnapshot } from '../src/modules/attendance/attendance.service.js'
 import { generate, finalizePeriod } from '../src/modules/payroll/payroll.service.js'

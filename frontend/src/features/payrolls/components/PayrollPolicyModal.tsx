@@ -1,3 +1,4 @@
+import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { nextPayrollPolicyPeriod } from '../../../utils/payrollUtils';
@@ -76,7 +77,7 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
       onClose={onClose}
       title="Thay đổi quy định Thưởng / Phạt"
     >
-      <form onSubmit={e => { if (blocked) { e.preventDefault(); return; } onSavePolicy(e); }} className="space-y-4">
+      <ActionForm onSubmit={e => { if (blocked) { e.preventDefault(); return; } return onSavePolicy(e); }} className="space-y-4">
         <label className="sf-field">Áp dụng từ kỳ lương
           <input className="sf-input" type="month" min={nextPayrollPolicyPeriod()} required value={policyData.effective_period}
             onChange={e => void loadPeriod(e.target.value)}/>
@@ -186,15 +187,15 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
           >
             Hủy
           </button>
-          <button
+          <ActionButton busyLabel="Đang lưu…"
             type="submit"
             disabled={blocked}
             className="px-4 py-2 rounded-xl text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md shadow-blue-500/20 cursor-pointer"
           >
             Lưu quy định
-          </button>
+          </ActionButton>
         </div>
-      </form>
+      </ActionForm>
     </Modal>
   );
 };

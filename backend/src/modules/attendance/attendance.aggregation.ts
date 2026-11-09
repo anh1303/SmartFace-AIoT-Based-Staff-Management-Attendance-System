@@ -6,7 +6,7 @@ import { policyForPeriod } from '../../common/payroll-policy.js'
 import { buildIdOrCodeWhere } from '../../common/utils.js'
 import { sourceHourlyRate, findEmployeesWithFilter } from '../employees/public.js'
 import { getEmployeeShiftsForAggregation } from '../shifts/public.js'
-import { payrollOverrides, findPeriodPayrolls } from '../payroll/public.js'
+import { attendancePayroll } from './attendance.payroll-port.js'
 import { calculateDay, prepareAttendance, vnDay, MAX_PAIR_MS } from './attendance.policy.js'
 import { syncDayAdjustments, flushAdjustmentBatch } from './attendance.adjustments.js'
 
@@ -54,7 +54,7 @@ export async function aggregateDailyAttendance(
       } }, orderBy: [{ event_time: 'asc' }, { id: 'asc' }] }),
       tx.daily_attendance_summary.findMany({ where: { employee_id: { in: ids }, work_date: { gte: start, lt: end } } }),
       tx.attendance_locks.findMany({ where: { work_date: { gte: start, lt: end }, is_locked: true } }),
-      findPeriodPayrolls(ids, first.slice(0, 7), tx),
+      attendancePayroll().findPeriodPayrolls(ids, first.slice(0, 7), tx),
       tx.attendanceAdjustment.findMany({ where: { employee_id: { in: ids }, work_date: { gte: start, lt: end } } }),
     ])
     const adjustmentBatch = { existing: new Map(adjustmentRows.map(r => [`${r.employee_id}:${r.work_date.toISOString().slice(0,10)}:${r.kind}`, r])), writes: [] as Prisma.AttendanceAdjustmentCreateManyInput[], audits: [] as Prisma.AuditLogCreateManyInput[] }
@@ -167,7 +167,7 @@ export async function aggregateDailyAttendance(
           pendingWrites.push({ employee_id: emp.id, work_date: date, ...data, updated_at: new Date().toISOString() })
         }
         const payroll = periodPayroll.find(p => p.employeeId === emp.id)
-        const oldRate = payrollOverrides(payroll ?? null).fields.hourly_rate
+        const oldRate = attendancePayroll().payrollOverrides(payroll ?? null).fields.hourly_rate
         await syncDayAdjustments(tx, { ...data, employee_id: emp.id, work_date: workDate }, sourceHourlyRate(emp, first.slice(0, 7), payroll?.hourly_rate, Boolean(oldRate)), adjustmentPolicy?.absence_penalty_rate ?? null, adjustmentBatch)
         details.push({
           employee_code: emp.employee_code,

@@ -1,3 +1,4 @@
+import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '../../../components/common/Modal';
@@ -79,7 +80,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
       maxWidth="md"
     >
       {editingShift && (
-        <form onSubmit={onSubmit} className="space-y-4">
+        <ActionForm onSubmit={onSubmit} className="space-y-4">
           {isReadOnly && (
             <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2.5">
               <span className="text-base shrink-0">🔒</span>
@@ -207,7 +208,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
                   >
                     Hủy
                   </button>
-                  <button
+                  <ActionButton busyLabel="Đang lưu…"
                     type="submit"
                     disabled={isTimeInvalid || isSubmitting}
                     className={`px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-sm transition-all ${isTimeInvalid || isSubmitting
@@ -216,12 +217,12 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
                       }`}
                   >
                     Lưu
-                  </button>
+                  </ActionButton>
                 </div>
               </>
             )}
           </div>
-        </form>
+        </ActionForm>
       )}
     </Modal>
   );

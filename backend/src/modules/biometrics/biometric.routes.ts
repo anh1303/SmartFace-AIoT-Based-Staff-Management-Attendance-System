@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { enrollImagesSchema } from './biometric.dto.js';
 import { submitEnrollment } from './biometric.jobs.js';
 import { successResponse } from '../../common/response.js';
+import { wakeOperationWorker } from '../operations/public.js';
 
 export const biometricRouter = Router();
 
@@ -17,7 +18,9 @@ biometricRouter.use(authenticate);
 biometricRouter.post('/:employeeId/enroll-jobs', authorize('ADMIN', 'MANAGER'), requirePasswordAuth, asyncHandler(async (req, res) => {
   const key = z.string().uuid().parse(req.header('Idempotency-Key'));
   const { images } = enrollImagesSchema.parse(req.body);
-  successResponse(res, await submitEnrollment(req.params.employeeId as string, images, req.user!, key), 'Đã tiếp nhận ảnh, đang xử lý nền', 202);
+  const result = await submitEnrollment(req.params.employeeId as string, images, req.user!, key);
+  wakeOperationWorker();
+  successResponse(res, result, 'Đã tiếp nhận ảnh, đang xử lý nền', 202);
 }));
 
 biometricRouter.get(['/:employeeId', '/face/:employeeId'], asyncHandler(controller.getByEmployee));

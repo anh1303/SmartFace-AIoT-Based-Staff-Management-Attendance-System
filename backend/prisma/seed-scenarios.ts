@@ -1,3 +1,4 @@
+import '../src/composition.js'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import {

@@ -10,7 +10,9 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
 const suite = enabled ? describe : describe.skip
 suite('Payroll policy storage on PostgreSQL', () => {
   let db: any, payroll: any
-  beforeAll(async () => { db = (await import('../../src/config/database.js')).prisma; payroll = await import('../../src/modules/payroll/payroll.service.js') })
+  beforeAll(async () => {
+    await import('../../src/composition.js')
+    db = (await import('../../src/config/database.js')).prisma; payroll = await import('../../src/modules/payroll/payroll.service.js') })
   afterAll(async () => { if (db) await db.$disconnect() })
   it.each([0, 2, 9.9999, 10, 50])('round-trips all three multipliers exactly: %s', async value => {
     const month = [0, 2, 9.9999, 10, 50].indexOf(value) + 1

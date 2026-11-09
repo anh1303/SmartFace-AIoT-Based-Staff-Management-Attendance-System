@@ -1,13 +1,12 @@
 import { apiFetch } from '../../../api/client';
 import { WorkShift } from '../../../types';
-import type { Operation } from '../../operations/OperationsProvider';
-import { submitBackgroundCommand } from '../../operations/commandApi';
+import { submitAndWait } from '../../operations';
 
 export async function submitScheduleBatch(assignments: unknown[]) {
-  return submitBackgroundCommand('/api/shifts/batch', { assignments });
+  return submitAndWait('/api/shifts/batch', { assignments });
 }
 export async function submitScheduleCopy(command: unknown) {
-  return submitBackgroundCommand('/api/shifts/copy-week', command);
+  return submitAndWait('/api/shifts/copy-week', command);
 }
 
 export async function fetchShiftsApi(): Promise<WorkShift[]> {

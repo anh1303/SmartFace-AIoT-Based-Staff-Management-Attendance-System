@@ -14,6 +14,14 @@ export function findPositionByName(name: string) {
 import { buildIdOrCodeWhere } from '../../common/utils.js'
 import { employeeInclude } from './employee.model.js'
 
+const identitySelect = { id: true, employee_code: true, full_name: true, user_id: true, status: true, departmentId: true,
+  position: { select: { name: true, level: true } }, department: { select: { name: true } },
+  users: { select: { roles: { select: { role_name: true } } } } } as const
+type EmployeeProfile = Prisma.EmployeeGetPayload<{ include: typeof employeeInclude }>
+type EmployeeIdentity = Prisma.EmployeeGetPayload<{ select: typeof identitySelect }>
+const calculationSelect = { id: true, employee_code: true, full_name: true, user_id: true, status: true,
+  departmentId: true, positionId: true, createdAt: true, hourly_rate: true, hourly_rate_history: true } as const
+
 export function getEmployeeClient(tx?: Prisma.TransactionClient) {
   return (tx && 'employee' in tx ? tx : prisma)
 }
@@ -25,12 +33,15 @@ export function updateEmployeePersonalDetails(userId: string, data: { full_name:
 /**
  * Public Module API: Tìm một nhân viên theo UUID hoặc mã nhân viên (hỗ trợ transaction)
  */
-export async function findEmployeeByIdOrCode(idOrCode: string, tx?: Prisma.TransactionClient) {
+export function findEmployeeByIdOrCode(idOrCode: string, tx?: Prisma.TransactionClient): Promise<EmployeeProfile | null>
+export function findEmployeeByIdOrCode(idOrCode: string, tx: Prisma.TransactionClient | undefined, projection: 'identity'): Promise<EmployeeIdentity | null>
+export async function findEmployeeByIdOrCode(idOrCode: string, tx?: Prisma.TransactionClient, projection?: 'identity') {
   const client = getEmployeeClient(tx)
+  const fields = projection === 'identity' ? { select: identitySelect } : { include: employeeInclude }
   if (typeof (client as any)?.employee?.findFirst === 'function') {
     const read = () => (client as any).employee.findFirst({
       where: buildIdOrCodeWhere(idOrCode),
-      include: employeeInclude,
+      ...fields,
     })
     try {
       return await read()
@@ -45,7 +56,7 @@ export async function findEmployeeByIdOrCode(idOrCode: string, tx?: Prisma.Trans
   if (typeof (client as any)?.employee?.findUnique === 'function') {
     return (client as any).employee.findUnique({
       where: { id: idOrCode },
-      include: employeeInclude,
+      ...fields,
     })
   }
   return null
@@ -88,12 +99,13 @@ export async function findActiveEmployeeIds(tx?: Prisma.TransactionClient): Prom
 /**
  * Public Module API: Tìm nhân viên theo user_id tài khoản (hỗ trợ transaction)
  */
-export async function findEmployeeByUserId(userId: string, tx?: Prisma.TransactionClient) {
+export function findEmployeeByUserId(userId: string, tx?: Prisma.TransactionClient): Promise<EmployeeProfile | null>
+export function findEmployeeByUserId(userId: string, tx: Prisma.TransactionClient | undefined, projection: 'identity'): Promise<EmployeeIdentity | null>
+export async function findEmployeeByUserId(userId: string, tx?: Prisma.TransactionClient, projection?: 'identity') {
   const client = getEmployeeClient(tx)
-  return client.employee.findFirst({
-    where: { user_id: userId },
-    include: employeeInclude,
-  })
+  return projection === 'identity'
+    ? client.employee.findFirst({ where: { user_id: userId }, select: identitySelect })
+    : client.employee.findFirst({ where: { user_id: userId }, include: employeeInclude })
 }
 
 /**
@@ -201,16 +213,16 @@ export async function findEmployeesWithFilter(
   if (options?.includeUsersAndRoles) {
     return client.employee.findMany({
       where,
-      include: { department: true, position: true, users: { include: { roles: true } } },
+      select: { ...calculationSelect, department: true, position: true, users: { select: { id: true, roles: { select: { role_name: true } } } } },
     })
   }
   if (options?.includeRelations) {
     return client.employee.findMany({
       where,
-      include: { department: true, position: true },
+      select: { ...calculationSelect, department: true, position: true },
     })
   }
-  return client.employee.findMany({ where })
+  return client.employee.findMany({ where, select: calculationSelect })
 }
 
 /**
@@ -223,6 +235,7 @@ export async function findEmployeeWageProfile(
   const client = getEmployeeClient(tx)
   return client.employee.findFirst({
     where: { id },
+    select: { id: true, status: true, hourly_rate: true, hourly_rate_history: true },
   })
 }
 
@@ -236,6 +249,6 @@ export async function findEmployeeWithRelations(
   const client = getEmployeeClient(tx)
   return client.employee.findUnique({
     where: { id },
-    include: { position: true, department: true, users: { include: { roles: true } } },
+    select: identitySelect,
   })
 }

@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { User, Camera, Check } from 'lucide-react';
@@ -55,7 +56,7 @@ function ProfileEditor({ profile, username }: { profile: AccountProfile; usernam
     setValidationError('');
     if (next.display_name === profile.display_name && next.contact_email === profile.contact_email && next.phone === profile.phone && nextAvatar === profile.avatar) return;
     setSaved(false);
-    update.mutate({ ...next, avatar: nextAvatar });
+    return update.mutateAsync({ ...next, avatar: nextAvatar });
   };
   const upload = async (selected: File | undefined) => {
     if (!selected) return;
@@ -96,11 +97,11 @@ function ProfileEditor({ profile, username }: { profile: AccountProfile; usernam
         <label className="sf-field">Email<input className="sf-input" type="email" value={draft.contact_email} maxLength={100} autoComplete="email" disabled={update.isPending} onChange={e => { setDraft({ ...draft, contact_email: e.target.value }); setSaved(false); }}/></label>
         <label className="sf-field">Số điện thoại<input className="sf-input" type="tel" maxLength={20} pattern="[+0-9 ().-]*" value={draft.phone} autoComplete="tel" disabled={update.isPending} onChange={e => { setDraft({ ...draft, phone: e.target.value }); setSaved(false); }}/></label>
       </div>
-      {update.isError && <div className="sf-feedback error" role="alert">{update.error.message} <button className="underline" onClick={() => save(draft, avatar)}>Thử lưu lại</button></div>}
+      {update.isError && <div className="sf-feedback error" role="alert">{update.error.message} <button className="underline" onClick={() => { void save(draft, avatar)?.catch(() => {}); }}>Thử lưu lại</button></div>}
       {update.isError && (update.error as { code?: string }).code === 'PASSWORD_REQUIRED' && <PasswordReauthentication onComplete={() => { update.reset(); save(draft, avatar); }}/>}
       {validationError && <div className="sf-feedback error" role="alert">{validationError}</div>}
       {saved && <div className="sf-feedback" role="status"><Check size={17}/>Đã lưu thông tin.</div>}
-      <div className="sf-footer"><button type="button" className="sf-button primary" disabled={update.isPending || imageBusy} onClick={() => save(draft)}>{update.isPending ? 'Đang lưu…' : 'Lưu'}</button></div>
+      <div className="sf-footer"><ActionButton busyLabel="Đang lưu…" type="button" className="sf-button primary" disabled={update.isPending || imageBusy} onClick={() => save(draft)}>{update.isPending ? 'Đang lưu…' : 'Lưu'}</ActionButton></div>
     </div>}
     {tab === 'security' && <div role="tabpanel" className="pt-6"><PasswordForm/></div>}
     {tab === 'work' && <div role="tabpanel" className="pt-6"><dl className="divide-y divide-slate-200 dark:divide-[#272d5a]">{[

@@ -1,7 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { adjustmentFingerprint } from '../../src/modules/attendance/attendance.adjustments.js'
+import { prisma } from '../../src/config/database.js'
 
-const state = vi.hoisted(() => ({ record: null as any, summaries: [] as any[], employee: null as any }))
+const state = vi.hoisted(() => ({ record: null as any, summaries: [] as any[], shifts: [] as any[], employee: null as any }))
 vi.mock('../../src/modules/attendance/public.js', async (importOriginal) => {
   const actual: any = await importOriginal()
   return {
@@ -27,7 +28,7 @@ vi.mock('../../src/config/database.js', () => {
     daily_attendance_summary: { findMany: vi.fn(async () => state.summaries), count: vi.fn(async () => 0) },
     attendanceAdjustment: { findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
     attendance_locks: { findMany: vi.fn(async () => []) },
-    employee_shifts: { findMany: vi.fn(async () => []) },
+    employee_shifts: { findMany: vi.fn(async () => state.shifts) },
     work_shifts: { findFirst: vi.fn(async () => null) },
     auditLog: { create: vi.fn(async () => ({})) },
     payrollRecord: {
@@ -42,11 +43,24 @@ vi.mock('../../src/config/database.js', () => {
   return { prisma: db }
 })
 
-import { generate, updateItem, finalizePeriod, list, formatPayrollRecord } from '../../src/modules/payroll/payroll.service.js'
+import { generate, updateItem, previewItem, finalizePeriod, list, formatPayrollRecord } from '../../src/modules/payroll/payroll.service.js'
 const actor = { id: 'admin-user', role: 'ADMIN' }
 const calculate = () => generate('2026-10', state.employee.id, actor.id, actor)
 
 describe('Unresolved legacy snapshots', () => {
+  it('leaves older snapshots unknown unless the completeness-checked count was saved', () => {
+    expect((formatPayrollRecord(state.record) as any).approved_absence_count).toBeNull()
+    state.record.calculation_details = { adjustment_ids: ['11', '12'], applied_policy_snapshot: { approved_absences: [{ id: '11' }, { id: '13' }] } }
+    expect((formatPayrollRecord(state.record) as any).approved_absence_count).toBeNull()
+    state.record.status = 'FINALIZED'
+    expect((formatPayrollRecord(state.record) as any).approved_absence_count).toBeNull()
+    state.record.calculation_details = { early_settlement: { is_early_settlement: true }, adjustment_ids: ['11'], applied_policy_snapshot: { approved_absences: [{ id: '11' }] } }
+    expect(formatPayrollRecord(state.record).approved_absence_count).toBeNull()
+    state.record.calculation_details.approved_absence_count = 0
+    expect(formatPayrollRecord(state.record).approved_absence_count).toBe(0)
+    state.record.calculation_details = { approved_absence_count: null, adjustment_ids: [], applied_policy_snapshot: { approved_absences: [] } }
+    expect(formatPayrollRecord(state.record).approved_absence_count).toBeNull()
+  })
   it('keeps paid money but does not reinterpret the old fixed rate as a multiplier', () => {
     state.record.status = 'PAID'
     state.record.overtime_rate = 100000
@@ -69,11 +83,48 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-30T20:00:00+07:00'))
   state.employee = { id: '00000000-0000-4000-8000-000000000001', employee_code: 'NV-001', full_name: 'Test employee', hourly_rate: 100000, status: 'ACTIVE', departmentId: 1, user_id: 'employee-user', department: { name: 'A' }, position: { level: 'EMPLOYEE' }, users: { roles: { role_name: 'EMPLOYEE' } } }
   state.summaries = [{ id: 1n, employee_id: state.employee.id, work_date: new Date('2026-10-29T00:00:00Z'), total_working_hours: 90, overtime: 0, late_early: 0, overtime_status: 'NONE', policy_version: '2026-10-29-v6', requires_review: false, review_status: 'APPROVED', calculation_details: { fingerprint: 'source-90', scheduledEnd: '2026-10-29T17:00:00+07:00' } }]
+  state.shifts = []
   state.record = { id: 1n, employeeId: state.employee.id, employee: state.employee, payroll_period: '2026-10', hourly_rate: 100000, total_working_hours: 90, total_overtime: 0, total_late_early: 0, total_absence_penalty: 0, allowance: 1500000, net_salary: 10500000, overtime_rate: 2.0, late_penalty_rate: 1.5, status: 'PENDING', updated_at: new Date(), calculation_details: { adjustment_fingerprint: adjustmentFingerprint([]) } }
 })
 afterEach(() => vi.useRealTimers())
 
 describe('Independent payroll edits and source reconciliation', () => {
+  it('marks absence count unknown in generated payroll if a past working shift has no summary', async () => {
+    state.shifts = [{ employee_id: state.employee.id, work_date: new Date('2026-10-28T00:00:00Z'), shift_type: 'MORNING' }]
+    const [record] = await calculate()
+    expect(record.approved_absence_count).toBeNull()
+  })
+  it('previews the same amount as a subsequent allowance edit without writing', async () => {
+    const version = state.record.updated_at.toISOString()
+    const preview = await previewItem('1', { allowance: 2000000, updated_at: version }, actor)
+    expect(state.record.allowance).toBe(1500000)
+    const updated = await updateItem('1', { allowance: 2000000, updated_at: version, reason: 'Test' }, actor)
+    expect(preview.net_salary).toBe(updated.net_salary)
+  })
+  it.each([
+    { hourly: 100.25, hours: 1, absence: 0, allowance: 0, expected: 100 },
+    { hourly: 100, hours: 1, absence: 500, allowance: 0, expected: 0 },
+    { hourly: 100.5, hours: 1, absence: 0, allowance: 0, expected: 101 },
+  ])('previews and saves the same rounded or clamped result %#', async ({ hourly, hours, absence, allowance, expected }) => {
+    Object.assign(state.record, { hourly_rate: hourly, total_working_hours: hours, total_absence_penalty: absence })
+    const updated_at = state.record.updated_at.toISOString()
+    const preview = await previewItem('1', { allowance, updated_at }, actor)
+    const updated = await updateItem('1', { allowance, updated_at, reason: 'Adjustment' }, actor)
+    expect(preview.net_salary).toBe(expected)
+    expect(updated.net_salary).toBe(expected)
+  })
+  it('rejects a stale preview and locked payroll', async () => {
+    await expect(previewItem('1', { allowance: 0, updated_at: '2020-01-01T00:00:00.000Z' }, actor)).rejects.toThrow(/thay đổi/)
+    state.record.status = 'FINALIZED'
+    await expect(previewItem('1', { allowance: 0, updated_at: state.record.updated_at.toISOString() }, actor)).rejects.toThrow(/khóa/)
+  })
+  it('does not preview payroll for an unauthenticated actor', async () => {
+    await expect(previewItem('1', { allowance: 0, updated_at: state.record.updated_at.toISOString() })).rejects.toMatchObject({ statusCode: 401 })
+  })
+  it('does not preview an employee outside a manager scope', async () => {
+    vi.mocked(prisma.employee.findFirst).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+    await expect(previewItem('1', { allowance: 0, updated_at: state.record.updated_at.toISOString() }, { id: 'manager', role: 'MANAGER' })).rejects.toMatchObject({ statusCode: 403 })
+  })
   it('does not reprice an earlier month from a later profile rate change', async () => {
     state.record.payroll_period = '2026-09'
     state.summaries[0].work_date = new Date('2026-09-29T00:00:00Z')

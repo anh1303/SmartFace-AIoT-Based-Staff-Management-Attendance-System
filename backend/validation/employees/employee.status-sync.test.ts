@@ -17,9 +17,11 @@ vi.mock('../../src/modules/auth/public.js', () => ({
 }))
 
 import { update } from '../../src/modules/employees/employee.service.js'
+import { configureEmployeeIntegration } from '../../src/modules/employees/employee.integration-port.js'
 
 describe('Employee and Auth User status atomic synchronization', () => {
   beforeEach(() => {
+    configureEmployeeIntegration({ updateAuthUser: mockUpdateAuthUser } as any)
     vi.clearAllMocks()
     db.$transaction.mockImplementation(async (cb: any) => cb(db))
     mockUpdateAuthUser.mockResolvedValue({})

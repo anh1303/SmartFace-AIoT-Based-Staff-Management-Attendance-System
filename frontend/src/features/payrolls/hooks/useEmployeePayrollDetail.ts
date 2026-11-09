@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useApp } from '../../../context/AppContext';
+import { usePayrollContext } from '../../../context/PayrollContext';
 import { Employee } from '../../../types';
 
 export interface UseEmployeePayrollDetailOptions {
@@ -9,7 +9,7 @@ export interface UseEmployeePayrollDetailOptions {
 }
 
 export function useEmployeePayrollDetail({ currentEmp }: UseEmployeePayrollDetailOptions) {
-  const { payroll } = useApp();
+  const { payroll } = usePayrollContext();
   const employeePayrolls = useMemo(() => {
     if (!currentEmp) return [];
     return payroll

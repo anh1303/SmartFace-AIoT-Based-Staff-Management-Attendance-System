@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { useEmployeeContext } from '../../context/EmployeeContext';
 import { Employee } from '../../types';
 import {
@@ -26,10 +27,9 @@ export const ManagerEmployeeList: React.FC = () => {
     updateEmployee,
     deleteEmployee,
     toggleEmployeeStatus,
-    showToast,
-    role,
-    currentUser,
-  } = useApp();
+  } = employeeState;
+  const { showToast } = useToast();
+  const { role, currentUser } = useAuth();
 
   const isManager = role === 'manager';
   const managerDept = currentUser?.department;
@@ -173,18 +173,15 @@ export const ManagerEmployeeList: React.FC = () => {
     return matchSearch && matchDept && matchPos && matchStatus;
   });
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmp.full_name || !newEmp.email) {
-      showToast('Vui lòng điền đầy đủ họ tên và email', 'error');
+      showToast('Vui lòng điền đầy đủ họ tên và email', 'error', "Không thể thêm nhân viên");
       return;
     }
 
     const draft = { ...newEmp };
-    void addEmployee(draft).catch(() => {
-      setNewEmp(draft);
-      setAddModalOpen(true);
-    });
+    await addEmployee(draft);
     setAddModalOpen(false);
     const updatedEmployees = [
       ...employees,
@@ -214,12 +211,11 @@ export const ManagerEmployeeList: React.FC = () => {
     });
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editEmployee) return;
 
-    const draft = { ...editEmployee };
-    void updateEmployee(editEmployee.employee_id, {
+    await updateEmployee(editEmployee.employee_id, {
       full_name: editEmployee.full_name,
       department: editEmployee.department,
       position: editEmployee.position,
@@ -227,13 +223,13 @@ export const ManagerEmployeeList: React.FC = () => {
       phone: editEmployee.phone,
       hourly_rate: editEmployee.hourly_rate,
       fingerprint_enrolled: editEmployee.fingerprint_enrolled,
-    }).catch(() => setEditEmployee(draft));
+    });
     setEditEmployee(null);
   };
 
   const handleExportExcel = (format: 'excel' | 'pdf') => {
     if (employeeState.isLoading || employeeState.isError || filteredEmployees.length === 0) return;
-    exportEmployeesToExcel({
+    return exportEmployeesToExcel({
       format,
       employees: filteredEmployees,
       showToast,
@@ -313,8 +309,8 @@ export const ManagerEmployeeList: React.FC = () => {
       <ConfirmDeleteEmployeeModal
         employee={confirmDeleteEmployee}
         onClose={() => setConfirmDeleteEmployee(null)}
-        onConfirmDelete={(emp) => {
-          deleteEmployee(emp.id || emp.employee_id);
+        onConfirmDelete={async (emp) => {
+          await deleteEmployee(emp.id || emp.employee_id);
           setConfirmDeleteEmployee(null);
         }}
       />
@@ -323,8 +319,8 @@ export const ManagerEmployeeList: React.FC = () => {
       <ConfirmStatusEmployeeModal
         employee={confirmStatusEmployee}
         onClose={() => setConfirmStatusEmployee(null)}
-        onConfirmToggle={(emp) => {
-          toggleEmployeeStatus(emp.employee_id);
+        onConfirmToggle={async (emp) => {
+          await toggleEmployeeStatus(emp.employee_id);
           setConfirmStatusEmployee(null);
         }}
       />

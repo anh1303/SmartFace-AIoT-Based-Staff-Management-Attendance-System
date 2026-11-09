@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import { Avatar } from '../../../components/common/Avatar';
 import React from 'react';
 import { ScanFace, Fingerprint, Upload, Camera, Trash2, Radio } from 'lucide-react';
@@ -97,14 +98,14 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
             </div>
 
             {employee.face_enrolled && (
-              <button
+              <ActionButton busyLabel="Đang xóa…"
                 type="button"
                 onClick={() => onDeleteFaceId(employee)}
                 className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-600 dark:bg-rose-950/40 dark:hover:bg-rose-600 text-rose-600 hover:text-white dark:text-rose-300 dark:hover:text-white border border-rose-200 dark:border-rose-800/50 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Xóa Face ID</span>
-              </button>
+              </ActionButton>
             )}
           </div>
         </div>
@@ -144,14 +145,14 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
             </button>
 
             {employee.fingerprint_enrolled && (
-              <button
+              <ActionButton busyLabel="Đang thu hồi…"
                 type="button"
                 onClick={() => onDeleteFingerprint(employee)}
                 className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-600 dark:bg-rose-950/40 dark:hover:bg-rose-600 text-rose-600 hover:text-white dark:text-rose-300 dark:hover:text-white border border-rose-200 dark:border-rose-800/50 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Xóa Vân tay</span>
-              </button>
+              </ActionButton>
             )}
           </div>
         </div>

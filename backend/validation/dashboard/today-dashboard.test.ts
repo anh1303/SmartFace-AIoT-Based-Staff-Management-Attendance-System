@@ -34,6 +34,35 @@ describe('today dashboard', () => {
     expect(result.punctuality).toMatchObject({ notCheckedInCount: 0, notCheckedInPct: 0 })
   })
 
+  it('returns every daily DB punch, including check-ins older than the latest ten check-outs', async () => {
+    const punches = [
+      ...Array.from({ length: 12 }, (_, i) => ({ id: BigInt(24 - i), employee_id: '1', type: 'CHECK_OUT', event_time: new Date(`2026-11-10T17:00:${String(59 - i).padStart(2, '0')}+07:00`), status: 'VALID', device_info: 'DB_DEVICE', verification_score: null })),
+      ...Array.from({ length: 12 }, (_, i) => ({ id: BigInt(12 - i), employee_id: '1', type: 'CHECK_IN', event_time: new Date(`2026-11-10T08:00:${String(59 - i).padStart(2, '0')}+07:00`), status: 'VALID', device_info: 'DB_DEVICE', verification_score: 0.98 })),
+    ]
+    db.attendance_logs.findMany.mockResolvedValue(punches)
+    const result = await getTodayDashboard()
+    expect(result.recentLogs).toHaveLength(24)
+    expect(result.recentLogs.map(log => log.attendance_id)).toEqual(punches.map(log => String(log.id)))
+    expect(result.recentLogs.filter(log => log.type === 'CHECK_IN')).toHaveLength(12)
+    expect(result.recentLogs[0]).toMatchObject({ device_id: 'DB_DEVICE', verification_score: null, timestamp: punches[0].event_time.toISOString() })
+    expect(result.recentLogs.at(-1)?.verification_score).toBe(0.98)
+  })
+
+  it('does not synthesize a check-in when the database only has a checkout', async () => {
+    db.attendance_logs.findMany.mockResolvedValue([{ id: 1n, employee_id: '1', type: 'CHECK_OUT', event_time: new Date(), status: 'VALID' }])
+    expect((await getTodayDashboard()).recentLogs.map(log => log.type)).toEqual(['CHECK_OUT'])
+  })
+
+  it('queries the entire VN calendar day using an exclusive next-midnight boundary', async () => {
+    await getTodayDashboard()
+    const query = db.attendance_logs.findMany.mock.calls[0][0]
+    expect(query.where.employee_id).toEqual({ in: ['1', '2'] })
+    expect(query.where.event_time.lt).toBeInstanceOf(Date)
+    expect(+query.where.event_time.lt - +query.where.event_time.gte).toBe(86400000)
+    expect(query.orderBy).toEqual([{ event_time: 'desc' }, { id: 'desc' }])
+    expect(query.take).toBeUndefined()
+  })
+
   it('counts unique scheduled employees and keeps assigned shifts', async () => {
     db.employee_shifts.findMany.mockResolvedValue([
       { employee_id: '1', shift_type: 'MORNING', start_time: null, end_time: null, work_shifts: null },

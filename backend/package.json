@@ -14,8 +14,6 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:seed:shifts": "tsx prisma/seed-shifts.ts",
     "prisma:seed:attendance": "tsx prisma/seed-attendance.ts",
-    "prisma:seed:scenarios": "tsx prisma/seed-scenarios.ts",
-    "prisma:seed:all": "tsx prisma/seed.ts && tsx prisma/seed-shifts.ts && tsx prisma/seed-attendance.ts",
     "prisma:studio": "prisma studio",
     "prisma:generate": "prisma generate"
   },

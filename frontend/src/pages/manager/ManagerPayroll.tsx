@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionUtils';
 import { PayrollRecord } from '../../types';
 import { logger } from '../../utils/logger';
-import { nextPayrollPolicyPeriod } from '../../utils/payrollUtils';
+import { nextPayrollPolicyPeriod, wasHiredByPayrollPeriod } from '../../utils/payrollUtils';
 import { useDepartmentPositions } from '@/features/employees';
 import {
   PayrollHeader,
@@ -125,21 +125,13 @@ export const ManagerPayroll: React.FC = () => {
   const [isSavingItem, setIsSavingItem] = useState(false);
   const [earlySettlementRecord, setEarlySettlementRecord] = useState<PayrollRecord | null>(null);
 
-  // Dynamic periods generated from payroll records
-  const availablePeriods = Array.from(
-    new Set([
-      ...(payroll.map((p) => p.period || p.payroll_period).filter(Boolean) as string[]),
-      selectedPeriod,
-    ])
-  )
-    .sort()
-    .reverse();
-
   // All records for the selected period (for status & total metrics)
   // Chốt chặn phân quyền: Quản lý chỉ xem được phiếu lương của chính mình và nhân viên phòng ban mình phụ trách
   const allPeriodRecords = payroll.filter((p) => {
     const isPeriodMatch = p.period === selectedPeriod || p.payroll_period === selectedPeriod;
     if (!isPeriodMatch) return false;
+    const employee = employees.find(e => e.employee_id === p.employee_id || e.id === p.employee_id);
+    if (!wasHiredByPayrollPeriod(employee?.created_at, selectedPeriod)) return false;
 
     if (role !== 'admin') {
       const emp = employees.find((e) => e.employee_id === p.employee_id);
@@ -392,7 +384,6 @@ export const ManagerPayroll: React.FC = () => {
       <PayrollHeader
         selectedPeriod={selectedPeriod}
         onSelectPeriod={setSelectedPeriod}
-        availablePeriods={availablePeriods}
         isCalculating={isCalculating}
         isFinalized={isFinalized}
         onCalculatePayroll={handleCalculatePayroll}

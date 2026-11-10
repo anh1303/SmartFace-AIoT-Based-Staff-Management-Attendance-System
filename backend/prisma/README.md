@@ -1,5 +1,8 @@
 # 🗄️ SmartFace AIoT Database & Prisma ORM Architecture Specification
 
+Hướng dẫn chạy từng lệnh tạo phân ca và check-in/out: [README-SEED.md](./README-SEED.md).
+
+
 > **Tài liệu đặc tả kỹ thuật toàn diện** về Kiến trúc Cơ sở Dữ liệu (Database Architecture), Sơ đồ Thực thể Quan hệ (**ERD**), Các Động cơ Khoa học Dữ liệu (Biometrics Vector Engine, Edge Idempotency, Overtime State Machine, Deterministic Payroll), Hệ thống Di chuyển Dữ liệu (**Migrations**), và Quy trình Khởi tạo Dữ liệu Thực nghiệm 3 Bước Độc lập trong hệ sinh thái **SmartFace AIoT**.
 
 ---
@@ -16,7 +19,7 @@
    - [4.5. Cơ Chế Khóa Dữ Liệu Ngày (Daily Timecard Lock Mechanism)](#45-cơ-chế-khóa-dữ-liệu-ngày-daily-timecard-lock-mechanism)
 5. [Từ Điển Dữ Liệu & Đặc Tả 15 Mô Hình (Data Dictionary)](#5-từ-điển-dữ-liệu--đặc-tả-15-mô-hình-data-dictionary)
 6. [Quy Chuẩn Đặt Tên & Ma Trận Ánh Xạ Kiểu (Naming & Type Mapping)](#6-quy-chuẩn-đặt-tên--ma-trận-ánh-xạ-kiểu-naming--type-mapping)
-7. [Quy Trình Khởi Tạo Dữ Liệu Thực Nghiệm 3 Bước Độc Lập](#7-quy-trình-khởi-tạo-dữ-liệu-thực-nghiệm-3-bước-độc-lập)
+7. [Master Data Seed](#7-master-data-seed)
 8. [Quy Trình Quản Trị Vận Hành & Migration (DevOps Runbook)](#8-quy-trình-quản-trị-vận-hành--migration-devops-runbook)
 
 ---
@@ -574,87 +577,84 @@ Bảng `attendance_locks` thực thi nguyên tắc bảo mật và toàn vẹn d
 
 ---
 
-## 🚀 7. Quy Trình Khởi Tạo Dữ Liệu Thực Nghiệm 3 Bước Độc Lập
+## 7. Master Data Seed
 
-Dữ liệu ban đầu được phân rã thành **3 kịch bản chuyên biệt, có tính lũy kế (Idempotent) và độc lập**:
-
-```mermaid
-flowchart LR
-    A["🌱 Bước 1: seed.ts<br/>(Master Data)"] --> B["📅 Bước 2: seed-shifts.ts<br/>(Lịch làm việc theo tháng)"]
-    B --> C["⏱️ Bước 3: seed-attendance.ts<br/>(Dữ liệu chấm công thực nghiệm)"]
-    
-    style A fill:#1e1b4b,stroke:#818cf8,color:#fff
-    style B fill:#1e1b4b,stroke:#818cf8,color:#fff
-    style C fill:#1e1b4b,stroke:#818cf8,color:#fff
-```
-
-### 🔹 Bước 1: Khởi Tạo Danh Mục Cứng (Master Data)
 - **File:** `prisma/seed.ts`
 - **Nội dung khởi tạo:**
   - 3 Vai trò hệ thống: `ADMIN`, `MANAGER`, `EMPLOYEE`.
   - 6 Phòng ban: `Nhân sự (HR)`, `Kế toán (ACC)`, `Kinh doanh (SALE)`, `Marketing (MKT)`, `IT (IT)`, `CSKH (CS)`.
   - 18 Vị trí chức danh chuẩn hóa: Mỗi phòng ban gồm chính xác 1 `MANAGER` và 2 `EMPLOYEE`.
-  - 4 Ca làm việc chuẩn hóa (`Full time`, `Part time: Ca sáng`, `Part time: Ca chiều`, `Nghỉ (OFF)`).
   - 1 Tài khoản Quản trị viên cấp cao `admin`.
   - 18 Hồ sơ nhân sự và tài khoản người dùng tương ứng (`NV-001` $\rightarrow$ `NV-018`).
-  - 4 Thiết bị AIoT mẫu (`FaceCam-01`, `FaceCam-02`, `Fingerprint-01`, `Fingerprint-02`).
-  - Chính sách tính thưởng phạt `BonusPenalty` mặc định.
+  - 1 thiết bị `PI4_FRONT_GATE` theo tên mặc định của tích hợp ThingsBoard; trạng thái `OFFLINE`, chưa có IP hoặc lần kết nối cuối. Thiết bị vân tay được đăng ký qua luồng riêng, không tạo bản ghi giả.
+  - Chính sách thưởng phạt mặc định (OT 2x, trễ/sớm 1.5x, vắng 2x), có hiệu lực từ tháng tuyển sớm nhất (`2023-09`).
+  - Lịch sử lương giờ ban đầu theo tháng tuyển của từng nhân viên. Giữ ngày tuyển mẫu 2023–2024, không tạo lịch ca hay công lịch sử.
 - **Lệnh thực thi:**
   ```bash
   cd backend
   npm run prisma:seed
   ```
 
----
 
-### 🔹 Bước 2: Phân Ca Làm Việc Theo Tháng (Shift Scheduling)
-- **File:** `prisma/seed-shifts.ts`
-- **Nguyên lý thực thi:**
-  - Đọc danh sách 18 nhân viên đang hoạt động trực tiếp từ CSDL.
-  - Phân tích ngày Chủ Nhật $\rightarrow$ Gán ca `Nghỉ (OFF)`.
-  - Phân tích từ Thứ Hai đến Thứ Bảy: Các Quản lý giữ ca hành chính cố định `Full time`, nhân viên được luân chuyển đồng đều giữa ca sáng và ca chiều.
-  - Cho phép tùy chọn tháng linh hoạt qua CLI argument hoặc biến môi trường `TARGET_MONTH`.
-- **Lệnh thực thi:**
-  ```bash
-  cd backend
-  # Chạy cho tháng mặc định (2026-09 hoặc tháng hiện hành):
-  npm run prisma:seed:shifts
+`seed.ts` chỉ tạo dữ liệu nền. Không tạo ca làm, phân ca, chấm công, phiếu lương, sinh trắc học hoặc audit log mẫu. Nhân viên chưa có ảnh đại diện và chưa đăng ký khuôn mặt/vân tay.
 
-  # Hoặc chỉ định rõ tháng bất kỳ:
-  npx tsx prisma/seed-shifts.ts 2026-10
-  ```
+Các script demo/rebuild cũ đã được loại bỏ. Hai seed phân ca và chấm công mới bên dưới chạy riêng với thời gian và chế độ do người dùng chọn.
 
----
+Seed chỉ khởi tạo trên database phát triển đã migrate nhưng chưa có dữ liệu nền. Nếu đã có vai trò, phòng ban, chức vụ, tài khoản, nhân viên, thiết bị, chính sách hoặc ca làm, script từ chối trước khi ghi. Toàn bộ dữ liệu được tạo trong một transaction; lỗi sẽ rollback, không xóa hoặc ghi đè dữ liệu cũ. Chạy lại sau khi seed thành công cũng sẽ bị từ chối.
 
-### 🔹 Bước 3: Mô Phỏng Chấm Công Thực Nghiệm (Empirical Attendance Simulation)
-- **File:** `prisma/seed-attendance.ts`
-- **Nguyên lý mô phỏng khoa học:**
-  - Khớp nối trực tiếp với lịch ca đã phân ở Bước 2.
-  - Áp dụng phân phối xác suất ngẫu nhiên mô phỏng hành vi công sở thực tế:
-    - **$80\%$ trường hợp**: Nhân viên đến đúng giờ (trước giờ vào ca 5–15 phút) và về đúng giờ.
-    - **$15\%$ trường hợp**: Nhân viên đi muộn ngẫu nhiên từ 5 đến 45 phút hoặc về sớm.
-    - **$5\%$ trường hợp**: Nhân viên vắng mặt có phép hoặc nghỉ đột xuất (`ABSENT`).
-  - Tự động đồng bộ đồng thời 2 bảng: `attendance_logs` (lưu mốc chi tiết và sinh `event_key`) và `daily_attendance_summary` (tính toán `total_working_hours`, `late_early`, `overtime_candidate_hours`).
-- **Lệnh thực thi:**
-  ```bash
-  cd backend
-  # Chế độ 1: Mô phỏng toàn bộ các ngày trong tháng
-  npx tsx prisma/seed-attendance.ts 2026-10
+Không đặt lại `employee_code_seq`: mã nhân viên mới do migration và bộ sinh mã hiện tại quản lý. Mật khẩu bên dưới chỉ dành cho dữ liệu phát triển/demo.
 
-  # Chế độ 2: Mô phỏng cho 1 ngày cụ thể
-  npx tsx prisma/seed-attendance.ts 2026-10-25
+### Seed phân ca theo tháng
 
-  # Mặc định (mô phỏng ngày hôm nay):
-  npm run prisma:seed:attendance
-  ```
-
----
-
-### ⚡ Thiết Lập Toàn Bộ Hệ Thống Với Một Câu Lệnh (All-in-One)
 ```bash
 cd backend
-npm run prisma:seed:all
+npm run prisma:seed:shifts
 ```
+
+Terminal sẽ hỏi tháng `YYYY-MM`, rồi hỏi cách xử lý dữ liệu đã có:
+
+1. **Xóa và tạo lại** (`overwrite`).
+2. **Bỏ qua** (`skip`), chỉ bổ sung ngày chưa có phân ca.
+
+Cũng có thể truyền trực tiếp:
+
+```bash
+npm run prisma:seed:shifts -- 2026-11 --mode overwrite
+npm run prisma:seed:shifts -- 2026-11 --mode skip
+```
+
+Seed lấy nhân viên `ACTIVE`, phòng ban và chức vụ từ DB, không phân ca trước ngày tuyển. Quản lý/khối văn phòng chủ yếu làm hành chính; nhân viên Kinh doanh/CSKH đổi ca sáng–chiều theo tuần; IT có một người trực đêm thứ Ba (22:00–06:00) mỗi tuần và nghỉ thứ Tư. Cuối tuần nghỉ. Đây là giả định mô phỏng, không phải quy chế nhân sự thực tế; không ép phân ca đêm nếu DB thiếu nhóm IT phù hợp. Chi tiết tại [README-SEED.md](./README-SEED.md).
+
+Kiểm tra trùng theo nhân viên + ngày công. Ghi đè chỉ thay phân ca trong tháng được chọn, giữ lượt quét thật và đánh dấu bản tổng hợp cũ `SHIFT_CHANGED` để tính lại. Các phiếu lương `PENDING` liên quan được đánh dấu cần tính lại.
+
+### Seed chấm công theo tháng, ngày hoặc khoảng ngày
+
+```bash
+cd backend
+npm run prisma:seed:attendance
+```
+
+Nhập một trong ba dạng trên terminal: `2026-11`, `2026-11-02`, hoặc `2026-10-25 2026-11-02`. Khoảng ngày bao gồm cả hai đầu, tối đa 366 ngày. Sau đó chọn `1` (xóa/tạo lại) hoặc `2` (bỏ qua).
+
+```bash
+npm run prisma:seed:attendance -- 2026-11 --mode overwrite
+npm run prisma:seed:attendance -- 2026-11-02 --mode skip
+npm run prisma:seed:attendance -- 2026-10-25 2026-11-02 --mode overwrite
+```
+
+Seed lấy nhân viên `ACTIVE` và phân ca sẵn có từ DB; cần chạy seed phân ca trước nếu chưa có lịch. Trọng số trên ngày làm: đúng giờ 70%, trễ 10%, sớm 5%, trễ kèm sớm 2%, OT 5%, vắng 3%, thiếu lượt 3%, tình huống đặc biệt 2%. Ngày nghỉ xét riêng với 98% không quét; nghỉ sau ca đêm luôn không quét. Giờ quét có dao động đến giây, kết quả tái lập theo nhân viên/ngày. Không ép trường hợp hiếm trên mẫu nhỏ; cuối lần chạy báo cả tỉ lệ mục tiêu và thực tế. Ca qua đêm sử dụng đúng ngày bắt đầu ca làm ngày công. Lượt quét có nhãn `DEMO_SEED`, không giả lập đăng ký sinh trắc học hoặc thiết bị đang kết nối.
+
+Tạo bản tổng hợp bằng `calculateDay` và các khoản cần duyệt bằng `syncDayAdjustments` hiện có của dự án. Không tự duyệt công/OT hoặc tạo phiếu lương. Quét trên ngày nghỉ vẫn hiển thị trong lượt gốc; chính sách hiện tại không tự ghi nhận công hoặc OT cho ca `OFF`. Chính sách phạt vắng của kỳ lịch sử phải tồn tại nếu DB đã có chính sách phiên bản; thiếu chính sách thì transaction rollback.
+
+Ở chế độ bỏ qua, chỉ cần ngày đã có lượt quét, bản tổng hợp hoặc khoản điều chỉnh thì giữ nguyên **toàn bộ ngày của nhân viên**, không chèn thêm lượt quét. Ở chế độ ghi đè, xóa lượt quét/bản tổng hợp/khoản điều chỉnh của đúng nhân viên + ngày được tạo lại; không xóa phân ca. Lượt check-out sau nửa đêm vẫn thuộc ca đêm của ngày trước, kể cả dữ liệu cũ chưa có `work_date`.
+
+### Phạm vi và báo cáo của hai seed
+
+- Luôn giữ ngày đang khóa, ngày đã duyệt/điều chỉnh thủ công, khoản đã duyệt/từ chối và kỳ lương không còn `PENDING`; báo số ngày được bảo vệ.
+- Không tạo lượt quét tương lai; bỏ qua ca chưa kết thúc và ca làm chưa có giờ hợp lệ. Phân ca tương lai vẫn được phép tạo.
+- Mỗi lần chạy ghi trong một transaction; lỗi sẽ rollback cả lần chạy. Không chạy seed đồng thời với tác vụ thu nhận dữ liệu thật.
+- Cuối lần chạy in số bản ghi tạo/thay thế/bỏ qua/bảo vệ và bảng số lượng từng loại ca/kịch bản **vừa tạo**. Nếu dữ liệu đủ điều kiện quá ít để có đủ loại, báo rõ loại còn thiếu; có thể chọn khoảng dài hơn hoặc thêm nhân viên/phân ca phù hợp.
+- Trên PowerShell chặn `npm.ps1`, dùng `npm.cmd` thay cho `npm`. Dùng `--help` để xem cú pháp mà không truy cập database.
 
 ---
 
@@ -663,13 +663,13 @@ npm run prisma:seed:all
 | Tên đăng nhập | Mật khẩu mặc định | Vai trò (Role) | Chức vụ | Phòng ban | Mức lương giờ |
 | :---: | :---: | :---: | :--- | :---: | :---: |
 | **`admin`** | `Admin@123456` | `ADMIN` | Quản trị viên hệ thống | Quản trị | — |
-| **`NV-001`** | `Employee@123456` | `MANAGER` | Trưởng phòng Nhân sự | Nhân sự | 100,000 VND |
-| **`NV-004`** | `Employee@123456` | `MANAGER` | Kế toán trưởng | Kế toán | 110,000 VND |
-| **`NV-007`** | `Employee@123456` | `MANAGER` | Trưởng phòng Kinh doanh | Kinh doanh | 120,000 VND |
-| **`NV-010`** | `Employee@123456` | `MANAGER` | Trưởng phòng Marketing | Marketing | 105,000 VND |
-| **`NV-013`** | `Employee@123456` | `MANAGER` | Trưởng phòng CNTT | IT | 130,000 VND |
-| **`NV-016`** | `Employee@123456` | `MANAGER` | Trưởng phòng CSKH | CSKH | 95,000 VND |
-| **`NV-002` .. `NV-018`** | `Employee@123456` | `EMPLOYEE` | Chuyên viên các phòng ban | Tương ứng | 45,000 – 75,000 VND |
+| **`NV-001`** | `Employee@123456` | `MANAGER` | Trưởng phòng Nhân sự | Nhân sự | 160,000 VND |
+| **`NV-004`** | `Employee@123456` | `MANAGER` | Kế toán trưởng | Kế toán | 170,000 VND |
+| **`NV-007`** | `Employee@123456` | `MANAGER` | Trưởng phòng Kinh doanh | Kinh doanh | 180,000 VND |
+| **`NV-010`** | `Employee@123456` | `MANAGER` | Trưởng phòng Marketing | Marketing | 165,000 VND |
+| **`NV-013`** | `Employee@123456` | `MANAGER` | Trưởng phòng CNTT | IT | 190,000 VND |
+| **`NV-016`** | `Employee@123456` | `MANAGER` | Trưởng phòng CSKH | CSKH | 150,000 VND |
+| Các mã còn lại | `Employee@123456` | `EMPLOYEE` | Chuyên viên các phòng ban | Tương ứng | 90,000 – 140,000 VND |
 
 ---
 

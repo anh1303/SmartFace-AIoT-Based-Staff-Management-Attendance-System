@@ -54,7 +54,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
       if (!session) return;
       try {
-        const response = await api.get<NotificationItem[]>('/notifications');
+        const response = await api.get<NotificationItem[]>('/api/notifications');
         if (disposed || session !== (sessionStorage.getItem('userSession') || localStorage.getItem('userSession'))) return;
         if (Array.isArray(response.data)) {
           setNotifications(prev => [...response.data!.map(restoreNotification), ...prev.filter(item => !item.id.startsWith('server_'))].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, MAX_STORED_NOTIFICATIONS));
@@ -129,7 +129,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Remove single notification
   const removeNotification = useCallback(async (id: string) => {
     const session = activeSession();
-    if (id.startsWith('server_')) await api.patch(`/notifications/${id.slice(7)}`, { action: 'delete' });
+    if (id.startsWith('server_')) await api.patch(`/api/notifications/${id.slice(7)}`, { action: 'delete' });
     if (session !== activeSession()) return;
     setNotifications((prev) => prev.filter((item) => item.id !== id));
   }, []);
@@ -137,7 +137,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Clear all (xóa sạch cả state và storage)
   const clearAll = useCallback(async (localOnly = false) => {
     const session = activeSession();
-    if (!localOnly) await api.patch('/notifications', { action: 'delete' });
+    if (!localOnly) await api.patch('/api/notifications', { action: 'delete' });
     if (session !== activeSession()) return;
     setNotifications([]);
     try {
@@ -153,7 +153,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Mark all as read
   const markAllAsRead = useCallback(async () => {
     const session = activeSession();
-    await api.patch('/notifications', { action: 'read' });
+    await api.patch('/api/notifications', { action: 'read' });
     if (session !== activeSession()) return;
     setNotifications((prev) =>
       prev.map((item) => (item.read ? item : { ...item, read: true }))
@@ -163,7 +163,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Mark single as read
   const markAsRead = useCallback(async (id: string) => {
     const session = activeSession();
-    if (id.startsWith('server_')) await api.patch(`/notifications/${id.slice(7)}`, { action: 'read' });
+    if (id.startsWith('server_')) await api.patch(`/api/notifications/${id.slice(7)}`, { action: 'read' });
     if (session !== activeSession()) return;
     setNotifications((prev) =>
       prev.map((item) => (item.id === id ? { ...item, read: true } : item))

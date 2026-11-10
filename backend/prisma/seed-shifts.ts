@@ -1,236 +1,111 @@
-import { PrismaClient } from '@prisma/client'
+import 'dotenv/config'
+import type { PrismaClient } from '@prisma/client'
+import { prisma } from '../src/config/database.js'
+import { STANDARD_SHIFT_CONFIGS } from '../src/modules/shifts/shift.queries.js'
+import { vnDay } from '../src/modules/attendance/attendance.policy.js'
+import { addDays, dateValue, datesInRange, dayKey, isMain, loadSeedState, markPayrollsStale, printCoverage, readSeedInput, shouldSkip, type SeedMode, type SeedRange } from './seed-utils.js'
 
-const prisma = new PrismaClient()
+const TYPES = ['OFFICE_HOURS', 'MORNING', 'AFTERNOON', 'OTHER', 'OFF'] as const
+const time = (clock: string) => new Date(`1970-01-01T${clock}:00Z`)
 
-/**
- * Danh sách thứ trong tuần
- */
-const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
+type ScheduleEmployee = { id: string; createdAt: Date; department?: { department_code: string } | null; position?: { level: string } | null }
 
-/**
- * Hàm kiểm tra Thứ 7, Chủ Nhật theo yêu cầu
- * @param date Đối tượng Date
- * @returns Thông tin cuối tuần (isWeekend, isSaturday, isSunday, dayName)
- */
-export function isWeekend(date: Date): {
-  isWeekend: boolean
-  isSaturday: boolean
-  isSunday: boolean
-  dayName: string
-} {
-  const day = date.getUTCDay() // 0 = Chủ Nhật, 6 = Thứ Bảy
-  return {
-    isWeekend: day === 0 || day === 6,
-    isSaturday: day === 6,
-    isSunday: day === 0,
-    dayName: DAY_NAMES[day],
-  }
-}
-
-async function main() {
-
-  // 1. Biến cấu hình tháng cần tạo lịch (mặc định lấy tháng truyền vào CLI, env TARGET_MONTH, hoặc tháng 10/2026)
-  const defaultMonth = '2026-09'
-  const targetMonthStr = process.env.TARGET_MONTH || process.argv[2] || defaultMonth
-
-  if (!/^\d{4}-\d{2}$/.test(targetMonthStr)) {
-    throw new Error(`Định dạng tháng không hợp lệ: "${targetMonthStr}". Vui lòng dùng định dạng YYYY-MM (ví dụ: 2026-10)`)
-  }
-
-  const [yearStr, monthStr] = targetMonthStr.split('-')
-  const year = parseInt(yearStr, 10)
-  const month = parseInt(monthStr, 10) // 1-12
-  const monthIndex = month - 1 // 0-11
-
-  // Tính số ngày trong tháng
-  const daysInMonth = new Date(year, month, 0).getDate()
-  console.log(`📌 Tháng mục tiêu: ${targetMonthStr} (Tổng cộng: ${daysInMonth} ngày)`)
-
-  // 2. Query trực tiếp từ DB: Lấy danh sách nhân viên đang hoạt động
-  const employees = await prisma.employee.findMany({
-    where: { status: 'ACTIVE' },
-    include: {
-      position: true,
-      department: true,
-    },
-    orderBy: { employee_code: 'asc' },
-  })
-
-  if (employees.length === 0) {
-    throw new Error('❌ Không tìm thấy nhân viên nào trong database! Vui lòng chạy Bước 1 trước: npm run prisma:seed')
-  }
-  console.log(`👥 Đã tìm thấy ${employees.length} nhân viên hoạt động từ DB.`)
-
-  // 3. Query trực tiếp từ DB: Lấy danh mục ca làm việc (work_shifts)
-  const workShifts = await prisma.work_shifts.findMany()
-  if (workShifts.length === 0) {
-    throw new Error('❌ Không tìm thấy ca làm việc (work_shifts) trong DB! Vui lòng chạy Bước 1 trước: npm run prisma:seed')
-  }
-
-  const shiftOffice = workShifts.find((s) => s.shift_name.toLowerCase().includes('full') || s.shift_name.toLowerCase().includes('hành chính')) || workShifts[0]
-  const shiftMorning = workShifts.find((s) => s.shift_name.toLowerCase().includes('sáng')) || workShifts[1] || workShifts[0]
-  const shiftAfternoon = workShifts.find((s) => s.shift_name.toLowerCase().includes('chiều')) || workShifts[2] || workShifts[0]
-  const shiftOff = workShifts.find((s) => s.shift_name.toLowerCase().includes('off') || s.shift_name.toLowerCase().includes('nghỉ')) || workShifts[3] || workShifts[0]
-
-  console.log('🏢 Các ca làm việc áp dụng:')
-  console.log(`   - Hành chính: [${shiftOffice.id}] ${shiftOffice.shift_name}`)
-  console.log(`   - Ca Sáng:    [${shiftMorning.id}] ${shiftMorning.shift_name}`)
-  console.log(`   - Ca Chiều:   [${shiftAfternoon.id}] ${shiftAfternoon.shift_name}`)
-  console.log(`   - Ca OFF:     [${shiftOff.id}] ${shiftOff.shift_name}`)
-
-  // 4. Dọn dẹp dữ liệu lịch cũ của tháng mục tiêu để đảm bảo tính Idempotent
-  const periodStart = new Date(Date.UTC(year, monthIndex, 1))
-  const periodEnd = new Date(Date.UTC(year, monthIndex + 1, 1))
-
-  const deletedOldShifts = await prisma.employee_shifts.deleteMany({
-    where: {
-      work_date: {
-        gte: periodStart,
-        lt: periodEnd,
-      },
-    },
-  })
-  console.log(`🧹 Đã dọn dẹp ${deletedOldShifts.count} bản ghi lịch làm việc cũ trong tháng ${targetMonthStr}.`)
-
-  // 5. Sinh danh sách lịch làm việc cho từng nhân viên và từng ngày trong tháng
-  const shiftRecordsToCreate: Array<{
-    employee_id: string
-    shift_id: number
-    work_date: Date
-    work_day: string
-    shift_type: string
-    start_time: Date | null
-    end_time: Date | null
-    note: string
-  }> = []
-
-  let countOff = 0
-  let countOffice = 0
-  let countMorning = 0
-  let countAfternoon = 0
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dayStr = String(day).padStart(2, '0')
-    const workDate = new Date(`${yearStr}-${monthStr}-${dayStr}T00:00:00.000Z`)
-    const weekendInfo = isWeekend(workDate)
-
-    for (let empIdx = 0; empIdx < employees.length; empIdx++) {
-      const emp = employees[empIdx]
-      const createdDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(emp.createdAt)
-      if (`${yearStr}-${monthStr}-${dayStr}` < createdDay) continue
-      const isManager = emp.position?.level === 'MANAGER'
-
-      // Quy luật gán lịch:
-      // - Nếu là Chủ Nhật: Công ty nghỉ Chủ Nhật -> gán ca OFF
-      // - Thứ 2 đến Thứ 7: Phân phối đều ca sáng / chiều / hành chính để dữ liệu sinh động
-      if (weekendInfo.isSunday) {
-        shiftRecordsToCreate.push({
-          employee_id: emp.id,
-          shift_id: shiftOff.id,
-          work_date: workDate,
-          work_day: weekendInfo.dayName,
-          shift_type: 'OFF',
-          start_time: null,
-          end_time: null,
-          note: 'Nghỉ Chủ Nhật hàng tuần',
-        })
-        countOff++
-      } else if (weekendInfo.isSaturday) {
-        // Thứ 7: Các Quản lý và khối văn phòng phân phối ca sáng và hành chính
-        const satMod = (empIdx + day) % 2
-        if (satMod === 0) {
-          shiftRecordsToCreate.push({
-            employee_id: emp.id,
-            shift_id: shiftMorning.id,
-            work_date: workDate,
-            work_day: weekendInfo.dayName,
-            shift_type: 'MORNING',
-            start_time: shiftMorning.start_time,
-            end_time: shiftMorning.end_time,
-            note: 'Lịch làm việc Thứ Bảy ca sáng',
-          })
-          countMorning++
-        } else {
-          shiftRecordsToCreate.push({
-            employee_id: emp.id,
-            shift_id: shiftOffice.id,
-            work_date: workDate,
-            work_day: weekendInfo.dayName,
-            shift_type: 'OFFICE_HOURS',
-            start_time: shiftOffice.start_time,
-            end_time: shiftOffice.end_time,
-            note: 'Lịch làm việc Thứ Bảy hành chính',
-          })
-          countOffice++
-        }
-      } else {
-        // Thứ Hai đến Thứ Sáu:
-        // Quản lý (MANAGER) giữ nhịp ca hành chính ổn định
-        // Nhân viên phân phối đều 3 ca: Sáng / Chiều / Hành chính
-        let assignedShift = shiftOffice
-        let assignedType = 'OFFICE_HOURS'
-        let note = 'Ca hành chính chuẩn'
-
-        if (isManager) {
-          assignedShift = shiftOffice
-          assignedType = 'OFFICE_HOURS'
-          note = 'Lịch quản trị phòng ban hành chính'
-          countOffice++
-        } else {
-          const shiftCycle = (empIdx * 2 + day) % 3
-          if (shiftCycle === 0) {
-            assignedShift = shiftOffice
-            assignedType = 'OFFICE_HOURS'
-            note = 'Lịch phân công ca hành chính'
-            countOffice++
-          } else if (shiftCycle === 1) {
-            assignedShift = shiftMorning
-            assignedType = 'MORNING'
-            note = 'Lịch phân công ca sáng'
-            countMorning++
-          } else {
-            assignedShift = shiftAfternoon
-            assignedType = 'AFTERNOON'
-            note = 'Lịch phân công ca chiều'
-            countAfternoon++
+export function buildShiftPlan(employees: ScheduleEmployee[], range: SeedRange) {
+  const ordered = [...employees].sort((a, b) => a.id.localeCompare(b.id))
+  const itTeam = ordered.filter(e => e.department?.department_code === 'IT' && e.position?.level !== 'MANAGER')
+  return employees.flatMap(employee => datesInRange(range)
+    .filter(date => date >= vnDay(employee.createdAt))
+    .map(date => {
+      const weekday = dateValue(date).getUTCDay()
+      const week = Math.floor((+dateValue(date) - +dateValue('2026-01-05')) / (7 * 86400000))
+      let shift_type: typeof TYPES[number] = 'OFFICE_HOURS'
+      if (weekday === 0 || weekday === 6) shift_type = 'OFF'
+      else if (employee.position?.level !== 'MANAGER') {
+        const department = employee.department?.department_code
+        if (department === 'SALE' || department === 'CS') {
+          const team = ordered.filter(e => e.department?.department_code === department && e.position?.level !== 'MANAGER')
+          shift_type = (team.findIndex(e => e.id === employee.id) + week) % 2 === 0 ? 'MORNING' : 'AFTERNOON'
+        } else if (department === 'IT') {
+          const tuesday = addDays(date, 2 - weekday)
+          const available = itTeam.filter(e => vnDay(e.createdAt) <= tuesday)
+          const onCall = available.length ? available[((week % available.length) + available.length) % available.length] : undefined
+          if (onCall?.id === employee.id) {
+            if (weekday === 2) shift_type = 'OTHER'
+            if (weekday === 3) shift_type = 'OFF'
           }
         }
-
-        shiftRecordsToCreate.push({
-          employee_id: emp.id,
-          shift_id: assignedShift.id,
-          work_date: workDate,
-          work_day: weekendInfo.dayName,
-          shift_type: assignedType,
-          start_time: assignedShift.start_time,
-          end_time: assignedShift.end_time,
-          note,
-        })
       }
-    }
-  }
-
-  // 6. Lưu vào DB thông qua createMany
-  console.log(`💾 Đang lưu ${shiftRecordsToCreate.length} bản ghi ca làm việc vào database...`)
-  await prisma.employee_shifts.createMany({
-    data: shiftRecordsToCreate,
-  })
-
-  console.log('======================================================================')
-  console.log(`📊 Thống kê chi tiết:`)
-  console.log(`   - Tổng số ca được tạo:       ${shiftRecordsToCreate.length} ca`)
-  console.log(`   - Ca Hành chính (Full time): ${countOffice} ca (${Math.round((countOffice / shiftRecordsToCreate.length) * 100)}%)`)
-  console.log(`   - Ca Sáng:                   ${countMorning} ca (${Math.round((countMorning / shiftRecordsToCreate.length) * 100)}%)`)
-  console.log(`   - Ca Chiều:                  ${countAfternoon} ca (${Math.round((countAfternoon / shiftRecordsToCreate.length) * 100)}%)`)
-  console.log(`   - Ca Nghỉ (OFF Chủ Nhật):    ${countOff} ca (${Math.round((countOff / shiftRecordsToCreate.length) * 100)}%)`)
-  console.log('======================================================================')
+      return { employee_id: employee.id, date, shift_type }
+    }))
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Lỗi khi seed lịch làm việc:', e)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+export async function seedShifts(db: PrismaClient, range: SeedRange, mode: SeedMode) {
+  return db.$transaction(async tx => {
+    const state = await loadSeedState(tx, range)
+    const plan = buildShiftPlan(state.employees, range)
+    if (!plan.length) throw new Error('Không có nhân viên đã tuyển trong tháng đã chọn.')
+    const counts: Record<string, number> = {}
+    const result = { created: 0, replaced: 0, skipped: 0, protected: 0, counts }
+    const catalog = await tx.work_shifts.findMany({ orderBy: { id: 'asc' } })
+    const changed = new Set<string>()
+    // Create only missing standard templates; keep existing catalog times intact.
+    const catalogIds = new Map<string, number>()
+    for (const type of TYPES) {
+      const config = STANDARD_SHIFT_CONFIGS[type]
+      const existing = catalog.find(s => s.shift_name.toLocaleLowerCase('vi') === config.name.toLocaleLowerCase('vi'))
+      const shift = existing ?? await tx.work_shifts.create({ data: { shift_name: config.name, start_time: time(config.start_time), end_time: time(config.end_time) } })
+      catalogIds.set(type, shift.id)
+    }
+    for (const item of plan) {
+      const old = state.shifts.find(s => s.employee_id === item.employee_id && vnDay(s.work_date) === item.date)
+      const protectedDay = state.isProtected(item.employee_id, item.date)
+      if (shouldSkip(mode, Boolean(old), protectedDay)) {
+        if (protectedDay) result.protected++
+        else result.skipped++
+        continue
+      }
+      // Respect an actual preserved night on the previous date, including month boundaries.
+      const previous = state.shifts.find(s => s.employee_id === item.employee_id && vnDay(s.work_date) === addDays(item.date, -1))
+      if (previous && previous.shift_type !== 'OFF' && previous.end_time < previous.start_time) item.shift_type = 'OFF'
+      if (item.shift_type === 'OTHER') {
+        const nextDate = addDays(item.date, 1)
+        const next = state.shifts.find(s => s.employee_id === item.employee_id && vnDay(s.work_date) === nextDate)
+        const cannotChangeNext = nextDate > range.to || state.isProtected(item.employee_id, nextDate) || (mode === 'skip' && Boolean(next))
+        if (cannotChangeNext && next?.shift_type !== 'OFF') item.shift_type = 'OFFICE_HOURS'
+      }
+      const key = { employee_id: item.employee_id, work_date: dateValue(item.date) }
+      if (old) {
+        await tx.employee_shifts.deleteMany({ where: key })
+        result.replaced++
+      }
+      const config = STANDARD_SHIFT_CONFIGS[item.shift_type]
+      await tx.employee_shifts.create({ data: { ...key, shift_id: catalogIds.get(item.shift_type)!, shift_type: item.shift_type,
+        work_day: ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'][dateValue(item.date).getUTCDay()],
+        start_time: time(item.shift_type === 'OTHER' ? '22:00' : config.start_time),
+        end_time: time(item.shift_type === 'OTHER' ? '06:00' : config.end_time),
+        note: 'DEMO_SEED: lịch theo phòng ban/chức vụ; nghỉ cuối tuần và sau ca đêm',
+      } })
+      // Later days must use this newly written schedule rather than the overwritten snapshot.
+      if (old) Object.assign(old, { shift_type: item.shift_type, start_time: time(item.shift_type === 'OTHER' ? '22:00' : config.start_time), end_time: time(item.shift_type === 'OTHER' ? '06:00' : config.end_time) })
+      // Keep actual scans; the existing UI/aggregator can recalculate them under the new schedule.
+      await tx.daily_attendance_summary.updateMany({ where: key, data: { requires_review: true, review_reason: 'SHIFT_CHANGED', review_status: 'PENDING' } })
+      changed.add(dayKey(item.employee_id, item.date.slice(0, 7)))
+      counts[item.shift_type] = (counts[item.shift_type] ?? 0) + 1
+      result.created++
+    }
+    await markPayrollsStale(tx, state.payrolls, changed)
+    return result
+  }, { maxWait: 20000, timeout: 180000 })
+}
+
+if (isMain(import.meta.url)) {
+  try {
+    const input = await readSeedInput(true)
+    if (input) {
+      const result = await seedShifts(prisma, input.range, input.mode)
+      console.log(`Phân ca ${input.range.from} → ${input.range.to}: ${result.created} bản ghi mới (thay ${result.replaced} ca cũ), bỏ qua ${result.skipped}, bảo vệ ${result.protected}.`)
+      printCoverage(result.counts, TYPES)
+    }
+  } catch (error) { console.error(error); process.exitCode = 1 }
+  finally { await prisma.$disconnect() }
+}

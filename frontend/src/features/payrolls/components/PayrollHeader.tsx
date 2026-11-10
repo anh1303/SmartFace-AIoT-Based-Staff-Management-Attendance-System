@@ -8,7 +8,6 @@ import { PageHeaderBanner } from '../../../components/common';
 interface PayrollHeaderProps {
   selectedPeriod: string;
   onSelectPeriod: (period: string) => void;
-  availablePeriods: string[];
   isCalculating: boolean;
   isFinalized: boolean;
   onCalculatePayroll: () => void;
@@ -21,7 +20,6 @@ interface PayrollHeaderProps {
 export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
   selectedPeriod,
   onSelectPeriod,
-  availablePeriods,
   isCalculating,
   isFinalized,
   onCalculatePayroll,
@@ -43,21 +41,15 @@ export const PayrollHeader: React.FC<PayrollHeaderProps> = ({
         <div className="h-10 flex items-center gap-2 bg-white/80 dark:bg-[#0f1224] px-3 rounded-xl border border-blue-200/80 dark:border-[#272d5a] shadow-inner backdrop-blur-sm">
           <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
           <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Kỳ lương:</span>
-          <select
+          <input
+            type="month"
             aria-label="Kỳ lương"
             value={selectedPeriod}
-            onChange={(e) => onSelectPeriod(e.target.value)}
-            className="h-full min-h-0 bg-transparent text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none cursor-pointer"
-          >
-            {availablePeriods.map((period) => {
-              const [year, month] = period.split('-');
-              return (
-                <option key={period} value={period} className="bg-white dark:bg-[#13162b]">
-                  Tháng {month}/{year}
-                </option>
-              );
-            })}
-          </select>
+            onChange={(e) => {
+              if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) onSelectPeriod(e.target.value);
+            }}
+            className="h-full min-h-0 bg-transparent text-xs text-slate-900 dark:text-white font-mono font-bold rounded focus-visible:outline-2 focus-visible:outline-blue-500 [color-scheme:light] dark:[color-scheme:dark] cursor-pointer"
+          />
         </div>
       }
       actions={

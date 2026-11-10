@@ -6,7 +6,7 @@ import { defineConfig } from 'vite';
 export default defineConfig(() => {
   return {
     cacheDir: '.vite-cache',
-    plugins: [react(), tailwindcss()],
+    plugins: [react({ exclude: [/\/node_modules\//, /\/\.vite-cache\//] }), tailwindcss()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

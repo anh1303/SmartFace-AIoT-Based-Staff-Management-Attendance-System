@@ -27,6 +27,17 @@ describe('automatic daily attendance lock', () => {
     expect(await autoLockAttendanceDate('2026-11-04', new Date('2026-11-04T17:05:00Z'))).toBe(true)
     expect(db.attendance_locks.upsert).toHaveBeenCalledOnce()
   })
+  it('locks an approved historical day during catch-up even outside the previous month', async () => {
+    const date = new Date('2026-08-02T00:00:00Z')
+    db.employee_shifts.findMany.mockResolvedValue([{ employee_id: 'a', shift_type: 'MORNING', work_date: date }])
+    db.attendance_locks.findMany.mockResolvedValue([])
+    db.daily_attendance_summary.findMany.mockImplementation(async ({ where }: any) => {
+      if (where.work_date instanceof Date) return [{ employee_id: 'a', review_status: 'APPROVED' }]
+      return (!where.work_date.gte || date >= where.work_date.gte) && date < where.work_date.lt ? [{ work_date: date }] : []
+    })
+    expect(await autoLockCompletedAttendanceDates(new Date('2026-11-10T09:00:00+07:00'))).toBe(1)
+    expect(db.attendance_locks.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { work_date: date } }))
+  })
 
   it('waits for all assigned shifts to be approved', async () => {
     db.employee_shifts.findMany.mockResolvedValue([{ employee_id: 'a', shift_type: 'MORNING' }, { employee_id: 'b', shift_type: 'OTHER' }])

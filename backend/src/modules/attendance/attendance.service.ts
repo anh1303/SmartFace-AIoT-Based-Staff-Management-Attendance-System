@@ -1,3 +1,4 @@
+import { timeAttendanceStage } from '../../common/attendance-timing.js'
 import { requireFingerprintBinding, assertNoFingerprintMaintenance, type FingerprintScan } from '../biometrics/fingerprint.attendance.js'
 import { aggregateDailyAttendance } from './attendance.aggregation.js'
 import { attendanceIntervalRemaining, attendanceIntervalMessage } from './attendance.interval.js'
@@ -425,9 +426,12 @@ async function recordAttendance(
   requester: { id?: string; role?: string } | undefined,
   capture: CaptureOptions = {}
 ) {
+  const edgeRequest = !requester && Boolean(capture.deviceId) && capture.syncSummary === false
   const employee = requester?.role === 'EMPLOYEE' && requester.id
     ? await findEmployeeByUserId(requester.id)
-    : await findEmployeeByIdOrCode(employeeId)
+    : edgeRequest
+      ? await findEmployeeByIdOrCode(employeeId, undefined, 'attendance')
+      : await findEmployeeByIdOrCode(employeeId)
   if (!employee) throw AppError.notFound('Employee not found')
   if (requester?.role?.toUpperCase() === 'MANAGER') {
     if (employee.user_id && requester.id && employee.user_id === requester.id) {
@@ -442,7 +446,7 @@ async function recordAttendance(
   if (!Number.isFinite(+eventTime)) throw AppError.badRequest('Thời điểm ghi nhận không hợp lệ')
   const flagged = +eventTime > Date.now() + 120000 || +eventTime < Date.now() - MAX_PAIR_MS
   const eventKey = capture.eventId ? createHash('sha256').update(`${capture.deviceId || device || 'web'}:${capture.eventId}`).digest('hex') : undefined
-  const outcome = await prisma.$transaction(async tx => {
+  const outcome = await timeAttendanceStage('record_transaction', () => prisma.$transaction(async tx => {
     // Lock adjacent periods in chronological order for cross-midnight/month pairs.
     const periods = [-1, 0, 1].map(offset => { const d = new Date(eventTime); d.setUTCMonth(d.getUTCMonth() + offset, 1); return vnDay(d).slice(0, 7) }).sort()
     for (const period of periods) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${period}`}))`
@@ -506,7 +510,7 @@ async function recordAttendance(
       ? 'FINGERPRINT' : capture.verified
       ? 'FACE'
       : (capture.method && capture.method !== 'FACE' ? capture.method : 'MANUAL')
-    const created = await tx.attendance_logs.create({
+    const createdRow = await tx.attendance_logs.create({
       data: {
         employee_id: employee.id,
         type,
@@ -519,8 +523,21 @@ async function recordAttendance(
         liveness_score: capture.livenessScore,
         status: flagged || isBlocked ? 'FLAGGED' : 'VALID',
       },
-      include: attendanceInclude,
+      include: edgeRequest ? undefined : attendanceInclude,
     })
+    // The transaction already loaded the current employee. Reuse that snapshot
+    // for the web event instead of making Prisma fetch employee/department/position
+    // again after INSERT. The RPC is still sent only after this transaction commits.
+    const created = edgeRequest ? {
+      ...createdRow,
+      employees: {
+        id: currentEmployee.id,
+        user_id: currentEmployee.user_id,
+        avatar_url: currentEmployee.avatar_url,
+        full_name: currentEmployee.full_name,
+        employee_code: currentEmployee.employee_code,
+      },
+    } : createdRow
     if (isBlocked) await notifyLockedScan(tx, employee.id, created.id, type, eventTime, created.created_at)
     if (!capture.verified) {
       await tx.auditLog.create({
@@ -568,10 +585,13 @@ async function recordAttendance(
     }
     const affected = isBlocked ? [] : [...new Set([date, vnDay(eventTime), ...(previousCheckInDate ? [previousCheckInDate] : [])])]
     for (const day of affected) {
-      const closed = await isPayrollPeriodClosed(day.slice(0, 7), employee.id, tx)
+      // Reuse decisions read under the same payroll/employee locks. Nothing above
+      // mutates these records on the accepted path; other dates still get checked.
+      const closed = day.slice(0, 7) === date.slice(0, 7)
+        ? closedPeriod : await isPayrollPeriodClosed(day.slice(0, 7), employee.id, tx)
       const work_date = new Date(`${day}T00:00:00Z`)
-      const dayLock = await tx.attendance_locks.findUnique({ where: { work_date } })
-      const targetSummary = await tx.daily_attendance_summary.findUnique({ where: { employee_id_work_date: { employee_id: employee.id, work_date } } })
+      const dayLock = day === date ? lockedDay : await tx.attendance_locks.findUnique({ where: { work_date } })
+      const targetSummary = day === date ? existingDaySummary : await tx.daily_attendance_summary.findUnique({ where: { employee_id_work_date: { employee_id: employee.id, work_date } } })
       const isTargetReopened = Boolean(targetSummary && (targetSummary as any)?.reopened_at !== null)
       const isTargetDayBlocked = Boolean(dayLock?.is_locked && !isTargetReopened)
       const isTargetApproved = (targetSummary as any)?.review_status === 'APPROVED'
@@ -589,8 +609,8 @@ async function recordAttendance(
         })
       }
     }
-    return { created, affected, duplicate: false, accessDenied: false, ignored: false as const }
-  }, { timeout: 15000, maxWait: 10000 })
+    return { created, affected, nearShifts, duplicate: false, accessDenied: false, ignored: false as const }
+  }, { timeout: 15000, maxWait: 10000 }))
   if (outcome.ignored) {
     return {
       id: String(outcome.latestAccepted.id), employee_id: employee.id,
@@ -628,7 +648,7 @@ async function recordAttendance(
     })
   }
 
-  const [formatted] = await formatAttendanceRecords([created])
+  const [formatted] = await timeAttendanceStage('format_response', () => formatAttendanceRecords([created], edgeRequest ? outcome.nearShifts : undefined))
   const result = { ...formatted, duplicate, ignored: false, cooldown: false, retry_after_seconds: 0, message: undefined as string | undefined, access_denied: accessDenied, summaries: updatedSummaries, work_date: vnDay(created.work_date || created.event_time) }
   if (shouldSyncSummary) {
     eventBus.publish('attendance:summary-updated', {

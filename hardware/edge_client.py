@@ -127,7 +127,10 @@ FACE_LOST_RESET_SECONDS = get_env_float("FACE_LOST_RESET_SECONDS", 1.5)
 # Cấu hình Động cơ Servo mô phỏng mở cổng (0° đóng, 90° mở cho cả checkin/checkout, ngắt PWM chống giật)
 SERVO_ENABLED = get_env_bool("SERVO_ENABLED", True)
 SERVO_PIN = get_env_int("SERVO_PIN", 18)
+SERVO_BACKEND = get_env_str("SERVO_BACKEND", "gpio").lower()
+SERVO_ARDUINO_PORT = get_env_str("SERVO_ARDUINO_PORT", "/dev/ttyACM0")
 SERVO_OPEN_SECONDS = get_env_float("SERVO_OPEN_SECONDS", 3.0)
+SERVO_TRAVEL_SECONDS = get_env_float("SERVO_TRAVEL_SECONDS", 2.0)
 
 # Tự động phát hiện môi trường Headless (SSH trên Pi) để tránh lỗi Qt xcb abort()
 if SHOW_GUI and sys.platform.startswith("linux"):
@@ -148,6 +151,7 @@ from recognition.remote import RemoteFaceEmbedder, ARCFACE_SHA256
 from vision_pipeline import update_track_pad, limit_faces
 from alignment.aligner import get_input_face
 from iot import ThingsBoardClient
+from iot.direct_attendance import DirectAttendanceClient
 from streaming import RTSPStreamer
 from display import TFTDisplay
 from peripherals import (
@@ -241,7 +245,8 @@ def main(args=None):
     print(f"  Cooldown         : {COOLDOWN_SEC}s mỗi Track")
     print(f"  TFT ST7789V SPI  : {'BẬT (320x240)' if TFT_ENABLED else 'TẮT'}")
     print(f"  Ultrasonic Sensor: {'BẬT (TRIG=GPIO' + str(ULTRASONIC_TRIG_PIN) + ' [Pin 16], ECHO=GPIO' + str(ULTRASONIC_ECHO_PIN) + ' [Pin 13], <= ' + str(ULTRASONIC_TRIGGER_DISTANCE) + 'cm)' if ULTRASONIC_ENABLED else 'TẮT'}")
-    print(f"  Servo Barrier Gate: {'BẬT (GPIO' + str(SERVO_PIN) + ' [Pin 12], Open=' + str(SERVO_OPEN_SECONDS) + 's)' if SERVO_ENABLED else 'TẮT'}")
+    servo_output = SERVO_ARDUINO_PORT if SERVO_BACKEND == "arduino" else f"GPIO {SERVO_PIN}"
+    print(f"  Servo Barrier Gate: {servo_output if SERVO_ENABLED else 'TẮT'} | travel={SERVO_TRAVEL_SECONDS:g}s")
     print("=======================================================\n")
 
     result_queue = queue.SimpleQueue()
@@ -256,7 +261,14 @@ def main(args=None):
     current_volume = 75
     current_is_muted = False
     audio_manager = AudioManager(initial_volume=current_volume, initial_muted=current_is_muted)
-    servo_gate = ServoController(pin=SERVO_PIN, enabled=SERVO_ENABLED)
+    if SERVO_BACKEND == "arduino":
+        from peripherals.arduino_servo import ArduinoServoController
+        servo_gate = ArduinoServoController(port=SERVO_ARDUINO_PORT, enabled=SERVO_ENABLED)
+        servo_gate.initialize_closed()
+    elif SERVO_BACKEND == "gpio":
+        servo_gate = ServoController(pin=SERVO_PIN, enabled=SERVO_ENABLED)
+    else:
+        raise ValueError("SERVO_BACKEND must be arduino or gpio")
 
     # 1 Cảm biến siêu âm nhận diện hiện diện (Wake-on-Presence)
     ultrasonic_sensor = UltrasonicSensor(
@@ -270,11 +282,25 @@ def main(args=None):
     )
     ultrasonic_sensor.start()
 
+    scan_timings = {}  # Bounded, monotonic timings; no images or embeddings.
+    perf_log = get_env_str("ATTENDANCE_PERF_LOG", "false").lower() == "true"
     feedback_guard = AttendanceFeedbackGuard()
     # Callback khi nhận kết quả đối soát điểm danh Two-way RPC từ Backend
     def on_attendance_result(res: dict):
         nonlocal status_banner, status_banner_time
         if not isinstance(res, dict):
+            return
+
+        if res.get("reconciled"):
+            status_banner = "ĐÃ LƯU CHẤM CÔNG" if res.get("success") else "LƯỢT ĐÃ LƯU, CẦN KIỂM TRA"
+            status_banner_time = time.time()
+            print(f"[EDGE] {status_banner} event={res.get('event_id')}")
+            return
+
+        if res.get("uncertain") or res.get("retryable"):
+            status_banner = "ĐANG ĐỐI SOÁT LƯỢT CHẤM CÔNG"
+            status_banner_time = time.time()
+            print(f"[EDGE] Đang đối soát lượt chấm công event={res.get('event_id')}")
             return
 
         is_matched = res.get("matched", False)
@@ -292,16 +318,11 @@ def main(args=None):
             status_banner = f"{emp_name} - {mode}: {'ĐÃ LƯU, CẦN KIỂM TRA' if review else 'THÀNH CÔNG'} ({sim:.2f})"
             status_banner_time = time.time()
             print(f"[EDGE] 🎉 ĐIỂM DANH THÀNH CÔNG: {emp_name} ({mode}) - Similarity: {sim:.2f}")
-            try:
-                bt_info = get_bluetooth_info()
-                audio_manager.speak_attendance(
-                    emp_name=emp_name,
-                    mode=mode,
-                    target_mac=bt_info.get("address", ""),
-                    target_name=bt_info.get("deviceName", ""),
-                )
-            except Exception as e:
-                print(f"[AUDIO WARN] Lỗi phát âm thanh điểm danh: {e}")
+            feedback_started = time.monotonic()
+            audio_manager.queue_attendance(emp_name, mode, get_bluetooth_info)
+
+            if perf_log:
+                print(f"[AttendanceTiming] event={res.get('event_id')} feedback_setup_ms={(time.monotonic() - feedback_started)*1000:.1f}", flush=True)
 
             # Kích hoạt mở cổng Servo (0° đóng, 90° mở, ngắt xung nghỉ sau khi quay)
             if res.get("door_open", True):
@@ -310,6 +331,7 @@ def main(args=None):
                     is_person_present_fn=ultrasonic_sensor.is_person_present if ULTRASONIC_ENABLED else None,
                     close_delay_seconds=5.0,
                     open_seconds=SERVO_OPEN_SECONDS,
+                    travel_seconds=SERVO_TRAVEL_SECONDS,
                     detach_after_move=True,
                 )
         elif is_matched and not is_success:
@@ -374,10 +396,12 @@ def main(args=None):
             return fingerprint_worker.wake() if fingerprint_worker else {"success": False}
         if action == "playTestSound":
             bt_info = get_bluetooth_info()
+            if not bt_info.get("connected"):
+                return {"success": False, "message": "Chưa có tai nghe/loa Bluetooth kết nối"}
             target_mac = bt_info.get("address", "")
             target_name = bt_info.get("deviceName", "")
             success = audio_manager.play_test_sound(target_mac=target_mac, target_name=target_name)
-            return {"success": success, "message": "Played test sound"}
+            return {"success": success, "queued": success, "message": "Đã xếp chuông thử vào hàng phát" if success else "Không thể phát chuông (mute hoặc lỗi file)"}
         if action == "scanBluetooth":
             devices = scan_bluetooth_devices()
             print(f"[BLUETOOTH] Quét thực tế phát hiện {len(devices)} thiết bị")
@@ -403,7 +427,8 @@ def main(args=None):
                     subprocess.run(["bluetoothctl", "connect", addr], capture_output=True, text=True, timeout=6)
                 except Exception:
                     pass
-            return get_bluetooth_info()
+            info = get_bluetooth_info(addr) if addr else get_bluetooth_info()
+            return {**info, "success": info.get("connected", False)}
         if action == "connectBluetooth":
             target_name = params.get("name", "") if isinstance(params, dict) else ""
             target_addr = params.get("address", "") if isinstance(params, dict) else ""
@@ -415,14 +440,18 @@ def main(args=None):
                     subprocess.run(["bluetoothctl", "trust", target_addr], capture_output=True, text=True, timeout=3)
                     res = subprocess.run(["bluetoothctl", "connect", target_addr], capture_output=True, text=True, timeout=6)
                     info_res = subprocess.run(["bluetoothctl", "info", target_addr], capture_output=True, text=True, timeout=2)
-                    connected = "Connected: yes" in (info_res.stdout or "") or (res.returncode == 0 and "Connection successful" in (res.stdout or ""))
+                    connected = "Connected: yes" in (info_res.stdout or "")
+                    if connected:
+                        time.sleep(.5)
+                        connected = get_bluetooth_info(target_addr).get("connected", False)
                 except Exception as e:
                     print(f"[BLUETOOTH] Lỗi kết nối {target_addr}: {e}")
             if connected:
                 tb_client.send_telemetry({"bluetooth_device": target_name, "bluetooth_connected": True})
             return {
-                "success": True,
+                "success": connected,
                 "connected": connected,
+                "message": "Đã kết nối" if connected else "Không kết nối được tai nghe; kiểm tra pairing và thiết bị khác",
                 "deviceName": target_name,
                 "address": target_addr,
                 "status": "connected" if connected else "disconnected",
@@ -437,13 +466,10 @@ def main(args=None):
                     subprocess.run(["bluetoothctl", "disconnect"], capture_output=True, text=True, timeout=5)
             except Exception as e:
                 print(f"[BLUETOOTH] Lỗi khi ngắt kết nối: {e}")
-            tb_client.send_telemetry({"bluetooth_device": "", "bluetooth_connected": False})
-            return {
-                "success": True,
-                "connected": False,
-                "deviceName": "",
-                "status": "disconnected",
-            }
+            info = get_bluetooth_info(target_addr) if target_addr else get_bluetooth_info()
+            if not info.get("connected"):
+                tb_client.send_telemetry({"bluetooth_device": "", "bluetooth_connected": False})
+            return {**info, "success": not info.get("connected", False)}
         return {"success": True, "message": f"Handled action {action}"}
 
     # 1. Khởi động kết nối MQTT ThingsBoard với cơ chế Two-way RPC & Settings Sync
@@ -463,19 +489,45 @@ def main(args=None):
         on_action_request=on_action_request,
     )
 
+    attendance_transport = get_env_str('ATTENDANCE_TRANSPORT', 'thingsboard').lower()
+    if attendance_transport not in ('direct', 'thingsboard'):
+        raise ValueError('ATTENDANCE_TRANSPORT must be direct or thingsboard')
+    attendance_client = DirectAttendanceClient(
+        get_env_str('BACKEND_BASE_URL', ''), DEVICE_ID, get_env_str('EDGE_RECOGNITION_TOKEN', ''),
+        timeout=float(get_env_str('ATTENDANCE_HTTP_TIMEOUT_SECONDS', '8')),
+    ) if attendance_transport == 'direct' else tb_client
+    print(f'[Attendance] transport={attendance_transport}; ThingsBoard telemetry/control enabled')
+    def publish_attendance_result(response):
+        # Monitoring only: never publish vectors/templates or submit another write.
+        if attendance_transport == 'direct' and not response.get('uncertain'):
+            tb_client.send_telemetry({'attendance_transport': 'direct',
+                'attendance_event_id': response.get('event_id', ''),
+                'attendance_accepted': is_accepted_attendance(response),
+                'attendance_mode': response.get('mode', current_mode)})
+
+    def fingerprint_feedback(response):
+        publish_attendance_result(response)
+        feedback_queue.put(response)
+
     fingerprint_worker = FingerprintWorker(DEVICE_ID, attendance_coordinator,
-        tb_client.send_fingerprint_rpc, lambda: current_mode, feedback_queue.put)
+        attendance_client.send_fingerprint_rpc, lambda: current_mode, fingerprint_feedback)
 
     def submit_face(embedding, pad_score, mode, submission, captured_at, event_kind, expected_employee):
         # Capture immutable request parameters for retry, even after tracking resets.
         recognition_id = uuid.uuid4().hex
+        rpc_started = time.monotonic()
         def callback(response):
+            received = time.monotonic()
+            timings = scan_timings.get(submission[2])
+            if perf_log and timings:
+                print(f"[AttendanceTiming] event={submission[2]} pre_extract_ms={timings['pre_extract_ms']:.1f} extraction_ms={timings.get('extraction_ms', 0):.1f} rpc_ms={(received-rpc_started)*1000:.1f} session_to_ack_ms={(received-timings['seen'])*1000:.1f} accepted={is_accepted_attendance(response)}", flush=True)
             attendance_coordinator.response(submission[2], response, resend)
+            publish_attendance_result(response)
             result_queue.put((submission, response))
             if not response.get('verification_only'):
                 feedback_queue.put(response)
         def resend():
-            return tb_client.send_scan_rpc(embedding, pad_score, mode, on_result=callback,
+            return attendance_client.send_scan_rpc(embedding, pad_score, mode, on_result=callback,
                 event_id=submission[2], captured_at=captured_at, event_kind=event_kind,
                 recognition_id=recognition_id, expected_employee_id=expected_employee)
         request = resend()
@@ -809,6 +861,12 @@ def main(args=None):
                         print(f"[EDGE] 🔄 Phát hiện khuôn mặt mới (Track #{current_track_id} thay cho #{last_active_track_id}) -> Mở chốt điểm danh!")
                     last_active_track_id = current_track_id
 
+                for _, observed_track in tracked:
+                    timing_scope = (observed_track.verification_generation, current_mode, mode_generation, presence_generation)
+                    if getattr(observed_track, 'perf_scope', None) != timing_scope:
+                        observed_track.perf_scope = timing_scope
+                        observed_track.perf_first_seen = time.monotonic()
+
                 update_track_pad(tracked, frame, fas_predictor, PAD_INTERVAL_SECONDS,
                                  frame_id, detector_due, vision.PAD_DIAGNOSTIC_LOG,
                                  crop_smoothing=vision.PAD_CROP_SMOOTHING)
@@ -887,6 +945,11 @@ def main(args=None):
                                             raise ValueError("Alignment failed")
                                         captured_at = track.scan_captured_at or int(now_wall * 1000)
                                         context = (track.scan_event_id, captured_at, liveness_score(track.last_pad_score, track.last_pad_threshold))
+                                        if perf_log and track.scan_event_id not in scan_timings:
+                                            if len(scan_timings) >= 32:
+                                                scan_timings.pop(next(iter(scan_timings)))
+                                            seen = getattr(track, 'perf_first_seen', time.monotonic())
+                                            scan_timings[track.scan_event_id] = {'seen': seen, 'pre_extract_ms': (time.monotonic()-seen)*1000}
                                         recognition_worker.submit(key, aligned_face, context)
                                     except Exception:
                                         track.stable_recognitions = 0
@@ -933,6 +996,8 @@ def main(args=None):
                                                   vision.RECOGNITION_LABEL_UNKNOWN_CONFIRMATIONS)
                     track.recognition_status = "CACHE (DISPLAY ONLY)"
                 event_id, captured_at, pad_score = result.context
+                if event_id in scan_timings:
+                    scan_timings[event_id]["extraction_ms"] = result.latency * 1000
                 expected_employee = getattr(track, 'employee_id', None)
                 commit = (vision.ATTENDANCE_STABLE_COUNT == 1 or
                           (getattr(track, 'stable_recognitions', 0) >= vision.ATTENDANCE_STABLE_COUNT - 1
@@ -983,8 +1048,10 @@ def main(args=None):
                                        and track.verification_generation == submission[5]
                                        and track.missing_frames == 0 and track.is_real
                                        and not track.pad_invalid_reason), None)
-                if response_track is None:
+                if response_track is None and is_final_success:
                     response_track = next((track for _, track in tracked if track.track_id == submission[0]), None)
+                if response_track is None and not is_final_success:
+                    continue
 
                 if response_track is not None:
                     if response.get('matched') and last_submission_embedding is not None:
@@ -1138,6 +1205,8 @@ def main(args=None):
         print("\n[STOP] Đang dừng Pi Edge Client...")
     finally:
         fingerprint_worker.close()
+        if attendance_client is not tb_client:
+            attendance_client.close()
         stopped = recognition_worker.close()
         print(f"[Recognition worker] stopped={stopped}")
         if cap is not None:
@@ -1161,4 +1230,12 @@ def main(args=None):
 
 
 if __name__ == "__main__":
+    import signal
+
+    def stop_client(signum, frame):
+        raise KeyboardInterrupt()
+
+    # nohup/background shells may inherit SIGINT=ignored. Restore a graceful stop.
+    signal.signal(signal.SIGINT, stop_client)
+    signal.signal(signal.SIGTERM, stop_client)
     main()

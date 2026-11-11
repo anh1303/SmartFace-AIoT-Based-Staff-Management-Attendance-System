@@ -16,7 +16,16 @@ const deviceName = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/)
 export const fingerprintManagementRouter = Router()
 fingerprintManagementRouter.use(authenticate, authorize('ADMIN', 'MANAGER'))
 fingerprintManagementRouter.get('/fingerprint-devices', asyncHandler(async (_req, res) => {
-  successResponse(res, await prisma.fingerprintDevice.findMany({ orderBy: { device_id: 'asc' } }))
+  const [devices, sessions] = await Promise.all([
+    prisma.fingerprintDevice.findMany({ orderBy: { device_id: 'asc' } }),
+    prisma.fingerprintSession.findMany({
+      where: { status: { in: service.liveSessionStates }, OR: [{ status: 'SYNCING' }, { expires_at: { gt: new Date() } }] },
+      select: { device_id: true },
+      distinct: ['device_id'],
+    }),
+  ])
+  const enrolling = new Set(sessions.map(session => session.device_id))
+  successResponse(res, devices.map(device => ({ ...device, enrollment_active: enrolling.has(device.device_id) })))
 }))
 fingerprintManagementRouter.patch('/fingerprint-devices/:deviceId', authorize('ADMIN'), requirePasswordAuth, asyncHandler(async (req, res) => {
   const patch = z.object({ polling_fallback: z.boolean().optional(), attendance_enabled: z.boolean().optional(), acceptance_verified: z.literal(true).optional() }).strict().parse(req.body)

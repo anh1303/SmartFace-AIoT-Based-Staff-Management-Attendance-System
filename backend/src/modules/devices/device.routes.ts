@@ -1,3 +1,4 @@
+import { deviceAttendanceRouter } from '../attendance/attendance.device.js';
 import { fingerprintDeviceRouter } from '../biometrics/fingerprint.routes.js';
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth.middleware.js';
@@ -15,6 +16,7 @@ deviceRouter.post('/:id/settings-notify', asyncHandler(controller.settingsNotify
 deviceRouter.post('/:id/face-embedding', asyncHandler(authenticateFaceExtraction), faceExtractionLimiter, asyncHandler(extractDeviceFace));
 
 deviceRouter.use('/:id/fingerprint', fingerprintDeviceRouter);
+deviceRouter.use('/:id/attendance', deviceAttendanceRouter);
 
 deviceRouter.use(authenticate, authorize('ADMIN'));
 

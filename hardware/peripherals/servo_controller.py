@@ -92,6 +92,21 @@ class ServoController:
             else:
                 self.door_state = self._open_state
 
+    def _move_between(self, start: float, end: float, seconds: float, *, smooth: bool = False):
+        """Send intermediate targets using monotonic deadlines."""
+        if self._stopping.is_set():
+            return
+        steps = max(1, round(seconds * (50 if smooth else 20)))
+        started = time.monotonic()
+        self.set_angle(start)
+        for step in range(1, steps + 1):
+            fraction = step / steps
+            deadline = started + seconds * fraction
+            if self._stopping.wait(max(0.0, deadline - time.monotonic())):
+                return
+            position = fraction * fraction * (3 - 2 * fraction) if smooth else fraction
+            self.set_angle(start + (end - start) * position)
+
     def open_gate_safe(
         self,
         mode: str,
@@ -101,13 +116,12 @@ class ServoController:
         max_hold_seconds: Optional[float] = None,
         detach_after_move: bool = False,
         on_state_change: Optional[Callable[[str], None]] = None,
+        travel_seconds: float = 0.0,
     ):
         """Hold open while occupied, then close after continuous absence.
 
-        - detach_after_move=True: Ngắt xung PWM (servo.angle = None) sau 0.6s quay để triệt tiêu
-          nhiệt lượng cuộn dây, chống rung lắc (jitter) và chống sụt áp nguồn 5V (theo dht11_servo.py).
-          Khi đóng cửa, tự động re-arm PWM tại góc mở và lướt mượt về 0° qua các góc trung gian để
-          triệt tiêu hoàn toàn hiện tượng PWM Re-attach Glitch (khựng/nhích ngược) và chống sụt áp tức thời.
+        - travel_seconds: Time to send intermediate angles in each direction.
+        - detach_after_move: Release PWM after reaching each target.
         - max_hold_seconds: Giới hạn thời gian mở tối đa chống kẹt cổng vô hạn khi test tại bàn.
         """
         if not self.enabled or self._stopping.is_set():
@@ -117,17 +131,24 @@ class ServoController:
             return
 
         def _action():
+            opened = False
             try:
                 normalized = (mode or 'CHECK_IN').upper()
                 self._open_state = 'OPEN_IN' if normalized == 'CHECK_IN' else 'OPEN_OUT'
                 target_angle = 90.0
                 print(f'[SERVO] Mở cổng {normalized}: {target_angle}°')
-                self.set_angle(target_angle)
+                if travel_seconds > 0:
+                    self._move_between(0.0, target_angle, travel_seconds)
+                    if self._stopping.is_set():
+                        return
+                    move_time = 0.0  # Start the open hold once the ramp finishes.
+                else:
+                    self.set_angle(target_angle)
+                    move_time = 0.6 if detach_after_move else 1.0
+                opened = True
                 if on_state_change:
                     on_state_change(self.door_state)
-                # Cho motor quay đến góc đích rồi ngắt xung nếu detach_after_move để triệt tiêu rung lắc tại góc 90°
-                move_time = 0.6 if detach_after_move else 1.0
-                time.sleep(move_time)
+                time.sleep(0.1 if travel_seconds > 0 else move_time)
                 if detach_after_move:
                     self.set_angle(None)
                     print('[SERVO] 🔌 Đã ngắt xung PWM tại 90° -> Triệt tiêu rung lắc, motor nghỉ mát.')
@@ -167,15 +188,22 @@ class ServoController:
                         time.sleep(0.1)
             finally:
                 try:
+                    if travel_seconds > 0 and (self._stopping.is_set() or not opened):
+                        return  # close() owns the final position during shutdown.
                     print('[SERVO] Đóng cổng: 0°')
                     if detach_after_move:
                         # Ổn định lại xung tại 90° (80ms) trước khi kéo về 0° để triệt tiêu glitch giật ngược
                         self.set_angle(target_angle)
                         time.sleep(0.08)
-                    self.set_angle(0.0)
+                    if travel_seconds > 0:
+                        self._move_between(target_angle, 0.0, travel_seconds)
+                        if self._stopping.is_set():
+                            return
+                    else:
+                        self.set_angle(0.0)
                     if on_state_change:
                         on_state_change(self.door_state)
-                    time.sleep(1.0)
+                    time.sleep(0.1 if travel_seconds > 0 else 1.0)
                     self.set_angle(None)
                     print('[SERVO] 🔌 Đã đóng cổng 0° và ngắt xung PWM -> Motor nghỉ mát, 0 power.')
                 finally:

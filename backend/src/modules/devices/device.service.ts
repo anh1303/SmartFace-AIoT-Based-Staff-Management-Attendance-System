@@ -805,6 +805,7 @@ export async function triggerDeviceAction(
   action: string,
   params?: any,
 ): Promise<{ success: boolean; data?: any; message: string }> {
+  const requiresDeviceAck = ['bluetooth-connect', 'bluetooth-reconnect', 'bluetooth-disconnect', 'test-audio'].includes(action)
   // 1. Thử gọi ThingsBoard RPC nếu có kết nối
   if (process.env.TB_HOST && process.env.NODE_ENV !== 'test') {
     try {
@@ -823,12 +824,19 @@ export async function triggerDeviceAction(
         params: params || {},
         timeout: 12000,
       })
-      if (action === 'bluetooth-disconnect') {
-        const cur = deviceSettingsStore.get(deviceId)
-        if (cur) {
-          cur.bluetooth = { connected: false, deviceName: '', status: 'disconnected' }
-          cur.lastUpdated = new Date().toISOString()
-          deviceSettingsStore.set(deviceId, cur)
+      if (requiresDeviceAck) {
+        const connectionAction = action === 'bluetooth-connect' || action === 'bluetooth-reconnect'
+        if (!result || result.success === false || (connectionAction && result.connected !== true)
+            || (action === 'bluetooth-disconnect' && result.connected !== false)) {
+          throw new AppError(502, result?.message || 'Pi chưa xác nhận thao tác Bluetooth/âm thanh thành công')
+        }
+        if (action.startsWith('bluetooth-')) {
+          const cur = deviceSettingsStore.get(deviceId)
+          if (cur) {
+            cur.bluetooth = { connected: result.connected === true, deviceName: result.deviceName || '',
+              status: result.connected ? 'connected' : 'disconnected' }
+            cur.lastUpdated = new Date().toISOString()
+          }
         }
       }
       let data = result
@@ -848,8 +856,11 @@ export async function triggerDeviceAction(
       return { success: true, data, message: `Thực hiện ${action} thành công qua ThingsBoard RPC` }
     } catch (err: any) {
       console.warn(`[Device Service] ThingsBoard RPC fallback for ${action}:`, err?.message)
+      if (requiresDeviceAck) throw new AppError(502, err instanceof AppError ? err.message : 'Không nhận được xác nhận từ Pi; kiểm tra kết nối thiết bị')
     }
   }
+
+  if (requiresDeviceAck) throw new AppError(503, 'Chưa kết nối ThingsBoard/Pi; không thể xác nhận Bluetooth hoặc âm thanh')
 
   // 2. Mock Fallback phục vụ môi trường Dev / Offline
   if (action === 'scan-wifi') {
@@ -860,55 +871,11 @@ export async function triggerDeviceAction(
     }
   }
 
-  if (action === 'bluetooth-disconnect') {
-    const cur = deviceSettingsStore.get(deviceId)
-    if (cur) {
-      cur.bluetooth = { connected: false, deviceName: '', status: 'disconnected' }
-      cur.lastUpdated = new Date().toISOString()
-      deviceSettingsStore.set(deviceId, cur)
-    }
-    return {
-      success: true,
-      data: { connected: false, deviceName: '', status: 'disconnected' },
-      message: 'Đã ngắt kết nối loa Bluetooth',
-    }
-  }
-
   if (action === 'scan-bluetooth') {
     return {
       success: true,
       data: [],
       message: 'Chưa quét được danh sách thiết bị loa Bluetooth',
-    }
-  }
-
-  if (action === 'bluetooth-connect') {
-    const current = await getDeviceSettings(deviceId)
-    const targetName = params?.name || params?.deviceName || 'Loa Bluetooth'
-    current.bluetooth = {
-      connected: true,
-      deviceName: targetName,
-      status: 'connected',
-    }
-    deviceSettingsStore.set(deviceId, current)
-    eventBus.emit('device:settings-updated', current)
-    return {
-      success: true,
-      data: current.bluetooth,
-      message: `Đã kết nối thành công tới loa ${targetName}`,
-    }
-  }
-
-  if (action === 'bluetooth-reconnect') {
-    const current = await getDeviceSettings(deviceId)
-    current.bluetooth.connected = true
-    current.bluetooth.status = 'connected'
-    deviceSettingsStore.set(deviceId, current)
-    eventBus.emit('device:settings-updated', current)
-    return {
-      success: true,
-      data: current.bluetooth,
-      message: `Đã kết nối lại thành công với ${current.bluetooth.deviceName}`,
     }
   }
 

@@ -27,7 +27,7 @@ class ServoPresenceTests(unittest.TestCase):
         def thread(target, **kwargs):
             return SimpleNamespace(start=target)
         gate.set_angle = set_angle
-        with patch.object(driver.time, 'monotonic', lambda: clock.now), patch.object(driver.time, 'sleep', sleep), patch.object(driver.threading, 'Thread', thread):
+        with patch.object(driver.time, 'monotonic', lambda: clock.now), patch.object(driver.time, 'sleep', sleep), patch.object(driver.threading, 'Thread', thread), patch.object(gate._stopping, 'wait', sleep):
             gate.open_gate_safe(mode, lambda: sensor(clock.now), close_delay_seconds=5, **kwargs)
         return commands
 
@@ -69,6 +69,16 @@ class ServoPresenceTests(unittest.TestCase):
                 thread.assert_not_called()
         finally:
             gate._lock.release()
+
+    def test_three_second_travel_each_way_with_presence_delay(self):
+        commands = self.run_gate(lambda now: False, travel_seconds=3, detach_after_move=True)
+        opening_end = next(t for t, angle in commands if angle == 90)
+        self.assertAlmostEqual(opening_end, 3)
+        closing_start = next(t for t, angle in commands if angle == 90 and t > opening_end)
+        closing_end = next(t for t, angle in commands if angle == 0 and t > closing_start)
+        self.assertGreaterEqual(closing_start, opening_end + 5)
+        self.assertAlmostEqual(closing_end - closing_start, 3.08)
+        self.assertTrue(any(0 < angle < 90 for _, angle in commands if angle is not None))
 
     def test_max_hold_seconds_and_detach_after_move(self):
         commands = self.run_gate(lambda now: True, max_hold_seconds=8.0, detach_after_move=True)

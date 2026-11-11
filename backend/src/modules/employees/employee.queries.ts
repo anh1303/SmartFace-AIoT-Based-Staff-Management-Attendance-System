@@ -25,12 +25,14 @@ export function updateEmployeePersonalDetails(userId: string, data: { full_name:
 /**
  * Public Module API: Tìm một nhân viên theo UUID hoặc mã nhân viên (hỗ trợ transaction)
  */
-export async function findEmployeeByIdOrCode(idOrCode: string, tx?: Prisma.TransactionClient) {
+export async function findEmployeeByIdOrCode(idOrCode: string, tx?: Prisma.TransactionClient, projection: 'full' | 'attendance' = 'full') {
   const client = getEmployeeClient(tx)
   if (typeof (client as any)?.employee?.findFirst === 'function') {
     const read = () => (client as any).employee.findFirst({
       where: buildIdOrCodeWhere(idOrCode),
-      include: employeeInclude,
+      ...(projection === 'attendance'
+        ? { select: { id: true, employee_code: true, full_name: true, user_id: true, status: true } }
+        : { include: employeeInclude }),
     })
     try {
       return await read()
@@ -45,7 +47,9 @@ export async function findEmployeeByIdOrCode(idOrCode: string, tx?: Prisma.Trans
   if (typeof (client as any)?.employee?.findUnique === 'function') {
     return (client as any).employee.findUnique({
       where: { id: idOrCode },
-      include: employeeInclude,
+      ...(projection === 'attendance'
+        ? { select: { id: true, employee_code: true, full_name: true, user_id: true, status: true } }
+        : { include: employeeInclude }),
     })
   }
   return null

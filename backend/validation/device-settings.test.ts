@@ -51,19 +51,12 @@ describe('Device Settings & Quick Settings Service', () => {
     expect(btScan.success).toBe(true)
     expect(Array.isArray(btScan.data)).toBe(true)
 
-    const reconnect = await service.triggerDeviceAction(testDeviceId, 'bluetooth-reconnect')
-    expect(reconnect.success).toBe(true)
-    expect(reconnect.data.connected).toBe(true)
+    await expect(service.triggerDeviceAction(testDeviceId, 'bluetooth-reconnect')).rejects.toThrow(/không thể xác nhận/)
+    await expect(service.triggerDeviceAction(testDeviceId, 'bluetooth-connect', {
+      name: 'HAVIT TW958 PRO', address: '01:08:51:ED:08:B9',
+    })).rejects.toThrow(/không thể xác nhận/)
+    await expect(service.triggerDeviceAction(testDeviceId, 'test-audio')).rejects.toThrow(/không thể xác nhận/)
+    expect((await service.getDeviceSettings(testDeviceId)).bluetooth.connected).toBe(false)
 
-    const connectNewBt = await service.triggerDeviceAction(testDeviceId, 'bluetooth-connect', {
-      name: 'Sony SRS-XB13',
-      address: '00:1A:7D:DA:71:13',
-    })
-    expect(connectNewBt.success).toBe(true)
-    expect(connectNewBt.data.deviceName).toBe('Sony SRS-XB13')
-    expect(connectNewBt.data.connected).toBe(true)
-
-    const audioAction = await service.triggerDeviceAction(testDeviceId, 'test-audio')
-    expect(audioAction.success).toBe(true)
   })
 })

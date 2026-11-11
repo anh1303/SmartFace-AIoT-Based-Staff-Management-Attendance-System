@@ -11,6 +11,7 @@ export interface FingerprintSession {
 }
 export interface FingerprintDevice {
   device_id: string; ready: boolean; wak_verified: boolean; roundtrip_verified: boolean;
+  enrollment_active?: boolean;
   capacity: number; attendance_enabled: boolean; polling_fallback: boolean; last_seen: string; error: string | null;
 }
 const terminal = ['COMPLETED','CANCELLED','EXPIRED','FAILED'];
@@ -34,7 +35,7 @@ export function useFingerprintEnrollment(employeeId: string | undefined, blocked
     }
   }, [storageKey]);
   const devices = useQuery({ queryKey: ['fingerprint-devices',currentUser?.username], enabled: Boolean(currentUser),
-    queryFn: async () => (await apiFetch<FingerprintDevice[]>('/api/biometrics/fingerprint-devices')).data || [], refetchInterval: 30000, staleTime: 15000 });
+    queryFn: async () => (await apiFetch<FingerprintDevice[]>('/api/biometrics/fingerprint-devices')).data || [], refetchInterval: 15000, staleTime: 10000 });
   const recover = useQuery({ queryKey: ['fingerprint-current', currentUser?.username, employeeId], enabled: Boolean(employeeId && !blocked),
     queryFn: async () => (await apiFetch<FingerprintSession | null>(`/api/biometrics/${employeeId}/fingerprint/sessions/current`)).data });
   useEffect(() => {
@@ -54,6 +55,7 @@ export function useFingerprintEnrollment(employeeId: string | undefined, blocked
   useEffect(() => {
     if (session.data?.status && terminal.includes(session.data.status)) {
       sessionStorage.removeItem(storageKey);
+      void client.invalidateQueries({ queryKey: ['fingerprint-devices', currentUser?.username] });
     }
   }, [session.data?.status, storageKey]);
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { traceAttendance } from '../../common/attendance-timing.js';
 import { getEmployeeScope, assertCanManageEmployee } from '../employees/public.js';
 import { workDateSchema } from '../../common/date.schema.js';
 import { assertDeviceWebhook } from '../../common/device-auth.js';
@@ -22,10 +23,10 @@ export const tbWebhook = async (req: Request, res: Response) => {
     return res.status(200).json({ success: false, matched: false, door_open: false, message: 'Tên thiết bị không khớp originator ThingsBoard' });
   }
   try {
-    const result = await service.handleThingsBoardWebhook({
+    const result = await traceAttendance(rawData?.event_id, () => service.handleThingsBoardWebhook({
       ...rawData,
       device_id: deviceId,
-    });
+    }));
     res.status(200).json(compactAttendanceRpcResponse(result));
   } catch (error: any) {
     const status = error.statusCode || 400;

@@ -1,3 +1,4 @@
+import { findBestFaceMatch } from './modules/biometrics/public.js'
 import { initializeFingerprintGateway } from './modules/biometrics/fingerprint.gateway.js'
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'
@@ -41,6 +42,11 @@ registerOperationHandler('employee.email', executeAccountEmail)
 async function start() {
   // 11. Đảm bảo kết nối CSDL Prisma hoàn tất trước khi mở kết nối MQTT và nhận message
   await prisma.$connect()
+  // Prime pgvector/query-engine setup before accepting the first physical scan.
+  // A synthetic unit vector performs a read only; it never records attendance.
+  const warmupStarted = performance.now()
+  await findBestFaceMatch('[' + ['1', ...Array(511).fill('0')].join(',') + ']')
+  serverLogger.info(`Face matcher ready (${Math.round(performance.now() - warmupStarted)} ms warmup)`)
   startOperationWorker()
   serverLogger.info('Database connected successfully')
 

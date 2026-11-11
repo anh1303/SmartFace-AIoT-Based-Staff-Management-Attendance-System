@@ -176,40 +176,38 @@ def get_wifi_info() -> Dict[str, Any]:
     }
 
 
-def get_bluetooth_info() -> Dict[str, Any]:
-    """
-    Lấy thông tin thực tế của loa Bluetooth đang kết nối tới Pi qua bluetoothctl.
-    Trả về connected=False nếu chưa kết nối loa nào.
-    """
+def get_bluetooth_info(address: Optional[str] = None) -> Dict[str, Any]:
+    """Find a connected audio device, not bluetoothctl's possibly stale default."""
+    disconnected = {"deviceName": "", "connected": False, "status": "disconnected", "address": address or ""}
     try:
-        res = subprocess.run(["bluetoothctl", "info"], capture_output=True, text=True, timeout=2)
-        if res.returncode == 0 and "Connected: yes" in res.stdout:
-            device_name = ""
-            device_addr = ""
+        if address:
+            addresses = [address]
+        else:
+            devices = subprocess.run(["bluetoothctl", "devices", "Connected"], capture_output=True, text=True, timeout=2)
+            addresses = [line.split()[1] for line in devices.stdout.splitlines()
+                         if line.startswith("Device ") and len(line.split()) >= 3]
+            # Compatibility with older BlueZ versions without the Connected filter.
+            if devices.returncode != 0:
+                addresses = [None]
+        for target in addresses:
+            command = ["bluetoothctl", "info"] + ([target] if target else [])
+            res = subprocess.run(command, capture_output=True, text=True, timeout=2)
+            if res.returncode != 0 or "Connected: yes" not in res.stdout:
+                continue
+            if not address and not any(value in res.stdout for value in ('0000110b', 'Icon: audio-', 'Icon: audio_headset')):
+                continue
+            name, addr = "", target or ""
             for line in res.stdout.splitlines():
                 line = line.strip()
                 if line.startswith("Name:"):
-                    device_name = line.split(":", 1)[1].strip()
-                elif line.startswith("Device"):
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        device_addr = parts[1]
-            if device_name or device_addr:
-                return {
-                    "deviceName": device_name or "Bluetooth Speaker",
-                    "connected": True,
-                    "status": "connected",
-                    "address": device_addr,
-                }
+                    name = line.split(":", 1)[1].strip()
+                elif line.startswith("Device "):
+                    addr = line.split()[1]
+            return {"deviceName": name or "Bluetooth Speaker", "connected": True,
+                    "status": "connected", "address": addr}
     except Exception:
         pass
-
-    return {
-        "deviceName": "",
-        "connected": False,
-        "status": "disconnected",
-        "address": "",
-    }
+    return disconnected
 
 
 def scan_bluetooth_devices() -> List[Dict[str, Any]]:

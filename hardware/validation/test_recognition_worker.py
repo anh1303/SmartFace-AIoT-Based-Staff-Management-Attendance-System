@@ -112,7 +112,7 @@ class CameraIntegrationTests(unittest.TestCase):
         display.wants_frame.return_value = False
         track = SimpleNamespace(track_id=1, bbox=(0, 0, 100, 100), landmarks=np.zeros((5, 2)),
                                 missing_frames=0, pad_ready=True, is_spoof=False, is_real=True,
-                                verification_generation=0, pad_invalid_reason=None,
+                                verification_generation=0, pad_invalid_reason=None, recognized_once=False,
                                 update_display_identity=Mock(), update_result=Mock(), invalidate_recognition=Mock(),
                                 display_result=lambda *a: ("UNKNOWN", 0.0, False),
                                 _pad_window=[], pad_min_votes=3,
@@ -169,13 +169,14 @@ class CameraIntegrationTests(unittest.TestCase):
             FaceEmbedder=lambda **kw: embedder, RecognitionWorker=make_worker, IdentityCache=lambda *a: cache,
             FaceTracker=lambda **kw: tracker, create_detector=lambda *a, **kw: detector,
             AntiSpoofPredictor=Mock(), ThingsBoardClient=lambda **kw: tb,
+            FingerprintWorker=Mock(return_value=Mock(maintenance=False)), ServoController=Mock(), AudioManager=Mock(),
             RTSPStreamer=lambda *a, **kw: streamer, TFTDisplay=lambda **kw: display,
             UltrasonicSensor=lambda **kw: ultrasonic, get_input_face=lambda *a: np.zeros((112, 112, 3), np.uint8),
             update_track_pad=lambda *a, **kw: 0,
             ULTRASONIC_ENABLED=False, SHOW_GUI=False, current_mode='CHECK_IN', mode_generation=0,
         )
         try:
-            with patch.multiple(edge, **replacements), patch.object(edge.cv2, 'VideoCapture', return_value=camera), patch('builtins.print'):
+            with patch.multiple(edge, **replacements), patch.object(edge.cv2, 'VideoCapture', return_value=camera), patch('builtins.print'), patch.dict('os.environ', {'ATTENDANCE_TRANSPORT': 'thingsboard'}):
                 edge.main()
                 if reply_after_reset:
                     track.update_result.assert_not_called()
@@ -201,13 +202,26 @@ class CameraIntegrationTests(unittest.TestCase):
     def test_camera_keeps_reading_while_embedding_waits_then_sends_rpc(self):
         self.run_camera()
 
-    def test_no_overlay_when_all_video_outputs_are_disabled(self):
-        with patch.object(edge, 'STREAM_ENABLED', False), \
-             patch.object(edge.cv2, 'putText') as text, \
-             patch.object(edge.cv2, 'rectangle') as rectangle:
-            self.run_camera()
-        text.assert_not_called()
-        rectangle.assert_not_called()
+    def test_camera_off_does_not_open_capture_or_run_inference(self):
+        # STREAM_ENABLED now controls the physical camera too. The old fixture
+        # waited for camera reads while explicitly disabling the camera.
+        detector, embedder = Mock(), Mock(input_size=(112, 112))
+        replacements = dict(
+            STREAM_ENABLED=False, SHOW_GUI=False, ULTRASONIC_ENABLED=False,
+            FaceEmbedder=lambda **kw: embedder, create_detector=lambda *a, **kw: detector,
+            FaceTracker=Mock(), AntiSpoofPredictor=Mock(), ThingsBoardClient=Mock(),
+            FingerprintWorker=Mock(return_value=Mock(maintenance=False)),
+            ServoController=Mock(), AudioManager=Mock(), UltrasonicSensor=Mock(),
+            RTSPStreamer=Mock(), TFTDisplay=Mock(),
+        )
+        with patch.multiple(edge, **replacements), \
+             patch.object(edge.cv2, 'VideoCapture') as camera, \
+             patch.object(edge.time, 'sleep', side_effect=KeyboardInterrupt), \
+             patch('builtins.print'), patch.dict('os.environ', {'ATTENDANCE_TRANSPORT': 'thingsboard'}):
+            edge.main()
+        camera.assert_not_called()
+        detector.detect.assert_not_called()
+        embedder.extract.assert_not_called()
 
     def test_mode_roundtrip_discards_old_embedding(self):
         def invalidate(track):

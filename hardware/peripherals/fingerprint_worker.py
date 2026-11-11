@@ -41,6 +41,8 @@ class FingerprintWorker:
         self._last_touch = False
         self._touched = False
         self._last_session = None
+        self.perf_log = os.getenv('ATTENDANCE_PERF_LOG', 'false').lower() == 'true'
+        self._touch_started = None
 
     def start(self):
         if not self.enabled:
@@ -196,13 +198,31 @@ class FingerprintWorker:
                 self._http(f"/bindings/{binding['id']}/ack", {'error': 'SYNC_FAILED'})
                 raise
 
-    def _scan(self, token):
-        if self._ack(self.sensor.capture_image()) != 0 or self._ack(self.sensor.image_to_charbuffer(1)) != 0:
+    def _scan(self, token, image_captured=False, polling_capture_ms=0.0):
+        active = [b for b in self.manifest['bindings']
+                  if b['state'] == 'SYNCED' and b['id'] in self._verified]
+        if not active:
             self.coordinator.finish(token)
             return
-        matched, slot, score = self.sensor.search_database(page_count=self.sensor.capacity)
+        started = self._touch_started or time.monotonic()
+        stage = time.monotonic()
+        capture_code = 0 if image_captured else self._ack(self.sensor.capture_image())
+        capture_ms = polling_capture_ms if image_captured else (time.monotonic()-stage)*1000
+        if capture_code != 0:
+            self.coordinator.finish(token)
+            return
+        stage = time.monotonic()
+        if self._ack(self.sensor.image_to_charbuffer(1)) != 0:
+            self.coordinator.finish(token)
+            return
+        feature_ms = (time.monotonic()-stage)*1000
+        stage = time.monotonic()
+        # Search every active mapped slot, without scanning unused trailing Flash.
+        page_count = min(self.sensor.capacity, max(b['slot'] for b in active)+1)
+        matched, slot, score = self.sensor.search_database(page_count=page_count)
+        search_ms = (time.monotonic()-stage)*1000
         self._ack(0xfe if getattr(self.sensor, '_needs_reconnect', False) else 0)
-        binding = next((b for b in self.manifest['bindings'] if b['slot'] == slot and b['state'] == 'SYNCED' and b['id'] in self._verified), None)
+        binding = next((b for b in active if b['slot'] == slot), None)
         if not matched or not binding:
             self.coordinator.finish(token)
             print('[FINGERPRINT] No active fingerprint match')
@@ -210,7 +230,11 @@ class FingerprintWorker:
         scan = {'event_kind': 'FINGERPRINT_SCAN', 'device_id': self.device_id, 'event_id': token,
                 'client_timestamp': int(time.time()*1000), 'mode': self.current_mode(),
                 'binding_id': binding['id'], 'slot': slot, 'revision': binding['revision'], 'match_score': score}
+        rpc_started = time.monotonic()
         def callback(response):
+            if self.perf_log:
+                received = time.monotonic()
+                print(f"[FingerprintTiming] event={token} capture_ms={capture_ms:.1f} feature_ms={feature_ms:.1f} search_ms={search_ms:.1f} rpc_ms={(received-rpc_started)*1000:.1f} touch_to_ack_ms={(received-started)*1000:.1f} accepted={response.get('door_open') is True}", flush=True)
             self.coordinator.response(token, response, resend)
             self.on_result(response)
         def resend():
@@ -236,18 +260,23 @@ class FingerprintWorker:
                         self.stop_event.wait(3)
                         continue
                 present = self._present()
+                wak_before = self.wak_verified
                 if present:
                     self._touched = True
-                    self.wak_verified = True
                 elif self._touched:
+                    # Require a complete touch/lift cycle before trusting WAK.
                     self.wak_verified = True
                     self._needs_lift = False
                 self.error = None if self.wak_verified or self.manifest['device'].get('polling_fallback') else 'WAK_UNVERIFIED'
-                if self.wake_event.is_set():
+                if self.wake_event.is_set() or self.wak_verified != wak_before:
                     self.wake_event.clear()
                     self._refresh(force=True)
                 else:
-                    self._refresh()
+                    # A fresh manifest is already backend-validated again on scan.
+                    # Prioritize a touch over an ordinary periodic HTTP refresh.
+                    urgent_touch = present and not self._last_touch and not self._needs_lift and not self.maintenance
+                    if not (urgent_touch and time.monotonic()-self._last_manifest < 30):
+                        self._refresh()
                 session = self.manifest.get('session')
                 needs_sync = any(b['state'] == 'REVOKED' or b['id'] not in self._verified for b in self.manifest['bindings'])
                 if session or needs_sync:
@@ -266,15 +295,24 @@ class FingerprintWorker:
                     self.stop_event.wait(.1)
                     continue
                 polling = self.manifest['device'].get('polling_fallback')
+                polling_capture_ms = 0.0
                 if polling:
+                    polling_started = time.monotonic()
                     present = self._ack(self.sensor.capture_image()) == 0
+                    polling_capture_ms = (time.monotonic()-polling_started)*1000
+                if present and not self._last_touch:
+                    self._touch_started = time.monotonic()-polling_capture_ms/1000
+                    if self.perf_log:
+                        print('[FingerprintTiming] phase=touch', flush=True)
+                if not present and self._last_touch and self.perf_log:
+                    print('[FingerprintTiming] phase=lift', flush=True)
                 trigger = present and not self._last_touch and not self._needs_lift
                 self._last_touch = present
                 if trigger:
                     self._needs_lift = True
                     token = uuid.uuid4().hex
                     if self.current_mode() in ('AUTO','CHECK_IN','CHECK_OUT') and self.manifest['device'].get('attendance_enabled') and self.coordinator.begin('fingerprint', token):
-                        self._scan(token)
+                        self._scan(token, image_captured=bool(polling), polling_capture_ms=polling_capture_ms)
                 if not present:
                     self._needs_lift = False
                 self.stop_event.wait(.1 if self.touch else .5)

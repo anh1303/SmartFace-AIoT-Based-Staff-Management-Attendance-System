@@ -7,10 +7,24 @@
 
 # Xac dinh thu muc goc cua du an
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FACE_AUTH_PYTHON="python3"
-if [ -x "$DIR/face_auth/.venv/bin/python" ]; then
-  FACE_AUTH_PYTHON="$DIR/face_auth/.venv/bin/python"
+FACE_AUTH_PYTHON="${FACE_AUTH_PYTHON:-}"
+if [ -z "$FACE_AUTH_PYTHON" ]; then
+  for candidate in "$DIR/face_auth/.venv/bin/python" "$DIR/.venv/bin/python" "$DIR/venv/bin/python"; do
+    if [ -x "$candidate" ]; then
+      FACE_AUTH_PYTHON="$candidate"
+      break
+    fi
+  done
+  FACE_AUTH_PYTHON="${FACE_AUTH_PYTHON:-python3}"
 fi
+
+check_face_auth() {
+  if ! "$FACE_AUTH_PYTHON" -c 'import uvicorn, fastapi, cv2, numpy, insightface, psycopg, psycopg_pool, dotenv, sklearn, PIL'; then
+    echo "[LOI] Python Face Auth thieu dependencies: $FACE_AUTH_PYTHON" >&2
+    echo "Cai face_auth/requirements.txt vao virtualenv truoc khi chay." >&2
+    return 1
+  fi
+}
 
 # Ham dung man hinh cho nguoi dung nhan phim
 pause() {
@@ -90,6 +104,7 @@ menu() {
 
     case "$choice" in
       1)
+        check_face_auth || { pause; continue; }
         check_env
         echo ""
         echo "Dang khoi chay Face Auth API, Backend va Frontend (Cloud DB) trong cua so Terminal moi..."
@@ -103,6 +118,7 @@ menu() {
         pause
         ;;
       2)
+        check_face_auth || { pause; continue; }
         check_env
         echo ""
         echo "Dang khoi dong Docker Database Local..."

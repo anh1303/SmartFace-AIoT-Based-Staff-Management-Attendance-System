@@ -35,7 +35,12 @@ class ConfirmationFlowTests(unittest.TestCase):
         for mode in ('CHECK_IN', 'CHECK_OUT'):
             with self.subTest(mode=mode): self.run_mode(mode, interruption='lost')
 
-    def run_mode(self, mode, interruption=None, required=3):
+    def test_direct_transport_preserves_single_and_multiple_confirmation_contract(self):
+        for required in (1, 3):
+            for mode in ('CHECK_IN', 'CHECK_OUT'):
+                self.run_mode(mode, required=required, transport='direct')
+
+    def run_mode(self, mode, interruption=None, required=3, transport="thingsboard"):
         track = Track(1, (100,100,200,200), pad_min_votes=3)
         track.landmarks = [[130,135],[170,135],[150,155],[135,175],[165,175]]
         for _ in range(3): track.update_pad(True,3.)
@@ -91,11 +96,12 @@ class ConfirmationFlowTests(unittest.TestCase):
         detector=Mock();detector.detect.return_value=[]
         replacements=dict(FaceEmbedder=lambda **kw:embedder, FaceTracker=lambda **kw:tracker,
                           create_detector=lambda *a, **kw:detector, AntiSpoofPredictor=Mock(),
-                          ThingsBoardClient=lambda **kw:tb, RTSPStreamer=Mock(), TFTDisplay=lambda **kw:display,
+                          ThingsBoardClient=lambda **kw:tb, DirectAttendanceClient=lambda *a, **kw:tb, RTSPStreamer=Mock(), TFTDisplay=lambda **kw:display,
+                          FingerprintWorker=Mock(return_value=Mock(maintenance=False)), ServoController=Mock(), AudioManager=Mock(),
                           UltrasonicSensor=Mock(), update_track_pad=lambda *a, **kw:0,
                           get_input_face=lambda *a:np.zeros((112,112,3),np.uint8),
                           ULTRASONIC_ENABLED=False, SHOW_GUI=False, current_mode=mode, mode_generation=0)
-        with patch.multiple(edge, **replacements), patch.object(edge.vision, 'ATTENDANCE_STABLE_COUNT', required), patch.object(edge.cv2,'VideoCapture',return_value=camera), patch('builtins.print'):
+        with patch.multiple(edge, **replacements), patch.object(edge.vision, 'ATTENDANCE_STABLE_COUNT', required), patch.object(edge.cv2,'VideoCapture',return_value=camera), patch('builtins.print'), patch.dict('os.environ', {'ATTENDANCE_TRANSPORT': transport}):
             edge.main()
         self.assertEqual(len(sent),target)
         self.assertEqual(track.stable_recognitions,required)

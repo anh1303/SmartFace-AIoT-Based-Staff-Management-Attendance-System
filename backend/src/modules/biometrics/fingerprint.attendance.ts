@@ -6,6 +6,7 @@ import { AppError } from '../../common/AppError.js'
 import { MAX_PAIR_MS } from '../attendance/attendance.policy.js'
 import { findAttendanceLogByEventKey, findRecentValidAttendanceLog } from '../attendance/attendance.service.js'
 import { liveSessionStates } from './fingerprint.service.js'
+import { timeAttendanceStage } from '../../common/attendance-timing.js'
 
 const scanSchema = z.object({ device_id: z.string().regex(/^[A-Za-z0-9_-]{1,100}$/),
   event_id: z.string().regex(/^[a-zA-Z0-9_-]{8,120}$/), client_timestamp: z.coerce.number().finite().positive(),
@@ -13,7 +14,12 @@ const scanSchema = z.object({ device_id: z.string().regex(/^[A-Za-z0-9_-]{1,100}
   revision: z.number().int().positive(), match_score: z.number().int().min(0).max(65535), event_kind: z.literal('FINGERPRINT_SCAN') })
 export type FingerprintScan = z.infer<typeof scanSchema>
 export async function requireFingerprintBinding(tx: Prisma.TransactionClient, scan: FingerprintScan, employeeId?: string) {
-  const b = await tx.fingerprintBinding.findUnique({ where: { id: scan.binding_id }, include: { template: { include: { employee: true } } } })
+  // Authorization needs revision/status/identity, not encrypted templates or avatars.
+  const b = await tx.fingerprintBinding.findUnique({ where: { id: scan.binding_id }, select: {
+    id: true, device_id: true, slot: true, state: true,
+    template: { select: { employee_id: true, revision: true, status: true,
+      employee: { select: { id: true, full_name: true, employee_code: true, status: true } } } },
+  } })
   const device = await tx.fingerprintDevice.findUnique({ where: { device_id: scan.device_id } })
   if (!device?.attendance_enabled || !device.ready || (!device.wak_verified && !device.polling_fallback)
       || !device.roundtrip_verified || Date.now() - +device.last_seen > 90_000) throw AppError.forbidden('Vân tay đang ở chế độ thử nghiệm hoặc cảm biến chưa sẵn sàng')
@@ -32,7 +38,7 @@ export async function processFingerprintAttendance(input: unknown, actions: {
   checkOut: typeof import('../attendance/attendance.service.js').checkOut,
 }) {
   const data = scanSchema.parse(input)
-  const b = await requireFingerprintBinding(prisma, data)
+  const b = await timeAttendanceStage('fingerprint_precheck', () => requireFingerprintBinding(prisma, data))
   const employee = { id: b.template.employee_id, full_name: b.template.employee.full_name, employee_code: b.template.employee.employee_code }
   const key = createHash('sha256').update(`${data.device_id}:${data.event_id}`).digest('hex')
   // Recover the immutable original mode even when AUTO would now choose its opposite.

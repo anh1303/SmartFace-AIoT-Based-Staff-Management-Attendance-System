@@ -136,14 +136,14 @@ export function formatAttendanceRecord(log: RawAttendanceLogDb, shifts = log.emp
   }
 }
 
-export async function formatAttendanceRecords(logs: RawAttendanceLogDb[]) {
+export async function formatAttendanceRecords(logs: RawAttendanceLogDb[], preloadedShifts?: Array<Omit<Awaited<ReturnType<typeof getEmployeeShiftsForDateRange>>[number], 'employees'>>) {
   if (!logs.length) return []
   const dates = logs.map(log => formatVNDateISO(log.event_time)).sort()
   const employeeIds = [...new Set(logs.map(log => log.employee_id))]
-  const shifts = await getEmployeeShiftsForDateRange(
-    { gte: new Date(+new Date(`${dates[0]}T00:00:00Z`) - 86400000), lte: new Date(`${dates[dates.length - 1]}T00:00:00Z`) },
-    employeeIds
-  )
+  const range = { gte: new Date(+new Date(`${dates[0]}T00:00:00Z`) - 86400000), lte: new Date(`${dates[dates.length - 1]}T00:00:00Z`) }
+  const shifts = preloadedShifts === undefined
+    ? await getEmployeeShiftsForDateRange(range, employeeIds)
+    : preloadedShifts.filter(shift => +new Date(shift.work_date) >= +range.gte && +new Date(shift.work_date) <= +range.lte)
   const shiftsByEmployee = new Map<string, typeof shifts>()
   for (const shift of shifts) {
     const employeeShifts = shiftsByEmployee.get(shift.employee_id) || []

@@ -23,6 +23,7 @@ vi.mock('../../src/modules/employees/public.js', () => ({
 vi.mock('../../src/modules/shifts/public.js', () => ({ getEmployeeNearShifts: shifts }))
 vi.mock('../../src/modules/payroll/public.js', () => ({ isPayrollPeriodClosed: vi.fn(async () => false) }))
 import { checkIn, checkOut } from '../../src/modules/attendance/attendance.service.js'
+import { isPayrollPeriodClosed } from '../../src/modules/payroll/public.js'
 
 const now = new Date('2026-11-06T08:00:00+07:00')
 const prior = (overrides = {}) => ({ id: 'prior', employee_id: 'a', type: 'CHECK_IN', status: 'VALID', created_at: new Date(+now - 60_000), event_time: new Date(+now - 60_000), work_date: new Date('2026-11-06T00:00:00Z'), ...overrides })
@@ -106,4 +107,14 @@ it('supports a five-second demo interval and accepts its exact boundary', async 
   expect(await scan('CHECK_OUT')).toMatchObject({ ignored: true, retry_after_seconds: 1 })
   vi.setSystemTime(new Date(+now + 4000))
   expect(await scan('CHECK_OUT')).not.toHaveProperty('ignored', true)
+})
+
+it('checks the accepted day once under the transaction locks instead of rereading it for invalidation', async () => {
+  const result = await scan('CHECK_IN')
+  expect(result).toMatchObject({ ignored: false, status: 'VALID' })
+  expect(isPayrollPeriodClosed).toHaveBeenCalledTimes(1)
+  expect(db.attendance_locks.findUnique).toHaveBeenCalledTimes(1)
+  expect(db.daily_attendance_summary.findUnique).toHaveBeenCalledTimes(1)
+  expect(db.daily_attendance_summary.upsert).toHaveBeenCalledTimes(1)
+  expect(state.locks).toContain('employee:a')
 })

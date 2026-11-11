@@ -260,13 +260,13 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
         `/api/devices/${deviceId}/actions/bluetooth-reconnect`,
         { method: 'POST' }
       );
-      if (res.success && res.data) {
+      if (res.success && res.data?.connected === true) {
         setSettings((prev) => ({
           ...prev,
-          bluetooth: { ...prev.bluetooth, ...res.data, connected: true, status: 'connected' },
+          bluetooth: { ...prev.bluetooth, ...res.data },
         }));
       }
-      return true;
+      return res.success && res.data?.connected === true;
     } catch (err) {
       console.error('[useDeviceSettings] Lỗi khi kết nối lại Bluetooth:', err);
       return false;
@@ -321,15 +321,13 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
             body: JSON.stringify({ name: device.name, address: device.address }),
           }
         );
-        if (res.success && res.data) {
+        if (res.success && res.data?.connected === true) {
           setSettings((prev) => ({
             ...prev,
             bluetooth: {
               ...prev.bluetooth,
               ...res.data,
-              connected: true,
               deviceName: device.name,
-              status: 'connected',
             },
           }));
           return true;

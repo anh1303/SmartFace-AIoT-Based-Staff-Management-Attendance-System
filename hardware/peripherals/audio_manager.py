@@ -364,6 +364,24 @@ class AudioManager:
         chime_file = self.ensure_chime_wav()
         return self.play_sound_file(chime_file, target_mac, target_name, sound_label="chuông test (Ding-Dong)")
 
+    def queue_attendance(self, emp_name, mode, bluetooth_info):
+        """Keep Bluetooth discovery/routing off the camera and gate-control thread."""
+        if self.is_muted:
+            return False
+
+        def announce():
+            try:
+                info = bluetooth_info()
+                if not info.get('connected'):
+                    print('[AUDIO WARN] Chưa có tai nghe Bluetooth kết nối; không phát nhầm ra HDMI.')
+                    return
+                self.speak_attendance(emp_name, mode, info.get('address', ''), info.get('deviceName', ''))
+            except Exception as exc:
+                print(f"[AUDIO WARN] Lỗi phát âm thanh điểm danh: {exc}")
+
+        threading.Thread(target=announce, name='attendance-audio', daemon=True).start()
+        return True
+
     def speak_attendance(
         self,
         emp_name: str,

@@ -141,3 +141,43 @@ class WorkerSyncTests(unittest.TestCase):
         b=self.binding();b['state']='REVOKED';w=self.worker(b)
         w._sync();w.sensor.delete_template.assert_called_once_with(2)
         w._http.assert_called_once_with('/bindings/binding-a/ack',{'deleted':True})
+
+
+class WorkerScanLatencyTests(unittest.TestCase):
+    def worker(self):
+        from peripherals.fingerprint_worker import FingerprintWorker
+        coordinator = AttendanceCoordinator()
+        coordinator.begin('fingerprint', 'test-event')
+        w = FingerprintWorker('PI_A', coordinator, Mock(return_value=1), lambda: 'AUTO', Mock())
+        w.sensor = Mock()
+        w.sensor.capacity = 300
+        w.sensor.capture_image.return_value = 0
+        w.sensor.image_to_charbuffer.return_value = 0
+        w.sensor.search_database.return_value = (True, 1, 100)
+        w.sensor._needs_reconnect = False
+        w.manifest = {'bindings': [{'id': 'a', 'slot': 1, 'state': 'SYNCED', 'revision': 1},
+                                   {'id': 'b', 'slot': 290, 'state': 'REVOKED', 'revision': 1}], 'session': None, 'device': {}}
+        w._verified = {'a'}
+        return w
+
+    def test_search_covers_all_verified_active_slots_but_not_unused_tail(self):
+        w = self.worker()
+        w._scan('test-event')
+        w.sensor.search_database.assert_called_once_with(page_count=2)
+        scan = w.send_attendance.call_args.args[0]
+        self.assertEqual(scan['slot'], 1)
+        self.assertEqual(scan['binding_id'], 'a')
+
+    def test_polling_reuses_the_image_already_captured_instead_of_capturing_twice(self):
+        w = self.worker()
+        w._scan('test-event', image_captured=True, polling_capture_ms=120)
+        w.sensor.capture_image.assert_not_called()
+        w.sensor.image_to_charbuffer.assert_called_once_with(1)
+        w.send_attendance.assert_called_once()
+
+    def test_unverified_or_revoked_matches_never_submit_attendance(self):
+        w = self.worker()
+        w.sensor.search_database.return_value = (True, 290, 100)
+        w._scan('test-event')
+        w.send_attendance.assert_not_called()
+        self.assertFalse(w.coordinator.busy)

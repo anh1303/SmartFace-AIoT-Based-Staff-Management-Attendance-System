@@ -1,3 +1,4 @@
+import { timeAttendanceStage } from '../../common/attendance-timing.js'
 import { processFingerprintAttendance } from '../biometrics/fingerprint.attendance.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
@@ -114,7 +115,7 @@ export async function processThingsBoardWebhook(data: ThingsBoardWebhookPayload,
 
   // Vector similarity search against active employees in DB
   const MATCH_THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD) || 0.45
-  const bestMatch = await findBestFaceMatch(vecLiteral)
+  const bestMatch = await timeAttendanceStage('match', () => findBestFaceMatch(vecLiteral))
 
   if (!bestMatch || bestMatch.similarity < MATCH_THRESHOLD) {
     if (isConfirmation) observeRecognition(device_id, `${normalizedRequestedMode}:${data.event_id}`, data.recognition_id!, null)

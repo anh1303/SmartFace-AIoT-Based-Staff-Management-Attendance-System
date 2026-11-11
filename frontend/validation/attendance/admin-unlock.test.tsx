@@ -11,8 +11,8 @@ const retryShifts = vi.fn()
 vi.mock('../../src/utils/dateUtils', () => ({ getTodayVNString: () => '2026-11-02' }))
 vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }) }))
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => ({ employees: [], workShifts: [], role: 'admin', currentUser: {}, showToast: vi.fn() }) }))
-vi.mock('../../src/context/ShiftContext', () => ({ useShiftContext: () => ({ isLoading: false, isError: true, refetchShifts: retryShifts }) }))
-vi.mock('../../src/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ isLoading: false, isError: false }) }))
+vi.mock('../../src/context/ShiftContext', async () => { const app = await import('../../src/context/AppContext'); return ({ useShiftContext: () => ({ ...app.useApp(), isLoading: false, isError: true, refetchShifts: retryShifts }) }) });
+vi.mock('../../src/context/EmployeeContext', async () => { const app = await import('../../src/context/AppContext'); return ({ useEmployeeContext: () => ({ ...app.useApp(), isLoading: false, isError: false }) }) });
 vi.mock('../../src/features/employees', () => ({ useDepartmentPositions: () => ({ departmentOptions: [], positionOptions: [] }) }))
 vi.mock('../../src/features/attendances', async () => ({
   AttendanceHeader: (await import('../../src/features/attendances/components/AttendanceHeader')).AttendanceHeader,
@@ -52,3 +52,5 @@ it('explains which data blocks Excel export and offers to retry it', async () =>
     expect(retryShifts).toHaveBeenCalled()
   } finally { await act(async () => root.unmount()); queryClient.clear(); host.remove() }
 })
+
+vi.mock('../../src/context/ToastContext', async () => { const app = await import('../../src/context/AppContext'); return { useToast: () => app.useApp() }; });

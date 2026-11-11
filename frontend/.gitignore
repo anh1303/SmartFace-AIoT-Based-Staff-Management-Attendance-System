@@ -22,16 +22,7 @@ build/
 coverage/
 
 # 3. Tests & Kiểm thử
-__tests__/
-**/__tests__/
-test/
-**/test/
-tests/
-**/tests/
-*.test.ts
-*.test.tsx
-*.spec.ts
-*.spec.tsx
+# Test source is tracked; generated reports are ignored by the root .gitignore.
 
 # 4. IDE & Hệ điều hành
 .vscode/*

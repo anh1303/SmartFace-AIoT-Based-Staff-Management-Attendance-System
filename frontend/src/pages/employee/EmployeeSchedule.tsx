@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, CalendarDays, Clock } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
 import { useShiftContext } from '../../context/ShiftContext';
 import { FilterBar, SearchInput, PageHeaderBanner } from '../../components/common';
 import { getTodayVNString } from '../../utils/dateUtils';
@@ -11,7 +12,8 @@ function moveDate(date: string, days: number) { const d = new Date(`${date}T00:0
 function monday(date: string) { return moveDate(date, -((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7)); }
 
 export const EmployeeSchedule: React.FC = () => {
-  const { currentUser, employees } = useApp();
+  const { currentUser } = useAuth();
+  const { employees } = useEmployeeContext();
   const { workShifts, isLoading, isError, refetchShifts } = useShiftContext();
   const today = getTodayVNString();
   const [selected, setSelected] = useState(today);

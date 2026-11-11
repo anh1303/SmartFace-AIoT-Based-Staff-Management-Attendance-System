@@ -1,3 +1,6 @@
+import { configureAttendancePayroll } from '../../src/modules/attendance/attendance.payroll-port.js'
+import * as payrollIntegration from '../../src/modules/payroll/public.js'
+configureAttendancePayroll(payrollIntegration)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const db = vi.hoisted(() => ({

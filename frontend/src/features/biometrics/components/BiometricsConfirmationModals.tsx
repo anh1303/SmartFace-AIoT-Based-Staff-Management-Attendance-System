@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -34,11 +35,6 @@ export const FaceConfirmModal: React.FC<FaceConfirmModalProps> = ({
           <p className="font-semibold text-slate-900 dark:text-white">
             Xác nhận ghi nhận {photoCount} ảnh mẫu sinh trắc học?
           </p>
-          <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
-            Ảnh sẽ được gửi đến Face Auth để phát hiện khuôn mặt, trích xuất vector 512-D và tạo
-            centroid. Các vector được lưu trong bảng{' '}
-            <code className="text-blue-600 dark:text-blue-400">face_embeddings</code> của database PBL6.
-          </p>
           <div className="pt-2 border-t border-slate-200/60 dark:border-[#21264b] flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">
             <span>ĐIỀU KIỆN: TỐI THIỂU 3 ẢNH (HIỆN CÓ {photoCount} ẢNH)</span>
           </div>
@@ -53,7 +49,7 @@ export const FaceConfirmModal: React.FC<FaceConfirmModalProps> = ({
           >
             Hủy bỏ
           </button>
-          <button
+          <ActionButton busyLabel="Đang lưu Face ID…"
             type="button"
             disabled={analyzingFace}
             onClick={onConfirm}
@@ -71,7 +67,7 @@ export const FaceConfirmModal: React.FC<FaceConfirmModalProps> = ({
             ) : (
               <span>Xác nhận lưu thay đổi</span>
             )}
-          </button>
+          </ActionButton>
         </div>
       </div>
     </Modal>
@@ -174,10 +170,6 @@ export const FaceResultModal: React.FC<FaceResultModalProps> = ({
             </div>
           )}
 
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 leading-relaxed">
-            Các mẫu khuôn mặt đã được lưu vào bảng{' '}
-            <code className="text-blue-600 dark:text-blue-400">face_embeddings</code> trong database PBL6.
-          </p>
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-2">
@@ -244,13 +236,13 @@ export const FingerprintConfirmModal: React.FC<FingerprintConfirmModalProps> = (
           >
             Hủy bỏ
           </button>
-          <button
+          <ActionButton busyLabel="Đang đồng bộ…"
             type="button"
             onClick={onConfirm}
             className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm shadow-emerald-600/20 cursor-pointer"
           >
             Xác nhận lưu mẫu vân tay
-          </button>
+          </ActionButton>
         </div>
       </div>
     </Modal>

@@ -5,6 +5,7 @@ import { recognizeLogin, loginBody } from '../../src/modules/auth/face-login/fac
 import { prisma } from '../../src/config/database.js'
 import { findBestFaceMatch } from '../../src/modules/biometrics/public.js'
 import { createFaceSession } from '../../src/modules/auth/auth.service.js'
+import { configureAuthBiometrics } from '../../src/modules/auth/auth.biometrics-port.js'
 
 vi.mock('../../src/config/database.js', () => ({ prisma: { user: { findMany: vi.fn(), update: vi.fn() }, attendance_logs: { create: vi.fn() } } }))
 vi.mock('../../src/modules/biometrics/public.js', () => ({ findBestFaceMatch: vi.fn() }))
@@ -44,6 +45,7 @@ describe('Face login policies', () => {
 
 describe('Face recognition creates only an authentication session', () => {
   beforeEach(() => {
+    configureAuthBiometrics({ findBestFaceMatch } as any)
     vi.clearAllMocks()
     Object.assign(env, { FACE_LOGIN_ENABLED: true, FACE_MATCH_THRESHOLD: 0.45, FACE_AUTH_INTERNAL_KEY: 'x'.repeat(32) })
     process.env.ATTENDANCE_STABLE_COUNT = '3'

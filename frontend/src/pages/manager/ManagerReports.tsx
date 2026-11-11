@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
-import { useApp } from '../../context/AppContext';
+import { usePayrollContext } from '../../context/PayrollContext';
+import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   ReportsHeader,
   ReportsSummaryKpis,
@@ -8,10 +10,12 @@ import {
   ReportsEmployeeLeaderboard,
   useMonthlyReport,
 } from '@/features/reports';
-import { exportMonthlyExcel, printMonthlyReport } from '@/features/reports/utils/monthlyReportExport';
+import { exportMonthlyExcel, printMonthlyReport } from '@/features/reports';
 
 export const ManagerReports: React.FC = () => {
-  const { selectedPeriod, setSelectedPeriod, showToast, role } = useApp();
+  const { selectedPeriod, setSelectedPeriod } = usePayrollContext();
+  const { showToast } = useToast();
+  const { role } = useAuth();
   const isManager = role === 'manager';
 
   const chartRef = useRef<HTMLDivElement>(null);
@@ -63,9 +67,9 @@ export const ManagerReports: React.FC = () => {
 
   const handleExport = (format: 'excel' | 'pdf') => {
     if (format === 'excel') {
-      void exportMonthlyExcel(reportData, isManager)
-        .then(saved => { if (saved) showToast('Đã lưu báo cáo Excel.', 'success'); })
-        .catch(() => showToast('Không thể lưu báo cáo.', 'error'));
+      return exportMonthlyExcel(reportData, isManager)
+        .then(saved => { if (saved) showToast('Đã lưu báo cáo Excel.', 'success', "Xuất báo cáo thành công"); })
+        .catch(() => showToast('Không thể lưu báo cáo.', 'error', "Không thể xuất báo cáo"));
     } else {
       printMonthlyReport(reportData, isManager, chartRef.current);
     }

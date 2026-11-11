@@ -1,3 +1,9 @@
+import { formatVNDateISO } from './dateUtils';
+
+export function wasHiredByPayrollPeriod(createdAt: string | null | undefined, period: string): boolean {
+  return !createdAt || formatVNDateISO(createdAt).slice(0, 7) <= period;
+}
+
 /**
  * Tính số tiền theo công thức hệ số: Số giờ * Hệ số * Lương theo giờ
  */

@@ -4,6 +4,7 @@ export * from './components/AttendanceFilters';
 export * from './components/DeviceStatusCards';
 export * from './components/AttendanceTable';
 export * from './components/AttendanceEditModal';
+export * from './components/AttendanceDayDetails';
 export * from './components/WebRTCPlayer';
 export * from './components/LiveEventFeed';
 
@@ -16,6 +17,8 @@ export * from './hooks/useAttendanceSocket';
 export * from './hooks/useAttendancePairs';
 export * from './hooks/useEmployeeAttendanceDetail';
 export * from './hooks/useRawLogsPagination';
+export * from './hooks/useEmployeeOverview';
+export * from './hooks/useDeviceSettings';
 
 // Api
 export * from './api/attendanceApi';

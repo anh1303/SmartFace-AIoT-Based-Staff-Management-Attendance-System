@@ -8,7 +8,7 @@
 - Tháng 10: 22 phiếu PENDING. Ba ngày đang mở để demo: NV-002/26-10, NV-003/26-10, NV-005/27-10. NV-006/27-10 đã duyệt để demo mở khóa và sửa quyết định.
 - Tháng 11: chỉ ngày 1 và 2, 24 phiếu PENDING. Ca sáng kết thúc đã có một số ngày duyệt để xem lương tạm tính; ca hành chính hôm nay còn mở. NV-022 chỉ có dữ liệu từ ngày tuyển 02/11.
 - Giữ nguyên tháng 8 và ngoài tháng 9–11; không đổi nhân viên, tài khoản, phòng ban, chức vụ, chính sách, thiết bị hay embeddings. Hash dữ liệu bảo vệ đã đối chiếu trước/sau và trùng nhau.
-- Script: `cd backend && node --import tsx prisma/seed-demo-2026.ts`. Mặc định chỉ dry-run; thêm `--apply` sẽ reset lại dữ liệu demo. Script giới hạn ngày chạy 02/11/2026; không chạy lại sau khi đã thực hiện demo nếu muốn giữ quyết định mới.
+- The demo seed script has been removed. This document preserves the results from 2026-11-02.
 
 ## Xem từng case
 

@@ -4,7 +4,7 @@ import { useOptionalNotifications } from '../features/notifications';
 
 interface ToastContextType {
   toasts: ToastMessage[];
-  showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning', title?: string) => void;
   removeToast: (id: string) => void;
 }
 
@@ -14,15 +14,15 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const notifications = useOptionalNotifications();
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', title = message) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts(prev => [...prev, { id, message, type }]);
+    setToasts(prev => [...prev, { id, title, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 4500);
 
     // Đồng thời đưa thông báo vào Floating Notification Bubble
-    notifications?.addNotification({ message, type });
+    notifications?.addNotification({ title, message, type });
   }, [notifications]);
 
 

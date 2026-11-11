@@ -19,7 +19,7 @@ export interface LiveAttendanceEvent {
 }
 
 export interface UseAttendanceSocketOptions {
-  showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning', title?: string) => void;
 }
 
 export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = {}) {
@@ -106,7 +106,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
         ? Number(record.verification_score)
         : (record.verificationScore ?? record.similarity ?? null);
 
-      showToast?.(`[CHECK-IN] ${empName} (${empCode}) vừa vào ca lúc ${eventTime}`, 'success');
+      showToast?.(`[CHECK-IN] ${empName} (${empCode}) vừa vào ca lúc ${eventTime}`, 'success', "Chấm công vào ca thành công");
 
       queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
@@ -145,7 +145,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
         ? Number(record.verification_score)
         : (record.verificationScore ?? record.similarity ?? null);
 
-      showToast?.(`[CHECK-OUT] ${empName} (${empCode}) vừa tan ca lúc ${eventTime}`, 'success');
+      showToast?.(`[CHECK-OUT] ${empName} (${empCode}) vừa tan ca lúc ${eventTime}`, 'success', "Chấm công tan ca thành công");
 
       queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
@@ -177,7 +177,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
       if (seenEventIdsRef.current.has(id)) return;
       seenEventIdsRef.current.add(id);
       const timestamp = data?.timestamp || new Date().toISOString();
-      showToast?.('Điểm danh bị gắn cờ và từ chối.', 'warning');
+      showToast?.('Điểm danh bị gắn cờ và từ chối.', 'error', "Chấm công bị từ chối");
       queryClient.invalidateQueries({ queryKey: ATTENDANCE_QUERY_KEY });
       setLiveEvents(prev => [{ id, type: 'FLAGGED', employeeCode: data?.employee_id, deviceId: data?.device_id, time: new Date(timestamp).toLocaleTimeString('vi-VN'), timestamp, message: 'Điểm danh bị gắn cờ và từ chối' }, ...prev.slice(0, 9)]);
     });
@@ -188,7 +188,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
       if (seenEventIdsRef.current.has(recordId)) return;
       seenEventIdsRef.current.add(recordId);
 
-      showToast?.('Phát hiện khuôn mặt chưa đăng ký trong hệ thống!', 'warning');
+      showToast?.('Phát hiện khuôn mặt chưa đăng ký trong hệ thống!', 'error', "Không thể cập nhật Face ID");
       const deviceId = data?.device_id || data?.deviceId || undefined;
       const similarity = data?.similarity ?? (data?.score ? Number(data.score) : undefined);
       const rawTimestamp = data?.timestamp || new Date().toISOString();
@@ -212,7 +212,7 @@ export function useAttendanceSocket({ showToast }: UseAttendanceSocketOptions = 
       if (seenEventIdsRef.current.has(recordId)) return;
       seenEventIdsRef.current.add(recordId);
 
-      showToast?.('CẢNH BÁO: Đã chặn hành vi giả mạo khuôn mặt!', 'error');
+      showToast?.('CẢNH BÁO: Đã chặn hành vi giả mạo khuôn mặt!', 'error', "Không thể thêm ảnh mẫu");
       const deviceId = data?.device_id || data?.deviceId || undefined;
       const rawTimestamp = data?.timestamp || new Date().toISOString();
 

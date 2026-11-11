@@ -35,13 +35,22 @@ it('ignores a late save result after the account session has changed', async () 
   expect(toast).not.toHaveBeenCalled();
 });
 afterEach(() => { act(() => root.unmount()); client.clear(); host.remove(); });
-it('shows the edited value while the server is slow and tells the user it is saving', async () => {
+it('keeps the deleted employee identity in the notification even after the list has changed', async () => {
+  let finish!: () => void;
+  api.deleteEmployeeApi.mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+  let pending!: Promise<unknown>;
+  await act(async () => { pending = model.deleteEmployee('uuid1'); });
+  client.setQueryData(['employees'], []);
+  await act(async () => { finish(); await pending; });
+  expect(toast).toHaveBeenCalledWith('Đã xóa hồ sơ An (NV1) và tài khoản liên kết.', 'success', 'Xóa nhân viên thành công');
+});
+it('shows the edited value while the server is slow without duplicating button feedback in a toast', async () => {
   let resolve!: (v: unknown) => void;
   api.updateEmployeeApi.mockReturnValue(new Promise(r => { resolve = r; }));
   let pending: Promise<unknown>;
   await act(async () => { pending = model.updateEmployee('NV1', { full_name: 'Bình' }); });
   await act(async () => { await new Promise(r => setTimeout(r, 10)); });
-  expect(host.textContent).toContain('Bình'); expect(toast).toHaveBeenCalledWith(expect.stringContaining('Đang lưu'), 'info');
+  expect(host.textContent).toContain('Bình'); expect(toast).not.toHaveBeenCalledWith(expect.stringContaining('Đang lưu'), 'info');
   await act(async () => { resolve({ ...original, full_name: 'Bình chuẩn' }); await pending; });
   expect(client.getQueryData<any[]>(['employees'])![0].full_name).toBe('Bình chuẩn');
 });
@@ -53,7 +62,7 @@ it('restores only the failed employee and reports the failure', async () => {
   client.setQueryData(['employees'], (rows: any[]) => [...rows, { ...original, id: 'uuid2', employee_id: 'NV2', full_name: 'Chi' }]);
   await act(async () => { reject(new Error('Không có quyền')); await pending!.catch(() => {}); });
   expect(client.getQueryData<any[]>(['employees'])!.map(e => e.full_name)).toEqual(['An', 'Chi']);
-  expect(toast).toHaveBeenCalledWith(expect.stringContaining('Không có quyền'), 'error');
+  expect(toast).toHaveBeenCalledWith(expect.stringContaining('Không có quyền'), 'error', 'Không thể cập nhật nhân viên');
 });
 it('does not roll back a newer server update when an older request fails', async () => {
   let reject!: (v: Error) => void;

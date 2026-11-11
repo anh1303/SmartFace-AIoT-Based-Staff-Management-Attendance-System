@@ -13,6 +13,12 @@ import * as attendance from '../../src/modules/attendance/attendance.service.js'
 import * as shifts from '../../src/modules/shifts/shift.service.js'
 import * as employees from '../../src/modules/employees/employee.service.js'
 import * as biometrics from '../../src/modules/biometrics/biometric.service.js'
+import { configureEmployeeIntegration } from '../../src/modules/employees/employee.integration-port.js'
+import * as authPort from '../../src/modules/auth/public.js'
+import * as biometricsPort from '../../src/modules/biometrics/public.js'
+import * as shiftPort from '../../src/modules/shifts/public.js'
+import * as attendancePort from '../../src/modules/attendance/public.js'
+import * as payrollPort from '../../src/modules/payroll/public.js'
 
 const manager = { id: 'manager-user', role: 'MANAGER' }
 const self = { id: 'manager', user_id: manager.id, employee_code: 'M1', departmentId: 1, status: 'ACTIVE' }
@@ -29,6 +35,7 @@ function matches(row: any, where: any): boolean {
 }
 let rows: any[]
 beforeEach(() => {
+  configureEmployeeIntegration({ ...authPort, ...biometricsPort, ...shiftPort, ...attendancePort, ...payrollPort })
   vi.clearAllMocks()
   rows = [self, staff, { ...staff, id: 'other', employee_code: 'O1', departmentId: 2 },
     { ...staff, id: 'unassigned', employee_code: 'U1', departmentId: null },

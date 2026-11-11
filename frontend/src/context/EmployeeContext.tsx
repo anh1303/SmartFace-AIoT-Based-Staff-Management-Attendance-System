@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useEmployees } from '../features/employees/hooks/useEmployees';
 import { Employee } from '../types';
+import { useAuth } from './AuthContext';
 
 export interface EmployeeContextType {
   employees: Employee[];
@@ -10,14 +11,15 @@ export interface EmployeeContextType {
   refetchEmployees: () => void;
   addEmployee: (emp: Omit<Employee, 'created_at' | 'updated_at'>) => Promise<unknown>;
   updateEmployee: (id: string, updates: Partial<Employee>) => Promise<unknown>;
-  deleteEmployee: (id: string) => void;
-  toggleEmployeeStatus: (id: string) => void;
+  deleteEmployee: (id: string) => Promise<unknown>;
+  toggleEmployeeStatus: (id: string) => Promise<void>;
 }
 
 const EmployeeContext = createContext<EmployeeContextType | undefined>(undefined);
 
 export const EmployeeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const employeesHook = useEmployees();
+  const { currentUser, isInitializing } = useAuth();
+  const employeesHook = useEmployees(Boolean(currentUser) && !isInitializing);
 
   const value = useMemo<EmployeeContextType>(() => ({
     employees: employeesHook.employees,

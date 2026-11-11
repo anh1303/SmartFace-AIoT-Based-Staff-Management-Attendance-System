@@ -47,11 +47,11 @@ export function useAttendanceLocks() {
         result.lock
           ? `Đã chốt ca làm việc ngày ${result.date} thành công!`
           : `Đã mở khoá chỉnh sửa ca làm việc ngày ${result.date}!`,
-        result.lock ? 'success' : 'info'
-      );
+        'success',
+        result.lock ? 'Chốt ngày công thành công' : 'Mở khóa ngày công thành công');
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Lỗi khi cập nhật trạng thái chốt ca!', 'error');
+      showToast(err.message || 'Lỗi khi cập nhật trạng thái chốt ca!', 'error', "Không thể cập nhật trạng thái ngày công");
     },
   });
 

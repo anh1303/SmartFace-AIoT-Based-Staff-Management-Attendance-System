@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React, { useState } from 'react';
 import {
   Wifi,
@@ -27,7 +28,7 @@ import {
 import {
   useDeviceSettings,
   BluetoothDevice,
-} from '../../attendances/hooks/useDeviceSettings';
+} from '../../attendances';
 
 interface DeviceKioskSettingsPanelProps {
   deviceId: string;
@@ -46,6 +47,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
   deviceName,
 }) => {
   const {
+    actionError,
     settings,
     isUpdating,
     setVolume,
@@ -72,14 +74,12 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
 
   const handleTestAudio = async () => {
     setIsTestingSound(true);
-    await testAudio();
-    setTimeout(() => setIsTestingSound(false), 700);
+    try { await testAudio(); } finally { setIsTestingSound(false); }
   };
 
   const handleReconnectBluetooth = async () => {
     setIsReconnectingBt(true);
-    await reconnectBluetooth();
-    setTimeout(() => setIsReconnectingBt(false), 600);
+    try { await reconnectBluetooth(); } finally { setIsReconnectingBt(false); }
   };
 
   const handleScanBluetooth = async () => {
@@ -165,6 +165,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
 
   return (
     <section className="sf-panel p-5 space-y-5">
+      {actionError && <p role="alert" className="sf-feedback error">{actionError}</p>}
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2.5">
@@ -276,7 +277,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
 
               <div className="flex items-center gap-1.5 shrink-0">
                 {settings.bluetooth.connected && settings.bluetooth.status === 'disconnected' && (
-                  <button
+                  <ActionButton busyLabel="Đang kết nối…"
                     type="button"
                     onClick={handleReconnectBluetooth}
                     disabled={isReconnectingBt}
@@ -284,11 +285,11 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isReconnectingBt ? 'animate-spin' : ''}`} />
                     <span>{isReconnectingBt ? 'Đang thử...' : 'Nối lại'}</span>
-                  </button>
+                  </ActionButton>
                 )}
 
                 {settings.bluetooth.connected && (
-                  <button
+                  <ActionButton busyLabel="Đang ngắt…"
                     type="button"
                     onClick={() => handleDisconnectBluetooth()}
                     disabled={isDisconnectingBt || isUpdating}
@@ -296,7 +297,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
                   >
                     <Unlink className="w-3.5 h-3.5" />
                     <span>{isDisconnectingBt ? 'Đang ngắt...' : 'Ngắt kết nối'}</span>
-                  </button>
+                  </ActionButton>
                 )}
 
                 <button
@@ -327,7 +328,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
                   <span className="font-semibold uppercase tracking-wider text-[11px]">
                     Thiết bị Bluetooth phát hiện ({scannedBtDevices.length})
                   </span>
-                  <button
+                  <ActionButton busyLabel="Đang quét…"
                     type="button"
                     onClick={handleScanBluetooth}
                     disabled={isScanningBt}
@@ -335,7 +336,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
                   >
                     <RefreshCw className={`w-3 h-3 ${isScanningBt ? 'animate-spin' : ''}`} />
                     <span>{isScanningBt ? 'Đang quét...' : 'Quét lại'}</span>
-                  </button>
+                  </ActionButton>
                 </div>
 
                 {/* Bộ lọc tìm kiếm */}
@@ -448,24 +449,24 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
                                   <CheckCircle2 className="w-3.5 h-3.5" />
                                   Đang dùng
                                 </span>
-                                <button
+                                <ActionButton busyLabel="Đang ngắt…"
                                   type="button"
                                   onClick={() => handleDisconnectBluetooth(dev.address)}
                                   disabled={isDisconnectingBt}
                                   className="text-[11px] font-semibold px-2 py-1 rounded bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 transition-colors cursor-pointer"
                                 >
                                   Bỏ kết nối
-                                </button>
+                                </ActionButton>
                               </>
                             ) : (
-                              <button
+                              <ActionButton busyLabel="Đang kết nối…"
                                 type="button"
                                 onClick={() => handleSelectBtDevice(dev)}
                                 disabled={connectingBtAddr !== null}
                                 className="text-[11px] font-semibold px-2.5 py-1 rounded bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 transition-colors cursor-pointer"
                               >
                                 Kết nối
-                              </button>
+                              </ActionButton>
                             )}
                           </div>
                         </div>
@@ -486,14 +487,14 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
               </div>
 
               <div className="flex items-center gap-3">
-                <button
+                <ActionButton busyLabel="Đang lưu…"
                   type="button"
                   onClick={toggleMute}
                   title={settings.isMuted ? 'Bật âm thanh' : 'Tắt tiếng (Mute)'}
                   className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-[#252c5c] text-slate-600 dark:text-slate-300 cursor-pointer transition-colors shrink-0"
                 >
                   {renderVolumeIcon('w-4 h-4')}
-                </button>
+                </ActionButton>
 
                 <div className="relative flex-1 flex items-center">
                   <input
@@ -524,7 +525,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
                 </div>
               )}
 
-              <button
+              <ActionButton busyLabel="Đang gửi…"
                 type="button"
                 onClick={handleTestAudio}
                 disabled={isTestingSound || !settings.online}
@@ -536,7 +537,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
                     ? 'Đang phát chuông trên thiết bị...'
                     : 'Phát thử âm thanh check-in trên thiết bị'}
                 </span>
-              </button>
+              </ActionButton>
             </div>
           </div>
         </div>
@@ -549,7 +550,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
 
           <div className="grid grid-cols-2 gap-3">
             {/* Nút bật/tắt Camera Kiosk */}
-            <button
+            <ActionButton busyLabel="Đang lưu…"
               type="button"
               onClick={toggleStream}
               disabled={!settings.online || isUpdating}
@@ -585,10 +586,10 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
                   Bật/tắt phần cứng camera & luồng video
                 </div>
               </div>
-            </button>
+            </ActionButton>
 
             {/* Nút bật/tắt FPS màn hình LCD */}
-            <button
+            <ActionButton busyLabel="Đang lưu…"
               type="button"
               onClick={toggleFps}
               disabled={!settings.online || isUpdating}
@@ -632,7 +633,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
                   Hiển thị tốc độ khung hình xử lý
                 </div>
               </div>
-            </button>
+            </ActionButton>
           </div>
 
           {/* Cài đặt Số khuôn mặt được nhận diện tối đa (MAX_FACES_PER_FRAME) */}
@@ -660,7 +661,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
               {[1, 2, 3, 4, 5].map((num) => {
                 const isActive = (settings.maxFaces || 3) === num;
                 return (
-                  <button
+                  <ActionButton busyLabel="Đang lưu…"
                     key={num}
                     type="button"
                     disabled={!settings.online || isUpdating}
@@ -674,14 +675,11 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
                     }`}
                   >
                     {num} người
-                  </button>
+                  </ActionButton>
                 );
               })}
             </div>
 
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Khi thay đổi, giá trị sẽ được áp dụng ngay lập tức cho pipeline AI trên Raspberry Pi và tự động lưu vào file <code className="font-mono">hardware/.env</code>.
-            </p>
           </div>
         </div>
       </div>

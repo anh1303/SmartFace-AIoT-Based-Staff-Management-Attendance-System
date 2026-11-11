@@ -41,7 +41,7 @@ export async function getTodayDashboard(
   const dateFormatted = `${dayName}, ${parts[2]}/${parts[1]}/${parts[0]}`;
 
   const startUtc = new Date(`${todayStr}T00:00:00+07:00`);
-  const endUtc = new Date(`${todayStr}T23:59:59.999+07:00`);
+  const endUtc = new Date(+startUtc + 24 * 60 * 60 * 1000);
 
   // RBAC scope
   const employeeScope = await getEmployeeScope(actor);
@@ -300,9 +300,8 @@ export async function getTodayDashboard(
       return a.fullName.localeCompare(b.fullName, 'vi');
     });
 
-  // Recent attendance logs (10 latest)
-  const recentLogsRaw = todayLogs.slice(0, 10);
-  const recentLogs: DashboardRecentLogDto[] = recentLogsRaw.map((att) => {
+  // Every recorded punch today; keep chronological DB order without truncating older check-ins.
+  const recentLogs: DashboardRecentLogDto[] = todayLogs.map((att) => {
     const empInfo = empIdToInfoMap.get(att.employee_id);
     const punctuality = punctualityOf(att);
     let statusLabel = 'Đúng giờ';

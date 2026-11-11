@@ -32,6 +32,8 @@ export function formatPayrollRecord(record: RawPayrollRecord) {
   const allowance = Number(record.allowance || 0)
   const net_salary = Number(record.net_salary || 0)
   const details = (record.calculation_details || {}) as Record<string, any>
+  const explicitCount = details.approved_absence_count
+  const approved_absence_count = Number.isSafeInteger(explicitCount) && explicitCount >= 0 ? explicitCount : null
   const hasRateSnapshot = hasMultiplierSnapshot(record)
   const breakdown = hasRateSnapshot ? computePayrollBreakdown({
     hourly_rate, total_working_hours, total_overtime, total_late_early, allowance,
@@ -59,6 +61,7 @@ export function formatPayrollRecord(record: RawPayrollRecord) {
     total_overtime,
     total_late_early,
     total_absence_penalty: Number(record.total_absence_penalty || 0),
+    approved_absence_count,
     allowance,
     net_salary,
     overtime_rate: hasRateSnapshot ? Number(record.overtime_rate) : null,

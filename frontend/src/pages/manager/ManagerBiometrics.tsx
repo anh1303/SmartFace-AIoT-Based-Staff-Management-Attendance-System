@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useDepartmentPositions } from '@/features/employees';
 import { ScanFace, Fingerprint, AlertTriangle } from 'lucide-react';
@@ -19,7 +19,7 @@ import {
 } from '@/features/biometrics';
 
 export const ManagerBiometrics: React.FC = () => {
-  const { employees } = useApp();
+  const { employees } = useEmployeeContext();
   const { currentUser, role } = useAuth();
   const [, setSearchParams] = useSearchParams();
 
@@ -187,7 +187,7 @@ export const ManagerBiometrics: React.FC = () => {
               <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 flex items-start gap-3 text-amber-800 dark:text-amber-200 text-xs">
                 <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
                 <div className="space-y-1">
-                  <p className="font-bold">Chốt chặn an toàn (Nguyên tắc Bất kiêm nhiệm - Phê duyệt độc lập):</p>
+                  <p className="font-bold">Không thể cập nhật sinh trắc học</p>
                   <p>
                     {isSelf
                       ? 'Bạn không thể tự tải ảnh, chụp eKYC hoặc đăng ký dữ liệu nhận diện của chính mình để tránh gian lận thời gian làm việc. Thay đổi này chỉ có Admin mới có quyền thực hiện.'
@@ -235,7 +235,7 @@ export const ManagerBiometrics: React.FC = () => {
                     onDeleteFingerprint={() => {
                       if (!currentEmp) return;
                       if (window.confirm(`Bạn có chắc chắn muốn xóa dữ liệu vân tay của nhân viên ${currentEmp.full_name} (${currentEmp.employee_id}) không? Mẫu vân tay sẽ được thu hồi và xóa khỏi thiết bị.`)) {
-                        void handleDeleteFingerprint(currentEmp);
+                        return handleDeleteFingerprint(currentEmp);
                       }
                     }}
                     onSendIoTTrigger={handleSendIoTTrigger}

@@ -21,8 +21,8 @@ export interface NotificationContextType {
   hasNewAlert: boolean;
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   addNotification: (params: { message: string; type?: NotificationType; title?: string }) => void;
-  removeNotification: (id: string) => void;
-  clearAll: (localOnly?: boolean) => void;
-  markAllAsRead: () => void;
-  markAsRead: (id: string) => void;
+  removeNotification: (id: string) => Promise<void>;
+  clearAll: (localOnly?: boolean) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  markAsRead: (id: string) => Promise<void>;
 }

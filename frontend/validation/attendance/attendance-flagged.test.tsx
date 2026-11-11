@@ -23,7 +23,7 @@ it('shows a flagged scan as a warning rather than a successful check-in', async 
   await act(async () => socket.handlers['attendance-flagged']?.({ event_id: 'event-1', employee_id: 'NV01', device_id: 'gate', timestamp: '2026-10-15T03:00:00Z' }))
   expect(host.textContent).toContain('TỪ CHỐI')
   expect(host.textContent).toContain('NV01')
-  expect(toast).toHaveBeenCalledWith(expect.any(String), 'warning')
+  expect(toast).toHaveBeenCalledWith(expect.any(String), 'error', 'Chấm công bị từ chối')
   await act(async () => root.unmount())
   host.remove()
 })

@@ -32,32 +32,11 @@ coverage/
 **/coverage/
 
 # ==============================================================================
-# 3. TESTS & KIỂM THỬ (Không đưa thư mục test lên Git)
+# 3. TEST SOURCE & GENERATED REPORTS
 # ==============================================================================
-__tests__/
-**/__tests__/
-test/
-**/test/
-tests/
-**/tests/
-*.test.ts
-*.test.tsx
-*.test.js
-*.test.jsx
-*.spec.ts
-*.spec.tsx
-*.spec.js
-*.spec.jsx
-
-# Track the webcam spike regression suite without exposing unrelated test files.
-!face_auth/tests/
-face_auth/tests/*
-!face_auth/tests/test_face_login_spike.py
-!face_auth/tests/test_face_login_http.py
-!face_auth/tests/test_face_login_parity.py
-!backend/validation/auth/face-login*.test.ts
-!frontend/validation/auth/face-login*.test.ts
-!frontend/validation/auth/face-login*.test.tsx
+# Keep test source files visible to Git; ignore only generated test reports.
+playwright-report/
+test-results/
 /.local/face-login-spike/
 /.local/face-login-browser/
 
@@ -82,6 +61,7 @@ desktop.ini
 # 5. LOGS & TEMPORARY FILES
 # ==============================================================================
 *.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -109,6 +89,8 @@ venv/
 env/
 ENV/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # ==============================================================================
 # 7. AI EXPERIMENTS, CHECKPOINTS & RESEARCH ARTIFACTS (Không đưa lên Git)
@@ -160,3 +142,6 @@ md/
 # Notebook/editor and development-server caches.
 .ipynb_checkpoints/
 .vite-cache/
+
+# Original employee avatars and rollback data contain personal images.
+/.local/database-backups/

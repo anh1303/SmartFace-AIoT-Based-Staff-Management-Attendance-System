@@ -1,17 +1,19 @@
-import type { Server } from 'socket.io'
-import { socketAuthMiddleware, refreshSocketScope } from '../../sockets/socket.auth.js'
-import { findEmployeeByIdOrCode } from '../employees/public.js'
+import type { Server, Socket } from 'socket.io'
 
 let server: Server | undefined
-export function initializeOperationGateway(io: Server) {
+let findEmployee: (id: string) => Promise<{ id: string; departmentId: number | null } | null>
+let refreshScope: (socket: Socket) => Promise<void>
+export function initializeOperationGateway(io: Server, lookup: typeof findEmployee, security: { authenticate: (socket: Socket, next: (error?: Error) => void) => void; refresh: typeof refreshScope }) {
   server = io
-  io.of('/operations').use(socketAuthMiddleware)
+  findEmployee = lookup
+  refreshScope = security.refresh
+  io.of('/operations').use(security.authenticate)
 }
 export async function announceOperation(ownerId: string, jobId: string) {
   if (!server) return
   const nsp = server.of('/operations')
   await Promise.all([...nsp.sockets.values()].map(async socket => {
-    try { await refreshSocketScope(socket) } catch { socket.disconnect(true) }
+    try { await refreshScope(socket) } catch { socket.disconnect(true) }
   }))
   nsp.to(`user:${ownerId}`).emit('operation.updated', { jobId })
 }
@@ -20,11 +22,11 @@ export async function announceDataChange(domain: 'employees' | 'shifts' | 'biome
   try {
     const nsp = server.of('/operations')
     await Promise.all([...nsp.sockets.values()].map(async socket => {
-      try { await refreshSocketScope(socket) } catch { socket.disconnect(true) }
+      try { await refreshScope(socket) } catch { socket.disconnect(true) }
     }))
     const rooms = new Set(['ADMIN'])
     for (const id of new Set(employeeIds)) {
-      const employee = await findEmployeeByIdOrCode(id)
+      const employee = await findEmployee(id)
       if (!employee) continue
       rooms.add(`employee:${employee.id}`)
       if (employee.departmentId) rooms.add(`department:${employee.departmentId}`)

@@ -9,10 +9,11 @@ import * as client from '../../src/api/client'
 ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 vi.mock('../../src/utils/dateUtils', () => ({ getTodayVNString: () => '2026-10-25' }))
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => ({ employees: [], workShifts: [], role: 'manager', currentUser: { employee_id: 'manager' }, showToast: vi.fn() }) }))
-vi.mock('../../src/context/ShiftContext', () => ({ useShiftContext: () => ({ isLoading: false, isError: false }) }))
-vi.mock('../../src/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ isLoading: false, isError: false }) }))
+vi.mock('../../src/context/ShiftContext', async () => { const app = await import('../../src/context/AppContext'); return ({ useShiftContext: () => ({ ...app.useApp(), isLoading: false, isError: false }) }) });
+vi.mock('../../src/context/EmployeeContext', async () => { const app = await import('../../src/context/AppContext'); return ({ useEmployeeContext: () => ({ ...app.useApp(), isLoading: false, isError: false }) }) });
 vi.mock('../../src/features/employees', () => ({ useDepartmentPositions: () => ({ departmentOptions: [], positionOptions: [] }) }))
-vi.mock('../../src/features/attendances', () => ({
+vi.mock('../../src/features/attendances', async () => ({
+  fetchAttendanceApi: (await vi.importActual<typeof import('../../src/features/attendances/api/attendanceApi')>('../../src/features/attendances/api/attendanceApi')).fetchAttendanceApi,
   AttendanceHeader: () => null,
   AttendanceFilters: ({ setStartDate, setEndDate }: any) => <button onClick={() => { setStartDate('2026-09-01'); setEndDate('2026-09-01') }}>Old date</button>,
   AttendanceTable: ({ employeePairs }: any) => <div data-testid="summary">{employeePairs[0]?.count}:{String(employeePairs[0]?.hasOld)}</div>,
@@ -57,3 +58,6 @@ it('loads the selected older date instead of filtering only the newest 50,000 sc
     queryClient.clear(); api.mockRestore(); host.remove()
   }
 })
+
+vi.mock('../../src/context/ToastContext', async () => { const app = await import('../../src/context/AppContext'); return { useToast: () => app.useApp() }; });
+vi.mock('../../src/context/AuthContext', async () => { const app = await import('../../src/context/AppContext'); return { useAuth: () => app.useApp() }; });

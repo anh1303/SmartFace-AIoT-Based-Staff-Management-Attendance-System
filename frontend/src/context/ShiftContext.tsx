@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useShifts } from '../features/schedules/hooks/useShifts';
 import { WorkShift } from '../types';
+import { useAuth } from './AuthContext';
 
 export interface ShiftContextType {
   workShifts: WorkShift[];
@@ -13,7 +14,8 @@ export interface ShiftContextType {
 const ShiftContext = createContext<ShiftContextType | undefined>(undefined);
 
 export const ShiftProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const shiftsHook = useShifts();
+  const { currentUser, isInitializing } = useAuth();
+  const shiftsHook = useShifts(Boolean(currentUser) && !isInitializing);
 
   const value = useMemo<ShiftContextType>(() => ({
     workShifts: shiftsHook.workShifts,

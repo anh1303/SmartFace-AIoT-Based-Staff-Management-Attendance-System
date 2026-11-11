@@ -10,7 +10,7 @@ const state = vi.hoisted(() => ({
   update: vi.fn(), toast: vi.fn(), enroll: vi.fn(), remove: vi.fn(), track: vi.fn(),
 }));
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => ({ employees: state.employees, updateEmployee: state.update, showToast: state.toast }) }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: { employee_id: 'ADMIN' } }) }));
+vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: { employee_id: 'ADMIN' } }), getActiveSessionId: () => 1 }));
 vi.mock('../../src/features/operations/OperationsProvider', () => ({ useOperations: () => ({ track: state.track }) }));
 vi.mock('../../src/features/biometrics/api/biometricApi', () => ({ enrollFaceJobApi: state.enroll, deleteEmployeeBiometricsApi: state.remove }));
 vi.mock('../../src/features/biometrics/hooks/useFingerprintEnrollment', () => ({ useFingerprintEnrollment: () => ({ step: 'VERIFIED', session: { match_score: 132 }, devices: [], confirm: state.confirmFingerprint, start: vi.fn(), cancel: vi.fn() }) }));
@@ -23,18 +23,52 @@ beforeEach(async () => {
   await act(async () => root.render(<QueryClientProvider client={client}><MemoryRouter><Probe /></MemoryRouter></QueryClientProvider>));
 });
 afterEach(() => { act(() => root.unmount()); client.clear(); host.remove(); });
-it('tracks an accepted face job without claiming enrollment completed or issuing a second avatar PUT', async () => {
+it('keeps confirmation and photos until enrollment finishes, without issuing a second avatar PUT', async () => {
   let resolve!: (value: unknown) => void;
   state.enroll.mockReturnValue(new Promise(r => { resolve = r; }));
   await act(async () => { model.setUploadedPhotos([1, 2, 3].map(i => ({ id: String(i), url: `image${i}`, name: 'Ảnh', tag: 'Mặt' }))); model.setFaceConfirmModal(true); });
   let pending: Promise<void>;
   await act(async () => { pending = model.handleConfirmFaceSave(); });
   expect(host.textContent).toContain('Đang tải ảnh'); expect(state.track).not.toHaveBeenCalled();
-  const job = { jobId: 'job1', status: 'queued', label: 'Cập nhật khuôn mặt NV1' };
+  expect(model.faceConfirmModal).toBe(true); expect(model.uploadedPhotos).toHaveLength(3);
+  const job = { jobId: 'job1', status: 'succeeded', label: 'Cập nhật khuôn mặt NV1' };
   await act(async () => { resolve(job); await pending; });
-  expect(state.track).toHaveBeenCalledWith(job); expect(state.update).not.toHaveBeenCalled();
+  expect(state.track).not.toHaveBeenCalled(); expect(state.update).not.toHaveBeenCalled();
   expect(model.resultModalOpen).toBe(false); expect(model.currentEmp?.face_enrolled).toBe(false);
-  expect(state.toast.mock.calls.some(call => call[1] === 'success')).toBe(false);
+  expect(state.toast.mock.calls.some(call => call[1] === 'success')).toBe(true);
+  expect(state.toast).toHaveBeenCalledWith('Đã lưu mẫu khuôn mặt cho An (NV1) từ 3 ảnh mẫu.', 'success', 'Lưu Face ID thành công');
+});
+it('names the employee and code when uploaded photos finish loading', async () => {
+  const readers: any[] = [];
+  class Reader { result = 'data:image/jpeg;base64,sample'; onload?: () => void; readAsDataURL() { readers.push(this); } }
+  vi.stubGlobal('FileReader', Reader);
+  try {
+    const input = { files: [new File(['a'], 'a.jpg'), new File(['b'], 'b.jpg'), new File(['c'], 'c.jpg')], value: 'photos' };
+    await act(async () => model.handlePhotoUpload({ target: input } as any));
+    await act(async () => { readers.forEach(r => r.onload()); });
+    expect(state.toast).toHaveBeenCalledWith('Đã thêm 3 ảnh mẫu cho An (NV1). Ảnh chưa được lưu thành Face ID; hãy xác nhận lưu sau khi kiểm tra ảnh.', 'success', 'Thêm ảnh mẫu thành công');
+  } finally { vi.unstubAllGlobals(); }
+});
+it('names the employee in camera additions and emits one notification in StrictMode', async () => {
+  await act(async () => root.render(<React.StrictMode><QueryClientProvider client={client}><MemoryRouter><Probe /></MemoryRouter></QueryClientProvider></React.StrictMode>));
+  state.toast.mockClear();
+  await act(async () => model.handleEkycComplete([{ dataUrl: 'image1', label: 'Chính diện' }, { dataUrl: 'image2', label: 'Trái' }, { dataUrl: 'image3', label: 'Phải' }]));
+  expect(state.toast).toHaveBeenCalledTimes(1);
+  expect(state.toast).toHaveBeenCalledWith('Đã thêm 3 ảnh chụp camera cho An (NV1). Hiện có 3/10 ảnh mẫu; hãy xác nhận lưu để cập nhật Face ID.', 'success', 'Thêm ảnh mẫu thành công');
+});
+it('discards a late photo read after switching employees instead of attaching it to the wrong person', async () => {
+  const readers: any[] = [];
+  class Reader { result = 'data:image/jpeg;base64,sample'; onload?: () => void; readAsDataURL() { readers.push(this); } }
+  vi.stubGlobal('FileReader', Reader);
+  state.employees.push({ ...state.employees[0], id: 'e2', employee_id: 'NV2', full_name: 'Bình' });
+  try {
+    await act(async () => model.handlePhotoUpload({ target: { files: [new File(['a'], 'a.jpg')], value: 'photo' } } as any));
+    await act(async () => model.setSelectedEmpId('NV2'));
+    state.toast.mockClear();
+    await act(async () => { readers.forEach(r => r.onload()); });
+    expect(model.uploadedPhotos).toHaveLength(0);
+    expect(state.toast).not.toHaveBeenCalled();
+  } finally { state.employees.pop(); vi.unstubAllGlobals(); }
 });
 it('keeps the fingerprint confirmation open until the save is confirmed', async () => {
   let resolve!: (value: boolean) => void; state.confirmFingerprint.mockReturnValue(new Promise<boolean>(r => { resolve = r; }));
@@ -49,5 +83,8 @@ it('deletes faces through the biometric endpoint without sending an ineffective 
   state.remove.mockResolvedValue(undefined);
   await act(async () => { await model.handleDeleteFaceId(state.employees[0] as any); });
   expect(state.remove).toHaveBeenCalledWith('NV1'); expect(state.update).not.toHaveBeenCalled();
-  expect(state.toast).toHaveBeenCalledWith(expect.stringContaining('Đã xóa'), 'success');
+  expect(state.toast).toHaveBeenCalledWith(expect.stringContaining('Đã xóa'), 'success', 'Xóa Face ID thành công');
 });
+
+vi.mock('../../src/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ employees: state.employees, updateEmployee: state.update }) }));
+vi.mock('../../src/context/ToastContext', () => ({ useToast: () => ({ showToast: state.toast }) }));

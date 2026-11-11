@@ -5,11 +5,14 @@ import { asyncHandler } from '../../middlewares/asyncHandler.js'
 import { successResponse } from '../../common/response.js'
 import { listOperations, readOperation, readOperationByKey, retryFailedOperation } from './operation.service.js'
 import { authorize } from '../../middlewares/rbac.middleware.js'
+import { wakeOperationWorker } from './operation.worker.js'
 
 export const operationRouter = Router()
 operationRouter.use(authenticate)
 operationRouter.post('/:id/retry', authorize('ADMIN', 'MANAGER'), asyncHandler(async (req, res) => {
-  successResponse(res, await retryFailedOperation(z.string().uuid().parse(req.params.id), req.user!.id, z.string().uuid().parse(req.header('Idempotency-Key'))), 'Đã tiếp nhận thử lại các ca lỗi', 202)
+  const result = await retryFailedOperation(z.string().uuid().parse(req.params.id), req.user!.id, z.string().uuid().parse(req.header('Idempotency-Key')))
+  wakeOperationWorker()
+  successResponse(res, result, 'Đã tiếp nhận thử lại các ca lỗi', 202)
 }))
 operationRouter.get('/by-key/:key', asyncHandler(async (req, res) => {
   successResponse(res, await readOperationByKey(z.string().uuid().parse(req.params.key), req.user!.id))

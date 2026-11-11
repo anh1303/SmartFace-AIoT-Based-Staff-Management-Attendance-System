@@ -1,3 +1,6 @@
+import { configureAttendancePayroll } from '../../src/modules/attendance/attendance.payroll-port.js'
+import * as payrollIntegration from '../../src/modules/payroll/public.js'
+configureAttendancePayroll(payrollIntegration)
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { adjustmentFingerprint } from '../../src/modules/attendance/attendance.adjustments.js'
 import { prisma } from '../../src/config/database.js'

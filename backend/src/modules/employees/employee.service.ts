@@ -3,28 +3,18 @@ export { formatEmployee, type RawEmployeeDb } from './employee.format.js'
 import type { Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'node:crypto'
-import { enqueueOperation, findOperationByKey } from '../operations/operation.service.js'
+import { enqueueOperation, findOperationByKey } from '../operations/public.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, generateRandomPassword } from '../../common/utils.js'
 import { generateUniqueEmployeeCode } from './employee.code.js'
 import { sendAccountCredentialsEmail, type EmailSendResult } from '../../common/email.service.js'
 import { logAction } from '../audit-logs/public.js'
-import {
-  findAuthUserByUsername,
-  createAuthUser,
-  updateAuthUser,
-  getDefaultRole,
-  deleteAuthUser,
-} from '../auth/public.js'
-import { deleteBiometricsForEmployee } from '../biometrics/public.js'
-import { deleteShiftsForEmployee } from '../shifts/public.js'
+import { employeeIntegration } from './employee.integration-port.js'
 import { employeeInclude } from './employee.model.js'
 import { recordHourlyRateChange } from './employee.wage.js'
 import { vnDay, payrollPeriodLockKey } from '../../common/utils.js'
 import { nextPayrollPeriod } from '../../common/payroll-policy.js'
-import { hasAttendanceActivity } from '../attendance/public.js'
-import { hasPayrollActivity } from '../payroll/public.js'
 import { assertCanAccessEmployeeDetail, assertCanManageEmployee, getEmployeeScope, isEmployeeManager, type EmployeeActor } from './employee.permission.js'
 
 export async function list(query: Record<string, unknown>, actor?: EmployeeActor) {
@@ -161,7 +151,7 @@ export async function create(data: {
   let finalCode = existingCode ? await generateUniqueEmployeeCode() : codeCandidate
 
   // 2. Kiểm tra tên đăng nhập (username) trên bảng users trùng khớp với finalCode qua auth module
-  const existingUser = await findAuthUserByUsername(finalCode)
+  const existingUser = await employeeIntegration().findAuthUserByUsername(finalCode)
   if (existingUser) {
     if (!data.employee_code) {
       finalCode = await generateUniqueEmployeeCode()
@@ -183,7 +173,7 @@ export async function create(data: {
   const hashedPassword = await bcrypt.hash(rawPassword, 10)
 
   // 5. Tìm vai trò EMPLOYEE mặc định cho nhân viên mới qua auth module
-  const fallbackRole = await getDefaultRole()
+  const fallbackRole = await employeeIntegration().getDefaultRole()
   if (!fallbackRole || fallbackRole.role_name.toUpperCase() !== 'EMPLOYEE') {
     throw new AppError(500, 'Không tìm thấy vai trò (roles) trong hệ thống để gán cho người dùng mới')
   }
@@ -206,7 +196,7 @@ export async function create(data: {
       if (!self?.departmentId || self.departmentId !== deptId) throw AppError.forbidden('Employee department changed; refresh before creating staff')
     }
     // 6.1 Tạo tài khoản đăng nhập User mới qua auth module API
-    const newUser = await createAuthUser(
+    const newUser = await employeeIntegration().createAuthUser(
       {
         username: finalCode,
         passwordHash: hashedPassword,
@@ -362,7 +352,7 @@ export async function update(
   })
 
   if (existing.user_id && data.status !== undefined) {
-    await updateAuthUser(existing.user_id, { is_active: data.status === 'ACTIVE' }, client)
+    await employeeIntegration().updateAuthUser(existing.user_id, { is_active: data.status === 'ACTIVE' }, client)
   }
 
   await logAction({
@@ -403,8 +393,8 @@ export async function remove(idOrCode: string, actorUserId?: string) {
   // Tuyệt đối không xóa cứng (Hard Delete / Cascade Delete) nhân sự đã phát sinh dữ liệu chấm công/lương
   // để bảo toàn lịch sử chấm công, bảng lương cũ và báo cáo chi phí kiểm toán (Audit).
   const [hasAttendance, hasPayroll] = await Promise.all([
-    hasAttendanceActivity(existing.id),
-    hasPayrollActivity(existing.id),
+    employeeIntegration().hasAttendanceActivity(existing.id),
+    employeeIntegration().hasPayrollActivity(existing.id),
   ])
 
   if (hasAttendance || hasPayroll) {
@@ -415,10 +405,10 @@ export async function remove(idOrCode: string, actorUserId?: string) {
 
   return prisma.$transaction(async (tx) => {
     // 1. Xóa dữ liệu sinh trắc học Face Embeddings qua Biometrics module contract
-    await deleteBiometricsForEmployee(existing.id, tx)
+    await employeeIntegration().deleteBiometricsForEmployee(existing.id, tx)
 
     // 2. Xóa ca làm việc qua Shifts module contract
-    await deleteShiftsForEmployee(existing.id, tx)
+    await employeeIntegration().deleteShiftsForEmployee(existing.id, tx)
 
     // 3. Xóa bản ghi nhân viên
     await tx.employee.delete({
@@ -427,7 +417,7 @@ export async function remove(idOrCode: string, actorUserId?: string) {
 
     // 7. Xóa tài khoản đăng nhập User liên kết (nếu có)
     if (existing.user_id) {
-      await deleteAuthUser(existing.user_id, tx).catch(() => { })
+      await employeeIntegration().deleteAuthUser(existing.user_id, tx).catch(() => { })
     }
 
     // 8. Ghi log kiểm toán hành động xóa vĩnh viễn
@@ -470,18 +460,18 @@ export async function resetPassword(idOrCode: string, actorUserId?: string, acto
   const hashedPassword = await bcrypt.hash(rawPassword, 10)
 
   if (userId) {
-    await updateAuthUser(userId, {
+    await employeeIntegration().updateAuthUser(userId, {
       passwordHash: hashedPassword,
       updated_at: new Date(),
     })
   } else {
     // Nếu nhân viên chưa có User thì tạo mới qua auth module
-    const fallbackRole = await getDefaultRole()
+    const fallbackRole = await employeeIntegration().getDefaultRole()
     if (!fallbackRole || fallbackRole.role_name.toUpperCase() !== 'EMPLOYEE') {
       throw new AppError(500, 'Không tìm thấy vai trò (roles) trong hệ thống')
     }
 
-    const newUser = await createAuthUser({
+    const newUser = await employeeIntegration().createAuthUser({
       username: existing.employee_code,
       passwordHash: hashedPassword,
       role_id: fallbackRole.id,

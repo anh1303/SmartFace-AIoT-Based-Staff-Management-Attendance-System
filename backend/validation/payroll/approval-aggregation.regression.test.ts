@@ -11,8 +11,9 @@ suite('Payroll approval and aggregation regressions on isolated Neon', () => {
     await db.employee_shifts.create({ data: { employee_id: employee.id, shift_id: shift.id, work_date: new Date(`${date}T00:00:00Z`), shift_type: 'OFFICE_HOURS', start_time: shift.start_time, end_time: shift.end_time } })
     return employee
   }
-  const raw = (employee: any, date: string, type: string, time: string) => db.attendance_logs.create({ data: { employee_id: employee.id, type, event_time: new Date(`${date}T${time}+07:00`), status: 'VALID', method: 'MANUAL' } })
+  const raw = (employee: any, date: string, type: string, time: string) => db.attendance_logs.create({ data: { employee_id: employee.id, type, event_time: new Date(`${date}T${time}+07:00`), created_at: new Date(`${date}T${time}+07:00`), status: 'VALID', method: 'MANUAL' } })
   beforeAll(async () => {
+    await import('../../src/composition.js')
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-30T20:00:00+07:00'))
     db = (await import('../../src/config/database.js')).prisma
     attendance = await import('../../src/modules/attendance/attendance.service.js')

@@ -3,6 +3,14 @@ import { PayrollRecord, BonusPenaltyPolicy } from '../../../types';
 
 export type PayrollItemUpdates = { allowance: number; reason?: string; updated_at?: string };
 
+export async function previewPayrollItemApi(id: string, allowance: number, updated_at: string): Promise<{ net_salary: number; updated_at: string }> {
+  const res = await apiFetch(`/api/payroll/${encodeURIComponent(id)}/preview`, {
+    method: 'POST', body: JSON.stringify({ allowance, updated_at }),
+  });
+  if (!res.success || !res.data) throw new Error(res.message || 'Không thể xem trước lương');
+  return res.data;
+}
+
 export async function fetchPayrollApi(): Promise<PayrollRecord[]> {
   const res = await apiFetch('/api/payroll');
   if (res.success && Array.isArray(res.data)) {

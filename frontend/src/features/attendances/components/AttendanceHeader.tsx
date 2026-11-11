@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import { ReportExportButton, type ReportFormat } from '@/components/common/ReportExportButton';
 import React from 'react';
 import {
@@ -15,7 +16,7 @@ interface AttendanceHeaderProps {
   endDate: string;
   isCurrentDateLocked: boolean;
   onToggleLock: () => void;
-  onExportCSV: (format: ReportFormat) => void;
+  onExportCSV: (format: ReportFormat) => unknown;
   canLock?: boolean;
   canExport?: boolean;
 }
@@ -42,11 +43,11 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
       title="Giám sát chấm công"
       actions={
         <>
-          {isAdmin && <button
+          {isAdmin && <ActionButton busyLabel={isCurrentDateLocked ? 'Đang mở khóa…' : 'Đang chốt công…'}
             type="button"
             onClick={() => {
               if (canClickLock) {
-                onToggleLock();
+                return onToggleLock();
               }
             }}
             disabled={!canClickLock}
@@ -84,7 +85,7 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
                 </span>
               </>
             )}
-          </button>}
+          </ActionButton>}
 
           <ReportExportButton onExport={onExportCSV} disabled={!canExport} />
         </>

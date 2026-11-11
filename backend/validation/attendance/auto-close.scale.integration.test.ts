@@ -7,6 +7,7 @@ const enabled = process.env.RUN_POLICY_DB_TESTS === '1'
 if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.env.DIRECT_URL)
 ;(enabled ? describe : describe.skip)('auto close at expected scale', () => {
   it('closes 100 eligible employees without a transaction timeout', async () => {
+    await import('../../src/composition.js')
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-03T01:00:00+07:00'))
     const db = (await import('../../src/config/database.js')).prisma
     try {
@@ -24,9 +25,9 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
       })) })
       await service.autoCloseDueAttendance(new Date('2026-10-03T01:00:00+07:00'))
       expect(await db.daily_attendance_summary.count({ where: { employee_id: { in: employees.map(e => e.id) }, review_status: 'APPROVED' } })).toBe(100)
-      const penalties = await db.attendanceAdjustment.findMany({ where: { employee_id: { in: employees.map(e => e.id) }, kind: 'ABSENCE' } })
+      const penalties = await db.attendanceAdjustment.findMany({ where: { employee_id: { in: employees.map(e => e.id) }, kind: 'LATE_EARLY' } })
       expect(penalties).toHaveLength(50)
-      expect(penalties.every(item => item.status === 'APPROVED' && Number(item.amount) === 1800000)).toBe(true)
+      expect(penalties.every(item => item.status === 'APPROVED' && Number(item.hours) === 9)).toBe(true)
     } finally { vi.useRealTimers(); await db.$disconnect() }
   })
 })

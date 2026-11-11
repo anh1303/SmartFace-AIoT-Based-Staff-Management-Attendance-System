@@ -9,11 +9,14 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
 ;(enabled ? describe : describe.skip)('concurrent attendance operations on PostgreSQL', () => {
   let db: any, attendance: any, shifts: any, payroll: any, admin: any
   beforeAll(async () => {
+    await import('../../src/composition.js')
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-12-02T12:00:00+07:00'))
     db = (await import('../../src/config/database.js')).prisma
     attendance = await import('../../src/modules/attendance/attendance.service.js')
     shifts = await import('../../src/modules/shifts/shift.service.js')
+    const { configureShiftAttendance } = await import('../../src/modules/shifts/shift.attendance-port.js')
+    configureShiftAttendance(await import('../../src/modules/attendance/public.js'))
     payroll = await import('../../src/modules/payroll/payroll.service.js')
     await ensureTestPayrollPolicy(db)
     const role = await db.roles.findUnique({ where: { role_name: 'ADMIN' } })
@@ -22,6 +25,7 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
   afterAll(async () => { vi.useRealTimers(); if (db) await db.$disconnect() })
 
   async function fixture(date: string) {
+    vi.setSystemTime(new Date(`${date}T23:00:00+07:00`))
     const employee = await db.employee.create({ data: { employee_code: `RACE-${randomUUID().slice(0,8)}`, full_name: 'Race test', hourly_rate: 100000, createdAt: new Date('2026-01-01T00:00:00Z') } })
     await shifts.assignOrUpdate({ employee_id: employee.id, date, shift_type: 'OFFICE_HOURS' }, admin.id, 'ADMIN')
     await db.attendance_logs.createMany({ data: [
@@ -79,6 +83,7 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
 
   it.each([['2026-10-05', true], ['2026-11-05', false]])('serializes day lock and payroll finalization (%s)', async (date, lockFirst) => {
     const employee = await fixture(date)
+    vi.setSystemTime(new Date('2026-12-02T12:00:00+07:00'))
     const period = date.slice(0, 7)
     await payroll.generate(period, employee.id, admin.id, { id: admin.id, role: 'ADMIN' })
     const lock = () => attendance.toggleLock(date, true, admin.id, 'ADMIN')

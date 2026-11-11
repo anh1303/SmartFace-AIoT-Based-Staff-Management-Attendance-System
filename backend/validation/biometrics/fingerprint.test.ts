@@ -13,8 +13,8 @@ vi.mock('../../src/common/event-bus.js', () => ({ eventBus: { publish: vi.fn() }
 import { eventBus } from '../../src/common/event-bus.js'
 import { encryptPayload } from '../../src/common/biometric-crypto.js'
 import { publicFingerprintSession, confirmFingerprintSession, cancelFingerprintSession, fingerprintProgress,
-  acknowledgeFingerprintBinding, fingerprintManifest, startFingerprintSession } from '../../src/modules/biometrics/fingerprint.service.js'
-import { processFingerprintAttendance } from '../../src/modules/biometrics/fingerprint.attendance.js'
+  acknowledgeFingerprintBinding, fingerprintManifest, fingerprintTemplateForDevice, startFingerprintSession } from '../../src/modules/biometrics/fingerprint.service.js'
+import { processFingerprintAttendance } from '../../src/modules/attendance/attendance.fingerprint.js'
 const actor = { id: 'admin-a', role: 'ADMIN' }
 const session = () => ({ id: 'session-a', employee_id: 'employee-a', owner_id: 'admin-a', device_id: 'PI_A',
   finger_name: 'Index', key: 'request-a', status: 'VERIFIED', match_score: 132, confirm_key: null, template_id: null,
@@ -102,6 +102,45 @@ it('rejects an enrolled finger owned by a different employee', async () => {
 it('manifest only requests bindings belonging to the authenticated Pi', async () => {
   await fingerprintManifest('PI_A', { capacity: 300, ready: true, wak_verified: true, roundtrip_verified: true, error: null })
   expect(db.fingerprintBinding.findMany).toHaveBeenCalledWith({ where: { device_id: 'PI_A' }, include: { template: true } })
+})
+it('v2 manifest never selects ciphertext, including the live session', async () => {
+  const b = binding()
+  db.fingerprintBinding.findMany.mockResolvedValue([b])
+  db.fingerprintSession.findFirst.mockResolvedValue(session())
+  const result = await fingerprintManifest('PI_A', { capacity: 300, ready: true, wak_verified: true, roundtrip_verified: true, error: null }, 2)
+  expect(result).toMatchObject({ manifest_version: 2, bindings: [{ id: b.id, revision: 2 }] })
+  expect(JSON.stringify(result)).not.toMatch(/ciphertext|template_b64/)
+  for (const table of [db.fingerprintBinding, db.fingerprintSession]) {
+    const args = table.findMany === db.fingerprintBinding.findMany ? table.findMany.mock.calls[0][0] : table.findFirst.mock.calls[0][0]
+    expect(args.include).toBeUndefined()
+    expect(args.select).toBeDefined()
+    expect(JSON.stringify(args.select)).not.toMatch(/ciphertext/)
+  }
+})
+it('template download filters device, state, revision and checksum in SQL', async () => {
+  const b = binding()
+  db.fingerprintBinding.findFirst.mockResolvedValue({ ...b, template: { ...b.template, ciphertext: session().ciphertext } })
+  expect(await fingerprintTemplateForDevice('PI_A', b.id, 2, b.template.checksum)).toMatchObject({ revision: 2, template_b64: expect.any(String) })
+  expect(db.fingerprintBinding.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: {
+    id: b.id, device_id: 'PI_A', state: { in: ['PENDING', 'SYNCED'] },
+    template: { status: { in: ['PENDING', 'ACTIVE'] }, revision: 2, checksum: b.template.checksum },
+  } }))
+  db.fingerprintBinding.findFirst.mockResolvedValue(null)
+  await expect(fingerprintTemplateForDevice('PI_B', b.id, 2, b.template.checksum)).rejects.toMatchObject({ statusCode: 404 })
+})
+it('allows assigned inactive-employee templates to recover without authorizing their attendance', async () => {
+  const b = binding()
+  db.fingerprintBinding.findFirst.mockImplementation(async ({ where }: any) => {
+    // Employee status can change independently without revoking an assigned binding.
+    if (where.template.employee?.status === 'ACTIVE') return null
+    return { ...b, template: { ...b.template, employee: { ...b.template.employee, status: 'INACTIVE' }, ciphertext: session().ciphertext } }
+  })
+  await expect(fingerprintTemplateForDevice('PI_A', b.id, 2, b.template.checksum)).resolves.toHaveProperty('template_b64')
+  db.fingerprintBinding.findUnique.mockResolvedValue({ ...b, template: { ...b.template, employee: { ...b.template.employee, status: 'INACTIVE' } } })
+  const checkIn = vi.fn()
+  await expect(processFingerprintAttendance({ device_id: 'PI_A', event_id: 'inactive-employee-event', client_timestamp: Date.now(), mode: 'AUTO',
+    event_kind: 'FINGERPRINT_SCAN', binding_id: b.id, slot: 2, revision: 2, match_score: 132 }, { checkIn, checkOut: vi.fn() } as any)).rejects.toMatchObject({ statusCode: 403 })
+  expect(checkIn).not.toHaveBeenCalled()
 })
 it('idempotent creation checks all original request fields', async () => {
   db.fingerprintSession.findUnique.mockResolvedValue({ ...session(), key: 'request-a' })

@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { usePayrollContext } from '../../context/PayrollContext';
+import { useEmployeeContext } from '../../context/EmployeeContext';
+import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionUtils';
 import { PayrollRecord } from '../../types';
 import { logger } from '../../utils/logger';
-import { nextPayrollPolicyPeriod } from '../../utils/payrollUtils';
+import { nextPayrollPolicyPeriod, wasHiredByPayrollPeriod } from '../../utils/payrollUtils';
 import { useDepartmentPositions } from '@/features/employees';
 import {
   PayrollHeader,
@@ -20,13 +22,9 @@ import {
   buildPayrollItemUpdates,
   earlySettlementPayrollApi,
   fetchBonusPenaltyApi,
-  payrollAttendanceTotals,
 } from '@/features/payrolls';
-import { useAttendanceSummaries } from '@/features/attendances';
-import { useShiftContext } from '../../context/ShiftContext';
-import { formatVNDateISO } from '../../utils/dateUtils';
 import { exportToExcel } from '@/utils/excelExport';
-import { canExportPayroll } from '@/features/payrolls/payrollExportEligibility';
+import { canExportPayroll } from '@/features/payrolls';
 
 const payrollLogger = logger.child('ManagerPayroll');
 
@@ -44,20 +42,11 @@ export const ManagerPayroll: React.FC = () => {
     finalizePayrollPeriod,
     unlockPayrollPeriod,
     updateBonusPenalty,
-    employees,
-    showToast,
-  } = useApp();
+  } = usePayrollContext();
+  const { employees } = useEmployeeContext();
+  const { showToast } = useToast();
 
   const isManager = role === 'manager';
-  const shifts = useShiftContext();
-  const monthEnd = new Date(Date.UTC(Number(selectedPeriod.slice(0, 4)), Number(selectedPeriod.slice(5, 7)), 0)).getUTCDate();
-  const attendanceSummary = useAttendanceSummaries(`${selectedPeriod}-01`, `${selectedPeriod}-${String(monthEnd).padStart(2, '0')}`);
-  const attendanceTotals = useMemo(() => payrollAttendanceTotals(attendanceSummary.summaries, shifts.workShifts, selectedPeriod), [attendanceSummary.summaries, shifts.workShifts, selectedPeriod]);
-  const unprocessedEmployeeIds = useMemo(() => {
-    const today = formatVNDateISO(new Date());
-    const summarized = new Set(attendanceSummary.summaries.flatMap(s => [`${s.employee_id}_${s.date}`, `${s.employee_uuid}_${s.date}`]));
-    return new Set(shifts.workShifts.filter(s => s.date.startsWith(selectedPeriod) && s.date < today && s.shift_type !== 'OFF' && !summarized.has(`${s.employee_id}_${s.date}`)).map(s => s.employee_id));
-  }, [attendanceSummary.summaries, shifts.workShifts, selectedPeriod]);
   const managerDept = currentUser?.department;
 
   const [confirmFinalizeOpen, setConfirmFinalizeOpen] = useState(false);
@@ -100,7 +89,7 @@ export const ManagerPayroll: React.FC = () => {
 
   const handleOpenPolicyModal = async () => {
     if (role !== 'admin') {
-      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error');
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error', "Không thể tải chính sách lương");
       return;
     }
     try {
@@ -116,14 +105,14 @@ export const ManagerPayroll: React.FC = () => {
       });
       setIsPolicyModalOpen(true);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Không tải được chính sách', 'error');
+      showToast(error instanceof Error ? error.message : 'Không tải được chính sách', 'error', "Không thể tải chính sách lương");
     }
   };
 
   const handleSavePolicy = async (e: React.FormEvent) => {
     e.preventDefault();
     if (role !== 'admin') {
-      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error');
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền cấu hình hệ số thưởng OT và phạt đi trễ!', 'error', "Không thể cập nhật chính sách lương");
       setIsPolicyModalOpen(false);
       return;
     }
@@ -136,21 +125,13 @@ export const ManagerPayroll: React.FC = () => {
   const [isSavingItem, setIsSavingItem] = useState(false);
   const [earlySettlementRecord, setEarlySettlementRecord] = useState<PayrollRecord | null>(null);
 
-  // Dynamic periods generated from payroll records
-  const availablePeriods = Array.from(
-    new Set([
-      ...(payroll.map((p) => p.period || p.payroll_period).filter(Boolean) as string[]),
-      selectedPeriod,
-    ])
-  )
-    .sort()
-    .reverse();
-
   // All records for the selected period (for status & total metrics)
   // Chốt chặn phân quyền: Quản lý chỉ xem được phiếu lương của chính mình và nhân viên phòng ban mình phụ trách
   const allPeriodRecords = payroll.filter((p) => {
     const isPeriodMatch = p.period === selectedPeriod || p.payroll_period === selectedPeriod;
     if (!isPeriodMatch) return false;
+    const employee = employees.find(e => e.employee_id === p.employee_id || e.id === p.employee_id);
+    if (!wasHiredByPayrollPeriod(employee?.created_at, selectedPeriod)) return false;
 
     if (role !== 'admin') {
       const emp = employees.find((e) => e.employee_id === p.employee_id);
@@ -218,7 +199,7 @@ export const ManagerPayroll: React.FC = () => {
 
   const handleOpenEdit = (record: PayrollRecord) => {
     if (record.status !== 'PENDING') {
-      showToast('Bảng lương kỳ này đã bị Khóa. Cần mở khóa kỳ trước khi sửa phiếu lương!', 'warning');
+      showToast('Bảng lương kỳ này đã bị Khóa. Cần mở khóa kỳ trước khi sửa phiếu lương!', 'error', "Không thể chỉnh sửa phiếu lương");
       return;
     }
     const emp = employees.find((e) => e.employee_id === record.employee_id);
@@ -227,15 +208,15 @@ export const ManagerPayroll: React.FC = () => {
         emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
       );
       if (isSelf) {
-        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error');
+        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error', "Không thể chỉnh sửa phiếu lương");
         return;
       }
       if (isAnotherManager(emp, currentUser)) {
-        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error');
+        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error', "Không thể chỉnh sửa phiếu lương");
         return;
       }
       if (isDifferentDepartment(emp, currentUser)) {
-        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error');
+        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error', "Không thể chỉnh sửa phiếu lương");
         return;
       }
     }
@@ -253,7 +234,7 @@ export const ManagerPayroll: React.FC = () => {
     if (!editingItem) return;
 
     if (editingItem.record.status !== 'PENDING') {
-      showToast(`Không thể chỉnh sửa phiếu lương ở trạng thái ${editingItem.record.status}. Chỉ có thể chỉnh sửa khi ở trạng thái PENDING (Chờ duyệt)!`, 'error');
+      showToast(`Không thể chỉnh sửa phiếu lương ở trạng thái ${editingItem.record.status}. Chỉ có thể chỉnh sửa khi ở trạng thái PENDING (Chờ duyệt)!`, 'error', "Không thể cập nhật phiếu lương");
       return;
     }
 
@@ -263,15 +244,15 @@ export const ManagerPayroll: React.FC = () => {
         emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
       );
       if (isSelf) {
-        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error');
+        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error', "Không thể cập nhật phiếu lương");
         return;
       }
       if (isAnotherManager(emp, currentUser)) {
-        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error');
+        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error', "Không thể cập nhật phiếu lương");
         return;
       }
       if (isDifferentDepartment(emp, currentUser)) {
-        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error');
+        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error', "Không thể cập nhật phiếu lương");
         return;
       }
     }
@@ -280,18 +261,18 @@ export const ManagerPayroll: React.FC = () => {
       setIsSavingItem(true);
       await updatePayrollItem(editingItem.record.payroll_id, buildPayrollItemUpdates(editingItem));
 
-      showToast(`Đã lưu thay đổi bảng lương cho ${editingItem.empName}!`, 'success');
+      showToast(`Đã cập nhật phụ cấp của ${editingItem.empName} (${editingItem.record.employee_id}) trong kỳ ${selectedPeriod}. Lý do: ${editingItem.reason}`, 'success', "Cập nhật phiếu lương thành công");
       setEditingItem(null);
     } catch (err: any) {
       payrollLogger.error('Lỗi khi cập nhật phiếu lương:', err);
-      showToast(err.message || 'Lỗi khi cập nhật phiếu lương', 'error');
+      showToast(`${editingItem.empName} (${editingItem.record.employee_id}), kỳ ${selectedPeriod}: ${err.message || 'Chưa lưu được phiếu lương.'} Kiểm tra trạng thái kỳ lương trước khi lưu lại.`, 'error', "Không thể cập nhật phiếu lương");
     } finally {
       setIsSavingItem(false);
     }
   };
 
-  const handleFinalizeConfirm = () => {
-    finalizePayrollPeriod(selectedPeriod);
+  const handleFinalizeConfirm = async () => {
+    await finalizePayrollPeriod(selectedPeriod);
     setConfirmFinalizeOpen(false);
   };
 
@@ -304,22 +285,22 @@ export const ManagerPayroll: React.FC = () => {
         cutoffDate,
         reason,
       });
-      showToast(`Đã quyết toán sớm bảng lương cho nhân viên ${earlySettlementRecord.employee_name || earlySettlementRecord.employee_id}!`, 'success');
+      showToast(`Đã quyết toán sớm kỳ ${selectedPeriod} cho ${earlySettlementRecord.employee_name || earlySettlementRecord.employee_id} (${earlySettlementRecord.employee_id}) đến ngày ${cutoffDate.split('-').reverse().join('/')}. Lý do: ${reason}`, 'success', "Quyết toán lương sớm thành công");
       setEarlySettlementRecord(null);
       await generatePayroll(selectedPeriod);
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi quyết toán sớm', 'error');
+      showToast(err.message || 'Lỗi khi quyết toán sớm', 'error', "Không thể quyết toán lương sớm");
       throw err;
     }
   };
 
-  const handleUnlockConfirm = () => {
+  const handleUnlockConfirm = async () => {
     if (role !== 'admin') {
-      showToast('Chỉ Quản trị viên (Admin) mới có quyền mở khóa bảng lương!', 'error');
+      showToast('Chỉ Quản trị viên (Admin) mới có quyền mở khóa bảng lương!', 'error', "Không thể mở khóa bảng lương");
       setConfirmUnlockOpen(false);
       return;
     }
-    unlockPayrollPeriod(selectedPeriod);
+    await unlockPayrollPeriod(selectedPeriod);
     setConfirmUnlockOpen(false);
   };
 
@@ -336,11 +317,11 @@ export const ManagerPayroll: React.FC = () => {
 
   const handleExportCSV = (format: 'excel' | 'pdf') => {
     if (!canExport) {
-      showToast('Chỉ xuất Excel khi kỳ lương đã chốt và dữ liệu đã sẵn sàng.', 'warning');
+      showToast('Chỉ xuất Excel khi kỳ lương đã chốt và dữ liệu đã sẵn sàng.', 'error', "Không thể xuất báo cáo");
       return;
     }
     if (allPeriodRecords.length === 0) {
-      showToast(`Kỳ ${selectedPeriod} chưa có dữ liệu bảng lương để xuất Excel!`, 'warning');
+      showToast(`Kỳ ${selectedPeriod} chưa có dữ liệu bảng lương để xuất Excel!`, 'error', "Không thể xuất báo cáo");
       return;
     }
 
@@ -385,14 +366,14 @@ export const ManagerPayroll: React.FC = () => {
       ];
     });
 
-    void exportToExcel({
+    return exportToExcel({
       format,
       sheetName: `Kỳ lương ${selectedPeriod}`,
       headers,
       rows,
       fileName: `Bang_luong_chi_tiet_ky_${selectedPeriod}.xlsx`,
-    }).then(saved => { if (saved) showToast(`Đã lưu báo cáo bảng lương kỳ ${selectedPeriod} sang file Excel (.xlsx)!`, 'success'); })
-      .catch(() => showToast('Không thể lưu báo cáo.', 'error'));
+    }).then(saved => { if (saved) showToast(`Đã lưu báo cáo bảng lương kỳ ${selectedPeriod} sang file Excel (.xlsx)!`, 'success', "Xuất báo cáo thành công"); })
+      .catch(() => showToast('Không thể lưu báo cáo.', 'error', "Không thể xuất báo cáo"));
   };
 
   return (
@@ -403,7 +384,6 @@ export const ManagerPayroll: React.FC = () => {
       <PayrollHeader
         selectedPeriod={selectedPeriod}
         onSelectPeriod={setSelectedPeriod}
-        availablePeriods={availablePeriods}
         isCalculating={isCalculating}
         isFinalized={isFinalized}
         onCalculatePayroll={handleCalculatePayroll}
@@ -423,8 +403,6 @@ export const ManagerPayroll: React.FC = () => {
       />
 
       <div>
-      {attendanceSummary.isError && <p className="sf-feedback error mb-4" role="alert">Không tải được dữ liệu chấm công để tính số ca nghỉ. <button type="button" className="underline" onClick={() => attendanceSummary.refetch()}>Thử lại</button></p>}
-      {shifts.isError && <p className="sf-feedback error mb-4" role="alert">Không tải được lịch ca để tính số ca nghỉ. <button type="button" className="underline" onClick={shifts.refetchShifts}>Thử lại</button></p>}
 
       {/* Bento Table with Search & Position Filter */}
       <PayrollTable
@@ -450,9 +428,6 @@ export const ManagerPayroll: React.FC = () => {
         isFinalized={isFinalized}
         onOpenEdit={handleOpenEdit}
         onOpenEarlySettlement={(record) => setEarlySettlementRecord(record)}
-        attendanceTotals={attendanceTotals}
-        unprocessedEmployeeIds={unprocessedEmployeeIds}
-        attendanceUnavailable={attendanceSummary.isLoading || attendanceSummary.isError || shifts.isLoading || shifts.isError}
       />
 
       </div>
@@ -463,7 +438,7 @@ export const ManagerPayroll: React.FC = () => {
         onClose={() => setEditingItem(null)}
         onChangeEditingItem={setEditingItem}
         onConfirmSave={handleConfirmEditSave}
-        absenceLabel={attendanceSummary.isLoading || attendanceSummary.isError || shifts.isLoading || shifts.isError ? '—' : editingItem && unprocessedEmployeeIds.has(editingItem.record.employee_id) ? 'Chưa tổng hợp' : `${editingItem ? attendanceTotals.get(editingItem.record.employee_id) ?? 0 : 0} ca`}
+        absenceLabel={editingItem?.record.approved_absence_count == null ? 'Chưa có dữ liệu' : `${editingItem.record.approved_absence_count} ca`}
         otRate={otRate}
         lateRate={lateRate}
         selectedPeriod={selectedPeriod}

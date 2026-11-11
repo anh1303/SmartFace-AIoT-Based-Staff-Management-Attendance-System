@@ -4,7 +4,7 @@ import { rateLimit } from 'express-rate-limit'
 import { asyncHandler } from '../../middlewares/asyncHandler.js'
 import { AppError } from '../../common/AppError.js'
 import { traceAttendance } from '../../common/attendance-timing.js'
-import { authenticateFingerprintDevice } from '../biometrics/fingerprint.routes.js'
+import { authenticateFingerprintDevice } from '../biometrics/fingerprint.public.js'
 import { findAttendanceLogByEventKey, handleThingsBoardWebhook } from './attendance.service.js'
 import { compactAttendanceRpcResponse } from './attendance.rpc-response.js'
 

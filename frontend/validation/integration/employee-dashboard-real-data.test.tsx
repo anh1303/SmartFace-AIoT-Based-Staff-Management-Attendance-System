@@ -31,3 +31,7 @@ describe('employee dashboard missing data', () => {
     expect(html).not.toContain('0 giờ');
   });
 });
+
+vi.mock('../../src/context/EmployeeContext', async () => { const app = await import('../../src/context/AppContext'); return { useEmployeeContext: () => app.useApp() }; });
+vi.mock('../../src/context/PayrollContext', async () => { const app = await import('../../src/context/AppContext'); return { usePayrollContext: () => app.useApp() }; });
+vi.mock('../../src/context/AuthContext', async () => { const app = await import('../../src/context/AppContext'); return { useAuth: () => app.useApp() }; });

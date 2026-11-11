@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Fingerprint, Trash2 } from 'lucide-react';
@@ -109,12 +110,12 @@ export const FingerprintEnrollmentSection: React.FC<Props> = props => {
         </section>
         <p className="text-sm text-slate-500">Đăng ký hai lần cùng một ngón tay bất kỳ, nhấc tay giữa hai lần. Pi tạm dừng chấm công trong lúc đăng ký. Mẫu chỉ dùng tại Pi được chọn.</p>
         <div className="flex flex-wrap items-center gap-3 pt-1">
-          <button className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-40 transition-colors" disabled={props.disabled || enrolling || saving || !available}
+          <ActionButton busyLabel="Đang gửi yêu cầu…" className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-40 transition-colors" disabled={props.disabled || enrolling || saving || !available}
             onClick={props.onSendIoTTrigger}>
             {props.hasEnrolledFingerprint ? 'Đăng ký lại vân tay mới' : 'Bắt đầu lấy mẫu thật'}
-          </button>
+          </ActionButton>
           {props.hasEnrolledFingerprint && props.onDeleteFingerprint && (
-            <button
+            <ActionButton busyLabel="Đang thu hồi…"
               type="button"
               className="rounded-lg border border-red-500/40 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 px-3.5 py-2 text-sm font-medium disabled:opacity-40 flex items-center gap-1.5 transition-colors cursor-pointer"
               disabled={props.disabled || busy}
@@ -122,7 +123,7 @@ export const FingerprintEnrollmentSection: React.FC<Props> = props => {
             >
               <Trash2 className="w-4 h-4" />
               <span>Xóa vân tay</span>
-            </button>
+            </ActionButton>
           )}
         </div>
       </div>
@@ -133,16 +134,16 @@ export const FingerprintEnrollmentSection: React.FC<Props> = props => {
         {props.fingerQualityScore !== null && <p>Điểm so khớp hai mẫu: <strong>{props.fingerQualityScore}</strong></p>}
         {device && !device.wak_verified && !device.polling_fallback && <p className="text-sm">Cần kiểm tra WAK/Vt: chạm rồi nhấc tay để Pi xác nhận tín hiệu.</p>}
         {props.error && props.fingerprintStep === 'FAILED' && <p role="alert" className="text-red-600 text-sm">{props.error}</p>}
-        {busy && <button className="underline text-sm" onClick={props.onCancel} disabled={props.disabled || props.fingerprintStep === 'SENDING'}>Hủy phiên</button>}
+        {busy && <ActionButton busyLabel="Đang hủy…" className="underline text-sm" onClick={props.onCancel} disabled={props.disabled || props.fingerprintStep === 'SENDING'}>Hủy phiên</ActionButton>}
       </div>
     </div>
     <button className="rounded-lg bg-emerald-600 text-white px-4 py-2 disabled:opacity-40" onClick={props.onOpenConfirmModal}
       disabled={props.disabled || props.fingerprintStep !== 'VERIFIED'}>Xác nhận lưu mẫu</button>
     {role === 'admin' && device && <details className="border rounded-lg p-3 text-sm space-y-3">
       <summary>Cấu hình vận hành vân tay</summary>
-      <button type="button" className="border rounded p-2 disabled:opacity-40" disabled={saving || enrolling || props.disabled}
+      <ActionButton busyLabel="Đang lưu…" type="button" className="border rounded p-2 disabled:opacity-40" disabled={saving || enrolling || props.disabled}
         onClick={() => configure({ polling_fallback: !device.polling_fallback })}>
-        {device.polling_fallback ? 'Tắt đọc định kỳ dự phòng' : 'Bật đọc định kỳ khi WAK lỗi'}</button>
+        {device.polling_fallback ? 'Tắt đọc định kỳ dự phòng' : 'Bật đọc định kỳ khi WAK lỗi'}</ActionButton>
     </details>}
   </div>;
 };

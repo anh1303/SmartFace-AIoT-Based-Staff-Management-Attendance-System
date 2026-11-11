@@ -31,10 +31,12 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
     initialTab,
   });
 
+  const busy = manager.savingAddDept || manager.savingEditDept || manager.deletingDeptId !== null || manager.savingAddPos || manager.savingEditPos || manager.deletingPosId !== null;
+
   return (
     <Drawer
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={() => { if (!busy) onClose(); }}
       maxWidth="3xl"
       title={
         <div className="flex items-center gap-2.5">
@@ -45,7 +47,7 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
         </div>
       }
     >
-      <div className="space-y-5">
+      <fieldset disabled={busy} className="min-w-0 space-y-5">
         {/* Tab Switcher & Quick Action Add Button */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-100/80 dark:bg-[#0f1224]/80 p-1.5 rounded-2xl border border-slate-200/80 dark:border-[#21264b]">
           <div className="flex items-center gap-1.5">
@@ -254,7 +256,7 @@ export const DepartmentPositionDrawer: React.FC<DepartmentPositionDrawerProps> =
             handleExecuteDeletePos={manager.handleExecuteDeletePos}
           />
         )}
-      </div>
+      </fieldset>
     </Drawer>
   );
 };

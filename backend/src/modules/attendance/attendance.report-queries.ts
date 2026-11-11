@@ -6,10 +6,10 @@ export function getDashboardAttendanceLogs(employeeIds: string[], startUtc: Date
       employee_id: { in: employeeIds },
       event_time: {
         gte: startUtc,
-        lte: endUtc,
+        lt: endUtc,
       },
     },
-    orderBy: { event_time: 'desc' },
+    orderBy: [{ event_time: 'desc' }, { id: 'desc' }],
   })
 }
 

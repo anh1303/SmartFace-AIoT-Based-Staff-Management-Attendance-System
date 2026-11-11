@@ -1,4 +1,5 @@
-import React, { useRef, useId } from 'react';
+import React, { useRef, useId, useState, useCallback } from 'react';
+import { DialogActionContext } from './ActionFeedback';
 import { createPortal } from 'react-dom';
 import { useDialogFocus } from './useDialogFocus';
 import { X } from 'lucide-react';
@@ -22,7 +23,14 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  useDialogFocus(ref,isOpen,onClose);
+  const pendingCount = useRef(0);
+  const [busy, setBusy] = useState(false);
+  const register = useCallback(() => {
+    pendingCount.current++; setBusy(true);
+    return () => { pendingCount.current--; setBusy(pendingCount.current > 0); };
+  }, []);
+  const close = () => { if (!pendingCount.current) onClose(); };
+  useDialogFocus(ref,isOpen,close);
 
   if (!isOpen) return null;
 
@@ -58,7 +66,8 @@ export const Modal: React.FC<ModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
+            disabled={busy}
             aria-label="Đóng hộp thoại"
             className="min-w-10 min-h-10 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#181c38] transition-colors cursor-pointer shrink-0"
           >
@@ -68,7 +77,9 @@ export const Modal: React.FC<ModalProps> = ({
 
         {/* Content */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0">
-          {children}
+          <DialogActionContext.Provider value={register}>
+            <fieldset disabled={busy} className="min-w-0 border-0 p-0 m-0">{children}</fieldset>
+          </DialogActionContext.Provider>
         </div>
       </div>
     </div>

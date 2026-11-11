@@ -32,7 +32,6 @@ export function PayslipBreakdown({ record }: {
       </div>)}
       <div className="flex flex-wrap justify-between gap-3 py-5"><dt className="font-semibold">Thực lĩnh theo phiếu lương</dt><dd className="text-xl font-semibold sf-money text-blue-700">{money(record.net_salary)}</dd></div>
     </dl>
-    <p className="sf-secondary">Các khoản và thực lĩnh hiển thị theo kết quả đã lưu của hệ thống.</p>
     {record.reason && <div className="sf-feedback mt-4"><span>Lý do điều chỉnh: {record.reason}</span></div>}
   </div>;
 }

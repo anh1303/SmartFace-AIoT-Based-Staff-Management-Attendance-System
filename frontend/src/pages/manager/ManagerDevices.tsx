@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Server, Wifi, WifiOff, Wrench, Info, ArrowLeft, CheckCircle, Clock, RotateCcw, Trash2, Pencil } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, getActiveSessionId } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Modal } from '../../components/common/Modal';
 import { PageHeaderBanner } from '../../components/common/PageHeaderBanner';
@@ -16,7 +17,7 @@ import {
   type DeviceStatus,
   type AttendanceMode,
 } from '@/features/devices';
-import { DeviceKioskSettingsPanel } from '../../features/devices/components/DeviceKioskSettingsPanel';
+import { DeviceKioskSettingsPanel } from '../../features/devices';
 
 const labels = { ONLINE: 'Trực tuyến', OFFLINE: 'Ngoại tuyến', MAINTENANCE: 'Bảo trì' };
 const time = (value: string | null) => value ? new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Chưa ghi nhận';
@@ -43,6 +44,8 @@ const DeviceManagement: React.FC = () => {
         device?: Device;
     } | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const modePending = useRef(false);
+    const [modeWaiting, setModeWaiting] = useState(false);
     const [requested, setRequested] = useState<{
         mode: AttendanceMode;
         time: number;
@@ -52,8 +55,8 @@ const DeviceManagement: React.FC = () => {
     const save = useMutation({ mutationFn: ({ input, device }: {
             input: DeviceInput;
             device?: Device;
-        }) => device ? deviceApi.update(device.id, input) : deviceApi.create(input), onSuccess: (device) => { setForm(null); refresh(); showToast('Đã lưu thông tin đăng ký thiết bị.', 'success'); navigate(`/app/manager/devices/${device.id}?${params}`); } });
-    const remove = useMutation({ mutationFn: () => deviceApi.remove(id!), onSuccess: () => { setDeleting(false); refresh(); showToast('Đã xóa bản ghi thiết bị.', 'success'); navigate(`/app/manager/devices?${params}`); } });
+        }) => device ? deviceApi.update(device.id, input) : deviceApi.create(input), onSuccess: (device) => { setForm(null); refresh(); showToast(`Đã lưu thông tin thiết bị ${device.name} tại ${device.location}.`, 'success', 'Lưu thiết bị thành công'); navigate(`/app/manager/devices/${device.id}?${params}`); } });
+    const remove = useMutation({ mutationFn: () => deviceApi.remove(id!), onSuccess: () => { setDeleting(false); refresh(); showToast(`Đã xóa bản ghi thiết bị ${detail.data?.name || id}. Thao tác này không xóa cấu hình trên Pi.`, 'success', 'Xóa thiết bị thành công'); navigate(`/app/manager/devices?${params}`); } });
     const command = useMutation({ mutationFn: (value: AttendanceMode) => deviceApi.setMode(id!, value), onSuccess: (data) => { client.setQueryData(['deviceMode', id], data); refresh(); } });
     useEffect(() => { setRequested(null); command.reset(); setForm(null); setDeleting(false); }, [id]);
     useEffect(() => {
@@ -73,18 +76,34 @@ const DeviceManagement: React.FC = () => {
     const ack = confirmsRequestedMode(mode.data, requested);
     const modeConfirmed = !!mode.data?.confirmed && (!requested || ack);
     const currentActiveMode = modeConfirmed ? mode.data?.mode : null;
-    const send = (value: AttendanceMode) => {
+    const send = async (value: AttendanceMode) => {
+        if (modePending.current) return;
+        modePending.current = true; setModeWaiting(true);
+        try {
         const nextMode: AttendanceMode = currentActiveMode === value ? 'OFF' : value;
         command.reset();
-        setRequested({ mode: nextMode, time: Date.now() });
-        command.mutate(nextMode);
+        const request = { mode: nextMode, time: Date.now() };
+        const session = getActiveSessionId();
+        setRequested(request);
+        await command.mutateAsync(nextMode);
+        const deadline = Date.now() + 30_000;
+        while (Date.now() < deadline) {
+            if (getActiveSessionId() !== session) throw new Error('Phiên đăng nhập đã thay đổi.');
+            const observed = await deviceApi.mode(id!);
+            if (getActiveSessionId() !== session) throw new Error('Phiên đăng nhập đã thay đổi.');
+            client.setQueryData(['deviceMode', id], observed);
+            if (confirmsRequestedMode(observed, request)) return;
+            await new Promise(resolve => window.setTimeout(resolve, 1500));
+        }
+        throw new Error('Đã gửi lệnh nhưng thiết bị chưa xác nhận. Kiểm tra kết nối trước khi gửi lại.');
+        } finally { modePending.current = false; setModeWaiting(false); }
     };
-    return <div className="space-y-6">{id ? <><Link className="inline-flex gap-2 text-blue-700 items-center text-sm" to={`/app/manager/devices?${params}`}><ArrowLeft size={16}/>Danh sách thiết bị</Link><PageHeaderBanner title={device?.name || 'Chi tiết thiết bị'} subtitle="Thông tin đăng ký, kết nối, chế độ chấm công và cấu hình phần hardware Kiosk" actions={device && <><button className="sf-button" onClick={() => { save.reset(); setForm({ device }); }}><Pencil size={16}/>Sửa thông tin</button>{role === 'admin' && <button className="sf-button danger" onClick={() => { remove.reset(); setDeleting(true); }}><Trash2 size={16}/>Xóa</button>}</>}/>{detail.isPending && !device ? <div role="status" className="sf-empty">Đang tải thiết bị…</div> : detail.isError && !device ? <div className="sf-feedback error" role="alert"><span>{detail.error.message}<p className="mt-2">Thiết bị xuất hiện từ ThingsBoard có thể chưa có bản ghi quản lý tương ứng trong hệ thống.</p><button className="sf-button mt-3" onClick={() => detail.refetch()}>Thử lại</button></span></div> : <><div className="sf-detail-grid"><section className="sf-panel"><h2 className="p-5 border-b border-slate-200 font-semibold">Thông tin đăng ký</h2><dl className="sf-definition"><dt>Tên thiết bị</dt><dd>{device?.name || id}</dd><dt>Vị trí</dt><dd>{device?.location || '—'}</dd><dt>Địa chỉ IP</dt><dd>{device?.ip || 'Chưa khai báo'}</dd><dt>Kết nối</dt><dd>{device?.status ? <Status status={device.status}/> : '—'}</dd><dt>Liên lạc cuối</dt><dd>{time(device?.lastSeen || null)}</dd><dt>Ngày đăng ký</dt><dd>{time(device?.createdAt || null)}</dd><dt>Mã thiết bị</dt><dd className="text-xs">{device?.id || id}</dd></dl></section><section className="sf-panel p-5 space-y-4"><h2 className="font-semibold">Chế độ chấm công</h2>{mode.isPending ? <p role="status">Đang đọc chế độ…</p> : mode.isError ? <div className="sf-feedback error" role="alert">{mode.error.message}<button onClick={() => mode.refetch()} className="underline">Thử lại</button></div> : <><p className="text-sm">{modeConfirmed ? 'Thiết bị đã xác nhận:' : 'Chế độ hiện tại:'} <strong>{mode.data?.mode === 'CHECK_IN' ? 'Vào ca (CHECK_IN)' : mode.data?.mode === 'CHECK_OUT' ? 'Ra ca (CHECK_OUT)' : mode.data?.mode === 'AUTO' ? 'Tự động (AUTO)' : 'Đang tắt / Chờ cảm biến (OFF)'}</strong></p><p className="sf-secondary">{modeConfirmed ? 'Đồng bộ trực tiếp với cảm biến siêu âm' : 'Chưa nhận xác nhận từ thiết bị'}{mode.data?.lastUpdated && ` · ${time(mode.data.lastUpdated)}`}</p></>}<div className="flex flex-wrap gap-2">{(['CHECK_IN', 'CHECK_OUT', 'AUTO'] as const).map(value => { const isActive = currentActiveMode === value; return <button key={value} className={`sf-button ${isActive ? 'primary' : ''}`} disabled={command.isPending} onClick={() => send(value)} title={isActive ? 'Nhấn lần nữa để tắt chế độ này' : undefined}>{value === 'CHECK_IN' ? 'Chuyển sang Vào ca' : value === 'CHECK_OUT' ? 'Chuyển sang Ra ca' : 'Chế độ Tự động (AUTO)'}</button>; })}</div>{command.isPending ? <div className="sf-feedback" role="status"><Clock size={18}/>Đang gửi lệnh tới thiết bị…</div> : command.isError ? <div className="sf-feedback error" role="alert">{command.error.message}</div> : requested && !ack ? <div className="sf-feedback warning" role="status"><Clock size={18}/><span>Đã gửi lệnh {requested.mode === 'CHECK_IN' ? 'Vào ca' : requested.mode === 'CHECK_OUT' ? 'Ra ca' : requested.mode === 'AUTO' ? 'Tự động (AUTO)' : 'Tắt chế độ (OFF)'} · Chờ Pi xác nhận. <button className="underline" onClick={() => mode.refetch()}>Kiểm tra lại</button></span></div> : ack ? <div className="sf-feedback" role="status"><CheckCircle size={18}/>Thiết bị đã xác nhận chế độ.</div> : null}<p className="sf-secondary">Ở chế độ Tự động (AUTO), hệ thống tự động phân định Vào ca / Tan ca dựa theo lịch sử chấm công trong ngày của nhân viên.</p></section></div><DeviceKioskSettingsPanel deviceId={device?.name || id} deviceName={device?.name}/></>}</> : <><PageHeaderBanner className="[&>div:first-child]:items-center" icon={<div className="w-10 h-10 rounded-xl bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-inner"><Server className="w-5 h-5" /></div>} title="Quản lý thiết bị" subtitle="Quản lý thông tin đăng ký và trạng thái kết nối" actions={<button className="sf-button primary" onClick={() => { save.reset(); setForm({}); }}><Plus size={18}/>Thêm thiết bị</button>}/><div className="sf-summary"><span><strong>{all.length}</strong> thiết bị</span>{(Object.keys(labels) as DeviceStatus[]).map(s => <span key={s}><strong>{all.filter(d => d.status === s).length}</strong> {labels[s].toLocaleLowerCase('vi-VN')}</span>)}</div><div className="sf-toolbar"><label className="sf-field sf-search">Tìm kiếm<input className="sf-input" placeholder="Tìm theo tên hoặc vị trí" value={q} onChange={e => setFilter('q', e.target.value)}/></label><label className="sf-field">Trạng thái<select className="sf-input" value={status} onChange={e => setFilter('status', e.target.value)}><option value="ALL">Tất cả trạng thái</option>{Object.entries(labels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><button className="sf-button" disabled={list.isFetching} onClick={() => list.refetch()}><RotateCcw size={16}/>Tải lại</button></div>{list.isPending ? <div className="sf-empty" role="status">Đang tải danh sách thiết bị…</div> : list.isError ? <div className="sf-feedback error" role="alert">{list.error.message}<button className="underline" onClick={() => list.refetch()}>Thử lại</button></div> : <div className="sf-panel"><table className="sf-table sf-responsive"><thead><tr><th>Tên thiết bị</th><th>Vị trí</th><th>Địa chỉ IP</th><th>Trạng thái</th><th>Liên lạc cuối</th><th>Thao tác</th></tr></thead><tbody>{visible.map(d => <tr key={d.id}><td><span className="inline-flex gap-3 items-center font-semibold"><Server size={20} className="text-slate-500"/>{d.name}</span></td><td data-label="Vị trí">{d.location}</td><td data-label="IP">{d.ip || '—'}</td><td data-label="Trạng thái"><Status status={d.status}/></td><td data-label="Liên lạc cuối" className="text-xs">{time(d.lastSeen)}</td><td><Link className="sf-button" to={`/app/manager/devices/${d.id}?${params}`}>Xem chi tiết</Link></td></tr>)}</tbody></table>{!visible.length && <div className="sf-empty"><Server size={32}/><p className="font-semibold">{all.length ? 'Không tìm thấy thiết bị phù hợp' : 'Chưa có thiết bị đăng ký'}</p><p className="sf-secondary">{all.length ? 'Thử thay đổi từ khóa hoặc bộ lọc.' : 'Thêm thông tin thiết bị để bắt đầu quản lý.'}</p></div>}<div className="flex flex-wrap justify-between items-center gap-3 p-4 border-t border-slate-200"><span className="sf-secondary">{filtered.length ? `${(page - 1) * 10 + 1}–${Math.min(page * 10, filtered.length)}` : '0'} trong {filtered.length} thiết bị</span><div className="flex items-center gap-2"><button className="sf-button" disabled={page <= 1} onClick={() => setParams(p => { p.set('page', String(page - 1)); return p; })}>Trước</button><span className="text-xs">{page}/{pages}</span><button className="sf-button" disabled={page >= pages} onClick={() => setParams(p => { p.set('page', String(page + 1)); return p; })}>Sau</button></div></div></div>}</>}
+    return <div className="space-y-6">{id ? <><Link className="inline-flex gap-2 text-blue-700 items-center text-sm" to={`/app/manager/devices?${params}`}><ArrowLeft size={16}/>Danh sách thiết bị</Link><PageHeaderBanner title={device?.name || 'Chi tiết thiết bị'} subtitle="Thông tin đăng ký, kết nối, chế độ chấm công và cấu hình phần hardware Kiosk" actions={device && <><button className="sf-button" onClick={() => { save.reset(); setForm({ device }); }}><Pencil size={16}/>Sửa thông tin</button>{role === 'admin' && <button className="sf-button danger" onClick={() => { remove.reset(); setDeleting(true); }}><Trash2 size={16}/>Xóa</button>}</>}/>{detail.isPending && !device ? <div role="status" className="sf-empty">Đang tải thiết bị…</div> : detail.isError && !device ? <div className="sf-feedback error" role="alert"><span>{detail.error.message}<p className="mt-2">Thiết bị xuất hiện từ ThingsBoard có thể chưa có bản ghi quản lý tương ứng trong hệ thống.</p><button className="sf-button mt-3" onClick={() => detail.refetch()}>Thử lại</button></span></div> : <><div className="sf-detail-grid"><section className="sf-panel"><h2 className="p-5 border-b border-slate-200 font-semibold">Thông tin đăng ký</h2><dl className="sf-definition"><dt>Tên thiết bị</dt><dd>{device?.name || id}</dd><dt>Vị trí</dt><dd>{device?.location || '—'}</dd><dt>Địa chỉ IP</dt><dd>{device?.ip || 'Chưa khai báo'}</dd><dt>Kết nối</dt><dd>{device?.status ? <Status status={device.status}/> : '—'}</dd><dt>Liên lạc cuối</dt><dd>{time(device?.lastSeen || null)}</dd><dt>Ngày đăng ký</dt><dd>{time(device?.createdAt || null)}</dd><dt>Mã thiết bị</dt><dd className="text-xs">{device?.id || id}</dd></dl></section><section className="sf-panel p-5 space-y-4"><h2 className="font-semibold">Chế độ chấm công</h2>{mode.isPending ? <p role="status">Đang đọc chế độ…</p> : mode.isError ? <div className="sf-feedback error" role="alert">{mode.error.message}<button onClick={() => mode.refetch()} className="underline">Thử lại</button></div> : <><p className="text-sm">{modeConfirmed ? 'Thiết bị đã xác nhận:' : 'Chế độ hiện tại:'} <strong>{mode.data?.mode === 'CHECK_IN' ? 'Vào ca (CHECK_IN)' : mode.data?.mode === 'CHECK_OUT' ? 'Ra ca (CHECK_OUT)' : mode.data?.mode === 'AUTO' ? 'Tự động (AUTO)' : 'Đang tắt / Chờ cảm biến (OFF)'}</strong></p><p className="sf-secondary">{modeConfirmed ? 'Đồng bộ trực tiếp với cảm biến siêu âm' : 'Chưa nhận xác nhận từ thiết bị'}{mode.data?.lastUpdated && ` · ${time(mode.data.lastUpdated)}`}</p></>}<div className="flex flex-wrap gap-2">{(['CHECK_IN', 'CHECK_OUT', 'AUTO'] as const).map(value => { const isActive = currentActiveMode === value; return <ActionButton busyLabel="Đang chuyển chế độ…" key={value} className={`sf-button ${isActive ? 'primary' : ''}`} disabled={modeWaiting} onClick={() => send(value)} title={isActive ? 'Nhấn lần nữa để tắt chế độ này' : undefined}>{value === 'CHECK_IN' ? 'Chuyển sang Vào ca' : value === 'CHECK_OUT' ? 'Chuyển sang Ra ca' : 'Chế độ Tự động (AUTO)'}</ActionButton>; })}</div>{command.isPending ? <div className="sf-feedback" role="status"><Clock size={18}/>Đang gửi lệnh tới thiết bị…</div> : command.isError ? <div className="sf-feedback error" role="alert">{command.error.message}</div> : requested && !ack ? <div className="sf-feedback warning" role="status"><Clock size={18}/><span>Đã gửi lệnh {requested.mode === 'CHECK_IN' ? 'Vào ca' : requested.mode === 'CHECK_OUT' ? 'Ra ca' : requested.mode === 'AUTO' ? 'Tự động (AUTO)' : 'Tắt chế độ (OFF)'} · Chờ Pi xác nhận. <button className="underline" onClick={() => mode.refetch()}>Kiểm tra lại</button></span></div> : ack ? <div className="sf-feedback" role="status"><CheckCircle size={18}/>Thiết bị đã xác nhận chế độ.</div> : null}<p className="sf-secondary">Ở chế độ Tự động (AUTO), hệ thống tự động phân định Vào ca / Tan ca dựa theo lịch sử chấm công trong ngày của nhân viên.</p></section></div><DeviceKioskSettingsPanel deviceId={device?.name || id} deviceName={device?.name}/></>}</> : <><PageHeaderBanner className="[&>div:first-child]:items-center" icon={<div className="w-10 h-10 rounded-xl bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-inner"><Server className="w-5 h-5" /></div>} title="Quản lý thiết bị" subtitle="Quản lý thông tin đăng ký và trạng thái kết nối" actions={<button className="sf-button primary" onClick={() => { save.reset(); setForm({}); }}><Plus size={18}/>Thêm thiết bị</button>}/><div className="sf-summary"><span><strong>{all.length}</strong> thiết bị</span>{(Object.keys(labels) as DeviceStatus[]).map(s => <span key={s}><strong>{all.filter(d => d.status === s).length}</strong> {labels[s].toLocaleLowerCase('vi-VN')}</span>)}</div><div className="sf-toolbar"><label className="sf-field sf-search">Tìm kiếm<input className="sf-input" placeholder="Tìm theo tên hoặc vị trí" value={q} onChange={e => setFilter('q', e.target.value)}/></label><label className="sf-field">Trạng thái<select className="sf-input" value={status} onChange={e => setFilter('status', e.target.value)}><option value="ALL">Tất cả trạng thái</option>{Object.entries(labels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><button className="sf-button" disabled={list.isFetching} onClick={() => list.refetch()}><RotateCcw size={16}/>Tải lại</button></div>{list.isPending ? <div className="sf-empty" role="status">Đang tải danh sách thiết bị…</div> : list.isError ? <div className="sf-feedback error" role="alert">{list.error.message}<button className="underline" onClick={() => list.refetch()}>Thử lại</button></div> : <div className="sf-panel"><table className="sf-table sf-responsive"><thead><tr><th>Tên thiết bị</th><th>Vị trí</th><th>Địa chỉ IP</th><th>Trạng thái</th><th>Liên lạc cuối</th><th>Thao tác</th></tr></thead><tbody>{visible.map(d => <tr key={d.id}><td><span className="inline-flex gap-3 items-center font-semibold"><Server size={20} className="text-slate-500"/>{d.name}</span></td><td data-label="Vị trí">{d.location}</td><td data-label="IP">{d.ip || '—'}</td><td data-label="Trạng thái"><Status status={d.status}/></td><td data-label="Liên lạc cuối" className="text-xs">{time(d.lastSeen)}</td><td><Link className="sf-button" to={`/app/manager/devices/${d.id}?${params}`}>Xem chi tiết</Link></td></tr>)}</tbody></table>{!visible.length && <div className="sf-empty"><Server size={32}/><p className="font-semibold">{all.length ? 'Không tìm thấy thiết bị phù hợp' : 'Chưa có thiết bị đăng ký'}</p><p className="sf-secondary">{all.length ? 'Thử thay đổi từ khóa hoặc bộ lọc.' : 'Thêm thông tin thiết bị để bắt đầu quản lý.'}</p></div>}<div className="flex flex-wrap justify-between items-center gap-3 p-4 border-t border-slate-200"><span className="sf-secondary">{filtered.length ? `${(page - 1) * 10 + 1}–${Math.min(page * 10, filtered.length)}` : '0'} trong {filtered.length} thiết bị</span><div className="flex items-center gap-2"><button className="sf-button" disabled={page <= 1} onClick={() => setParams(p => { p.set('page', String(page - 1)); return p; })}>Trước</button><span className="text-xs">{page}/{pages}</span><button className="sf-button" disabled={page >= pages} onClick={() => setParams(p => { p.set('page', String(page + 1)); return p; })}>Sau</button></div></div></div>}</>}
  <div className="sf-feedback"><Info size={18}/><span>Đăng ký thiết bị chỉ lưu thông tin quản lý. Pi, ThingsBoard và luồng camera cần được cấu hình riêng.</span></div>
  {form && <DeviceForm device={form.device} busy={save.isPending} error={save.error?.message} onClose={() => { if (!save.isPending)
-        setForm(null); }} onSave={input => save.mutate({ input, device: form.device })}/>}
+        setForm(null); }} onSave={input => save.mutateAsync({ input, device: form.device })}/>}
  <Modal isOpen={deleting && role === 'admin'} onClose={() => { if (!remove.isPending)
-        setDeleting(false); }} title="Xóa bản ghi thiết bị" subtitle={device?.name}><p>Thông tin đăng ký này sẽ bị xóa khỏi hệ thống. Thao tác không thay thế việc cấu hình hoặc ngắt kết nối Pi.</p>{remove.isError && <div role="alert" className="sf-feedback error mt-4">{remove.error.message}</div>}<div className="sf-footer"><button className="sf-button" disabled={remove.isPending} onClick={() => setDeleting(false)}>Hủy</button><button className="sf-button danger" disabled={remove.isPending} onClick={() => remove.mutate()}>{remove.isPending ? 'Đang xóa…' : 'Xác nhận xóa'}</button></div></Modal>
+        setDeleting(false); }} title="Xóa bản ghi thiết bị" subtitle={device?.name}><p>Thông tin đăng ký này sẽ bị xóa khỏi hệ thống. Thao tác không thay thế việc cấu hình hoặc ngắt kết nối Pi.</p>{remove.isError && <div role="alert" className="sf-feedback error mt-4">{remove.error.message}</div>}<div className="sf-footer"><button className="sf-button" disabled={remove.isPending} onClick={() => setDeleting(false)}>Hủy</button><ActionButton busyLabel="Đang xóa…" className="sf-button danger" disabled={remove.isPending} onClick={() => remove.mutateAsync()}>{remove.isPending ? 'Đang xóa…' : 'Xác nhận xóa'}</ActionButton></div></Modal>
  </div>;
 };
 function DeviceForm({
@@ -112,7 +131,7 @@ function DeviceForm({
             title={device ? 'Sửa thông tin thiết bị' : 'Thêm thiết bị'}
             subtitle="Đăng ký thông tin quản lý; kết nối thiết bị được xác nhận riêng."
         >
-            <form
+            <ActionForm
                 className="space-y-4"
                 onSubmit={e => {
                     e.preventDefault();
@@ -126,7 +145,7 @@ function DeviceForm({
                     };
                     if (maintenance) input.status = 'MAINTENANCE';
                     else if (device?.status === 'MAINTENANCE') input.status = 'OFFLINE';
-                    onSave(input);
+                    return onSave(input);
                 }}
             >
                 <label className="sf-field">
@@ -162,9 +181,6 @@ function DeviceForm({
                     />
                     Đặt thiết bị ở trạng thái bảo trì
                 </label>
-                <p className="sf-secondary">
-                    Địa chỉ IP được Pi tự động báo cáo theo mạng Wi-Fi thực tế. Trạng thái trực tuyến do hệ thống ghi nhận.
-                </p>
                 {(validation || error) && (
                     <div className="sf-feedback error" role="alert">
                         {error || validation}
@@ -174,11 +190,11 @@ function DeviceForm({
                     <button className="sf-button" type="button" disabled={busy} onClick={onClose}>
                         Hủy
                     </button>
-                    <button className="sf-button primary" disabled={busy}>
+                    <ActionButton type="submit" busyLabel={device ? "Đang lưu…" : "Đang thêm…"} className="sf-button primary" disabled={busy}>
                         {busy ? 'Đang lưu…' : 'Lưu thông tin thiết bị'}
-                    </button>
+                    </ActionButton>
                 </div>
-            </form>
+            </ActionForm>
         </Modal>
     );
 }

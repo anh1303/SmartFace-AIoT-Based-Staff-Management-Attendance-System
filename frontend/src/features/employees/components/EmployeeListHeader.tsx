@@ -8,7 +8,7 @@ export interface EmployeeListHeaderProps {
   onOpenDeptPositionDrawer?: () => void;
   onOpenPositionModal?: () => void;
   onOpenAddModal: () => void;
-  onExportExcel?: (format: ReportFormat) => void;
+  onExportExcel?: (format: ReportFormat) => unknown;
   canExport?: boolean;
 }
 

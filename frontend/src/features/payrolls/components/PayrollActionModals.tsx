@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { AlertCircle } from 'lucide-react';
@@ -80,7 +81,7 @@ export const PayrollFinalizeModal: React.FC<PayrollFinalizeModalProps> = ({
           >
             Hủy
           </button>
-          <button
+          <ActionButton busyLabel="Đang chốt lương…"
             type="button"
             onClick={onConfirm}
             disabled={isPeriodActive}
@@ -88,7 +89,7 @@ export const PayrollFinalizeModal: React.FC<PayrollFinalizeModalProps> = ({
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-sm shadow-blue-500/20 cursor-pointer"
           >
             Đồng ý chốt bảng lương
-          </button>
+          </ActionButton>
         </div>
       </div>
     </Modal>
@@ -129,13 +130,13 @@ export const PayrollUnlockModal: React.FC<PayrollUnlockModalProps> = ({
           >
             Hủy
           </button>
-          <button
+          <ActionButton busyLabel="Đang mở khóa…"
             type="button"
             onClick={onConfirm}
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-sm shadow-amber-500/20 cursor-pointer"
           >
             Mở khóa chỉnh sửa
-          </button>
+          </ActionButton>
         </div>
       </div>
     </Modal>

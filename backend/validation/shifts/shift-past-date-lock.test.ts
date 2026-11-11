@@ -36,9 +36,12 @@ vi.mock('../../src/modules/attendance/public.js', () => ({
 }))
 
 import { assignOrUpdate } from '../../src/modules/shifts/shift.service.js'
+import { configureShiftAttendance } from '../../src/modules/shifts/shift.attendance-port.js'
+import * as attendance from '../../src/modules/attendance/public.js'
 
 describe('Shift Past Date Lock Policy', () => {
   beforeEach(() => {
+    configureShiftAttendance(attendance)
     vi.clearAllMocks()
     db.$transaction.mockImplementation((fn: any) => fn(db))
   })

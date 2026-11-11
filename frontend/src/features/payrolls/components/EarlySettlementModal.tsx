@@ -1,7 +1,8 @@
+import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React, { useEffect, useState } from 'react';
 import { previewEarlySettlementApi, type EarlySettlementPreview } from '../api/payrollApi';
 import { Modal } from '../../../components/common/Modal';
-import { AlertCircle, Calendar, UserCheck, ShieldAlert } from 'lucide-react';
+import { AlertCircle, Calendar, ShieldAlert } from 'lucide-react';
 import { PayrollRecord } from '../../../types';
 
 interface EarlySettlementModalProps {
@@ -82,19 +83,7 @@ export const EarlySettlementModal: React.FC<EarlySettlementModalProps> = ({
       title="Quyết toán lương sớm cho nhân viên"
       subtitle={`Nhân viên: ${employeeName} (${record.employee_id}) · Kỳ ${selectedPeriod}`}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="p-3.5 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-xl text-xs text-blue-900 dark:text-blue-200 flex items-start gap-3">
-          <UserCheck className="w-5 h-5 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
-          <div className="space-y-1">
-            <p className="font-semibold">Quy trình quyết toán trước hạn (Offboarding):</p>
-            <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-              Hệ thống sẽ tổng hợp công đến hết ngày chốt, kiểm tra các điều chỉnh/OT chưa duyệt,
-              hủy các ca làm việc tương lai để không bị tính vắng ca ảo, và khóa phiếu lương này ở trạng thái
-              <strong> ĐÃ CHỐT (FINALIZED)</strong> kèm lịch sử kiểm toán. Nhân viên sẽ được chuyển sang trạng thái nghỉ việc ngay khi quyết toán thành công và không thể tiếp tục chấm công.
-            </p>
-          </div>
-        </div>
-
+      <ActionForm onSubmit={handleSubmit} className="space-y-4">
         {errorMsg && (
           <div className="p-3 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-xl text-xs text-rose-800 dark:text-rose-300 flex items-start gap-2.5">
             <ShieldAlert className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
@@ -117,9 +106,6 @@ export const EarlySettlementModal: React.FC<EarlySettlementModalProps> = ({
             required
             className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-[#272d5a] bg-white dark:bg-[#0f1224] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
           />
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            Chỉ tính giờ công và OT phát sinh từ đầu tháng đến hết ngày này.
-          </p>
         </div>
 
         <div className="space-y-1.5">
@@ -155,15 +141,15 @@ export const EarlySettlementModal: React.FC<EarlySettlementModalProps> = ({
           >
             Hủy bỏ
           </button>
-          <button
+          <ActionButton busyLabel={preview ? "Đang quyết toán…" : "Đang kiểm tra…"}
             type="submit"
             disabled={isSubmitting || preview?.blocked}
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-sm shadow-blue-500/20 cursor-pointer flex items-center gap-1.5"
           >
             {isSubmitting ? 'Đang xử lý...' : preview ? 'Xác nhận quyết toán sớm' : 'Xem trước quyết toán'}
-          </button>
+          </ActionButton>
         </div>
-      </form>
+      </ActionForm>
     </Modal>
   );
 };

@@ -13,6 +13,11 @@ beforeEach(() => {
   employees.findEmployeeByIdOrCode.mockResolvedValue({ ...candidate, id: candidate.employee_id });
 })
 describe('single-query face matching', () => {
+  it('can exclude avatars from repeated recognition calls before the device response strips them', async () => {
+    await findBestFaceMatch(vec, undefined, { includeAvatar: false });
+    const values = db.$queryRaw.mock.calls[0].slice(1);
+    expect(values.some((value: any) => value?.sql === 'NULL::text')).toBe(true);
+  })
   it('returns identity in one round trip with model, centroid and active filters before LIMIT', async () => {
     expect(await findBestFaceMatch(vec)).toEqual({ emp_id: 'employee-active', employee_code: 'NV1', full_name: 'An', avatar_url: null, embedding_type: 'CENTROID', similarity: .90 });
     expect(db.$queryRaw).toHaveBeenCalledOnce();

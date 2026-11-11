@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useApp } from '@/context/AppContext';
+import { useShiftContext } from '@/context/ShiftContext';
 import { Employee } from '@/types';
 import { useEmployeeAttendanceDetail, type AttendanceStats } from '@/features/attendances';
 import { useEmployeePayrollDetail } from '@/features/payrolls';
@@ -23,7 +23,7 @@ export interface UseEmployeeDetailDataOptions {
  */
 export function useEmployeeDetailData(options: UseEmployeeDetailDataOptions) {
   const { currentEmp, startDate, endDate, attendanceTypeFilter, attendanceStatusFilter } = options;
-  const { workShifts } = useApp();
+  const { workShifts } = useShiftContext();
 
   // 1. Phân hệ Chấm công chuyên biệt
   const { employeeAttendanceLogs, attendanceStats } = useEmployeeAttendanceDetail({

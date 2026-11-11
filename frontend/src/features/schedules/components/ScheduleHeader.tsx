@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import { ReportExportButton, type ReportFormat } from '@/components/common/ReportExportButton';
 import React from 'react';
 import {
@@ -25,7 +26,7 @@ export interface ScheduleHeaderProps {
   onDateSelect: (dateString: string) => void;
   onCopyPreviousWeek: () => void;
   onOpenBulkModal: () => void;
-  onExportExcel?: (format: ReportFormat) => void;
+  onExportExcel?: (format: ReportFormat) => unknown;
   canExport?: boolean;
 }
 
@@ -108,7 +109,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
         <div className="flex flex-wrap items-center justify-end gap-2.5">
           <fieldset disabled={busy} className="flex items-center gap-2.5 flex-wrap justify-end">
             {/* Copy from previous week */}
-            <button
+            <ActionButton busyLabel="Đang sao chép…"
               type="button"
               onClick={onCopyPreviousWeek}
               className="h-10 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#0f1224] dark:hover:bg-[#1a1e3a] text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-200 dark:border-[#272d5a] transition-colors shadow-xs cursor-pointer whitespace-nowrap shrink-0"
@@ -116,7 +117,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
             >
               <Copy className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
               <span>Sao chép tuần trước</span>
-            </button>
+            </ActionButton>
 
             {/* Bulk Assign Button */}
             <button

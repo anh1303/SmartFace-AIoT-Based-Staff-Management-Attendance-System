@@ -285,12 +285,23 @@ class TestRuntimeFrameLoop(unittest.TestCase):
         embedder.input_size = (112, 112)
         embedder.embed_aligned.return_value = np.ones(512) / np.sqrt(512)
         db.search.return_value = [("A", "Alice", 0.9, np.ones(512))]
+
+        # The frame-loop fixture checks which crops are submitted. The real
+        # worker can cancel queued jobs before inference when the camera closes.
+        def submit_crop(_key, crop):
+            embedder.embed_aligned(crop)
+            return True
+
+        worker = MagicMock(pending={}, visible_tracks={})
+        worker.submit.side_effect = submit_crop
+        worker.poll.return_value = []
         args = argparse.Namespace(capture_dir=None, pad_enabled=False, pad_threshold=app.config.PAD_THRESHOLD,
                                   pad_threshold_logit=None, pad_model=app.config.PAD_MODEL_PATH,
                                   camera=0, show_fps=False, mode="none")
         with contextlib.ExitStack() as stack:
             for name, value in [("parse_args", args), ("FaceDetector", detector),
                                 ("FaceEmbedder", embedder), ("VectorDB", db),
+                                ("RecognitionWorker", worker),
                                 ("cv2.VideoCapture", cap), ("cv2.waitKey", -1)]:
                 stack.enter_context(patch("app." + name, return_value=value))
             stack.enter_context(patch("app.cv2.imshow"))

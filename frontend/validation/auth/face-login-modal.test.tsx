@@ -45,6 +45,70 @@ describe('Camera login dialog', () => {
     expect(stop).toHaveBeenCalledOnce();
   });
 
+  it('captures eight ordered frames at 200 ms intervals before submitting', async () => {
+    const captures = vi.mocked(HTMLCanvasElement.prototype.toDataURL);
+    captures.mockImplementation(() => `data:image/jpeg;base64,frame${captures.mock.calls.length}`);
+    let submitted: string[] = [];
+    loginWithFace.mockImplementation(async (_id, frames) => { submitted = [...frames]; return { success: true }; });
+    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+    const scan = Array.from(document.querySelectorAll('button')).find(button => button.textContent?.includes('Bắt đầu nhận diện'))!;
+    await act(async () => { scan.click(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(199); });
+    expect(captures).toHaveBeenCalledTimes(0);
+    for (let count = 1; count <= 8; count++) {
+      await act(async () => { await vi.advanceTimersByTimeAsync(count === 1 ? 1 : 200); });
+      expect(captures).toHaveBeenCalledTimes(count);
+      if (count < 8) expect(loginWithFace).not.toHaveBeenCalled();
+    }
+    expect(submitted).toEqual(Array.from({ length: 8 }, (_, index) => `frame${index + 1}`));
+    expect(loginWithFace).toHaveBeenCalledOnce();
+  });
+
+  it('stops capture when unmounted during scanning', async () => {
+    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+    const scan = Array.from(document.querySelectorAll('button')).find(button => button.textContent?.includes('Bắt đầu nhận diện'))!;
+    await act(async () => { scan.click(); await vi.advanceTimersByTimeAsync(500); });
+    await act(async () => root.unmount());
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(loginWithFace).not.toHaveBeenCalled();
+    expect(stop).toHaveBeenCalledOnce();
+    root = createRoot(host);
+  });
+
+  it('does not submit incomplete frames when the challenge expires', async () => {
+    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+    challenge.mockResolvedValue({ challengeId: 'a'.repeat(32), expiresAt: Date.now() + 600 });
+    const scan = Array.from(document.querySelectorAll('button')).find(button => button.textContent?.includes('Bắt đầu nhận diện'))!;
+    await act(async () => { scan.click(); await vi.advanceTimersByTimeAsync(2000); });
+    expect(loginWithFace).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('hết hạn');
+  });
+
+  it('does not authenticate when the camera frame is unavailable', async () => {
+    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 0 });
+    const scan = Array.from(document.querySelectorAll('button')).find(button => button.textContent?.includes('Bắt đầu nhận diện'))!;
+    await act(async () => { scan.click(); await vi.advanceTimersByTimeAsync(2000); });
+    expect(loginWithFace).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="alert"]')).not.toBeNull();
+  });
+
+  it('shows an authentication failure without reporting success', async () => {
+    const success = vi.fn();
+    loginWithFace.mockResolvedValue({ success: false, message: 'Không thể xác thực' });
+    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={success}/>); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+    const scan = Array.from(document.querySelectorAll('button')).find(button => button.textContent?.includes('Bắt đầu nhận diện'))!;
+    await act(async () => { scan.click(); await vi.advanceTimersByTimeAsync(2000); });
+    expect(loginWithFace).toHaveBeenCalledOnce();
+    expect(success).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Không thể xác thực');
+  });
+
   it('stops camera on unmount and never authenticates without scanning', async () => {
     await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
     await act(async () => root.unmount());

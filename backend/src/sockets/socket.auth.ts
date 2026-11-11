@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken'
 import type { Socket } from 'socket.io'
 import { env } from '../config/env.js'
 import type { AuthUser } from '../middlewares/auth.middleware.js'
-import { prisma } from '../config/database.js'
+import { readAuthUser } from '../modules/auth/auth.read.js'
 import { assertFaceSession } from '../modules/auth/public.js'
 
 export async function refreshSocketScope(socket: Socket): Promise<void> {
@@ -33,13 +33,7 @@ export async function refreshSocketScope(socket: Socket): Promise<void> {
     const actor = (socket.data.user || decoded) as AuthUser | undefined
     if (!actor?.id) throw new Error('Authentication required')
 
-    const user = await prisma.user.findUnique({
-      where: { id: actor.id },
-      include: {
-        roles: true,
-        employees: true,
-      },
-    })
+    const user = await readAuthUser(actor.id)
     if (!user || !user.is_active) throw new Error('Authentication failed: Account unavailable')
     if (user.employees && (user.employees.status === 'TERMINATED' || user.employees.status === 'INACTIVE')) {
       throw new Error('Authentication failed: Employee inactive')

@@ -1,4 +1,5 @@
 import { storedProfile } from './profile.dto.js';
+import { readAuthUser } from './auth.read.js'
 import type { Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
@@ -6,13 +7,12 @@ import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
 import { AppError } from '../../common/AppError.js'
 import { USER_ROLES } from '../../common/constants.js'
-import { generateUniqueEmployeeCode, findEmployeeByEmail } from '../employees/employee.code.js'
-import { createEmployee, findDepartmentByIdOrCode, findPositionByName } from '../employees/public.js'
+import { generateUniqueEmployeeCode, findEmployeeByEmail, createEmployee, findDepartmentByIdOrCode, findPositionByName } from '../employees/public.js'
 import { logAction } from '../audit-logs/public.js'
 import type { z } from 'zod'
 import type { loginSchema, registerSchema } from './auth.dto.js'
 import { faceSessionAllowed } from './face-login/face-login.policy.js'
-import { hasFaceLoginTemplate } from '../biometrics/public.js'
+import { authBiometrics } from './auth.biometrics-port.js'
 
 function safeUser(user: {
   id: string
@@ -26,7 +26,7 @@ function safeUser(user: {
     email: string | null
     position?: { name?: string | null; id?: number } | string | null
     positionId?: number | null
-    avatar_url: string | null
+    avatar_url?: string | null
     department: { name: string } | null
   } | null
 }) {
@@ -62,7 +62,7 @@ const tokenFor = (user: ReturnType<typeof safeUser>, tokenVersion: number = 1, m
 
 export async function assertFaceSession(amr: unknown, employeeId: string | null | undefined, role: string) {
   if (!faceSessionAllowed(amr, role, env.FACE_LOGIN_ENABLED)
-    || (Array.isArray(amr) && amr.includes('face') && (!employeeId || !(await hasFaceLoginTemplate(employeeId))))) {
+    || (Array.isArray(amr) && amr.includes('face') && (!employeeId || !(await authBiometrics().hasFaceLoginTemplate(employeeId))))) {
     throw AppError.unauthorized('Phiên đăng nhập khuôn mặt đã hết hiệu lực. Vui lòng đăng nhập bằng mật khẩu.')
   }
 }
@@ -352,18 +352,7 @@ export async function verifyAndLoadActiveUser(token: string) {
 
   let user: any = null
   try {
-    user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: {
-        roles: true,
-        employees: {
-          include: {
-            department: true,
-            position: true,
-          },
-        },
-      },
-    })
+    user = await readAuthUser(decoded.id)
   } catch {
     throw new AppError(401, 'Invalid user ID in token')
   }

@@ -1,3 +1,4 @@
+import { ActionButton } from '@/components/common/ActionFeedback';
 import React, { useState } from 'react';
 import {
   ShieldCheck,
@@ -14,7 +15,7 @@ import { resetEmployeePasswordApi } from '../api/employeeApi';
 interface EmployeeAccountTabProps {
   currentEmp: Employee;
   onUpdateStatus: (newStatus: 'ACTIVE' | 'INACTIVE') => Promise<void> | void;
-  showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info', title?: string) => void;
 }
 
 export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
@@ -36,16 +37,16 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
         nextStatus === 'ACTIVE'
           ? `Tài khoản ${currentEmp.full_name} đã chuyển sang trạng thái Hoạt động`
           : `Tài khoản ${currentEmp.full_name} đã tạm ngưng hoạt động`,
-        'success'
-      );
+        'success',
+        "Cập nhật trạng thái tài khoản thành công");
     } catch {
-      showToast('Có lỗi xảy ra khi cập nhật trạng thái tài khoản', 'error');
+      showToast('Có lỗi xảy ra khi cập nhật trạng thái tài khoản', 'error', "Không thể cập nhật trạng thái tài khoản");
     }
   };
 
   const handleResetPassword = async () => {
     if (!currentEmp.email) {
-      showToast('Nhân viên chưa có email. Vui lòng cập nhật email trước khi đặt lại mật khẩu!', 'warning');
+      showToast('Nhân viên chưa có email. Vui lòng cập nhật email trước khi đặt lại mật khẩu!', 'error', "Không thể đặt lại mật khẩu");
       setIsConfirmModalOpen(false);
       return;
     }
@@ -54,9 +55,9 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
     try {
       const res = await resetEmployeePasswordApi(currentEmp.id || currentEmp.employee_id);
       setIsConfirmModalOpen(false);
-      showToast(res?.message || 'Đã đặt lại mật khẩu và gửi email thành công!', 'success');
+      showToast(`Đã đặt lại mật khẩu của ${currentEmp.full_name} (${currentEmp.employee_id}). ${res?.message || 'Vui lòng kiểm tra email tài khoản.'}`, 'success', "Đặt lại mật khẩu thành công");
     } catch (err: any) {
-      showToast(err?.message || 'Đặt lại mật khẩu thất bại, vui lòng thử lại', 'error');
+      showToast(`${currentEmp.full_name} (${currentEmp.employee_id}): ${err?.message || 'Chưa đặt lại được mật khẩu.'} Kiểm tra email và trạng thái tài khoản trước khi thử lại.`, 'error', "Không thể đặt lại mật khẩu");
     } finally {
       setIsResetting(false);
     }
@@ -151,7 +152,7 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
                 </div>
 
                 {/* Switch Toggle */}
-                <button
+                <ActionButton busyLabel="Đang lưu…"
                   type="button"
                   role="switch"
                   aria-checked={isActive}
@@ -165,7 +166,7 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
                     className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${isActive ? 'translate-x-6' : 'translate-x-0'
                       }`}
                   />
-                </button>
+                </ActionButton>
               </div>
 
               {/* Status Indicator Pill */}
@@ -257,7 +258,7 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
               >
                 Hủy bỏ
               </button>
-              <button
+              <ActionButton busyLabel="Đang đặt lại…"
                 type="button"
                 disabled={isResetting || !currentEmp.email}
                 onClick={handleResetPassword}
@@ -274,7 +275,7 @@ export const EmployeeAccountTab: React.FC<EmployeeAccountTabProps> = ({
                 ) : (
                   <span>Xác nhận đặt lại</span>
                 )}
-              </button>
+              </ActionButton>
             </div>
           </div>
         </div>

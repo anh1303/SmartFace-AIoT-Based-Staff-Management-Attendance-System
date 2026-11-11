@@ -165,7 +165,7 @@ export function useAttendanceSummaries(startDate?: string, endDate?: string, emp
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Không thể kết nối đến máy chủ để lưu thay đổi!', 'error');
+      showToast(err.message || 'Không thể kết nối đến máy chủ để lưu thay đổi!', 'error', "Không thể điều chỉnh chấm công");
     },
   });
 
@@ -180,16 +180,16 @@ export function useAttendanceSummaries(startDate?: string, endDate?: string, emp
       }
       return res.data;
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: any, payload) => {
       queryClient.invalidateQueries({ queryKey: ['attendanceSummaries'] });
       queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
       queryClient.invalidateQueries({ queryKey: ['payrolls'] });
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
-      showToast(data?.message || 'Đã mở khóa ngày công thành công', 'success');
+      showToast(`Đã mở khóa ngày công ${payload.date.split('-').reverse().join('/')} của nhân viên ${payload.employeeId}. ${data?.message || 'Có thể xét duyệt lại công của ngày này.'}`, 'success', "Mở khóa ngày công thành công");
     },
     onError: (err: Error) => {
-      showToast(err.message || 'Không thể mở khóa ngày công của nhân viên!', 'error');
+      showToast(err.message || 'Không thể mở khóa ngày công của nhân viên!', 'error', "Không thể mở khóa ngày công");
     },
   });
 

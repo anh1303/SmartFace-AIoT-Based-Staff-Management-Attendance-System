@@ -5,9 +5,9 @@ export async function attendanceRecipientRooms(payload: unknown): Promise<string
   const empId = p?.employee_uuid || p?.employee_id || p?.employeeId || p?.employees?.id || p?.employees?.employee_code
   const userId = p?.employee_user_id || p?.user_id || p?.userId || p?.employees?.user_id
   const employee = empId
-    ? await findEmployeeByIdOrCode(String(empId))
+    ? await findEmployeeByIdOrCode(String(empId), undefined, 'identity')
     : userId
-    ? await findEmployeeByUserId(String(userId))
+    ? await findEmployeeByUserId(String(userId), undefined, 'identity')
     : null
 
   const rooms = ['ADMIN']

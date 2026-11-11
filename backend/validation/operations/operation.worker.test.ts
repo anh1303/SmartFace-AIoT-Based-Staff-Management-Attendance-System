@@ -6,7 +6,7 @@ vi.mock('../../src/config/database.js', () => ({ prisma: db }))
 vi.mock('../../src/modules/operations/operation.gateway.js', () => gateway)
 vi.mock('../../src/common/logger.js', () => ({ logger: { error: vi.fn(), warn: vi.fn() } }))
 vi.mock('../../src/modules/auth/public.js', () => ({ findAuthUserById: vi.fn() }))
-import { claimOperation, registerOperationHandler, runOperationTick } from '../../src/modules/operations/operation.worker.js'
+import { claimOperation, registerOperationHandler, runOperationTick, startOperationWorker, stopOperationWorker, wakeOperationWorker } from '../../src/modules/operations/operation.worker.js'
 
 const job = () => ({ id: 'job-a', owner_id: 'owner-a', type: 'worker.test', lease_token: 'lease-a', status: 'running' })
 const deferred = () => {
@@ -81,4 +81,27 @@ describe('operation worker recovery boundaries', () => {
     await vi.advanceTimersByTimeAsync(40000)
     expect(db.$executeRaw).toHaveBeenCalledTimes(writes)
   })
+  it('starts committed work immediately and retries a wake received while busy', async () => {
+    vi.useFakeTimers()
+    const entered = deferred()
+    const release = deferred()
+    const second = deferred()
+    const handled: string[] = []
+    db.$queryRaw.mockResolvedValueOnce([job()]).mockResolvedValueOnce([{ status: 'succeeded' }])
+      .mockResolvedValueOnce([{ ...job(), id: 'job-b' }]).mockResolvedValueOnce([{ status: 'succeeded' }])
+    registerOperationHandler('worker.test', async claimed => {
+      handled.push(claimed.id)
+      if (claimed.id === 'job-a') { entered.resolve(); await release.promise } else second.resolve()
+    })
+    startOperationWorker()
+    try {
+      wakeOperationWorker()
+      await entered.promise
+      wakeOperationWorker()
+      release.resolve()
+      await second.promise
+      expect(handled).toEqual(['job-a', 'job-b'])
+    } finally { release.resolve(); await stopOperationWorker() }
+  })
+
 })

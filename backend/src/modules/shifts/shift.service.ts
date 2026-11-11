@@ -1,10 +1,5 @@
 import type { Prisma } from '@prisma/client'
-import {
-  assertEditableDay,
-  aggregateDailyAttendance,
-  isAttendanceDateLocked,
-  invalidateDailySummaryForShiftChange,
-} from '../attendance/public.js'
+import { shiftAttendance } from './shift.attendance-port.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere, formatVNDateISO, getTodayVNString, employeeLockKey, payrollPeriodLockKey } from '../../common/utils.js'
@@ -181,7 +176,7 @@ export async function assignOrUpdate(data: {
   const work_date = new Date(`${data.date}T00:00:00.000Z`)
 
   // Kiểm tra ngày đã khóa công qua attendance module API. Khi đã khóa, chỉ ADMIN mới được can thiệp
-  const isLocked = await isAttendanceDateLocked(work_date)
+  const isLocked = await shiftAttendance().isAttendanceDateLocked(work_date)
   if (isLocked && actorRole?.toUpperCase() !== 'ADMIN') {
     throw AppError.forbidden(
       'Dữ liệu công ngày này đã bị khóa (Locked). Không thể thay đổi ca làm việc của ngày đã chốt!'
@@ -305,7 +300,7 @@ export async function assignOrUpdate(data: {
 
     // 1. Kiểm tra trạng thái khóa và kỳ lương của TẤT CẢ các ngày thực sự bị ảnh hưởng TRƯỚC KHI thực hiện bất kỳ thay đổi nào
     for (const d of affectedDates) {
-      await assertEditableDay(tx, d, emp.id)
+      await shiftAttendance().assertEditableDay(tx, d, emp.id)
     }
 
     const shiftNameMatches: string[] = [standardConfig.name]
@@ -438,8 +433,8 @@ export async function assignOrUpdate(data: {
     // 3. Invalidate và tổng hợp lại cho tất cả các ngày liền kề bị ảnh hưởng (Issue 4)
     for (const d of affectedDates) {
       const dDate = new Date(`${d}T00:00:00Z`)
-      await invalidateDailySummaryForShiftChange(emp.id, dDate, tx)
-      await aggregateDailyAttendance(Number(d.slice(5, 7)), Number(d.slice(0, 4)), emp.id, d, undefined, tx)
+      await shiftAttendance().invalidateDailySummaryForShiftChange(emp.id, dDate, tx)
+      await shiftAttendance().aggregateDailyAttendance(Number(d.slice(5, 7)), Number(d.slice(0, 4)), emp.id, d, undefined, tx)
     }
 
     return shiftRecord

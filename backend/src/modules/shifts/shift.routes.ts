@@ -8,17 +8,22 @@ import { asyncHandler } from '../../middlewares/asyncHandler.js';
 import * as controller from './shift.controller.js';
 import { z } from 'zod';
 import { batchRequestSchema, copyWeekSchema, submitBatch, submitCopy } from './shift-batch.service.js';
+import { wakeOperationWorker } from '../operations/public.js';
 
 export const shiftRouter = Router();
 
 shiftRouter.use(authenticate);
 shiftRouter.post('/batch', authorize('ADMIN', 'MANAGER'), asyncHandler(async (req, res) => {
   const key = z.string().uuid().parse(req.header('Idempotency-Key'));
-  successResponse(res, await submitBatch(batchRequestSchema.parse(req.body), req.user!, key), 'Đã tiếp nhận phân lịch nền', 202);
+  const result = await submitBatch(batchRequestSchema.parse(req.body), req.user!, key);
+  wakeOperationWorker();
+  successResponse(res, result, 'Đã tiếp nhận phân lịch nền', 202);
 }));
 shiftRouter.post('/copy-week', authorize('ADMIN', 'MANAGER'), asyncHandler(async (req, res) => {
   const key = z.string().uuid().parse(req.header('Idempotency-Key'));
-  successResponse(res, await submitCopy(copyWeekSchema.parse(req.body), req.user!, key), 'Đã tiếp nhận sao chép lịch', 202);
+  const result = await submitCopy(copyWeekSchema.parse(req.body), req.user!, key);
+  wakeOperationWorker();
+  successResponse(res, result, 'Đã tiếp nhận sao chép lịch', 202);
 }));
 
 shiftRouter.get('/templates', authorize('ADMIN','MANAGER'), asyncHandler(async(req,res)=>{successResponse(res,await listShiftTemplates());}));

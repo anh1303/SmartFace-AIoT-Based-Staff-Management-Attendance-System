@@ -70,11 +70,17 @@ export function authenticateFingerprintDevice(req: any, _res: any, next: any) {
 export const fingerprintDeviceRouter = Router({ mergeParams: true })
 fingerprintDeviceRouter.use(asyncHandler(authenticateFingerprintDevice))
 fingerprintDeviceRouter.post('/manifest', asyncHandler(async (req, res) => {
-  const body = z.object({ capacity: z.number().int().min(1).max(65535), ready: z.boolean(),
+  const body = z.object({ manifest_version: z.union([z.literal(1), z.literal(2)]).default(1), capacity: z.number().int().min(1).max(65535), ready: z.boolean(),
     roundtrip_verified: z.boolean(), wak_verified: z.boolean(), error: z.enum(['UART_UNAVAILABLE','WAK_UNVERIFIED','ROUNDTRIP_UNVERIFIED','SENSOR_ERROR']).nullable() }).strict().parse(req.body)
   // Secret templates are only returned to their assigned authenticated device.
   res.setHeader('Cache-Control', 'no-store')
-  res.json(await service.fingerprintManifest(req.params.id, body))
+  const { manifest_version, ...health } = body
+  res.json(await service.fingerprintManifest(req.params.id, health, manifest_version))
+}))
+fingerprintDeviceRouter.post('/bindings/:bindingId/template', asyncHandler(async (req, res) => {
+  const body = z.object({ revision: z.number().int().positive(), checksum: z.string().regex(/^[a-f0-9]{64}$/) }).strict().parse(req.body)
+  res.setHeader('Cache-Control', 'no-store')
+  res.json(await service.fingerprintTemplateForDevice(req.params.id, uuid.parse(req.params.bindingId), body.revision, body.checksum))
 }))
 fingerprintDeviceRouter.post('/sessions/:sessionId/progress', asyncHandler(async (req, res) => {
   const body = z.object({ status: z.enum(['WAITING_TOUCH_1','LIFT_FINGER','WAITING_TOUCH_2','VERIFIED','FAILED']),

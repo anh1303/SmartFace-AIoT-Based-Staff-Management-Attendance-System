@@ -1,439 +1,173 @@
-import { PrismaClient } from '@prisma/client'
+import 'dotenv/config'
+import { createHash } from 'node:crypto'
+import type { Prisma, PrismaClient } from '@prisma/client'
+import { prisma } from '../src/config/database.js'
+import { calculateDay, shiftBounds, vnDay, type DatedPolicyShift, type PolicyLog } from '../src/modules/attendance/attendance.policy.js'
+import { syncDayAdjustments, flushAdjustmentBatch } from '../src/modules/attendance/attendance.adjustments.js'
+import { monthlyHourlyRate } from '../src/modules/employees/employee.wage.js'
+import { policyForPeriod } from '../src/common/payroll-policy.js'
+import { addDays, dateValue, dayKey, isMain, loadSeedState, markPayrollsStale, printCoverage, readSeedInput, seededRandom, shouldSkip, type SeedMode, type SeedRange } from './seed-utils.js'
 
-const prisma = new PrismaClient()
+export const WORK_CASES = ['ON_TIME', 'LATE', 'EARLY_LEAVE', 'LATE_AND_EARLY', 'ABSENT', 'MISSING_IN', 'MISSING_OUT',
+  'UNDER_MINIMUM', 'MULTIPLE_PAIRS', 'REPEATED_IN', 'FLAGGED', 'OT_BELOW_THRESHOLD', 'OVERTIME', 'OT_OVER_LIMIT'] as const
+type Scenario = typeof WORK_CASES[number] | 'OFF_REST' | 'OFF_WORK'
+const MINUTE = 60000
 
-/**
- * Lấy ngày hôm nay theo múi giờ Việt Nam (Asia/Ho_Chi_Minh) định dạng YYYY-MM-DD
- */
-function getTodayVN(): string {
-  const now = new Date()
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now)
+// Percentages among working employee-days; OFF days are modeled separately.
+export const CASE_WEIGHTS: Record<typeof WORK_CASES[number], number> = {
+  ON_TIME: 70, LATE: 10, EARLY_LEAVE: 5, LATE_AND_EARLY: 2, ABSENT: 3,
+  MISSING_IN: 1.5, MISSING_OUT: 1.5, OVERTIME: 4.8, OT_OVER_LIMIT: 0.2,
+  UNDER_MINIMUM: 0.4, MULTIPLE_PAIRS: 0.4, REPEATED_IN: 0.4, FLAGGED: 0.4, OT_BELOW_THRESHOLD: 0.4,
 }
 
-/**
- * Phân giải tham số ngày đầu vào thành danh sách các ngày YYYY-MM-DD
- * Hỗ trợ:
- * - Cả tháng: "2026-09" hoặc "2026-10" (định dạng YYYY-MM)
- * - 1 ngày:   "2026-10-16" (định dạng YYYY-MM-DD)
- */
-function resolveTargetDates(input: string): string[] {
-  // 1. Cả tháng YYYY-MM (ví dụ 2026-09, 2026-10)
-  if (/^\d{4}-\d{2}$/.test(input)) {
-    const [yearStr, monthStr] = input.split('-')
-    const year = parseInt(yearStr, 10)
-    const month = parseInt(monthStr, 10)
-    const daysInMonth = new Date(year, month, 0).getDate()
-    return Array.from({ length: daysInMonth }, (_, i) => {
-      const day = String(i + 1).padStart(2, '0')
-      return `${yearStr}-${monthStr}-${day}`
-    })
+export function chooseScenario(key: string, off: boolean): Scenario {
+  const draw = seededRandom(`scenario:${key}`)() * 100
+  if (off) return draw < 2 ? 'OFF_WORK' : 'OFF_REST'
+  let cumulative = 0
+  for (const [scenario, weight] of Object.entries(CASE_WEIGHTS)) {
+    cumulative += weight
+    if (draw < cumulative) return scenario as Scenario
   }
-
-  // 2. Ngày đơn lẻ YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
-    return [input]
-  }
-
-  throw new Error(
-    `❌ Tham số ngày không hợp lệ: "${input}".\n` +
-      `Các định dạng được hỗ trợ:\n` +
-      `  - Cả tháng: 2026-09 hoặc 2026-10 (định dạng YYYY-MM)\n` +
-      `  - 1 ngày:   2026-10-16 (định dạng YYYY-MM-DD)\n`
-  )
+  return 'ON_TIME'
 }
 
-/**
- * Tạo timestamp Date chính xác theo múi giờ Việt Nam (+07:00)
- */
-function makeVNTimestamp(dateStr: string, totalMinutes: number, seconds: number = 0): Date {
-  const normalizedSeconds = Math.max(0, totalMinutes * 60 + seconds)
-  const h = Math.floor(normalizedSeconds / 3600)
-  const rem = normalizedSeconds % 3600
-  const m = Math.floor(rem / 60)
-  const s = rem % 60
-
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const isoVN = `${dateStr}T${pad(h)}:${pad(m)}:${pad(s)}+07:00`
-  return new Date(isoVN)
-}
-
-/**
- * Định dạng Date ra chuỗi giờ:phút HH:mm theo giờ VN
- */
-function formatTimeVN(date: Date | null): string {
-  if (!date) return '--:--'
-  return new Intl.DateTimeFormat('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
-}
-
-/**
- * Rút trích giờ và phút từ trường Time của Prisma (@db.Time(6))
- */
-function extractHourMinute(
-  timeVal: Date | string | null | undefined,
-  fallbackH: number,
-  fallbackM: number
-): { h: number; m: number } {
-  if (!timeVal) return { h: fallbackH, m: fallbackM }
-  if (timeVal instanceof Date) {
-    return { h: timeVal.getUTCHours(), m: timeVal.getUTCMinutes() }
-  }
-  if (typeof timeVal === 'string') {
-    const match = timeVal.match(/(\d{1,2}):(\d{2})/)
-    if (match) {
-      return { h: parseInt(match[1], 10), m: parseInt(match[2], 10) }
+export function buildScenarioLogs(date: string, shift: DatedPolicyShift, scenario: Scenario, key = `${date}:${scenario}`): PolicyLog[] {
+  const { start, end } = shiftBounds(date, shift)
+  const duration = +end - +start
+  const random = seededRandom(`times:${key}:${scenario}`)
+  const between = (min: number, max: number) => min + Math.floor(random() * (max - min + 1))
+  const arrival = +start - between(0, 10 * 60) * 1000
+  const departure = +end + between(0, 10 * 60) * 1000
+  // Keep ordinary late/early cases above the minimum-work threshold, even on half-day shifts.
+  const penaltyLimit = Math.floor(duration / 6 / 1000)
+  const late = between(16 * 60, Math.max(16 * 60, Math.min((random() < 0.85 ? 25 : 45) * 60, penaltyLimit))) * 1000
+  const early = between(5 * 60, Math.max(5 * 60, Math.min((random() < 0.85 ? 15 : 30) * 60, penaltyLimit))) * 1000
+  const event = (at: number, type: string, status = 'VALID'): PolicyLog => ({ id: 0, type, event_time: new Date(at), status, method: 'FACE', device_info: `DEMO_SEED:${scenario}` })
+  const pair = (from = arrival, to = departure) => [event(from, 'CHECK_IN'), event(to, 'CHECK_OUT')]
+  let logs: PolicyLog[]
+  switch (scenario) {
+    case 'ABSENT': case 'OFF_REST': logs = []; break
+    case 'OFF_WORK': {
+      const from = +new Date(`${date}T14:00:00+07:00`) + between(0, 30 * 60) * 1000
+      logs = pair(from, from + between(60 * 60, 150 * 60) * 1000); break
     }
+    case 'LATE': logs = pair(+start + late); break
+    case 'EARLY_LEAVE': logs = pair(arrival, +end - early); break
+    case 'LATE_AND_EARLY': logs = pair(+start + late, +end - early); break
+    case 'MISSING_IN': logs = [event(departure, 'CHECK_OUT')]; break
+    case 'MISSING_OUT': logs = [event(arrival, 'CHECK_IN')]; break
+    case 'UNDER_MINIMUM': logs = pair(arrival, +start + Math.floor(duration * (0.2 + random() * 0.2))); break
+    case 'MULTIPLE_PAIRS': logs = [...pair(arrival, +start + duration / 2), ...pair(+start + duration / 2 + between(10, 25) * MINUTE, departure)]; break
+    case 'REPEATED_IN': logs = [event(arrival - between(5, 30) * 1000, 'CHECK_IN'), ...pair()]; break
+    case 'FLAGGED': logs = [event(arrival, 'CHECK_IN', 'INVALID'), event(departure, 'CHECK_OUT')]; break
+    case 'OT_BELOW_THRESHOLD': logs = pair(arrival, +end + between(60, 29 * 60) * 1000); break
+    case 'OVERTIME': logs = pair(arrival, +end + between(31 * 60, random() < 0.8 ? 90 * 60 : 120 * 60) * 1000); break
+    case 'OT_OVER_LIMIT': logs = pair(arrival, +end + between(241 * 60, 300 * 60) * 1000); break
+    default: logs = pair()
   }
-  return { h: fallbackH, m: fallbackM }
+  return logs.map((log, index) => ({ ...log, id: index + 1 }))
 }
 
-async function main() {
-  // 1. Biến cấu hình ngày/tháng/tuần (truyền qua CLI arg, env TARGET_DATE, hoặc ngày hôm nay)
-  const defaultDate = getTodayVN()
-  const rawInput = process.env.TARGET_DATE || process.argv[2] || defaultDate
-
-  const targetDates = resolveTargetDates(rawInput)
-  const isMultiDay = targetDates.length > 1
-
-  console.log(`📌 Phạm vi tạo dữ liệu: ${rawInput} (Tổng cộng: ${targetDates.length} ngày)`)
-
-  // 2. Query danh sách thiết bị AIoT từ DB để gắn vào log chấm công
-  const devices = await prisma.device.findMany()
-  const defaultDevice = devices[0] || { name: 'FaceCam-01' }
-
-  let totalLogsCreated = 0
-  let totalSummariesCreated = 0
-  let grandTotalWorkEmployees = 0
-  let grandStatOnTime = 0
-  let grandStatLate = 0
-  let grandStatAbsent = 0
-  let grandStatOff = 0
-
-  if (!isMultiDay) {
-    console.log(`\n🤖 Đang mô phỏng độ lệch ngẫu nhiên thực tế bằng Math.random()...`)
-    console.log(`----------------------------------------------------------------------`)
-    console.log(`MÃ NV   | HỌ TÊN                | CA LÀM VIỆC | VÀO     | RA      | KẾT QUẢ`)
-    console.log(`----------------------------------------------------------------------`)
-  }
-
-  // 3. Lặp qua từng ngày trong danh sách
-  for (const targetDateStr of targetDates) {
-    const targetDateObj = new Date(`${targetDateStr}T00:00:00.000Z`)
-
-    // Query lịch làm việc của ngày targetDateStr
-    const schedules = await prisma.employee_shifts.findMany({
-      where: {
-        work_date: targetDateObj,
-      },
-      include: {
-        employees: {
-          include: {
-            department: true,
-            position: true,
-          },
-        },
-        work_shifts: true,
-      },
-      orderBy: {
-        employees: { employee_code: 'asc' },
-      },
-    })
-
-    if (schedules.length === 0) {
-      if (!isMultiDay) {
-        const monthOfTarget = targetDateStr.slice(0, 7)
-        console.error(`❌ Chưa có lịch làm việc (Schedules) cho ngày ${targetDateStr}!`)
-        console.error(`👉 Vui lòng chạy Bước 2 trước để tạo lịch: npx tsx prisma/seed-shifts.ts ${monthOfTarget}`)
-        process.exit(1)
-      } else {
-        console.warn(`⚠️ Ngày ${targetDateStr}: Chưa có lịch làm việc trong DB, bỏ qua.`)
+export async function seedAttendance(db: PrismaClient, range: SeedRange, mode: SeedMode, now = new Date()) {
+  if (range.from > vnDay(now)) throw new Error('Không tạo lượt chấm công trong tương lai.')
+  return db.$transaction(async tx => {
+    const state = await loadSeedState(tx, range)
+    const assignments = state.shifts.filter(s => {
+      const date = vnDay(s.work_date)
+      const employee = state.employees.find(e => e.id === s.employee_id)!
+      return date >= range.from && date <= range.to && date >= vnDay(employee.createdAt)
+    }).sort((a, b) => vnDay(a.work_date).localeCompare(vnDay(b.work_date)) || a.employee_id.localeCompare(b.employee_id))
+    if (!assignments.length) throw new Error('Không có lịch phân ca phù hợp trong khoảng đã chọn. Chạy seed phân ca trước.')
+    const counts: Record<string, number> = {}
+    const result = { days: 0, logs: 0, replaced: 0, skipped: 0, protected: 0, unfinished: 0, counts }
+    const plans: Array<{ assignment: typeof assignments[number]; date: string; scenario: Scenario; logs: PolicyLog[] }> = []
+    for (const assignment of assignments) {
+      const date = vnDay(assignment.work_date)
+      const protectedDay = state.isProtected(assignment.employee_id, date)
+      const exists = state.existingAttendance.has(dayKey(assignment.employee_id, date))
+      if (shouldSkip(mode, exists, protectedDay)) {
+        if (protectedDay) result.protected++
+        else result.skipped++
         continue
       }
+      const bounds = shiftBounds(date, assignment)
+      if (date > vnDay(now) || +bounds.end > +now || (!bounds.off && bounds.isZeroDuration)) { result.unfinished++; continue }
+      const key = dayKey(assignment.employee_id, date)
+      const previous = state.shifts.find(s => s.employee_id === assignment.employee_id && vnDay(s.work_date) === addDays(date, -1))
+      const recovering = bounds.off && previous && previous.shift_type !== 'OFF' && previous.end_time < previous.start_time
+      let scenario: Scenario = recovering ? 'OFF_REST' : chooseScenario(key, bounds.off)
+      let logs = buildScenarioLogs(date, assignment, scenario, key)
+      // Do not truncate a case and silently turn it into an unrelated missing-scan case.
+      if (!bounds.off && (logs.some(l => +new Date(l.event_time) > +now) || +bounds.end - +bounds.start < 3 * 3600000 || +bounds.end - +bounds.start > 19 * 3600000)) {
+        scenario = 'ON_TIME'
+        logs = buildScenarioLogs(date, assignment, scenario, key)
+      }
+      if (logs.some(l => +new Date(l.event_time) > +now)) { result.unfinished++; continue }
+      if (exists) result.replaced++
+      plans.push({ assignment, date, scenario, logs })
     }
-
-    // Dọn dẹp dữ liệu cũ của ngày này để đảm bảo tính Idempotent
-    const dayStartVN = new Date(`${targetDateStr}T00:00:00+07:00`)
-    const dayEndVN = new Date(`${targetDateStr}T23:59:59.999+07:00`)
-
-    await prisma.attendance_logs.deleteMany({
-      where: {
-        event_time: {
-          gte: dayStartVN,
-          lte: dayEndVN,
-        },
-      },
-    })
-    await prisma.daily_attendance_summary.deleteMany({
-      where: {
-        work_date: targetDateObj,
-      },
-    })
-
-    const logsToCreate: Array<{
-      employee_id: string
-      event_time: Date
-      type: string
-      method: string
-      device_info: string
-      verification_score: number
-      liveness_score: number
-      status: string
-    }> = []
-
-    const summariesToCreate: Array<{
-      employee_id: string
-      work_date: Date
-      shift_id: number
-      first_check_in: Date | null
-      last_check_out: Date | null
-      total_working_hours: number
-      late_early: number
-      overtime: number
-      attendance_status: string
-      policy_version?: string
-    }> = []
-
-    let dayStatOnTime = 0
-    let dayStatLate = 0
-    let dayStatAbsent = 0
-    let dayStatOff = 0
-
-    for (const schedule of schedules) {
-      const emp = schedule.employees
-      if (!emp) continue
-
-      // Nếu là ca OFF (Nghỉ Chủ Nhật hoặc nghỉ theo lịch)
-      if (schedule.shift_type === 'OFF') {
-        summariesToCreate.push({
-          employee_id: emp.id,
-          work_date: targetDateObj,
-          shift_id: schedule.shift_id,
-          first_check_in: null,
-          last_check_out: null,
-          total_working_hours: 0,
-          late_early: 0,
-          overtime: 0,
-          attendance_status: 'OFF',
-          policy_version: 'v1.0',
+    const deletedIds = new Set<string>()
+    const changed = new Set<string>()
+    const writes: Prisma.attendance_logsCreateManyInput[] = []
+    for (const plan of plans) {
+      const employee_id = plan.assignment.employee_id
+      const key = { employee_id, work_date: dateValue(plan.date) }
+      const oldIds = state.logs.filter(l => l.employee_id === employee_id && state.ownership.get(String(l.id)) === plan.date).map(l => l.id)
+      oldIds.forEach(id => deletedIds.add(String(id)))
+      await tx.attendanceAdjustment.deleteMany({ where: key })
+      await tx.daily_attendance_summary.deleteMany({ where: key })
+      if (oldIds.length) await tx.attendance_logs.deleteMany({ where: { id: { in: oldIds } } })
+      for (const [index, log] of plan.logs.entries()) {
+        writes.push({ ...key, event_time: new Date(log.event_time), type: log.type, status: log.status, method: 'FACE',
+          device_info: log.device_info, event_key: createHash('sha256').update(`demo:${employee_id}:${plan.date}:${plan.scenario}:${index}`).digest('hex'),
         })
-        dayStatOff++
-        if (!isMultiDay) {
-          console.log(
-            `${emp.employee_code.padEnd(7)} | ${emp.full_name.padEnd(21)} | ${'Ca OFF'.padEnd(11)} | --:--   | --:--   | 🏖️ Nghỉ (OFF)`
-          )
-        }
-        continue
       }
-
-      // Giờ bắt đầu và kết thúc ca chuẩn
-      const startTimeInfo = extractHourMinute(schedule.start_time || schedule.work_shifts?.start_time, 8, 0)
-      const endTimeInfo = extractHourMinute(schedule.end_time || schedule.work_shifts?.end_time, 18, 0)
-
-      const shiftStartMins = startTimeInfo.h * 60 + startTimeInfo.m
-      const shiftEndMins = endTimeInfo.h * 60 + endTimeInfo.m
-
-      // Mô phỏng ngẫu nhiên:
-      // 80%: Đúng giờ / Sớm (0 - 10 phút)
-      // 15%: Muộn (5 - 45 phút)
-      // 5%: Nghỉ phép / Không chấm công (ABSENT)
-      const randCheckIn = Math.random()
-
-      let checkInDate: Date | null = null
-      let checkOutDate: Date | null = null
-      let lateMinutes = 0
-      let earlyMinutes = 0
-      let statusText = ''
-      let attendanceStatus = 'PRESENT'
-
-      if (randCheckIn >= 0.95) {
-        dayStatAbsent++
-        attendanceStatus = 'ABSENT'
-        statusText = '❌ Vắng mặt (ABSENT)'
-      } else {
-        let actualCheckInMins: number
-        const randomSec = Math.floor(Math.random() * 60)
-
-        if (randCheckIn < 0.8) {
-          const earlyDelta = Math.floor(Math.random() * 11)
-          actualCheckInMins = shiftStartMins - earlyDelta
-          dayStatOnTime++
-          statusText = earlyDelta === 0 ? '✅ Đúng giờ' : `✅ Sớm ${earlyDelta}p`
-        } else {
-          lateMinutes = 5 + Math.floor(Math.random() * 41)
-          actualCheckInMins = shiftStartMins + lateMinutes
-          dayStatLate++
-          statusText = `⚠️ Đi muộn ${lateMinutes}p`
-        }
-
-        checkInDate = makeVNTimestamp(targetDateStr, actualCheckInMins, randomSec)
-        const selectedCamIn = devices[Math.floor(Math.random() * devices.length)] || defaultDevice
-
-        logsToCreate.push({
-          employee_id: emp.id,
-          event_time: checkInDate,
-          type: 'CHECK_IN',
-          method: 'FACE',
-          device_info: selectedCamIn.name,
-          verification_score: parseFloat((0.92 + Math.random() * 0.07).toFixed(3)),
-          liveness_score: parseFloat((0.95 + Math.random() * 0.04).toFixed(3)),
-          status: 'VALID',
-        })
-
-        // Giờ về (checkOut):
-        // 80%: Đúng giờ hoặc nán lại (0 - 15 phút)
-        // 15%: Về sớm (5 - 30 phút)
-        // 5%: Quên check-out
-        const randCheckOut = Math.random()
-
-        if (randCheckOut < 0.95) {
-          let actualCheckOutMins: number
-          const randomOutSec = Math.floor(Math.random() * 60)
-
-          if (randCheckOut < 0.8) {
-            const otDelta = Math.floor(Math.random() * 16)
-            actualCheckOutMins = shiftEndMins + otDelta
-          } else {
-            earlyMinutes = 5 + Math.floor(Math.random() * 26)
-            actualCheckOutMins = shiftEndMins - earlyMinutes
-            statusText += ` & Về sớm ${earlyMinutes}p`
-          }
-
-          checkOutDate = makeVNTimestamp(targetDateStr, actualCheckOutMins, randomOutSec)
-          const selectedCamOut = devices[Math.floor(Math.random() * devices.length)] || defaultDevice
-
-          logsToCreate.push({
-            employee_id: emp.id,
-            event_time: checkOutDate,
-            type: 'CHECK_OUT',
-            method: 'FACE',
-            device_info: selectedCamOut.name,
-            verification_score: parseFloat((0.91 + Math.random() * 0.08).toFixed(3)),
-            liveness_score: parseFloat((0.95 + Math.random() * 0.04).toFixed(3)),
-            status: 'VALID',
-          })
-        } else {
-          statusText += ' & ⚠️ Quên check-out'
-        }
-
-        if (lateMinutes > 15 && earlyMinutes > 0) {
-          attendanceStatus = 'LATE_AND_EARLY'
-        } else if (lateMinutes > 15) {
-          attendanceStatus = 'LATE'
-        } else if (earlyMinutes > 0) {
-          attendanceStatus = 'EARLY_LEAVE'
-        } else {
-          attendanceStatus = 'PRESENT'
-        }
-      }
-
-      let totalWorkingHours = 0
-      if (checkInDate || checkOutDate) {
-        totalWorkingHours = Math.round(Math.max(0, (shiftEndMins - shiftStartMins) / 60) * 100) / 100
-      }
-
-      const lateEarlyHours = parseFloat(((lateMinutes + earlyMinutes) / 60).toFixed(2))
-      const overtimeHours = checkOutDate
-        ? Math.max(
-            0,
-            parseFloat(((checkOutDate.getTime() - makeVNTimestamp(targetDateStr, shiftEndMins).getTime()) / 3600000).toFixed(2))
-          )
-        : 0
-
-      summariesToCreate.push({
-        employee_id: emp.id,
-        work_date: targetDateObj,
-        shift_id: schedule.shift_id,
-        first_check_in: checkInDate,
-        last_check_out: checkOutDate,
-        total_working_hours: totalWorkingHours,
-        late_early: lateEarlyHours,
-        overtime: overtimeHours,
-        attendance_status: attendanceStatus,
-        policy_version: 'v1.0',
-      })
-
-      if (!isMultiDay) {
-        console.log(
-          `${emp.employee_code.padEnd(7)} | ${emp.full_name.padEnd(21)} | ${(schedule.shift_type || 'OFFICE').padEnd(
-            11
-          )} | ${formatTimeVN(checkInDate).padEnd(7)} | ${formatTimeVN(checkOutDate).padEnd(7)} | ${statusText}`
-        )
-      }
+      changed.add(dayKey(employee_id, plan.date.slice(0, 7)))
     }
-
-    // Lưu dữ liệu của ngày vào DB
-    if (logsToCreate.length > 0) {
-      await prisma.attendance_logs.createMany({ data: logsToCreate })
-    }
-    if (summariesToCreate.length > 0) {
-      await prisma.daily_attendance_summary.createMany({ data: summariesToCreate })
-    }
-
-    const dayWorkCount = schedules.filter((s) => s.shift_type !== 'OFF').length
-    totalLogsCreated += logsToCreate.length
-    totalSummariesCreated += summariesToCreate.length
-    grandTotalWorkEmployees += dayWorkCount
-    grandStatOnTime += dayStatOnTime
-    grandStatLate += dayStatLate
-    grandStatAbsent += dayStatAbsent
-    grandStatOff += dayStatOff
-
-    if (isMultiDay) {
-      const isSunday = dayStatOff === schedules.length
-      if (isSunday) {
-        console.log(`📅 ${targetDateStr} (Chủ Nhật): 🏖️ Tất cả ${dayStatOff} nhân viên nghỉ ca`)
-      } else {
-        console.log(
-          `📅 ${targetDateStr}: ${dayWorkCount} NV làm việc -> ✅ ${dayStatOnTime} Đúng giờ | ⚠️ ${dayStatLate} Muộn | ❌ ${dayStatAbsent} Vắng | 📝 ${logsToCreate.length} Logs`
-        )
+    for (let i = 0; i < writes.length; i += 1000) await tx.attendance_logs.createMany({ data: writes.slice(i, i + 1000) })
+    const inserted: typeof state.logs = []
+    for (let i = 0; i < writes.length; i += 1000) inserted.push(...await tx.attendance_logs.findMany({ where: { event_key: { in: writes.slice(i, i + 1000).map(w => w.event_key!) } } }))
+    const allLogs = [...state.logs.filter(l => !deletedIds.has(String(l.id))), ...inserted]
+    const summaryWrites: Prisma.daily_attendance_summaryCreateManyInput[] = []
+    const adjustmentBatch = { existing: new Map(), writes: [] as Prisma.AttendanceAdjustmentCreateManyInput[], audits: [] as Prisma.AuditLogCreateManyInput[] }
+    const policies = new Map<string, Awaited<ReturnType<typeof policyForPeriod>>>()
+    for (const plan of plans) {
+      const employee = state.employees.find(e => e.id === plan.assignment.employee_id)!
+      const employeeShifts = state.shifts.filter(s => s.employee_id === employee.id)
+      const calculation = calculateDay(plan.date, allLogs.filter(l => l.employee_id === employee.id), plan.assignment, now, employeeShifts)
+      const pending = calculation.requiresReview || calculation.overtimeCandidateHours > 0 || calculation.lateEarlyHours > 0 || calculation.absenceCandidate
+      const summary = { employee_id: employee.id, work_date: dateValue(plan.date), shift_id: plan.assignment.shift_id,
+        first_check_in: calculation.first, last_check_out: calculation.last, total_working_hours: calculation.workingHours,
+        late_early: calculation.lateEarlyHours, overtime: 0, regular_seconds: Math.round(calculation.regularSeconds),
+        overtime_seconds: Math.round(calculation.overtimeSeconds), late_early_seconds: Math.round(calculation.lateEarlySeconds),
+        overtime_candidate_hours: calculation.overtimeCandidateHours, overtime_status: calculation.overtimeCandidateHours > 0 ? 'PENDING' : 'NONE',
+        attendance_status: calculation.status, requires_review: calculation.requiresReview, review_reason: calculation.reviewReason,
+        review_status: pending ? 'PENDING' : 'NONE', calculation_details: calculation.details, policy_version: calculation.details.policy,
       }
+      summaryWrites.push(summary)
+      const period = plan.date.slice(0, 7)
+      if (!policies.has(period)) policies.set(period, await policyForPeriod(period, tx))
+      await syncDayAdjustments(tx, summary, monthlyHourlyRate(employee, period), policies.get(period)?.absence_penalty_rate ?? null, adjustmentBatch)
+      counts[plan.scenario] = (counts[plan.scenario] ?? 0) + 1
+      if (vnDay(shiftBounds(plan.date, plan.assignment).end) !== plan.date && plan.assignment.shift_type !== 'OFF') counts.OVERNIGHT = (counts.OVERNIGHT ?? 0) + 1
     }
-  }
-
-  // 4. In bảng tổng kết toàn kỳ
-  console.log('======================================================================')
-  console.log(`📊 TỔNG KẾT CHẤM CÔNG (${rawInput}):`)
-  console.log(`   - Tổng số ngày xử lý:                ${targetDates.length} ngày`)
-  console.log(`   - Tổng lượt nhân viên có ca làm:    ${grandTotalWorkEmployees} lượt`)
-  if (grandTotalWorkEmployees > 0) {
-    console.log(
-      `   - Đúng giờ / Sớm (80% mục tiêu):      ${grandStatOnTime} lượt (${Math.round(
-        (grandStatOnTime / grandTotalWorkEmployees) * 100
-      )}%)`
-    )
-    console.log(
-      `   - Đi muộn (15% mục tiêu):             ${grandStatLate} lượt (${Math.round(
-        (grandStatLate / grandTotalWorkEmployees) * 100
-      )}%)`
-    )
-    console.log(
-      `   - Nghỉ phép ABSENT (5% mục tiêu):     ${grandStatAbsent} lượt (${Math.round(
-        (grandStatAbsent / grandTotalWorkEmployees) * 100
-      )}%)`
-    )
-  }
-  if (grandStatOff > 0) {
-    console.log(`   - Lượt nghỉ ca:                       ${grandStatOff} lượt`)
-  }
-  console.log(`   - Tổng số lượt quẹt thẻ (Logs):        ${totalLogsCreated} lượt`)
-  console.log(`   - Tổng số bản ghi summary:            ${totalSummariesCreated} bản ghi`)
-  console.log('======================================================================')
+    for (let i = 0; i < summaryWrites.length; i += 250) await tx.daily_attendance_summary.createMany({ data: summaryWrites.slice(i, i + 250) })
+    await flushAdjustmentBatch(tx, adjustmentBatch)
+    await markPayrollsStale(tx, state.payrolls, changed)
+    result.days = plans.length
+    result.logs = writes.length
+    return result
+  }, { maxWait: 20000, timeout: 180000 })
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Lỗi khi seed lượt chấm công:', e)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+if (isMain(import.meta.url)) {
+  try {
+    const input = await readSeedInput(false)
+    if (input) {
+      const result = await seedAttendance(prisma, input.range, input.mode)
+      console.log(`Chấm công ${input.range.from} → ${input.range.to}: ${result.days} ngày công, ${result.logs} lượt quét; thay ${result.replaced}, bỏ qua ${result.skipped}, bảo vệ ${result.protected}, ca chưa kết thúc/không có giờ ${result.unfinished}.`)
+      printCoverage(result.counts, [...WORK_CASES, 'OFF_REST', 'OFF_WORK', 'OVERNIGHT'], CASE_WEIGHTS)
+    }
+  } catch (error) { console.error(error); process.exitCode = 1 }
+  finally { await prisma.$disconnect() }
+}

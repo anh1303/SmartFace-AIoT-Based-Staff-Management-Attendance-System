@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NotificationProvider, useNotifications } from '../../src/features/notifications/context/NotificationContext';
 
+;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
 const patch = vi.hoisted(() => vi.fn(async () => ({ success: true })));
 vi.mock('../../src/api/client', () => ({ api: { get: vi.fn(async () => ({ data: [] })), patch } }));
 
@@ -22,7 +24,7 @@ describe('durable notifications', () => {
     await act(async () => { container.querySelectorAll('button')[0].click(); });
     expect(patch).not.toHaveBeenCalled();
     await act(async () => { container.querySelectorAll('button')[1].click(); });
-    expect(patch).toHaveBeenCalledWith('/notifications', { action: 'delete' });
+    expect(patch).toHaveBeenCalledWith('/api/notifications', { action: 'delete' });
     await act(async () => { root.unmount(); });
     container.remove();
   });

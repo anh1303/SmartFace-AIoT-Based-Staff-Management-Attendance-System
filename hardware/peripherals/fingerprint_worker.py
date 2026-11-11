@@ -75,7 +75,7 @@ class FingerprintWorker:
         health = {'capacity': self.sensor.capacity, 'ready': self.sensor.is_connected,
                   'roundtrip_verified': self.roundtrip_verified, 'wak_verified': self.wak_verified,
                   'error': self.error}
-        self.manifest = self._http('/manifest', health)
+        self.manifest = self._http('/manifest', dict(health, manifest_version=2))
         self._last_manifest = time.monotonic()
 
     def _progress(self, session, status, **data):
@@ -178,7 +178,14 @@ class FingerprintWorker:
                 continue
             if binding['id'] in self._verified:
                 continue
-            template = base64.b64decode(binding['template_b64'], validate=True)
+            encoded = binding.get('template_b64')
+            if encoded is None:
+                payload = self._http(f"/bindings/{binding['id']}/template",
+                                     {'revision': binding['revision'], 'checksum': binding['checksum']})
+                if payload.get('revision') != binding['revision'] or payload.get('checksum') != binding['checksum']:
+                    raise RuntimeError('Template revision changed; refresh manifest')
+                encoded = payload['template_b64']
+            template = base64.b64decode(encoded, validate=True)
             if len(template) not in (512, 768) or hashlib.sha256(template).hexdigest() != binding['checksum']:
                 raise RuntimeError('Invalid manifest template')
             try:

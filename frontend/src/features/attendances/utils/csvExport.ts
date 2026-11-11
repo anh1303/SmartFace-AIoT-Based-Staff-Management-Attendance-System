@@ -12,7 +12,7 @@ export interface EmployeePairExportItem {
 export const exportAttendanceToExcel = (
   employeePairs: EmployeePairExportItem[],
   dateLabel: string,
-  showToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void,
+  showToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning', title?: string) => void,
   format: 'excel' | 'pdf' = 'excel'
 ) => {
   const headers = [
@@ -76,14 +76,14 @@ export const exportAttendanceToExcel = (
   });
 
   const safeFilenameDate = dateLabel.replace(/[^\w.-]/g, '_');
-  void exportToExcel({
+  return exportToExcel({
     format,
     sheetName: 'Báo cáo điểm danh',
     headers,
     rows,
     fileName: `Bao_cao_cham_cong_${safeFilenameDate}.xlsx`,
-  }).then(saved => { if (saved) showToast(`Đã lưu báo cáo chấm công sang file Excel (${dateLabel})!`, 'success'); })
-    .catch(() => showToast('Không thể lưu báo cáo.', 'error'));
+  }).then(saved => { if (saved) showToast(`Đã lưu báo cáo chấm công sang file Excel (${dateLabel})!`, 'success', "Xuất báo cáo chấm công thành công"); })
+    .catch(() => showToast('Không thể lưu báo cáo.', 'error', "Không thể xuất báo cáo chấm công"));
 };
 
 // Alias giữ lại để tương thích ngược với các file gọi cũ

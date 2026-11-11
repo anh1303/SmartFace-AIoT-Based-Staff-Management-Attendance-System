@@ -6,7 +6,7 @@ export interface UseRawLogsPaginationOptions {
   startDate?: string;
   endDate?: string;
   pageSize?: number;
-  showToast?: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
+  showToast?: (message: string, type: 'success' | 'error' | 'warning' | 'info', title?: string) => void;
 }
 
 export function useRawLogsPagination({
@@ -39,7 +39,7 @@ export function useRawLogsPagination({
       setRawLogPage(page);
     } catch {
       if (reqId === latestReqIdRef.current) {
-        showToast?.('Không thể tải trang nhật ký quẹt thẻ', 'error');
+        showToast?.('Không thể tải trang nhật ký quẹt thẻ', 'error', "Không thể tải nhật ký chấm công");
       }
     } finally {
       if (reqId === latestReqIdRef.current) {

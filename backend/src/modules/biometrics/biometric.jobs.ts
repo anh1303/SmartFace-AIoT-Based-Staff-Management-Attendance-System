@@ -6,6 +6,7 @@ import { enqueueOperation, assertNoEnrollment, stagedInput } from '../operations
 import type { OperationRow } from '../operations/public.js'
 import { currentActor } from '../operations/public.js'
 import { announceDataChange } from '../operations/public.js'
+import { logger } from '../../common/logger.js'
 
 export async function submitEnrollment(code: string, images: string[], actor: { id: string; role: string }, key: string) {
   if (env.FACE_AUTH_INTERNAL_KEY.length < 32) throw AppError.conflict('Máy chủ chưa cấu hình FACE_AUTH_INTERNAL_KEY để xử lý khuôn mặt nền.')
@@ -32,7 +33,16 @@ export async function executeEnrollment(job: OperationRow) {
     response = await fetch(`${env.FACE_AUTH_URL}/internal/enroll`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Face-Auth-Key': env.FACE_AUTH_INTERNAL_KEY },
       body: JSON.stringify({ employee_code: job.payload.employeeCode, images_base64: images, operation_id: job.id }), signal: AbortSignal.timeout(env.FACE_AUTH_TIMEOUT_MS) })
   } catch { throw AppError.conflict('Dịch vụ nhận diện mất kết nối hoặc hết thời gian chờ. Hãy kiểm tra kết quả trước khi tải ảnh lại.') }
-  if (!response.ok) throw AppError.conflict('Dịch vụ nhận diện chưa lưu được khuôn mặt. Vui lòng kiểm tra ảnh và thử lại.')
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { detail?: unknown } | null
+    logger.error('Face enrollment rejected by face_auth', { operationId: job.id, status: response.status })
+    if (response.status === 400 && typeof body?.detail === 'string') throw AppError.badRequest(body.detail)
+    if ([401, 403].includes(response.status)) throw AppError.conflict('Dịch vụ nhận diện từ chối khóa kết nối nội bộ. Cần kiểm tra FACE_AUTH_INTERNAL_KEY giữa backend và face_auth.')
+    if (response.status === 422) throw AppError.badRequest('Dữ liệu ảnh gửi tới dịch vụ nhận diện không đúng định dạng. Vui lòng chọn lại ảnh JPEG/PNG hoặc chụp lại.')
+    if (response.status === 503) throw AppError.conflict('Dịch vụ nhận diện chưa sẵn sàng hoặc chưa kết nối được DB. Vui lòng kiểm tra face_auth.')
+    if ([404, 409].includes(response.status) && typeof body?.detail === 'string') throw AppError.conflict(body.detail)
+    throw AppError.conflict(`Dịch vụ nhận diện gặp lỗi khi xử lý/lưu Face ID (HTTP ${response.status}). Cần kiểm tra log face_auth; giữ lại ảnh để thử lại sau khi khắc phục.`)
+  }
   // Python commits the receipt, avatar, audit and job completion together with the vectors.
   const confirmed = await prisma.$queryRaw<{ result: any }[]>`SELECT result FROM face_enrollment_receipts WHERE operation_id = ${job.id}::uuid`
   if (!confirmed.length) throw AppError.conflict('Dịch vụ nhận diện chưa hỗ trợ xác nhận tác vụ nền. Vui lòng cập nhật face_auth.')

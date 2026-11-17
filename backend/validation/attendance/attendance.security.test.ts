@@ -586,6 +586,7 @@ describe('Attendance Security & Period Finalization Test Suite', () => {
           id: BigInt(31),
           employee_id: state.employee.id,
           work_date: new Date('2026-10-31T00:00:00Z'),
+          review_status: 'APPROVED',
           total_working_hours: 8,
           overtime: 0,
           late_early: 0,
@@ -605,6 +606,7 @@ describe('Attendance Security & Period Finalization Test Suite', () => {
       await generate('2026-10', state.employee.id, admin.id, admin)
 
       // At 00:00:01 AM, overnight shift is STILL ONGOING (ends at 06:00 AM)
+      expect(state.record.total_working_hours).toBe(0)
       await expect(finalizePeriod('2026-10', admin.id, admin.role)).rejects.toThrow(
         /Còn ca chưa kết thúc, bao gồm ca qua đêm; chưa thể chốt lương/
       )
@@ -612,7 +614,10 @@ describe('Attendance Security & Period Finalization Test Suite', () => {
       // Advance clock past shift end: 06:30:00 AM on Nov 1
       vi.setSystemTime(new Date('2026-11-01T06:30:00+07:00'))
 
-      // Now finalizePeriod must succeed!
+      // The earlier snapshot excluded the unfinished shift; recalculate before finalizing.
+      await expect(finalizePeriod('2026-10', admin.id, admin.role)).rejects.toThrow(/Công\/OT đã thay đổi/)
+      await generate('2026-10', state.employee.id, admin.id, admin)
+      expect(state.record.total_working_hours).toBe(8)
       const res = await finalizePeriod('2026-10', admin.id, admin.role)
       expect(res).toBeDefined()
       expect(state.record.status).toBe('FINALIZED')

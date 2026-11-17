@@ -2,7 +2,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { adjustmentFingerprint } from '../../src/modules/attendance/attendance.adjustments.js'
 import { prisma } from '../../src/config/database.js'
 
-const state = vi.hoisted(() => ({ record: null as any, summaries: [] as any[], shifts: [] as any[], employee: null as any }))
+const state = vi.hoisted(() => ({ record: null as any, summaries: [] as any[], shifts: [] as any[], adjustments: [] as any[], employee: null as any }))
 vi.mock('../../src/modules/attendance/public.js', async (importOriginal) => {
   const actual: any = await importOriginal()
   return {
@@ -26,7 +26,7 @@ vi.mock('../../src/config/database.js', () => {
     employee: { findMany: vi.fn(async () => [state.employee]), findFirst: vi.fn(async () => state.employee) },
     bonusPenalty: { findFirst: vi.fn(async () => ({ id: 1, overtime_rate: 2.0, late_early_penalty: 1.5, absence_penalty_rate: 2.0 })) },
     daily_attendance_summary: { findMany: vi.fn(async () => state.summaries), count: vi.fn(async () => 0) },
-    attendanceAdjustment: { findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
+    attendanceAdjustment: { findMany: vi.fn(async () => state.adjustments), count: vi.fn(async () => 0) },
     attendance_locks: { findMany: vi.fn(async () => []) },
     employee_shifts: { findMany: vi.fn(async () => state.shifts) },
     work_shifts: { findFirst: vi.fn(async () => null) },
@@ -84,9 +84,81 @@ beforeEach(() => {
   state.employee = { id: '00000000-0000-4000-8000-000000000001', employee_code: 'NV-001', full_name: 'Test employee', hourly_rate: 100000, status: 'ACTIVE', departmentId: 1, user_id: 'employee-user', department: { name: 'A' }, position: { level: 'EMPLOYEE' }, users: { roles: { role_name: 'EMPLOYEE' } } }
   state.summaries = [{ id: 1n, employee_id: state.employee.id, work_date: new Date('2026-10-29T00:00:00Z'), total_working_hours: 90, overtime: 0, late_early: 0, overtime_status: 'NONE', policy_version: '2026-10-29-v6', requires_review: false, review_status: 'APPROVED', calculation_details: { fingerprint: 'source-90', scheduledEnd: '2026-10-29T17:00:00+07:00' } }]
   state.shifts = []
+  state.adjustments = []
   state.record = { id: 1n, employeeId: state.employee.id, employee: state.employee, payroll_period: '2026-10', hourly_rate: 100000, total_working_hours: 90, total_overtime: 0, total_late_early: 0, total_absence_penalty: 0, allowance: 1500000, net_salary: 10500000, overtime_rate: 2.0, late_penalty_rate: 1.5, status: 'PENDING', updated_at: new Date(), calculation_details: { adjustment_fingerprint: adjustmentFingerprint([]) } }
 })
 afterEach(() => vi.useRealTimers())
+
+describe('Manual payroll calculation cutoff', () => {
+  const day = (date: string) => new Date(`${date}T00:00:00Z`)
+  const summary = (date: string, hours: number) => ({ ...state.summaries[0], work_date: day(date), total_working_hours: hours })
+  const shift = (date: string, start = '08:00', end = '17:00') => ({ employee_id: state.employee.id, work_date: day(date), shift_type: 'OTHER', start_time: start, end_time: end })
+  const absence = (date: string, id: bigint) => ({ id, employee_id: state.employee.id, work_date: day(date), kind: 'ABSENCE', status: 'APPROVED', amount: 200000, hours: 8, source_details: {}, updated_at: new Date() })
+
+  it('excludes future and unfinished shifts from hours, deductions and absence counts, even with saved approvals', async () => {
+    vi.setSystemTime(new Date('2026-10-30T12:00:00+07:00'))
+    state.summaries = [summary('2026-10-28', 0), summary('2026-10-29', 8), summary('2026-10-30', 5), summary('2026-10-31', 100)]
+    state.shifts = ['2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31'].map(date => shift(date))
+    state.adjustments = ['2026-10-28', '2026-10-30', '2026-10-31'].map((date, i) => absence(date, BigInt(i + 1)))
+    state.adjustments.push({ ...absence('2026-10-30', 4n), kind: 'LATE_EARLY', hours: 4 }, { ...absence('2026-10-31', 5n), kind: 'OVERTIME', hours: 4 })
+    const [result] = await calculate()
+    expect(result).toMatchObject({ total_working_hours: 8, total_overtime: 0, total_late_early: 0, total_absence_penalty: 200000, approved_absence_count: 1, net_salary: 2100000 })
+    expect(result.calculation_details.calculation_range).toEqual({ start_date: '2026-10-01', end_date: '2026-10-30', as_of: '2026-10-30T05:00:00.000Z', is_partial: true })
+    expect(vi.mocked(prisma.attendanceAdjustment.findMany).mock.calls.at(-1)![0]!.where!.work_date).toEqual({ gte: day('2026-10-01'), lt: day('2026-10-31') })
+    expect((await list('2026-10'))[0].needs_recalculation).toBe(false)
+    await expect(previewItem('1', { allowance: 1500000, updated_at: state.record.updated_at.toISOString() }, actor)).resolves.toMatchObject({ net_salary: 2100000 })
+    await expect(updateItem('1', { allowance: 1500000, updated_at: state.record.updated_at.toISOString(), reason: 'Same allowance' }, actor)).resolves.toMatchObject({ net_salary: 2100000 })
+  })
+
+  it('does not call an unfinished shift missing attendance, then includes it when it finishes', async () => {
+    vi.setSystemTime(new Date('2026-10-30T12:00:00+07:00'))
+    state.shifts = [shift('2026-10-29'), shift('2026-10-30')]
+    expect((await calculate())[0].approved_absence_count).toBe(0)
+    vi.setSystemTime(new Date('2026-10-30T18:00:00+07:00'))
+    state.summaries = [summary('2026-10-29', 8), summary('2026-10-30', 8)]
+    expect((await list('2026-10'))[0].needs_recalculation).toBe(true)
+    expect((await calculate())[0].total_working_hours).toBe(16)
+  })
+
+  it('includes a previous-day overnight shift only after its actual end time', async () => {
+    state.shifts = [shift('2026-10-29', '22:00', '06:00')]
+    state.summaries = [summary('2026-10-29', 8)]
+    vi.setSystemTime(new Date('2026-10-30T05:59:00+07:00'))
+    expect((await calculate())[0].total_working_hours).toBe(0)
+    vi.setSystemTime(new Date('2026-10-30T06:00:00+07:00'))
+    expect((await calculate())[0].total_working_hours).toBe(8)
+  })
+
+  it('calculates the entire previous month and caps the saved range at its last day', async () => {
+    vi.setSystemTime(new Date('2026-11-17T12:00:00+07:00'))
+    state.summaries = [summary('2026-10-31', 8)]
+    state.shifts = [shift('2026-10-31', '22:00', '06:00')]
+    const [result] = await calculate()
+    expect(result.total_working_hours).toBe(8)
+    expect(result.calculation_details.calculation_range).toMatchObject({ start_date: '2026-10-01', end_date: '2026-10-31', is_partial: false })
+  })
+
+  it('uses the Vietnamese day at a UTC date boundary and rejects future periods', async () => {
+    vi.setSystemTime(new Date('2026-10-30T18:00:00Z'))
+    expect((await calculate())[0].calculation_details.calculation_range.end_date).toBe('2026-10-31')
+    await expect(generate('2026-11', state.employee.id, actor.id, actor)).rejects.toThrow(/tương lai/)
+  })
+
+  it.each([['2024-02', '2024-02-29'], ['2025-12', '2025-12-31']])('uses the actual last day of historical period %s', async (period, lastDay) => {
+    state.record.payroll_period = period
+    state.summaries = [summary(lastDay, 8)]
+    const [result] = await generate(period, state.employee.id, actor.id, actor)
+    expect(result.calculation_range).toMatchObject({ start_date: `${period}-01`, end_date: lastDay, is_partial: false })
+    expect(result.total_working_hours).toBe(8)
+  })
+
+  it.each(['FINALIZED', 'CONFIRMED', 'PAID'])('does not overwrite %s payroll', async status => {
+    state.record.status = status
+    const previous = { ...state.record }
+    await expect(calculate()).rejects.toThrow(/khóa/)
+    expect(state.record).toEqual(previous)
+  })
+})
 
 describe('Independent payroll edits and source reconciliation', () => {
   it('marks absence count unknown in generated payroll if a past working shift has no summary', async () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const db = vi.hoisted(() => ({
   employee: { findMany: vi.fn() },
@@ -17,6 +17,7 @@ vi.mock('../../src/modules/shifts/public.js', async () => ({ ...(await import('.
 import { getTodayDashboard } from '../../src/modules/dashboard/dashboard.service.js'
 
 describe('today dashboard', () => {
+  afterEach(() => vi.useRealTimers())
   beforeEach(() => {
     vi.clearAllMocks()
     db.employee.findMany.mockResolvedValue([
@@ -32,6 +33,31 @@ describe('today dashboard', () => {
     expect(result.kpis).toMatchObject({ workingEmployeesCount: 0, totalEmployees: 2, checkInCount: 0 })
     expect(result.shifts).toEqual([])
     expect(result.punctuality).toMatchObject({ notCheckedInCount: 0, notCheckedInPct: 0 })
+  })
+
+  it.each(['Ca khác', 'Ca hỗ trợ ban đêm', null])('uses the assigned DB shift name consistently in alerts and lists (%s)', async name => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-17T21:27:00+07:00'))
+    db.employee_shifts.findMany.mockResolvedValue([{
+      employee_id: '1', shift_type: 'OTHER', start_time: '22:00', end_time: '06:00',
+      work_shifts: name ? { shift_name: name, start_time: '00:00', end_time: '00:00' } : null,
+    }])
+    const result = await getTodayDashboard()
+    const expectedName = name || 'Ca khác'
+    expect(result.alerts.upcomingShiftNotice).toEqual({ name: expectedName, time: '22:00', minutesLeft: 33 })
+    expect(result.shifts[0]).toMatchObject({ name: expectedName, timeRange: '22:00 - 06:00', type: 'OTHER' })
+    expect(result.employeeList.find(e => e.employeeId === 'E1')?.shiftName).toBe(expectedName)
+  })
+
+  it('keeps differently named DB shifts separate even if their type and hours match', async () => {
+    db.employee_shifts.findMany.mockResolvedValue(['Ca kho', 'Ca bảo vệ'].map((name, i) => ({
+      employee_id: String(i + 1), shift_type: 'OTHER', start_time: '22:00', end_time: '06:00',
+      work_shifts: { shift_name: name },
+    })))
+    const result = await getTodayDashboard()
+    expect(result.shifts.map(s => ({ name: s.name, count: s.count }))).toEqual([
+      { name: 'Ca kho', count: 1 }, { name: 'Ca bảo vệ', count: 1 },
+    ])
   })
 
   it('returns every daily DB punch, including check-ins older than the latest ten check-outs', async () => {

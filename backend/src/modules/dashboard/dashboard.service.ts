@@ -23,6 +23,14 @@ const DEPARTMENT_COLORS = [
   '#ec4899',
 ];
 
+function getShiftName(shift: { shift_type: string | null; work_shifts: { shift_name: string } | null }): string {
+  const names: Record<string, string> = {
+    OFFICE_HOURS: 'Hành chính', MORNING: 'Ca sáng', AFTERNOON: 'Ca chiều',
+    NIGHT: 'Ca đêm', OTHER: 'Ca khác',
+  };
+  return shift.work_shifts?.shift_name?.trim() || names[shift.shift_type || ''] || 'Ca làm việc';
+}
+
 export async function getTodayDashboard(
   actor?: EmployeeActor
 ): Promise<TodayDashboardResponseDto> {
@@ -208,22 +216,10 @@ export async function getTodayDashboard(
         '17:00'
       );
       const shiftType = s.shift_type || 'OFFICE_HOURS';
-      const key = `${shiftType}_${startTime}_${endTime}`;
+      const name = getShiftName(s);
+      const key = `${shiftType}_${startTime}_${endTime}_${name}`;
 
       if (!shiftGroupMap.has(key)) {
-        let name = 'Ca làm việc';
-        if (shiftType === 'OFFICE_HOURS') {
-          name = 'Ca hành chính';
-        } else if (shiftType === 'MORNING') {
-          name = 'Ca sáng';
-        } else if (shiftType === 'AFTERNOON') {
-          name = 'Ca chiều';
-        } else if (shiftType === 'NIGHT') {
-          name = 'Ca đêm';
-        } else if (s.work_shifts?.shift_name) {
-          name = s.work_shifts.shift_name;
-        }
-
         shiftGroupMap.set(key, {
           id: key,
           name,
@@ -272,15 +268,7 @@ export async function getTodayDashboard(
   // Employee Shift List
   const empShiftNameMap = new Map<string, string>();
   todayShifts.forEach((s) => {
-    const name =
-      s.shift_type === 'MORNING'
-        ? 'Ca sáng'
-        : s.shift_type === 'AFTERNOON'
-          ? 'Ca chiều'
-          : s.shift_type === 'OFFICE_HOURS'
-            ? 'Ca HC'
-            : 'Có ca';
-    empShiftNameMap.set(s.employee_id, name);
+    empShiftNameMap.set(s.employee_id, getShiftName(s));
   });
 
   const employeeList: DashboardEmployeeShiftItemDto[] = employees
@@ -355,36 +343,14 @@ export async function getTodayDashboard(
   });
 
   let upcomingShiftNotice: DashboardAlertsDto['upcomingShiftNotice'] = null;
-  const uniqueStartTimes = Array.from(
-    new Set(
-      todayShifts.map((s) =>
-        formatShiftTime(s.start_time ?? s.work_shifts?.start_time, '08:00')
-      )
-    )
-  ).sort();
-
-  for (const st of uniqueStartTimes) {
+  for (const shift of shifts) {
+    const st = shift.startTime;
     const [h, m] = st.split(':').map(Number);
     const shiftMinutes = h * 60 + m;
     const diff = shiftMinutes - nowMinutes;
     if (diff > 0 && diff <= 60) {
-      const sample = todayShifts.find((s) => {
-        const sTime = formatShiftTime(
-          s.start_time ?? s.work_shifts?.start_time,
-          '08:00'
-        );
-        return sTime === st;
-      });
-      const shiftName =
-        sample?.shift_type === 'MORNING'
-          ? 'Ca sáng'
-          : sample?.shift_type === 'AFTERNOON'
-            ? 'Ca chiều'
-            : sample?.shift_type === 'NIGHT'
-              ? 'Ca đêm'
-              : 'Ca hành chính';
       upcomingShiftNotice = {
-        name: shiftName,
+        name: shift.name,
         time: st,
         minutesLeft: diff,
       };

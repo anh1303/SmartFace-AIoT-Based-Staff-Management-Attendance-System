@@ -41,6 +41,8 @@ export async function runOperationTick() {
       await handler(job)
     } catch (error) {
       await prisma.$executeRaw`UPDATE background_operations SET status = 'failed', error = ${safeError(error)}, revision = revision + 1, updated_at = now(), lease_until = NULL
+        , completed = CASE WHEN type = 'biometric.enroll' THEN total ELSE completed END
+        , failed = CASE WHEN type = 'biometric.enroll' THEN total - succeeded - skipped ELSE failed END
         WHERE id = ${job.id}::uuid AND lease_token = ${job.lease_token}::uuid AND status = 'running'`
       logger.error(`Background operation failed: ${job.type} ${job.id}`)
     }

@@ -18,6 +18,15 @@ beforeEach(() => { vi.resetAllMocks(); db.$executeRaw.mockResolvedValue(1) })
 afterEach(() => vi.useRealTimers())
 
 describe('operation worker recovery boundaries', () => {
+  it('counts a failed atomic face enrollment instead of returning zero failures', async () => {
+    db.$queryRaw.mockResolvedValueOnce([{ ...job(), type: 'biometric.enroll', total: 1 }]).mockResolvedValueOnce([{ status: 'failed' }])
+    registerOperationHandler('biometric.enroll', async () => { throw new Error('Upstream failed') })
+    await runOperationTick()
+    const failure = db.$executeRaw.mock.calls.find(call => call[0].join('').includes("SET status = 'failed'"))!
+    const sql = failure[0].join('')
+    expect(sql).toContain("completed = CASE WHEN type = 'biometric.enroll' THEN total ELSE completed END")
+    expect(sql).toContain("failed = CASE WHEN type = 'biometric.enroll' THEN total - succeeded - skipped ELSE failed END")
+  })
   it('returns no claimed operation when the database has no eligible work', async () => {
     db.$queryRaw.mockResolvedValue([])
     await expect(claimOperation()).resolves.toBeUndefined()

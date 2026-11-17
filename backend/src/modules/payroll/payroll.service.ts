@@ -61,6 +61,30 @@ function appliedPolicySnapshot(policy: Awaited<ReturnType<typeof policyForPeriod
   }
 }
 
+function elapsedPayrollSources(
+  summaries: Awaited<ReturnType<typeof findDailyAttendanceSummaries>>,
+  shifts: Awaited<ReturnType<typeof getEmployeeShiftsForDateRange>>,
+  start: Date, end: Date, asOf = new Date(),
+) {
+  const today = vnDay(asOf)
+  const cutoff = new Date(Math.min(+end, +new Date(`${today}T00:00:00Z`) + 86400000))
+  const inRange = (date: Date) => date >= start && date < cutoff
+  const dayKey = (row: { employee_id: string; work_date: Date }) => `${row.employee_id}:${vnDay(row.work_date)}`
+  const shiftsByDay = new Map(shifts.map(shift => [dayKey(shift), shift]))
+  const shiftFinished = (shift: (typeof shifts)[number]) => shift.shift_type === 'OFF' || +shiftBounds(vnDay(shift.work_date), {
+    ...shift, start_time: shift.start_time ?? shift.work_shifts?.start_time, end_time: shift.end_time ?? shift.work_shifts?.end_time,
+  }).end <= +asOf
+  const elapsedShifts = shifts.filter(shift => inRange(shift.work_date) && shiftFinished(shift))
+  const elapsedSummaries = summaries.filter(summary => {
+    if (!inRange(summary.work_date)) return false
+    const shift = shiftsByDay.get(dayKey(summary))
+    if (shift) return shiftFinished(shift)
+    const scheduledEnd = (summary.calculation_details as Record<string, unknown> | null)?.scheduledEnd
+    return typeof scheduledEnd !== 'string' || +new Date(scheduledEnd) <= +asOf
+  })
+  return { summaries: elapsedSummaries, shifts: elapsedShifts }
+}
+
 function assertOvernightSummariesCurrent(
   summaries: Array<{ employee_id: string; work_date: Date; calculation_details: unknown }>,
   shifts: Array<{ employee_id: string; work_date: Date; shift_type: string | null; start_time: Date | null; end_time: Date | null; work_shifts: { start_time: Date; end_time: Date } | null }>,
@@ -172,10 +196,12 @@ export async function list(payroll_period?: string, employeeIdOrCode?: string, r
   const periods = pending.map(row => row.payroll_period).sort()
   const ids = [...new Set(pending.map(row => row.employeeId))]
   const dateRange = { gte: validatePeriod(periods[0]).start, lt: validatePeriod(periods.at(-1)!).end }
-  const [summaries, adjustments] = await Promise.all([
+  const [allSummaries, adjustments, shifts] = await Promise.all([
     findDailyAttendanceSummaries({ employeeIds: ids, workDate: dateRange }),
     findAttendanceAdjustments({ employeeIds: ids, workDate: dateRange }),
+    getEmployeeShiftsForDateRange(ids, dateRange.gte, dateRange.lt),
   ])
+  const { summaries } = elapsedPayrollSources(allSummaries, shifts, dateRange.gte, dateRange.lt)
   return records.map(row => {
     if (row.status !== 'PENDING') return formatPayrollRecord(row)
     const source = summaries.filter(s => s.employee_id === row.employeeId && s.work_date.toISOString().slice(0, 7) === row.payroll_period)
@@ -204,7 +230,11 @@ export async function previewItem(idOrPayrollId: string, input: { allowance: num
   assertResolvedPayroll(record)
   if (!hasMultiplierSnapshot(record)) throw AppError.conflict('Phiếu thiếu snapshot hệ số lương; cần tính lại trước khi sửa')
   const bounds = validatePeriod(record.payroll_period)
-  const source = await findDailyAttendanceSummaries({ employeeId: record.employeeId, workDate: { gte: bounds.start, lt: bounds.end } }, false)
+  const [allSources, shifts] = await Promise.all([
+    findDailyAttendanceSummaries({ employeeId: record.employeeId, workDate: { gte: bounds.start, lt: bounds.end } }, false),
+    getEmployeeShiftsForDateRange([record.employeeId], bounds.start, bounds.end),
+  ])
+  const { summaries: source } = elapsedPayrollSources(allSources, shifts, bounds.start, bounds.end)
   const adjustments = await findAttendanceAdjustments({ employeeId: record.employeeId, workDate: { gte: bounds.start, lt: bounds.end } }, false)
   const approvedDates = new Set(source.filter(s => (s as any).review_status === 'APPROVED').map(s => vnDay(s.work_date)))
   const eligible = adjustments.filter(a => a.status === 'APPROVED' && approvedDates.has(vnDay(a.work_date)))
@@ -260,7 +290,11 @@ export async function updateItem(
     assertResolvedPayroll(fresh)
     if (+fresh.updated_at !== +record.updated_at || updates.updated_at && updates.updated_at !== fresh.updated_at.toISOString()) throw AppError.conflict('Phiếu lương vừa thay đổi; tải lại trước khi sửa')
     if (['FINALIZED', 'CONFIRMED', 'PAID'].includes(fresh.status)) throw AppError.conflict('Kỳ lương đã khóa')
-    const source = await findDailyAttendanceSummaries({ employeeId: record.employeeId, workDate: { gte: bounds.start, lt: bounds.end } }, false, tx)
+    const [allSources, shifts] = await Promise.all([
+      findDailyAttendanceSummaries({ employeeId: record.employeeId, workDate: { gte: bounds.start, lt: bounds.end } }, false, tx),
+      getEmployeeShiftsForDateRange([record.employeeId], bounds.start, bounds.end, tx),
+    ])
+    const { summaries: source } = elapsedPayrollSources(allSources, shifts, bounds.start, bounds.end)
     const adjustments = await findAttendanceAdjustments({ employeeId: record.employeeId, workDate: { gte: bounds.start, lt: bounds.end } }, false, tx)
     const approvedDates = new Set(source.filter(s => (s as any).review_status === 'APPROVED').map(s => vnDay(s.work_date)))
     const eligibleAdjustments = adjustments.filter(a => a.status === 'APPROVED' && approvedDates.has(vnDay(a.work_date)))
@@ -675,8 +709,15 @@ export async function unlockPeriod(period: string, actorUserId?: string) {
 
 export async function generate(payroll_period: string, employeeId?: string, actorUserId?: string, actorUser?: { id?: string; role?: string }) {
   const { year, month, start, end } = validatePeriod(payroll_period)
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
-  const tomorrow = new Date(+new Date(`${today}T00:00:00Z`) + 86400000).toISOString().slice(0, 10)
+  const calculatedAt = new Date()
+  const today = vnDay(calculatedAt)
+  const calculationEnd = new Date(Math.min(+end, +new Date(`${today}T00:00:00Z`) + 86400000))
+  const calculationRange = {
+    start_date: start.toISOString().slice(0, 10),
+    end_date: new Date(+calculationEnd - 86400000).toISOString().slice(0, 10),
+    as_of: calculatedAt.toISOString(),
+    is_partial: payroll_period === today.slice(0, 7),
+  }
   if (payroll_period > today.slice(0, 7)) throw AppError.badRequest('Không tính lương cho kỳ tương lai')
   if (!actorUser || !['ADMIN', 'MANAGER'].includes(actorUser.role || '')) throw AppError.forbidden()
   const employeeScope = await getEmployeeScope(actorUser, 'manage')
@@ -695,7 +736,7 @@ export async function generate(payroll_period: string, employeeId?: string, acto
         employeeId ? buildIdOrCodeWhere(employeeId) : {
           OR: [
             { status: 'ACTIVE' },
-            { daily_attendance_summary: { some: { work_date: { gte: start, lt: end } } } },
+            { daily_attendance_summary: { some: { work_date: { gte: start, lt: calculationEnd } } } },
           ],
         },
       ],
@@ -703,11 +744,12 @@ export async function generate(payroll_period: string, employeeId?: string, acto
     const employeeIds = employees.map(emp => emp.id)
     const [existingRecords, allSummaries, allAdjustments, allShifts] = employeeIds.length ? await Promise.all([
       tx.payrollRecord.findMany({ where: { payroll_period, employeeId: { in: employeeIds } } }),
-      findDailyAttendanceSummaries({ employeeIds, workDate: { gte: start, lt: end, lte: new Date(`${today}T00:00:00Z`) } }, false, tx),
-      findAttendanceAdjustments({ employeeIds, workDate: { gte: start, lt: end }, status: 'APPROVED' }, false, tx),
-      getEmployeeShiftsForDateRange(employeeIds, start, end, tx),
+      findDailyAttendanceSummaries({ employeeIds, workDate: { gte: start, lt: calculationEnd } }, false, tx),
+      findAttendanceAdjustments({ employeeIds, workDate: { gte: start, lt: calculationEnd }, status: 'APPROVED' }, false, tx),
+      getEmployeeShiftsForDateRange(employeeIds, start, calculationEnd, tx),
     ]) : [[], [], [], []]
-    assertOvernightSummariesCurrent(allSummaries.filter(summary => summary.review_status === 'APPROVED'), allShifts)
+    const { summaries: elapsedSummaries, shifts: elapsedShifts } = elapsedPayrollSources(allSummaries, allShifts, start, calculationEnd, calculatedAt)
+    assertOvernightSummariesCurrent(elapsedSummaries.filter(summary => summary.review_status === 'APPROVED'), elapsedShifts)
     const results = []
     for (const emp of employees) {
       const empCreatedDay = emp.createdAt ? vnDay(emp.createdAt) : null
@@ -723,7 +765,7 @@ export async function generate(payroll_period: string, employeeId?: string, acto
       }
       assertResolvedPayroll(existing)
       if ((!existing || !hasMultiplierSnapshot(existing)) && !policy) throw AppError.conflict('Chưa có chính sách hệ số được xác minh cho kỳ này')
-      const summaries = allSummaries.filter(summary => summary.employee_id === emp.id)
+      const summaries = elapsedSummaries.filter(summary => summary.employee_id === emp.id)
       const approvedSummaries = summaries.filter(s => (s as any).review_status === 'APPROVED')
       const approvedDateSet = new Set(approvedSummaries.map(s => vnDay(s.work_date)))
       const adjustments = allAdjustments.filter(adjustment => adjustment.employee_id === emp.id)
@@ -749,11 +791,11 @@ export async function generate(payroll_period: string, employeeId?: string, acto
           rate_snapshot_status: 'MULTIPLIER',
           source_working_hours, hours_source_fingerprint: basis, needs_recalculation: false,
           reason: (existing?.calculation_details as Record<string, any> | null)?.reason ?? null,
-          policy: ATTENDANCE_POLICY_VERSION, policy_id: policy?.id ?? null, generated_at: new Date().toISOString(),
+          policy: ATTENDANCE_POLICY_VERSION, policy_id: policy?.id ?? null, generated_at: calculatedAt.toISOString(), calculation_range: calculationRange,
           source_fingerprint: summaryFingerprint(summaries), adjustment_fingerprint: adjustmentFingerprint(approved),
           adjustment_ids: approved.map(a => String(a.id)), summary_ids: approvedSummaries.map(s => String(s.id)),
           overtime_rate, late_penalty_rate,
-          approved_absence_count: approvedAbsenceCount(approved, allShifts.filter(s => s.employee_id === emp.id), summaries, tomorrow),
+          approved_absence_count: approvedAbsenceCount(approved, elapsedShifts.filter(s => s.employee_id === emp.id), summaries, calculationEnd.toISOString().slice(0, 10)),
           applied_policy_snapshot: appliedPolicySnapshot(policy, overtime_rate, late_penalty_rate, approved),
           pending_review_days: summaries.filter(s => (s as any).review_status !== 'APPROVED').map(s => s.work_date.toISOString().slice(0, 10)),
         } }
@@ -761,7 +803,7 @@ export async function generate(payroll_period: string, employeeId?: string, acto
         update: data, create: { employeeId: emp.id, payroll_period, ...data }, include: { employee: { include: { department: true } } } }))
     }
     await tx.auditLog.create({ data: { userId: actorUserId, action: 'GENERATE_PAYROLL', target_table: 'payroll_records', record_id: payroll_period,
-      new_values: { employee_count: results.length, employeeId: employeeId || 'ALL' } } })
+      new_values: { employee_count: results.length, employeeId: employeeId || 'ALL', calculation_range: calculationRange } } })
     return results.map(formatPayrollRecord)
   }, { timeout: 60000, maxWait: 20000 })
 }

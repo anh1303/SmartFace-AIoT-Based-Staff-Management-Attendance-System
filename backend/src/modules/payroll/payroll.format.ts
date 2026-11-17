@@ -62,6 +62,7 @@ export function formatPayrollRecord(record: RawPayrollRecord) {
     total_late_early,
     total_absence_penalty: Number(record.total_absence_penalty || 0),
     approved_absence_count,
+    calculation_range: details.calculation_range ?? null,
     allowance,
     net_salary,
     overtime_rate: hasRateSnapshot ? Number(record.overtime_rate) : null,

@@ -1,0 +1,31 @@
+name: Publish SmartFace Pi
+on:
+  push:
+    tags:
+      - 'pi-v*'
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: pi-release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package and sign
+        env:
+          PI_RELEASE_SIGNING_KEY: ${{ secrets.PI_RELEASE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#pi-v}"
+          [[ "$VERSION" =~ ^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$ ]]
+          mkdir -p /tmp/pi-bundle
+          python3 hardware/update/package_release.py "$VERSION" "$(git rev-parse HEAD)" /tmp/pi-bundle
+          umask 077
+          key="$(mktemp)"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$PI_RELEASE_SIGNING_KEY" > "$key"
+          openssl pkeyutl -sign -rawin -inkey "$key" -in /tmp/pi-bundle/manifest.json -out /tmp/pi-bundle/manifest.sig
+      - name: Publish signed assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" /tmp/pi-bundle/{manifest.json,manifest.sig,smartface-pi.tar.gz} --verify-tag --generate-notes

@@ -203,7 +203,7 @@ class ThingsBoardClient:
                 self._deliver(info, payload)
             elif topic.startswith('v1/devices/me/rpc/request/') and isinstance(payload, dict):
                 method, params = payload.get('method'), payload.get('params')
-                if method == 'fingerprintWake':
+                if method in ('fingerprintWake', 'openGateOnce'):
                     response = self.on_action_request(method, params or {}) if self.on_action_request else {'success': False}
                 elif method == 'getMode':
                     response = {

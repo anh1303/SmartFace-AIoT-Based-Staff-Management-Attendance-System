@@ -8,6 +8,7 @@ Driver điều khiển Động cơ Servo (SG90 / MG995 / MG996R) mô phỏng đ�
 - Hỗ trợ Mock Mode tự động khi chạy trên môi trường không có GPIO/Pi
 """
 
+import os
 import threading
 import time
 from typing import Optional, Callable
@@ -96,7 +97,9 @@ class ServoController:
         """Send intermediate targets using monotonic deadlines."""
         if self._stopping.is_set():
             return
-        steps = max(1, round(seconds * (50 if smooth else 20)))
+        # Aim for smaller target changes on the smooth Arduino ramp.
+        targets_per_second = 60 if smooth else 20
+        steps = max(1, round(seconds * targets_per_second))
         started = time.monotonic()
         self.set_angle(start)
         for step in range(1, steps + 1):
@@ -117,7 +120,8 @@ class ServoController:
         detach_after_move: bool = False,
         on_state_change: Optional[Callable[[str], None]] = None,
         travel_seconds: float = 0.0,
-    ):
+        on_complete: Optional[Callable[[bool], None]] = None,
+    ) -> bool:
         """Hold open while occupied, then close after continuous absence.
 
         - travel_seconds: Time to send intermediate angles in each direction.
@@ -125,13 +129,27 @@ class ServoController:
         - max_hold_seconds: Giới hạn thời gian mở tối đa chống kẹt cổng vô hạn khi test tại bàn.
         """
         if not self.enabled or self._stopping.is_set():
-            return
+            return False
         if not self._lock.acquire(blocking=False):
             print('[SERVO] Cổng đang mở; không xếp thêm chu kỳ mở/đóng.')
-            return
+            return False
+
+        update_guard = None
+        lock_path = os.environ.get("SMARTFACE_GATE_LOCK")
+        if lock_path:
+            import fcntl
+            try:
+                update_guard = open(lock_path, "a")
+                fcntl.flock(update_guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                if update_guard:
+                    update_guard.close()
+                self._lock.release()
+                return False
 
         def _action():
             opened = False
+            completed = False
             try:
                 normalized = (mode or 'CHECK_IN').upper()
                 self._open_state = 'OPEN_IN' if normalized == 'CHECK_IN' else 'OPEN_OUT'
@@ -205,14 +223,22 @@ class ServoController:
                         on_state_change(self.door_state)
                     time.sleep(0.1 if travel_seconds > 0 else 1.0)
                     self.set_angle(None)
+                    completed = opened
                     print('[SERVO] 🔌 Đã đóng cổng 0° và ngắt xung PWM -> Motor nghỉ mát, 0 power.')
                 finally:
+                    if update_guard:
+                        update_guard.close()
                     self._lock.release()
+                    if on_complete:
+                        on_complete(completed)
 
         self._worker = threading.Thread(target=_action, daemon=True)
         try:
             self._worker.start()
+            return True
         except Exception:
+            if update_guard:
+                update_guard.close()
             self._lock.release()
             raise
 

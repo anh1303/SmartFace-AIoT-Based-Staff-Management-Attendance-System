@@ -11,6 +11,7 @@ Orchestrator kết nối toàn diện các module:
 - streaming   : RTSPStreamer (FFmpeg pipe -> MediaMTX WebRTC/HLS/RTSP)
 """
 
+import json
 import queue
 import uuid
 import os
@@ -34,6 +35,7 @@ load_dotenv(BASE_DIR / ".env")
 load_dotenv()
 import config as vision
 from attendance_coordinator import AttendanceCoordinator
+from event_media import EventMedia
 from peripherals.fingerprint_worker import FingerprintWorker
 from attendance_feedback import AttendanceFeedbackGuard, is_accepted_attendance
 
@@ -130,7 +132,7 @@ SERVO_PIN = get_env_int("SERVO_PIN", 18)
 SERVO_BACKEND = get_env_str("SERVO_BACKEND", "gpio").lower()
 SERVO_ARDUINO_PORT = get_env_str("SERVO_ARDUINO_PORT", "/dev/ttyACM0")
 SERVO_OPEN_SECONDS = get_env_float("SERVO_OPEN_SECONDS", 3.0)
-SERVO_TRAVEL_SECONDS = get_env_float("SERVO_TRAVEL_SECONDS", 2.0)
+SERVO_TRAVEL_SECONDS = get_env_float("SERVO_TRAVEL_SECONDS", 1.0)
 
 # Tự động phát hiện môi trường Headless (SSH trên Pi) để tránh lỗi Qt xcb abort()
 if SHOW_GUI and sys.platform.startswith("linux"):
@@ -251,6 +253,11 @@ def main(args=None):
 
     result_queue = queue.SimpleQueue()
     feedback_queue = queue.SimpleQueue()
+    event_media = EventMedia(get_env_str("BACKEND_BASE_URL", ""), DEVICE_ID,
+                             get_env_str("EDGE_RECOGNITION_TOKEN", ""))
+    gate_requests = {}
+    update_root = os.environ.get("SMARTFACE_UPDATE_ROOT")
+    update_ready_sent = False
     attendance_coordinator = AttendanceCoordinator()
     fingerprint_worker = None
 
@@ -291,6 +298,9 @@ def main(args=None):
         if not isinstance(res, dict):
             return
 
+        if not res.get("uncertain") and not res.get("retryable"):
+            event_media.attendance_result(res.get("event_id"),
+                is_accepted_attendance(res) or (res.get("reconciled") and res.get("success")))
         if res.get("reconciled"):
             status_banner = "ĐÃ LƯU CHẤM CÔNG" if res.get("success") else "LƯỢT ĐÃ LƯU, CẦN KIỂM TRA"
             status_banner_time = time.time()
@@ -392,6 +402,37 @@ def main(args=None):
             audio_manager.set_mute(current_is_muted)
 
     def on_action_request(action: str, params: dict):
+        if action == "openGateOnce":
+            if not isinstance(params, dict):
+                return {"success": False, "message": "Lệnh mở cổng không hợp lệ"}
+            event = params.get("id")
+            expires = params.get("expires_at")
+            now = int(time.time() * 1000)
+            if not isinstance(event, str) or len(event) != 36 or not isinstance(expires, int) or not now < expires <= now + 15000:
+                return {"success": False, "message": "Lệnh mở cổng hết hạn"}
+            for old in [key for key, expiry in gate_requests.items() if expiry <= now]:
+                gate_requests.pop(old, None)
+            if event in gate_requests:
+                return {"success": True, "id": event}
+            try:
+                ultrasonic_sensor.gate_presence()
+                if servo_gate._is_mock:
+                    return {"success": False, "id": event, "message": "Không có servo thật"}
+                photo = event_media.current_frame()
+                accepted = servo_gate.open_gate_safe(
+                    mode="CHECK_IN", is_person_present_fn=ultrasonic_sensor.gate_presence,
+                    close_delay_seconds=5.0, travel_seconds=SERVO_TRAVEL_SECONDS,
+                    detach_after_move=True,
+                    on_complete=lambda ok: event_media.enqueue(event, "gate", status="COMPLETE" if ok else "FAILED"),
+                )
+            except Exception:
+                return {"success": False, "id": event, "message": "Cổng hoặc cảm biến chưa sẵn sàng"}
+            if not accepted:
+                return {"success": False, "id": event, "message": "Cổng đang bận hoặc bị tắt"}
+            gate_requests[event] = expires
+            event_media.enqueue(event, "gate", status="ACCEPTED")
+            event_media.enqueue(event, "gate", photo)
+            return {"success": True, "id": event}
         if action == "fingerprintWake":
             return fingerprint_worker.wake() if fingerprint_worker else {"success": False}
         if action == "playTestSound":
@@ -509,8 +550,12 @@ def main(args=None):
         publish_attendance_result(response)
         feedback_queue.put(response)
 
+    def send_fingerprint(scan, callback):
+        event_media.pin(scan.get("event_id"))
+        return attendance_client.send_fingerprint_rpc(scan, callback)
+
     fingerprint_worker = FingerprintWorker(DEVICE_ID, attendance_coordinator,
-        attendance_client.send_fingerprint_rpc, lambda: current_mode, fingerprint_feedback)
+        send_fingerprint, lambda: current_mode, fingerprint_feedback)
 
     def submit_face(embedding, pad_score, mode, submission, captured_at, event_kind, expected_employee):
         # Capture immutable request parameters for retry, even after tracking resets.
@@ -664,6 +709,7 @@ def main(args=None):
 
             # ── 0. Bật/Tắt camera phần cứng từ xa (camera_enabled) ───────────
             if not current_stream_enabled:
+                event_media.update_frame(None)
                 _evaluate_presence()
                 if cap is not None:
                     cap.release()
@@ -712,6 +758,7 @@ def main(args=None):
                 print('[CAMERA] Đã BẬT lại camera phần cứng.')
 
             ret, frame = cap.read()
+            event_media.update_frame(frame if ret else None)
             if not ret:
                 camera_failures += 1
                 for track in previous_recognition_tracks.values():
@@ -732,6 +779,18 @@ def main(args=None):
                 time.sleep(0.05)
                 continue
             camera_failures = 0
+
+            if update_root and not update_ready_sent:
+                try:
+                    root = Path(update_root)
+                    challenge = json.loads((root / "boot-challenge.json").read_text())
+                    if challenge.get("path") == str(BASE_DIR):
+                        message = root / ".boot-ready.tmp"
+                        message.write_text(json.dumps({"nonce": challenge["nonce"]}))
+                        message.replace(root / "boot-ready.json")
+                        update_ready_sent = True
+                except (OSError, ValueError, KeyError):
+                    pass
 
             frame_id += 1
             fps_counter += 1
@@ -945,6 +1004,7 @@ def main(args=None):
                                             raise ValueError("Alignment failed")
                                         captured_at = track.scan_captured_at or int(now_wall * 1000)
                                         context = (track.scan_event_id, captured_at, liveness_score(track.last_pad_score, track.last_pad_threshold))
+                                        event_media.pin(track.scan_event_id, frame.copy(), use_latest=False)
                                         if perf_log and track.scan_event_id not in scan_timings:
                                             if len(scan_timings) >= 32:
                                                 scan_timings.pop(next(iter(scan_timings)))
@@ -1005,6 +1065,7 @@ def main(args=None):
                 event_kind = 'CONFIRMED_SCAN' if commit else 'VERIFY_ONLY'
                 submission = (track.track_id, result.key[2], event_id, result.key[3], result.key[4], result.key[1], event_kind)
                 track.scan_captured_at = captured_at
+                event_media.pin(event_id)
                 if not attendance_coordinator.begin('face', event_id):
                     continue
                 req_id = submit_face(result.embedding.copy(), pad_score, result.key[2], submission,

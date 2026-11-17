@@ -58,6 +58,7 @@ class UltrasonicSensor:
         self._lock = threading.Lock()
         self._samples = collections.deque(maxlen=self.window_size)
         self._current_distance: Optional[float] = None
+        self._last_raw_sample = None
         self._presence_state = False
         self._candidate_state = False
         self._candidate_start_time = 0.0
@@ -170,6 +171,7 @@ class UltrasonicSensor:
             now = time.monotonic()
 
             with self._lock:
+                self._last_raw_sample = (now, raw_dist)
                 if raw_dist is not None:
                     self._samples.append(raw_dist)
                     # Tính trung vị (Median) để loại bỏ nhiễu spike đột ngột
@@ -212,6 +214,16 @@ class UltrasonicSensor:
             return False
         with self._lock:
             return self._presence_state
+
+    def gate_presence(self) -> bool:
+        """Require a current, valid physical reading before treating the path as empty."""
+        with self._lock:
+            sample = self._last_raw_sample
+            if (not self.enabled or self._mock_mode or not self._is_active
+                    or sample is None or sample[1] is None
+                    or time.monotonic() - sample[0] > max(0.5, self.poll_interval * 3)):
+                raise RuntimeError("Cảm biến cổng không có dữ liệu hợp lệ")
+            return sample[1] <= self.trigger_distance or self._presence_state
 
     def stop(self):
         """Dừng worker thread và dọn dẹp GPIO."""

@@ -1,67 +1,157 @@
-import { randomBytes } from 'node:crypto'
-import { z } from 'zod'
 import { env } from '../../../config/env.js'
 import { AppError } from '../../../common/AppError.js'
 import { authBiometrics } from '../auth.biometrics-port.js'
 import { createFaceSession } from '../auth.service.js'
+import { ATTEMPT_TTL_MS, AttemptError, AttemptStore, digestFrame, type Attempt } from './face-login.attempts.js'
+import { EngineError, engineCancel, engineCreate, engineFrame } from './face-login.engine.js'
 
 export const FACE_LOGIN_FAILURE = 'Không thể xác thực khuôn mặt. Vui lòng thử lại hoặc đăng nhập bằng mật khẩu.'
-export const loginBody = z.object({ challengeId: z.string().regex(/^[a-f0-9]{32}$/),
-  frames: z.array(z.string().min(4).max(273068).regex(/^[A-Za-z0-9+/]+={0,2}$/)).length(8),
-}).strict()
+export const attempts = new AttemptStore()
+const RPC_CAP_MS = 3000
+
+const GUIDANCE: Record<string, string> = {
+  no_face: 'Không thấy khuôn mặt. Hãy nhìn thẳng vào camera.',
+  face_quality: 'Đưa khuôn mặt vào giữa khung, giữ đủ sáng.',
+  track_changed: 'Giữ yên khuôn mặt trong khung.',
+  frame_gap: 'Giữ yên khuôn mặt trong khung.',
+  raw_spoof: 'Giữ yên khuôn mặt trong khung.',
+  spoof: 'Giữ yên khuôn mặt trong khung.',
+  invalid_image: 'Ảnh camera không hợp lệ, đang thử lại.',
+  pad_pending: 'Đang kiểm tra người thật…',
+  ok: 'Đang xác nhận danh tính…',
+  no_match: 'Đang xác nhận danh tính…',
+}
+
+function parseRecognitionCount() {
+  const raw = process.env.ATTENDANCE_STABLE_COUNT
+  if (raw === undefined || raw.trim() === '') return 3
+  return Number.parseInt(raw, 10)
+}
+
+export function recognitionCount() {
+  const parsed = parseRecognitionCount()
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : 3
+}
 
 export function faceLoginConfigured() {
-  return env.FACE_LOGIN_ENABLED && env.FACE_AUTH_INTERNAL_KEY.length >= 32 && recognitionCount() <= 6
+  const parsed = parseRecognitionCount()
+  return env.FACE_LOGIN_ENABLED && env.FACE_AUTH_INTERNAL_KEY.length >= 32
+    && Number.isInteger(parsed) && parsed >= 1 && parsed <= 6
 }
 
-function recognitionCount() {
-  return Math.max(1, Number.parseInt(process.env.ATTENDANCE_STABLE_COUNT || '3', 10) || 3)
+const toAppError = (error: unknown): never => {
+  if (error instanceof AttemptError) {
+    const message = error.status === 410 ? 'Lượt nhận diện đã kết thúc. Vui lòng thử lại.'
+      : error.status === 429 ? 'Hệ thống đang bận. Vui lòng thử lại sau.' : 'Yêu cầu nhận diện không hợp lệ.'
+    throw new AppError(error.status, message)
+  }
+  throw error
 }
 
-const aiResponse = z.object({ request_id: z.string(), status: z.literal('ok'),
-  model_version: z.string(), embeddings: z.array(z.array(z.number().finite()).length(512)).min(1).max(6) })
+export async function startAttempt(binding: string) {
+  let attempt: Attempt
+  try { attempt = attempts.create(binding, recognitionCount()) } catch (error) { return toAppError(error) }
+  try {
+    attempt.bootId = await engineCreate(attempt.id, attempt.epoch, ATTEMPT_TTL_MS)
+  } catch (error) {
+    attempts.fail(attempt)
+    throw new AppError(error instanceof EngineError && error.kind === 'busy' ? 429 : 503,
+      'Dịch vụ nhận diện chưa sẵn sàng. Vui lòng thử lại hoặc đăng nhập bằng mật khẩu.')
+  }
+  if (attempt.state !== 'READY') { engineCancel(attempt.id); throw new AppError(409, 'Lượt nhận diện đã bị thay thế.') }
+  return { attemptId: attempt.id, expiresAt: attempt.deadline, intervalMs: 200 }
+}
 
-export async function recognizeLogin(frames: string[]) {
-  const requestId = randomBytes(16).toString('hex')
-  let response: Response
+async function matchEmployee(embedding: number[]) {
+  const norm = Math.hypot(...embedding)
+  if (!Number.isFinite(norm) || norm <= 1e-12) throw new Error('Invalid embedding norm')
+  const literal = '[' + embedding.map(value => (value / norm).toFixed(8)).join(',') + ']'
+  const candidate = await authBiometrics().findBestFaceMatch(literal, undefined, { includeAvatar: false })
+  if (!candidate || !Number.isFinite(candidate.similarity) || candidate.similarity < (env.FACE_MATCH_THRESHOLD || 0.45)) return null
+  return candidate.emp_id
+}
+
+export async function processAttemptFrame(id: string, binding: string | undefined, seq: number, frame: string) {
+  let attempt: Attempt, op: string
+  const digest = digestFrame(frame)
   try {
-    response = await fetch(`${env.FACE_AUTH_URL}/internal/face-login/extract`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Face-Auth-Key': env.FACE_AUTH_INTERNAL_KEY },
-      body: JSON.stringify({ request_id: requestId, frames, recognition_count: recognitionCount() }),
-      signal: AbortSignal.timeout(Math.min(env.FACE_AUTH_TIMEOUT_MS, 20000)),
-    })
-  } catch { throw new AppError(503, 'Dịch vụ nhận diện đang gián đoạn. Vui lòng đăng nhập bằng mật khẩu.') }
-  if (!response.ok) throw new AppError(503, 'Dịch vụ nhận diện chưa sẵn sàng. Vui lòng thử lại sau.')
-  let parsed: ReturnType<typeof aiResponse.safeParse>
-  const reader = response.body?.getReader()
-  if (!reader) throw AppError.unauthorized(FACE_LOGIN_FAILURE)
+    attempt = attempts.get(id, binding)
+    const reserved = attempts.startFrame(attempt, seq, digest)
+    if ('cached' in reserved) return reserved.cached
+    op = reserved.op
+  } catch (error) { return toAppError(error) }
+
+  let engine
   try {
-    const chunks: Uint8Array[] = []
-    let size = 0
-    while (true) {
-      const chunk = await reader.read()
-      if (chunk.done) break
-      size += chunk.value.byteLength
-      if (size > 80_000) { await reader.cancel(); throw new Error('Response too large') }
-      chunks.push(chunk.value)
+    const remaining = attempt.deadline - Date.now()
+    engine = await engineFrame(attempt.id, attempt.epoch, seq, frame, attempt.bootId!, Math.min(RPC_CAP_MS, remaining), op)
+  } catch (error) {
+    if (error instanceof EngineError && error.kind === 'busy') {
+      attempts.releaseFrame(attempt, op)
+      throw new AppError(429, 'Hệ thống đang bận, đang thử lại.')
     }
-    parsed = aiResponse.safeParse(JSON.parse(Buffer.concat(chunks).toString('utf8')))
-  } catch { throw AppError.unauthorized(FACE_LOGIN_FAILURE) }
-  finally { reader.releaseLock() }
-  if (!parsed.success || parsed.data.request_id !== requestId || parsed.data.model_version !== env.FACE_AUTH_MODEL_VERSION) {
+    // Timeout/restart/invalid: inference may still be running, never reopen.
+    attempts.fail(attempt); engineCancel(attempt.id)
     throw AppError.unauthorized(FACE_LOGIN_FAILURE)
   }
-  if (parsed.data.embeddings.length !== recognitionCount()) throw AppError.unauthorized(FACE_LOGIN_FAILURE)
-  let employeeId: string | undefined
-  for (const embedding of parsed.data.embeddings) {
-    const norm = Math.hypot(...embedding)
-    if (!Number.isFinite(norm) || norm < 1e-12) throw AppError.unauthorized(FACE_LOGIN_FAILURE)
-    const literal = '[' + embedding.map(value => (value / norm).toFixed(8)).join(',') + ']'
-    const candidate = await authBiometrics().findBestFaceMatch(literal, undefined, { includeAvatar: false })
-    if (!candidate || !Number.isFinite(candidate.similarity) || candidate.similarity < (env.FACE_MATCH_THRESHOLD || 0.45)
-        || (employeeId && candidate.emp_id !== employeeId)) throw AppError.unauthorized(FACE_LOGIN_FAILURE)
-    employeeId = candidate.emp_id
+  if (!attempts.isCurrent(attempt, op)) throw new AppError(410, 'Lượt nhận diện đã kết thúc. Vui lòng thử lại.')
+  if (engine.status === 'spoof' || engine.status === 'error') {
+    attempts.fail(attempt); engineCancel(attempt.id)
+    throw AppError.unauthorized(FACE_LOGIN_FAILURE)
   }
-  if (!employeeId) throw AppError.unauthorized(FACE_LOGIN_FAILURE)
-  return createFaceSession(employeeId)
+
+  let employeeId: string | null = null
+  let reason = engine.reason
+  if (engine.status === 'embedding') {
+    try { employeeId = await matchEmployee(engine.embedding!) } catch {
+      attempts.fail(attempt); engineCancel(attempt.id)
+      throw new AppError(503, 'Dịch vụ nhận diện đang gián đoạn. Vui lòng đăng nhập bằng mật khẩu.')
+    }
+    if (!employeeId) reason = 'no_match'
+  }
+  try {
+    const result = attempts.finishFrame(attempt, op, seq, digest,
+      { employeeId, pending: engine.status === 'pending' }, GUIDANCE[reason] ?? 'Giữ yên khuôn mặt trong khung.')
+    if (result.state === 'verified') engineCancel(attempt.id) // stop PAD work immediately
+    return result
+  } catch (error) { return toAppError(error) }
 }
+
+export async function completeAttempt(id: string, binding: string | undefined) {
+  if (!faceLoginConfigured()) {
+    throw new AppError(503, 'Đăng nhập khuôn mặt chưa được bật. Vui lòng dùng mật khẩu.')
+  }
+  let attempt: Attempt
+  try {
+    attempt = attempts.get(id, binding)
+    const recovered = attempts.recover(attempt)
+    if (recovered) return recovered
+    const employeeId = attempts.assertCompletable(attempt)
+    // Awaited account/template/role checks; cancel/expiry may win meanwhile.
+    let session
+    try {
+      session = await createFaceSession(employeeId)
+    } catch (error) {
+      attempts.fail(attempt)
+      throw error
+    }
+    return attempts.commit(attempt, session) // re-checks all guards synchronously
+  } catch (error) { return toAppError(error) }
+}
+
+export function cancelAttempt(id: string, binding: string | undefined) {
+  try {
+    const attempt = attempts.get(id, binding)
+    attempts.cancel(attempt)
+    engineCancel(attempt.id)
+  } catch (error) { toAppError(error) }
+}
+
+export function attemptStatus(id: string, binding: string | undefined) {
+  try {
+    const a = attempts.get(id, binding)
+    return { state: a.state.toLowerCase(), nextSeq: a.nextSeq, expiresAt: a.deadline }
+  } catch (error) { return toAppError(error) }
+}
+
+setInterval(() => attempts.sweep(), 1000).unref()

@@ -1,11 +1,12 @@
-"""Deterministic checks for webcam/Pi PAD and recognition parity."""
+"""Deterministic checks for webcam/Pi PAD and recognition parity on the incremental pipeline."""
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
 
-from face_login.pipeline import extract_sequence
+from face_login.pipeline import process_frame
+from face_login.sessions import LoginSession
 
 
 def vector():
@@ -15,7 +16,7 @@ def vector():
 
 
 class WebcamParityTests(unittest.TestCase):
-    def evaluate(self, votes):
+    def evaluate(self, votes, recognition_count=3):
         scores = iter(votes)
         face = {'bbox': (10, 10, 90, 90), 'score': 0.99,
                 'landmarks': [[30, 30], [70, 30], [50, 50], [35, 70], [65, 70]]}
@@ -26,16 +27,30 @@ class WebcamParityTests(unittest.TestCase):
                       predictor=SimpleNamespace(predict_frame=predict),
                       embedder=SimpleNamespace(input_size=(112, 112), embed_aligned=lambda _face: vector()),
                       align_face=lambda *_args: np.zeros((112, 112, 3), dtype=np.uint8))
-        with patch('face_login.pipeline.config.PAD_MIN_VOTES', 3), \
-             patch('face_login.pipeline.config.PAD_SMOOTH_WINDOW', 5), \
-             patch('face_login.pipeline.config.PAD_SPOOF_MIN_RATIO', 0.6):
-            return extract_sequence([np.zeros((100, 100, 3), dtype=np.uint8)] * 8,
-                                    **models, already_decoded=True)
+        with patch('face_login.sessions.config.PAD_MIN_VOTES', 3), \
+             patch('face_login.sessions.config.PAD_SMOOTH_WINDOW', 5), \
+             patch('face_login.sessions.config.PAD_SPOOF_MIN_RATIO', 0.6):
+            session = LoginSession('a' * 32, 1, 15.0, 0.0)
+            consecutive = []
+            outcomes = []
+            for _ in votes:
+                out = process_frame(session, np.zeros((100, 100, 3), dtype=np.uint8), **models)
+                outcomes.append(out)
+                if out['status'] == 'embedding':
+                    consecutive.append(out['embedding'])
+                elif out['status'] in ('reset', 'error'):
+                    consecutive.clear()
+            verified = len(consecutive) >= recognition_count and outcomes[-1]['status'] == 'embedding'
+            return {
+                'reason': 'verified' if verified else 'pad_rejected',
+                'embeddings': consecutive[-recognition_count:] if verified else [],
+                'outcomes': outcomes,
+            }
 
     def test_mixed_pad_votes_allow_straight_face_when_pi_verdict_is_real(self):
         result = self.evaluate([True, False, True, True, False, True, True, True])
         self.assertEqual(result['reason'], 'verified')
-        self.assertGreaterEqual(len(result['embeddings']), 3)
+        self.assertEqual(len(result['embeddings']), 3)
         self.assertTrue(all(len(embedding) == 512 for embedding in result['embeddings']))
 
     def test_spoof_majority_is_rejected(self):

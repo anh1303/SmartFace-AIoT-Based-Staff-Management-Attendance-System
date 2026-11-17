@@ -1,10 +1,9 @@
-"""HTTP login contract. No camera, real database or attendance dependency."""
-import base64
+"""HTTP streaming login contract. No camera, real database or attendance dependency."""
 import asyncio
-import json
+import base64
 import unittest
-from unittest.mock import patch
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import cv2
 import numpy as np
@@ -17,8 +16,8 @@ class Client:
     def __init__(self, app):
         self.app = app
 
-    def post(self, path, *, json: dict, headers=None):
-        payload = __import__('json').dumps(json).encode()
+    def post(self, path, *, json: dict = None, raw: bytes = None, headers=None):
+        payload = raw if raw is not None else __import__('json').dumps(json or {}).encode()
         messages = []
         async def run():
             sent = False
@@ -46,19 +45,41 @@ class FaceLoginHttpTests(unittest.TestCase):
         def auth(key):
             if key != 'internal-test-key':
                 raise HTTPException(401, 'Unauthorized')
-        self.models = SimpleNamespace(detector=object(), embedder=object(), predictor=object())
+        face = {'bbox': (10, 10, 90, 90), 'score': 0.99,
+                'landmarks': [[30, 30], [70, 30], [50, 50], [35, 70], [65, 70]]}
+        vec = np.zeros(512, dtype=np.float32); vec[0] = 1
+        self.models = SimpleNamespace(
+            detector=SimpleNamespace(detect=lambda _f: [face]),
+            embedder=SimpleNamespace(input_size=(112, 112), embed_aligned=lambda _f: vec),
+            predictor=SimpleNamespace(predict_frame=lambda *_a: {'is_real': True, 'pad_score': 2.0, 'threshold_logit': 0.0}),
+        )
         app = FastAPI()
-        app.include_router(build_router(lambda: self.models, auth))
+        self.router = build_router(lambda: self.models, auth)
+        app.include_router(self.router)
         self.client = Client(app)
+        self.headers = {'X-Face-Auth-Key': 'internal-test-key'}
         ok, image = cv2.imencode('.jpg', np.zeros((100, 100, 3), dtype=np.uint8))
         self.assertTrue(ok)
         self.jpeg = base64.b64encode(image).decode()
-        self.body = dict(request_id='a' * 32, frames=[self.jpeg] * 8, recognition_count=3)
+        self.attempt_id = 'a' * 32
 
-    def test_internal_key_required_and_extra_fields_rejected(self):
-        self.assertEqual(self.client.post('/internal/face-login/extract', json=self.body).status_code, 401)
-        self.assertEqual(self.client.post('/internal/face-login/extract', json={**self.body, 'employee_id': 'x'},
-                                        headers={'X-Face-Auth-Key': 'internal-test-key'}).status_code, 422)
+    def test_internal_key_required_extra_fields_rejected_and_body_cap_enforced(self):
+        create_body = {'attempt_id': self.attempt_id, 'epoch': 1, 'ttl_ms': 15000}
+        self.assertEqual(self.client.post('/internal/face-login/attempts', json=create_body).status_code, 401)
+        self.assertEqual(self.client.post('/internal/face-login/attempts',
+                                          json={**create_body, 'employee_id': 'x'}, headers=self.headers).status_code, 422)
+        self.client.post('/internal/face-login/attempts', json=create_body, headers=self.headers)
+        self.assertEqual(
+            self.client.post(f'/internal/face-login/attempts/{self.attempt_id}/frames',
+                             json={'epoch': 1, 'seq': 1, 'frame': self.jpeg, 'employee_id': 'x'},
+                             headers=self.headers).status_code,
+            422,
+        )
+        self.assertEqual(
+            self.client.post(f'/internal/face-login/attempts/{self.attempt_id}/frames',
+                             raw=b'x' * (300 * 1024 + 1), headers=self.headers).status_code,
+            413,
+        )
 
     def test_decode_rejects_invalid_non_jpeg_and_large_pixels_before_cv_decode(self):
         with self.assertRaises(ValueError):
@@ -73,18 +94,21 @@ class FaceLoginHttpTests(unittest.TestCase):
                 decode_jpeg(self.jpeg)
             decode.assert_not_called()
 
-    def test_rejection_does_not_return_vector_and_success_is_extraction_only(self):
-        headers = {'X-Face-Auth-Key': 'internal-test-key'}
-        with patch('face_login.http.extract_login_embeddings', return_value=[]):
-            result = self.client.post('/internal/face-login/extract', json=self.body, headers=headers)
-        self.assertEqual(result.json()['status'], 'rejected')
-        self.assertNotIn('embeddings', result.json())
-        with patch('face_login.http.extract_login_embeddings', return_value=[np.ones(512) / np.sqrt(512)] * 3):
-            result = self.client.post('/internal/face-login/extract', json=self.body, headers=headers)
-        self.assertEqual(result.status_code, 200)
-        self.assertEqual(len(result.json()['embeddings']), 3)
-        self.assertEqual(len(result.json()['embeddings'][0]), 512)
-        self.assertNotIn('employee_id', result.json())
+    def test_streaming_frames_never_return_identity_and_emit_embedding_only_when_pad_ready(self):
+        with patch('face_login.sessions.config.PAD_MIN_VOTES', 3):
+            self.client.post('/internal/face-login/attempts',
+                             json={'attempt_id': self.attempt_id, 'epoch': 1, 'ttl_ms': 15000}, headers=self.headers)
+            path = f'/internal/face-login/attempts/{self.attempt_id}/frames'
+            first = self.client.post(path, json={'epoch': 1, 'seq': 1, 'operation_id': 'op1', 'frame': self.jpeg}, headers=self.headers).json()
+            second = self.client.post(path, json={'epoch': 1, 'seq': 2, 'operation_id': 'op2', 'frame': self.jpeg}, headers=self.headers).json()
+            third = self.client.post(path, json={'epoch': 1, 'seq': 3, 'operation_id': 'op3', 'frame': self.jpeg}, headers=self.headers).json()
+        self.assertEqual(first['status'], 'pending')
+        self.assertNotIn('embedding', first)
+        self.assertEqual(second['status'], 'pending')
+        self.assertEqual(third['status'], 'embedding')
+        self.assertEqual(third['operation_id'], 'op3')
+        self.assertEqual(len(third['embedding']), 512)
+        self.assertNotIn('employee_id', third)
 
     def test_login_detector_counts_small_secondary_faces(self):
         from detection.detector import FaceDetector

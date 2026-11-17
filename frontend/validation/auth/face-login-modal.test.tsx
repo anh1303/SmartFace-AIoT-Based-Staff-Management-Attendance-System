@@ -3,124 +3,163 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { FaceLoginModal } from '../../src/features/auth/components/FaceLoginModal';
+import { ApiError } from '../../src/api/client';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-const { loginWithFace, config, challenge } = vi.hoisted(() => ({ loginWithFace: vi.fn(), config: vi.fn(), challenge: vi.fn() }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ loginWithFace }) }));
-vi.mock('../../src/features/auth/api/faceLoginApi', () => ({ faceLoginApi: { config, challenge } }));
+const api = vi.hoisted(() => ({ config: vi.fn(), start: vi.fn(), frame: vi.fn(), status: vi.fn(), cancel: vi.fn(), complete: vi.fn() }));
+const authState = vi.hoisted(() => ({ completeFaceLogin: vi.fn(), isLoggingOut: false }));
+vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => authState }));
+vi.mock('../../src/features/auth/api/faceLoginApi', async () => ({
+  faceLoginApi: api, FaceLoginHttpError: (await import('../../src/api/client')).ApiError,
+}));
 
-describe('Camera login dialog', () => {
-  let host: HTMLDivElement, root: Root, stop: ReturnType<typeof vi.fn>, openCamera: ReturnType<typeof vi.fn>;
+const pending = (seq: number) => ({ seq, state: 'pending', nextSeq: seq + 1, guidance: 'Giữ yên' });
+
+describe('Streaming camera login dialog', () => {
+  let host: HTMLDivElement, root: Root, stop: ReturnType<typeof vi.fn>, trackRef: { stop: ReturnType<typeof vi.fn>; onended?: () => void };
+  const scanButton = () => Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Bắt đầu nhận diện') || b.textContent?.includes('Thử lại'))!;
+  const backButton = () => Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Quay lại'))!;
+  async function openAndScan(success = vi.fn(), onClose = vi.fn()) {
+    await act(async () => { root.render(<FaceLoginModal onClose={onClose} onSuccess={success}/>); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+    await act(async () => { scanButton().click(); });
+    return { success, onClose };
+  }
   beforeEach(() => {
     vi.useFakeTimers(); vi.clearAllMocks();
+    authState.isLoggingOut = false;
     stop = vi.fn();
-    openCamera = vi.fn().mockResolvedValue({ getTracks: () => [{ stop }] });
-    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: openCamera } });
+    trackRef = { stop };
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [trackRef] }) } });
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
     Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 1280 });
     Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => 720 });
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as any);
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,YWJj');
-    config.mockResolvedValue(true);
-    challenge.mockResolvedValue({ challengeId: 'a'.repeat(32), expiresAt: Date.now() + 60000 });
-    loginWithFace.mockResolvedValue({ success: true, role: 'employee' });
+    api.config.mockResolvedValue(true);
+    api.start.mockResolvedValue({ attemptId: 'a'.repeat(32), expiresAt: Date.now() + 15000, intervalMs: 200 });
+    api.frame.mockImplementation(async (_id, seq) => seq >= 5 ? { seq, state: 'verified', nextSeq: seq + 1, guidance: 'ok' } : pending(seq));
+    api.cancel.mockResolvedValue(undefined);
+    authState.completeFaceLogin.mockResolvedValue({ success: true, role: 'employee' });
     host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
-  it('opens camera, captures straight-face frames and releases camera after login', async () => {
-    const success = vi.fn();
-    let submitted: string[] = [];
-    loginWithFace.mockImplementation(async (_id, frames) => { submitted = [...frames]; return { success: true, role: 'employee' }; });
-    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={success}/>); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
-    const scan = Array.from(document.querySelectorAll('button')).find(button => button.textContent?.includes('Bắt đầu nhận diện'))!;
-    expect(scan.disabled).toBe(false);
-    expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain('bật đăng nhập khuôn mặt');
-    await act(async () => { scan.click(); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(4000); });
-    expect(submitted).toEqual(Array(8).fill('YWJj'));
-    expect(loginWithFace).toHaveBeenCalledOnce();
+  it('sends the first frame immediately, then one frame per acknowledgement at >=200 ms, and completes on verification', async () => {
+    const { success } = await openAndScan();
+    expect(api.frame).toHaveBeenCalledTimes(1);
+    for (let n = 2; n <= 5; n++) {
+      await act(async () => { await vi.advanceTimersByTimeAsync(199); });
+      expect(api.frame).toHaveBeenCalledTimes(n - 1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(api.frame).toHaveBeenCalledTimes(n);
+    }
+    expect(api.frame.mock.calls.map(call => call[1])).toEqual([1, 2, 3, 4, 5]);
+    expect(authState.completeFaceLogin).toHaveBeenCalledWith('a'.repeat(32));
     expect(success).toHaveBeenCalledOnce();
     expect(stop).toHaveBeenCalledOnce();
   });
 
-  it('captures eight ordered frames at 200 ms intervals before submitting', async () => {
+  it('keeps exactly one request outstanding even at 500 ms response time and captures fresh frame after response', async () => {
     const captures = vi.mocked(HTMLCanvasElement.prototype.toDataURL);
     captures.mockImplementation(() => `data:image/jpeg;base64,frame${captures.mock.calls.length}`);
-    let submitted: string[] = [];
-    loginWithFace.mockImplementation(async (_id, frames) => { submitted = [...frames]; return { success: true }; });
-    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
-    const scan = Array.from(document.querySelectorAll('button')).find(button => button.textContent?.includes('Bắt đầu nhận diện'))!;
-    await act(async () => { scan.click(); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(199); });
-    expect(captures).toHaveBeenCalledTimes(0);
-    for (let count = 1; count <= 8; count++) {
-      await act(async () => { await vi.advanceTimersByTimeAsync(count === 1 ? 1 : 200); });
-      expect(captures).toHaveBeenCalledTimes(count);
-      if (count < 8) expect(loginWithFace).not.toHaveBeenCalled();
-    }
-    expect(submitted).toEqual(Array.from({ length: 8 }, (_, index) => `frame${index + 1}`));
-    expect(loginWithFace).toHaveBeenCalledOnce();
+    let release!: () => void;
+    api.frame.mockImplementationOnce(async (_id, seq) => { await new Promise<void>(r => { release = r; }); return pending(seq); });
+    await openAndScan();
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(api.frame).toHaveBeenCalledTimes(1);
+    expect(captures).toHaveBeenCalledTimes(1);
+    await act(async () => { release(); await vi.advanceTimersByTimeAsync(0); });
+    expect(api.frame).toHaveBeenCalledTimes(2);
+    expect(api.frame.mock.calls[1][2]).toBe('frame2');
   });
 
-  it('stops capture when unmounted during scanning', async () => {
-    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
-    const scan = Array.from(document.querySelectorAll('button')).find(button => button.textContent?.includes('Bắt đầu nhận diện'))!;
-    await act(async () => { scan.click(); await vi.advanceTimersByTimeAsync(500); });
+  it('shows busy guidance without sequence increment and delays retry by at least 200 ms from busy receipt', async () => {
+    api.frame.mockImplementationOnce(async () => {
+      await new Promise(r => setTimeout(r, 150));
+      throw new ApiError('Hệ thống đang bận, vui lòng giữ yên.', 429);
+    });
+    await openAndScan();
+    await act(async () => { await vi.advanceTimersByTimeAsync(150); });
+    expect(document.querySelector('[role="status"]')?.textContent).toContain('Hệ thống đang bận');
+    await act(async () => { await vi.advanceTimersByTimeAsync(199); });
+    expect(api.frame).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(api.frame.mock.calls.map(call => call[1]).slice(0, 2)).toEqual([1, 1]);
+  });
+
+  it('reconciles an ambiguous network failure through attempt status', async () => {
+    api.frame.mockRejectedValueOnce(new TypeError('network'));
+    api.status.mockResolvedValue({ state: 'ready', nextSeq: 2, expiresAt: Date.now() + 10000 });
+    await openAndScan();
+    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    expect(api.status).toHaveBeenCalledOnce();
+    expect(api.frame.mock.calls[1][1]).toBe(2);
+  });
+
+  it('locks ordinary close while completing and starts a new attempt on retry after failure', async () => {
+    api.frame.mockResolvedValueOnce({ seq: 1, state: 'verified', nextSeq: 2, guidance: 'ok' });
+    let finishComplete!: (v: any) => void;
+    authState.completeFaceLogin.mockImplementationOnce(() => new Promise(r => { finishComplete = r; }));
+    const onClose = vi.fn();
+    await openAndScan(vi.fn(), onClose);
+    expect(document.querySelector('[role="status"]')?.textContent).toContain('Đang hoàn tất đăng nhập');
+    expect(backButton().disabled).toBe(true);
+    await act(async () => { backButton().click(); });
+    expect(onClose).not.toHaveBeenCalled();
+
+    // Fail completion -> unlock UI -> retry creates a brand new attempt.
+    await act(async () => { finishComplete({ success: false, message: 'Thất bại' }); });
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Thất bại');
+    api.start.mockResolvedValueOnce({ attemptId: 'b'.repeat(32), expiresAt: Date.now() + 15000, intervalMs: 200 });
+    api.frame.mockResolvedValueOnce({ seq: 1, state: 'verified', nextSeq: 2, guidance: 'ok' });
+    await act(async () => { scanButton().click(); });
+    expect(authState.completeFaceLogin).toHaveBeenLastCalledWith('b'.repeat(32));
+  });
+
+  it('cancels before complete when closed or when camera track ends during scanning', async () => {
+    const onClose = vi.fn();
+    await openAndScan(vi.fn(), onClose);
+    await act(async () => { backButton().click(); });
+    expect(api.cancel).toHaveBeenCalledWith('a'.repeat(32));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(authState.completeFaceLogin).not.toHaveBeenCalled();
+  });
+
+  it('cancels the attempt and never completes when unmounted or camera track disconnects during scanning', async () => {
+    await openAndScan();
+    await act(async () => { trackRef.onended?.(); });
+    expect(api.cancel).toHaveBeenCalledWith('a'.repeat(32));
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Camera đã ngắt');
     await act(async () => root.unmount());
-    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
-    expect(loginWithFace).not.toHaveBeenCalled();
+    expect(authState.completeFaceLogin).not.toHaveBeenCalled();
     expect(stop).toHaveBeenCalledOnce();
     root = createRoot(host);
   });
 
-  it('does not submit incomplete frames when the challenge expires', async () => {
-    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
-    challenge.mockResolvedValue({ challengeId: 'a'.repeat(32), expiresAt: Date.now() + 600 });
-    const scan = Array.from(document.querySelectorAll('button')).find(button => button.textContent?.includes('Bắt đầu nhận diện'))!;
-    await act(async () => { scan.click(); await vi.advanceTimersByTimeAsync(2000); });
-    expect(loginWithFace).not.toHaveBeenCalled();
-    expect(document.querySelector('[role="alert"]')?.textContent).toContain('hết hạn');
+  it('stops at the attempt deadline without completing', async () => {
+    api.start.mockResolvedValue({ attemptId: 'a'.repeat(32), expiresAt: Date.now() + 1500, intervalMs: 200 });
+    api.frame.mockImplementation(async (_id, seq) => pending(seq));
+    await openAndScan();
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(authState.completeFaceLogin).not.toHaveBeenCalled();
+    expect(api.cancel).toHaveBeenCalled();
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('thời gian');
   });
 
-  it('does not authenticate when the camera frame is unavailable', async () => {
-    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
-    Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 0 });
-    const scan = Array.from(document.querySelectorAll('button')).find(button => button.textContent?.includes('Bắt đầu nhận diện'))!;
-    await act(async () => { scan.click(); await vi.advanceTimersByTimeAsync(2000); });
-    expect(loginWithFace).not.toHaveBeenCalled();
-    expect(document.querySelector('[role="alert"]')).not.toBeNull();
-  });
-
-  it('shows an authentication failure without reporting success', async () => {
-    const success = vi.fn();
-    loginWithFace.mockResolvedValue({ success: false, message: 'Không thể xác thực' });
-    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={success}/>); });
-    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
-    const scan = Array.from(document.querySelectorAll('button')).find(button => button.textContent?.includes('Bắt đầu nhận diện'))!;
-    await act(async () => { scan.click(); await vi.advanceTimersByTimeAsync(2000); });
-    expect(loginWithFace).toHaveBeenCalledOnce();
+  it('shows a terminal biometric failure without reporting success', async () => {
+    api.frame.mockRejectedValueOnce(new ApiError('Không thể xác thực khuôn mặt.', 401));
+    const { success } = await openAndScan();
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(success).not.toHaveBeenCalled();
+    expect(authState.completeFaceLogin).not.toHaveBeenCalled();
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('Không thể xác thực');
   });
 
-  it('stops camera on unmount and never authenticates without scanning', async () => {
-    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
-    await act(async () => root.unmount());
-    expect(stop).toHaveBeenCalledOnce();
-    expect(loginWithFace).not.toHaveBeenCalled();
-    root = createRoot(host);
-  });
-
   it('shows configuration failure without opening a camera', async () => {
-    config.mockResolvedValue(false);
+    api.config.mockResolvedValue(false);
     await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('chưa được bật');
-    expect(openCamera).not.toHaveBeenCalled();
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
   });
 });

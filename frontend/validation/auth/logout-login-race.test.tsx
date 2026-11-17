@@ -12,11 +12,17 @@ import { Sidebar } from '../../src/components/layout/Sidebar';
 const mockLoginApi = vi.fn();
 const mockLogoutApi = vi.fn();
 const mockMeApi = vi.fn().mockResolvedValue(null);
+const mockFaceComplete = vi.fn();
+const mockFaceStatus = vi.fn();
 
 vi.mock('@/features/auth', () => ({
   loginApi: (...args: any[]) => mockLoginApi(...args),
   logoutApi: () => mockLogoutApi(),
   meApi: () => mockMeApi(),
+  faceLoginApi: {
+    complete: (...args: any[]) => mockFaceComplete(...args),
+    status: (...args: any[]) => mockFaceStatus(...args),
+  },
   DEFAULT_USERS: {},
 }));
 
@@ -163,5 +169,40 @@ describe('AuthContext and Sidebar Logout/Login Race Prevention (P2-5)', () => {
     await act(async () => {
       root.unmount();
     });
+  });
+
+  it('reconciles a lost face-login completion response via attempt status and /me or cached retry', async () => {
+    const root = createRoot(host);
+    let authHandle: ReturnType<typeof useAuth> | null = null;
+    function TestComponent() { authHandle = useAuth(); return <div>Face Complete Test</div>; }
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider><TestComponent /></AuthProvider>
+        </QueryClientProvider>
+      );
+    });
+
+    // Case 1: complete response lost, but cookie was delivered (/me returns session).
+    mockFaceComplete.mockRejectedValueOnce(new TypeError('network lost'));
+    mockFaceStatus.mockResolvedValueOnce({ state: 'completed', nextSeq: 4, expiresAt: Date.now() + 5000 });
+    mockMeApi.mockResolvedValueOnce({ username: 'emp1', role: 'employee' });
+    let res1: any;
+    await act(async () => { res1 = await authHandle!.completeFaceLogin('a'.repeat(32)); });
+    expect(res1).toEqual({ success: true, role: 'employee' });
+    expect(mockFaceComplete).toHaveBeenCalledTimes(1);
+
+    // Case 2: complete response lost and cookie not yet delivered (/me null -> retries complete once).
+    mockFaceComplete
+      .mockRejectedValueOnce(new TypeError('network lost'))
+      .mockResolvedValueOnce({ session: { username: 'emp2', role: 'employee' }, targetRole: 'employee' });
+    mockFaceStatus.mockResolvedValueOnce({ state: 'completed', nextSeq: 4, expiresAt: Date.now() + 5000 });
+    mockMeApi.mockResolvedValueOnce(null);
+    let res2: any;
+    await act(async () => { res2 = await authHandle!.completeFaceLogin('b'.repeat(32)); });
+    expect(res2).toEqual({ success: true, role: 'employee' });
+    expect(mockFaceComplete).toHaveBeenCalledTimes(3);
+
+    await act(async () => { root.unmount(); });
   });
 });

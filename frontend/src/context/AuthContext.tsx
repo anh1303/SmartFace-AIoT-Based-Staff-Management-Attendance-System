@@ -5,6 +5,7 @@ import { loginApi, logoutApi, meApi, DEFAULT_USERS, faceLoginApi } from '@/featu
 import { useToast } from './ToastContext';
 import { useOptionalNotifications } from '../features/notifications';
 import { logger } from '../utils/logger';
+import { ApiError } from '../api/client';
 
 const authLogger = logger.child('AuthContext');
 
@@ -33,7 +34,7 @@ interface AuthContextType {
   isLoading: boolean;
   isLoggingOut: boolean;
   login: (identifier: string, password?: string, rememberMe?: boolean) => Promise<{ success: boolean; message?: string; role?: Role }>;
-  loginWithFace: (challengeId: string, frames: string[], signal?: AbortSignal) => Promise<{ success: boolean; message?: string; role?: Role }>;
+  completeFaceLogin: (attemptId: string) => Promise<{ success: boolean; message?: string; role?: Role }>;
   logout: () => Promise<void>;
   switchRole: (role: Role, employeesFallback?: Employee[]) => void;
   setCurrentUserSession: (session: UserSession | null) => void;
@@ -120,16 +121,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     (rememberMe ? localStorage : sessionStorage).setItem('userSession', JSON.stringify(session));
   }, [queryClient, notifications]);
 
-  const loginWithFace = useCallback(async (challengeId: string, frames: string[], signal?: AbortSignal) => {
+  /**
+   * Explicit face-login completion. The only step that receives an auth cookie.
+   * Serialized after an in-flight logout; never aborted (no rollback semantics).
+   * A lost response is reconciled via attempt status + /me, and a retry reuses
+   * the server's cached token instead of minting a second one.
+   */
+  const completeFaceLogin = useCallback(async (attemptId: string) => {
     if (activeLogoutPromiseRef.current) { try { await activeLogoutPromiseRef.current; } catch { /* completed logout */ } }
     const startingSession = globalSessionId;
-    try {
-      const { session, targetRole } = await faceLoginApi.login(challengeId, frames, signal);
-      if (signal?.aborted || startingSession !== globalSessionId) return { success: false, message: 'Lượt đăng nhập đã được hủy.' };
+    const isCancelledByLogout = () => Boolean(activeLogoutPromiseRef.current) || startingSession !== globalSessionId;
+    const accept = (session: UserSession, targetRole?: Role) => {
+      if (isCancelledByLogout()) return { success: false, message: 'Lượt đăng nhập đã được hủy.' };
       acceptSession(session, false);
       return { success: true, role: targetRole };
+    };
+    try {
+      const { session, targetRole } = await faceLoginApi.complete(attemptId);
+      return accept(session, targetRole);
     } catch (failure) {
-      return { success: false, message: failure instanceof Error ? failure.message : 'Không thể đăng nhập bằng khuôn mặt.' };
+      if (failure instanceof ApiError) return { success: false, message: failure.message };
+      if (isCancelledByLogout()) return { success: false, message: 'Lượt đăng nhập đã được hủy.' };
+      // Network failure: completion state is indeterminate.
+      try {
+        const status = await faceLoginApi.status(attemptId);
+        if (status.state === 'completed') {
+          const session = await meApi();
+          if (session) return accept(session, session.role);
+          if (isCancelledByLogout()) return { success: false, message: 'Lượt đăng nhập đã được hủy.' };
+          const retried = await faceLoginApi.complete(attemptId); // same cached token, cookie re-delivered
+          return accept(retried.session, retried.targetRole);
+        }
+      } catch { /* still offline */ }
+      return { success: false, message: 'Chưa xác định được kết quả đăng nhập. Vui lòng kiểm tra kết nối và tải lại trang.' };
     }
   }, [acceptSession]);
 
@@ -274,7 +298,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: isInitializing,
         isLoggingOut,
         login,
-        loginWithFace,
+        completeFaceLogin,
         logout,
         switchRole,
         setCurrentUserSession,

@@ -69,6 +69,12 @@ REM ======================================================================
 
 :start_services
 echo.
+echo Dang giai phong cac cong 3000, 5000, 5173 (neu con tien trinh cu)...
+for %%p in (3000 5000 5173) do (
+    for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":%%p " ^| findstr "LISTENING"') do (
+        taskkill /F /PID %%a >nul 2>&1
+    )
+)
 echo Dang khoi chay Face Auth API, Backend va Frontend trong cua so Terminal moi...
 start "SmartFace Backend" cmd /k "cd /d "%ROOT_DIR%backend" && npm run dev"
 start "SmartFace Frontend" cmd /k "cd /d "%ROOT_DIR%frontend" && npm run dev"

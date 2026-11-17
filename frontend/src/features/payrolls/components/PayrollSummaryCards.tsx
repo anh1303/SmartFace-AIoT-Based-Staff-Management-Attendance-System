@@ -135,7 +135,7 @@ export const PayrollSummaryCards: React.FC<PayrollSummaryCardsProps> = ({
           )}
         </div>
         <p className="text-[11px] text-slate-500 dark:text-slate-400">
-          {allPeriodRecords.length} nhân sự • Tổng lương:{' '}
+          {allPeriodRecords.length} nhân viên • Tổng lương:{' '}
           <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">
             {totalExpense.toLocaleString('vi-VN')} ₫
           </span>

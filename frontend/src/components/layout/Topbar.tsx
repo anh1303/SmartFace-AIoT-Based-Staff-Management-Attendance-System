@@ -29,7 +29,7 @@ export const Topbar: React.FC<{
   const parts = pathname.split('/');
   const page = parts[3];
   const employeeLabels: Record<string, string> = { dashboard: 'Tổng quan', attendance: 'Theo dõi chấm công', profile: 'Hồ sơ', payroll: 'Bảng lương' };
-  const managerGroups: Record<string, string> = { dashboard: 'Dashboard', employees: 'Nhân sự', 'employee-detail': 'Nhân viên', biometrics: 'Nhân sự', schedule: 'Nhân sự', attendance: 'Vận hành', devices: 'Vận hành', payroll: 'Tài chính', reports: 'Tài chính', profile: 'Cá nhân' };
+  const managerGroups: Record<string, string> = { dashboard: 'Dashboard', employees: 'Nhân viên', 'employee-detail': 'Nhân viên', biometrics: 'Nhân viên', schedule: 'Nhân viên', attendance: 'Vận hành', devices: 'Vận hành', payroll: 'Tài chính', reports: 'Tài chính', profile: 'Cá nhân' };
   const employeeGroups: Record<string, string> = { dashboard: 'Công việc', schedule: 'Công việc', attendance: 'Công việc', profile: 'Cá nhân', biometrics: 'Cá nhân', payroll: 'Cá nhân', 'salary-estimate': 'Cá nhân', 'salary-history': 'Cá nhân' };
   const isAccount = parts[2] === 'account';
   const group = isAccount ? 'Cá nhân' : (role === 'employee' ? employeeGroups[page] : managerGroups[page]) || 'SmartFace';

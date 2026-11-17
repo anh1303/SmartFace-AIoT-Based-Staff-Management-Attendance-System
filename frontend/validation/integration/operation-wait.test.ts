@@ -45,3 +45,8 @@ it('preserves the operation and item errors when a batch only partly succeeds', 
   await expect(waitForOperation(job)).rejects.toMatchObject({ operation: partial, message: expect.stringContaining('Lịch đã thay đổi') });
   await expect(waitForOperation({ ...job, status: 'failed' })).rejects.toBeInstanceOf(OperationFailedError);
 });
+
+it('shows the face enrollment rejection without unrelated batch counters', () => {
+  const error = new OperationFailedError({ ...job, type: 'biometric.enroll', status: 'failed', error: 'Không phát hiện được khuôn mặt hợp lệ' });
+  expect(error.message).toBe('Không phát hiện được khuôn mặt hợp lệ');
+});

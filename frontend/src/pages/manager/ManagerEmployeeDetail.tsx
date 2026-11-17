@@ -206,7 +206,6 @@ export const ManagerEmployeeDetail: React.FC = () => {
         phone: editEmployee.phone,
         email: editEmployee.email,
         hourly_rate: Number(editEmployee.hourly_rate),
-        fingerprint_enrolled: editEmployee.fingerprint_enrolled,
       });
       setEditEmployee(null);
     } catch {
@@ -262,7 +261,7 @@ export const ManagerEmployeeDetail: React.FC = () => {
                 }}
                 className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-[#272d5a] transition-all cursor-pointer"
               >
-                Xem nhân sự phòng mình
+                Xem nhân viên phòng mình
               </button>
             )}
           </div>
@@ -317,7 +316,7 @@ export const ManagerEmployeeDetail: React.FC = () => {
                 }}
                 className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-[#181c38] dark:hover:bg-[#20254b] dark:text-slate-200 rounded-xl text-xs font-semibold border border-slate-200 dark:border-[#272d5a] transition-all cursor-pointer"
               >
-                Xem nhân sự khác
+                Xem nhân viên khác
               </button>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
+import { ActionError, ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
@@ -96,7 +96,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
                 : 'bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-[#272d5a] hover:border-blue-300'
                 }`}
             >
-              Tất cả nhân sự ({employees.filter(e => e.status !== 'INACTIVE').length})
+              Tất cả nhân viên ({employees.filter(e => e.status !== 'INACTIVE').length})
             </button>
 
             <details className="relative min-w-0" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.open = false; }} onKeyDown={e => { if (e.key === 'Escape') { e.currentTarget.open = false; e.currentTarget.querySelector('summary')?.focus(); } }}>
@@ -269,7 +269,7 @@ export const BulkShiftModal: React.FC<BulkShiftModalProps> = ({
           />
         </div>
 
-        {error&&<div className="sf-feedback error" role="alert">{error}</div>}
+        <ActionError message={error}/>
         {bulkShiftType === 'OTHER' && !isTimeInvalid && bulkStartTime > bulkEndTime && <p className="text-xs text-blue-700">Ca qua đêm: kết thúc lúc {bulkEndTime} ngày hôm sau, thời lượng {calculateShiftWorkingHours({ start_time: bulkStartTime, end_time: bulkEndTime })} giờ. Mỗi ngày được chọn là ngày bắt đầu ca.</p>}
           <div className="pt-4 flex justify-end gap-2 border-t border-slate-200 dark:border-[#21264b]">
           <button

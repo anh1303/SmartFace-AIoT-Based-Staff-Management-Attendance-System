@@ -1,22 +1,36 @@
-import React, { createContext, useContext, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
 
 // A dialog owns its close lock; actions register only while their request is pending.
 export const DialogActionContext = createContext<(() => () => void) | null>(null);
 const FormPendingContext = createContext(false);
+
+export function ActionError({ message, title }: { message?: string; title?: string }) {
+  const toast = useToast(true);
+  const reportError = toast?.reportError;
+  useEffect(() => { if (message) reportError?.(message, title); }, [message, title, reportError]);
+  return message && !reportError ? <p role="alert" className="sf-feedback error text-sm">{message}</p> : null;
+}
 
 function useAction() {
   const register = useContext(DialogActionContext);
   const running = useRef(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const toast = useToast(true);
   async function run(action: () => unknown) {
     if (running.current) return;
     running.current = true;
     setPending(true); setError('');
     const release = register?.();
+    const checkpoint = toast?.getCheckpoint?.();
     try { await action(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Không thực hiện được thao tác. Vui lòng thử lại.'); }
+    catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'Không thực hiện được thao tác. Vui lòng thử lại.';
+      if (toast?.reportError) toast.reportError(message, undefined, checkpoint);
+      else setError(message);
+    }
     finally { running.current = false; setPending(false); release?.(); }
   }
   return { pending, error, run };

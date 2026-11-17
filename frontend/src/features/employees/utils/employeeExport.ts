@@ -69,11 +69,11 @@ export const exportEmployeesToExcel = ({
 
   return exportToExcel({
     format,
-    sheetName: 'Danh sách nhân sự',
+    sheetName: 'Danh sách nhân viên',
     headers,
     rows,
     fileName: targetFileName,
-  }).then(saved => { if (saved) showToast?.('Đã lưu danh sách nhân sự sang file Excel (.xlsx)!', 'success', "Xuất danh sách nhân viên thành công"); })
+  }).then(saved => { if (saved) showToast?.('Đã lưu danh sách nhân viên sang file Excel (.xlsx)!', 'success', "Xuất danh sách nhân viên thành công"); })
     .catch(() => showToast?.('Không thể lưu báo cáo.', 'error', "Không thể xuất danh sách nhân viên"));
 };
 

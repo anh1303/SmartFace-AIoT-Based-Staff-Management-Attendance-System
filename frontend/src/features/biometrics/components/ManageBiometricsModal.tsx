@@ -32,7 +32,7 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
       isOpen={Boolean(employee)}
       onClose={onClose}
       title="Quản Lý Sinh Trắc Học Nhân Viên"
-      subtitle={`Nhân sự: ${employee.full_name} (${employee.employee_id})`}
+      subtitle={`Nhân viên: ${employee.full_name} (${employee.employee_id})`}
       maxWidth="2xl"
     >
       <div className="space-y-5">
@@ -56,19 +56,14 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
 
         {/* Section 1: Face ID Management */}
         <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/50 flex items-center justify-center text-blue-600 dark:text-blue-400">
                 <ScanFace className="w-4 h-4" />
               </div>
-              <div>
-                <h5 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                  Khuôn mặt (Face ID)
-                </h5>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Nhận diện khuôn mặt 512-D qua camera AIoT
-                </p>
-              </div>
+              <h5 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                Khuôn mặt
+              </h5>
             </div>
 
             <BiometricStatusBadge enrolled={employee.face_enrolled} uppercase size="sm" />
@@ -112,19 +107,14 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
 
         {/* Section 2: Fingerprint Management */}
         <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                 <Fingerprint className="w-4 h-4" />
               </div>
-              <div>
-                <h5 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                  Vân tay (FAP30)
-                </h5>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Ghi nhận mẫu vân tay quang học 500 DPI qua IoT
-                </p>
-              </div>
+              <h5 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                Vân tay
+              </h5>
             </div>
 
             <BiometricStatusBadge enrolled={employee.fingerprint_enrolled} uppercase size="sm" />
@@ -145,13 +135,13 @@ export const ManageBiometricsModal: React.FC<ManageBiometricsModalProps> = ({
             </button>
 
             {employee.fingerprint_enrolled && (
-              <ActionButton busyLabel="Đang thu hồi…"
+              <ActionButton busyLabel="Đang xóa…"
                 type="button"
                 onClick={() => onDeleteFingerprint(employee)}
                 className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-600 dark:bg-rose-950/40 dark:hover:bg-rose-600 text-rose-600 hover:text-white dark:text-rose-300 dark:hover:text-white border border-rose-200 dark:border-rose-800/50 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Xóa Vân tay</span>
+                <span>Xóa vân tay</span>
               </ActionButton>
             )}
           </div>

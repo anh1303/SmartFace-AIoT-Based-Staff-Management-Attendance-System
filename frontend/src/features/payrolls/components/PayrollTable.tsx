@@ -40,8 +40,9 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({ currentRecords, empl
         const blocked = isFinalized || record.status !== 'PENDING' || (role !== 'admin' && (self || other || different));
         const reason = isFinalized ? 'Kỳ lương đã khóa' : record.status !== 'PENDING' ? 'Chỉ sửa được phiếu chờ duyệt' : self ? 'Không được tự sửa phiếu lương' : other ? 'Không được sửa phiếu của quản lý khác' : different ? 'Ngoài phòng ban được phụ trách' : '';
         const hours = record.total_working_hours ?? record.working_hours;
+        const range = record.calculation_range;
         return <TableRow key={record.payroll_id}>
-          <TableCell align="left"><div className="flex items-center gap-3"><Avatar src={emp?.avatar} name={name} size={40}/><div className="min-w-0"><strong className="break-words">{name}</strong><div className="sf-secondary">{record.employee_id}</div></div></div></TableCell>
+          <TableCell align="left"><div className="flex items-center gap-3"><Avatar src={emp?.avatar} name={name} size={40}/><div className="min-w-0"><strong className="break-words">{name}</strong><div className="sf-secondary">{record.employee_id}</div>{range && <p className="mt-1 text-xs text-slate-600 dark:text-slate-400" title={`Tính đến ${new Date(range.as_of).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}; chỉ gồm ca đã kết thúc và công đã duyệt.`}>{`${range.is_partial && record.status === 'PENDING' ? 'Tạm tính' : 'Đã tính'}: ${range.start_date.split('-').reverse().join('/')} – ${range.end_date.split('-').reverse().join('/')}`}</p>}</div></div></TableCell>
           <TableCell className="sf-money">{money(record.hourly_rate || 0)}</TableCell>
           <TableCell title="Giờ công đã lưu trên phiếu lương">{hours != null ? `${hours.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} giờ` : '—'}</TableCell>
           <TableCell>{record.total_overtime || 0} giờ</TableCell>

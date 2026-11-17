@@ -7,6 +7,15 @@ import type { PayrollRecord } from '../../src/types';
 vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: null }) }));
 
 describe('payroll table hours', () => {
+  it.each([[true, 'PENDING', 'Tạm tính'], [false, 'PENDING', 'Đã tính'], [true, 'FINALIZED', 'Đã tính']] as const)('shows the saved calculation range rather than assuming a full month (partial=%s, status=%s)', (partial, status, label) => {
+    const record = {
+      payroll_id: 'range', employee_id: 'NV-001', employee_name: 'Employee', status,
+      calculation_range: { start_date: '2026-10-01', end_date: partial ? '2026-10-15' : '2026-10-31', as_of: '2026-10-15T10:00:00Z', is_partial: partial },
+    } as PayrollRecord;
+    const html = renderToStaticMarkup(<PayrollTable selectedPeriod="2026-10" currentRecords={[record]} allPeriodRecords={[record]} employees={[]} searchTerm="" onSearchChange={() => {}} departmentFilter="ALL" onDepartmentFilterChange={() => {}} isFinalized={false} onOpenEdit={() => {}}/>);
+    expect(html).toContain(`${label}: 01/10/2026 – ${partial ? '15' : '31'}/10/2026`);
+  });
+
   it('shows saved payroll hours even when attendance contains a short uncredited scan', () => {
     const record = { payroll_id: '1', employee_id: 'NV-019', employee_name: 'Nhân viên', total_working_hours: 0, total_overtime: 0, total_late_early: 0, hourly_rate: 50000, allowance: 1500000, net_salary: 1500000, status: 'PENDING' } as PayrollRecord;
     const html = renderToStaticMarkup(<PayrollTable selectedPeriod="2026-10" currentRecords={[record]} allPeriodRecords={[record]} employees={[]} searchTerm="" onSearchChange={() => {}} departmentFilter="ALL" onDepartmentFilterChange={() => {}} isFinalized={false} onOpenEdit={() => {}}/>);

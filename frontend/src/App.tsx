@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppProviders } from './providers';
 import { AppRoutes } from './routes';
+import { ToastContainer } from './components/common/Toast';
 
 /**
  * Root Application Component
@@ -10,6 +11,7 @@ export default function App() {
   return (
     <AppProviders>
       <AppRoutes />
+      <ToastContainer />
     </AppProviders>
   );
 }

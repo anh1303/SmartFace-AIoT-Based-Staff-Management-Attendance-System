@@ -222,7 +222,6 @@ export const ManagerEmployeeList: React.FC = () => {
       email: editEmployee.email,
       phone: editEmployee.phone,
       hourly_rate: editEmployee.hourly_rate,
-      fingerprint_enrolled: editEmployee.fingerprint_enrolled,
     });
     setEditEmployee(null);
   };

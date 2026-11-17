@@ -10,7 +10,9 @@ export class OperationFailedError extends Error {
   constructor(public operation: Operation) {
     const details = operation.items?.filter(item => item.status === 'failed').slice(0, 5)
       .map(item => `${item.item_key}: ${item.error || 'Không lưu được'}`).join('; ');
-    super(`${operation.progress.succeeded} thành công, ${operation.progress.failed} lỗi, ${operation.progress.skipped} bỏ qua.${details ? ` ${details}` : operation.error ? ` ${operation.error}` : ''}`);
+    super(operation.type === 'biometric.enroll'
+      ? operation.error || 'Chưa lưu được Face ID. Vui lòng kiểm tra kết quả trước khi gửi lại.'
+      : `${operation.progress.succeeded} thành công, ${operation.progress.failed} lỗi, ${operation.progress.skipped} bỏ qua.${details ? ` ${details}` : operation.error ? ` ${operation.error}` : ''}`);
   }
 }
 

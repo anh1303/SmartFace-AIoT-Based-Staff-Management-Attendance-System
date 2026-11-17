@@ -1,4 +1,4 @@
-import { ActionButton } from '@/components/common/ActionFeedback';
+import { ActionError, ActionButton } from '@/components/common/ActionFeedback';
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { User, Camera, Check } from 'lucide-react';
@@ -97,20 +97,29 @@ function ProfileEditor({ profile, username }: { profile: AccountProfile; usernam
         <label className="sf-field">Email<input className="sf-input" type="email" value={draft.contact_email} maxLength={100} autoComplete="email" disabled={update.isPending} onChange={e => { setDraft({ ...draft, contact_email: e.target.value }); setSaved(false); }}/></label>
         <label className="sf-field">Số điện thoại<input className="sf-input" type="tel" maxLength={20} pattern="[+0-9 ().-]*" value={draft.phone} autoComplete="tel" disabled={update.isPending} onChange={e => { setDraft({ ...draft, phone: e.target.value }); setSaved(false); }}/></label>
       </div>
-      {update.isError && <div className="sf-feedback error" role="alert">{update.error.message} <button className="underline" onClick={() => { void save(draft, avatar)?.catch(() => {}); }}>Thử lưu lại</button></div>}
+      <ActionError message={update.isError ? update.error.message : undefined}/>
       {update.isError && (update.error as { code?: string }).code === 'PASSWORD_REQUIRED' && <PasswordReauthentication onComplete={() => { update.reset(); save(draft, avatar); }}/>}
       {validationError && <div className="sf-feedback error" role="alert">{validationError}</div>}
       {saved && <div className="sf-feedback" role="status"><Check size={17}/>Đã lưu thông tin.</div>}
       <div className="sf-footer"><ActionButton busyLabel="Đang lưu…" type="button" className="sf-button primary" disabled={update.isPending || imageBusy} onClick={() => save(draft)}>{update.isPending ? 'Đang lưu…' : 'Lưu'}</ActionButton></div>
     </div>}
     {tab === 'security' && <div role="tabpanel" className="pt-6"><PasswordForm/></div>}
-    {tab === 'work' && <div role="tabpanel" className="pt-6"><dl className="divide-y divide-slate-200 dark:divide-[#272d5a]">{[
+    {tab === 'work' && <div role="tabpanel" className="pt-6"><dl className="space-y-3">{[
       ['Mã nhân viên', profile.account.employee_code || 'Chưa liên kết hồ sơ nhân viên'],
       ['Phòng ban', profile.account.department || 'Chưa phân phòng ban'],
       ['Chức vụ', profile.account.position || 'Chưa khai báo'],
       ['Ngày vào làm', profile.account.joined_at ? new Date(profile.account.joined_at).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'Chưa có thông tin'],
-      ['Trạng thái', profile.account.status === 'ACTIVE' ? 'Hoạt động' : profile.account.status === 'INACTIVE' ? 'Tạm ngưng' : 'Chưa có thông tin'],
-    ].map(([label, value]) => <div key={label} className="flex justify-between gap-4 py-4 text-sm"><dt className="sf-secondary">{label}</dt><dd className="font-semibold text-right">{value}</dd></div>)}</dl></div>}
+      ['Trạng thái', profile.account.status === 'ACTIVE' ? 'Hoạt động' : profile.account.status === 'INACTIVE' ? 'Tạm ngưng' : profile.account.status === 'TERMINATED' ? 'Đã nghỉ việc' : 'Chưa có thông tin'],
+    ].map(([label, value]) => <div key={label} className="grid min-h-[50px] grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-transparent px-4 py-3 text-sm">
+      <dt className="font-semibold text-slate-900 dark:text-slate-100">{label}</dt>
+      <dd className="justify-self-end max-w-full text-right font-semibold break-words text-slate-900 dark:text-slate-100">
+        {label === 'Trạng thái' && ['ACTIVE', 'INACTIVE', 'TERMINATED'].includes(profile.account.status || '')
+          ? <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${profile.account.status === 'ACTIVE'
+            ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20'
+            : 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/20'}`}>{value}</span>
+          : value}
+      </dd>
+    </div>)}</dl></div>}
   </section>;
 }
 

@@ -97,7 +97,7 @@ export const BiometricsEmployeeTable: React.FC<BiometricsEmployeeTableProps> = (
         </TableHead>
         <TableBody>
           {filteredEmployees.length === 0 ? (
-            <TableEmpty colSpan={6} message="Không tìm thấy nhân sự phù hợp với bộ lọc" />
+            <TableEmpty colSpan={6} message="Không tìm thấy nhân viên phù hợp với bộ lọc" />
           ) : (
             filteredEmployees.map((emp) => (
               <TableRow key={emp.employee_id}>

@@ -1,3 +1,4 @@
+export { ScheduleShiftBadge } from './components/ScheduleShiftBadge';
 export { ScheduleHeader } from './components/ScheduleHeader';
 export { ScheduleWeekNavigator } from './components/ScheduleWeekNavigator';
 export { ScheduleMatrixTable } from './components/ScheduleMatrixTable';

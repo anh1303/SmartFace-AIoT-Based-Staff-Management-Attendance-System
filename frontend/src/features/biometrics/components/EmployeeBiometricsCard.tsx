@@ -199,7 +199,7 @@ export const EmployeeBiometricsCard: React.FC<EmployeeBiometricsCardProps> = ({
         </div>
       ) : (
         <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] text-center text-xs text-slate-400">
-          Chưa chọn nhân sự nào
+          Chưa chọn nhân viên nào
         </div>
       )}
     </div>

@@ -121,7 +121,7 @@ export const ReportsBreakdownAndLeaderboard: React.FC<ReportsBreakdownAndLeaderb
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading">
-              Bảng Xếp Hạng Chuyên Cần Nhân Sự
+              Bảng Xếp Hạng Chuyên Cần Nhân Viên
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Đánh giá tỷ lệ đúng giờ và chấp hành ca trực
@@ -183,7 +183,7 @@ export const ReportsBreakdownAndLeaderboard: React.FC<ReportsBreakdownAndLeaderb
             ))
           ) : (
             <div className="p-8 text-center text-xs text-slate-400 dark:text-slate-500">
-              Chưa có dữ liệu nhân sự
+              Chưa có dữ liệu nhân viên
             </div>
           )}
         </div>

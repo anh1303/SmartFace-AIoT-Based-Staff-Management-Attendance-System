@@ -17,6 +17,7 @@ vi.mock('../../src/context/ShiftContext', () => ({ useShiftContext: () => state.
 vi.mock('../../src/features/attendances/hooks/useEmployeeOverview', () => ({ useEmployeeOverview: () => state.overview }));
 import { EmployeeDashboard } from '../../src/pages/employee/EmployeeDashboard';
 import { EmployeeSchedule } from '../../src/pages/employee/EmployeeSchedule';
+import { ScheduleMatrixTable } from '../../src/features/schedules/components/ScheduleMatrixTable';
 import { EmployeeSalaryEstimate } from '../../src/pages/employee/EmployeeSalaryEstimate';
 import { EmployeeBiometrics } from '../../src/pages/employee/EmployeeBiometrics';
 import { Sidebar } from '../../src/components/layout/Sidebar';
@@ -52,19 +53,20 @@ describe('employee read-only portal', () => {
     expect(html).toContain('08:15 – 11:45'); expect(html).not.toContain('Thông tin người khác');
     expect(html).not.toContain('15.000'); expect(html).not.toContain('Soạn giải trình');
   });
-  it('navigates weeks, searches own assignments and selects a day without a shift exchange or edit action', () => {
+  it('navigates and selects own shifts without search, a date picker or edit actions', () => {
     root = createRoot(host); act(() => root!.render(<EmployeeSchedule />));
     expect(host.textContent).toContain('Đào tạo'); expect(host.textContent).not.toContain('Thông tin người khác');
     expect(host.textContent).not.toContain('đổi ca');
+    expect(host.querySelector('input[type="text"]')).toBeNull();
+    expect(host.querySelector('input[type="date"]')).toBeNull();
     act(() => (host.querySelector('[aria-label="Tuần sau"]') as HTMLButtonElement).click());
-    expect(host.textContent).toContain('13:30 – 17:30'); expect(host.textContent).not.toContain('Đào tạo');
-    const search = host.querySelector('input[type="text"]')!;
-    act(() => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, 'không tồn tại');
-      search.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    expect(host.textContent).not.toContain('13:30 – 17:30');
-    expect(host.textContent).toContain('Không có ca khớp');
+    expect(host.textContent).toContain('13:30 - 17:30'); expect(host.textContent).not.toContain('Đào tạo');
+    const emptyDay = host.querySelector('time[dateTime="2026-11-10"]')!.closest('button')!;
+    act(() => emptyDay.click());
+    expect(host.textContent).toContain('Chi tiết 10/11/2026');
+    expect(host.textContent).toContain('Chưa có ca làm việc được phân công.');
+    act(() => [...host.querySelectorAll('button')].find(button => button.textContent === 'Hôm nay')!.click());
+    expect(host.textContent).toContain('Đào tạo');
   });
   it('supports a six-week month calendar and month navigation', () => {
     root = createRoot(host); act(() => root!.render(<EmployeeSchedule />));
@@ -72,6 +74,24 @@ describe('employee read-only portal', () => {
     expect(host.querySelectorAll('time')).toHaveLength(42);
     act(() => (host.querySelector('[aria-label="Tháng sau"]') as HTMLButtonElement).click());
     expect(host.textContent).toContain('12/2026');
+  });
+  it('uses the same shift badges as admin for every shift type and past-day lock styling', () => {
+    state.shifts.workShifts = ['MORNING', 'AFTERNOON', 'OFFICE_HOURS', 'OTHER', 'OFF'].map((shift_type, index) => ({
+      shift_id: String(index), employee_id: 'E1', date: `2026-11-0${index + 2}`, shift_type, start_time: '08:00', end_time: '12:00',
+    }));
+    root = createRoot(host); act(() => root!.render(<EmployeeSchedule/>));
+    const employeeBadges = [...host.querySelectorAll('.schedule-shift-badge')];
+    expect(employeeBadges).toHaveLength(5);
+    const admin = document.createElement('div');
+    admin.innerHTML = render(<ScheduleMatrixTable filteredEmployees={[{ ...state.app.currentUser, status: 'ACTIVE' } as any]} daysOfWeek={Array.from({ length: 7 }, (_, index) => ({ date: `2026-11-0${index + 2}`, name: '', label: '', offset: index }))} workShifts={state.shifts.workShifts} onCellClick={() => {}}/>);
+    const adminBadges = [...admin.querySelectorAll('.schedule-shift-badge')].slice(0, 5);
+    expect(employeeBadges.map(badge => [badge.textContent, badge.className])).toEqual(adminBadges.map(badge => [badge.textContent, badge.className]));
+    expect(employeeBadges[0].className).toContain('text-emerald-700');
+    expect(employeeBadges[1].className).toContain('text-amber-700');
+    expect(employeeBadges[2].className).toContain('text-purple-700');
+    expect(employeeBadges[3].className).toContain('text-blue-700');
+    expect(employeeBadges[0].querySelector('[aria-label="Ca đã qua"]')).not.toBeNull();
+    expect(employeeBadges[4].textContent).toBe('Nghỉ ca');
   });
   it('shows an empty payroll without made-up money or export controls', () => {
     const html = render(<EmployeeSalaryEstimate />);

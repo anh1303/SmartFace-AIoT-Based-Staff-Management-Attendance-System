@@ -17,7 +17,7 @@ export const Sidebar: React.FC<{
     useDialogFocus(ref, isOpen && mobile, onClose);
     const groups = role === 'admin' || role === 'manager' ? [
         { label: 'Dashboard', items: [['Tổng quan', 'dashboard', LayoutDashboard]] },
-        { label: 'Nhân sự', items: [['Nhân viên', 'employees', Users], ['Sinh trắc học', 'biometrics', Fingerprint], ['Lịch làm việc', 'schedule', CalendarDays]] },
+        { label: 'Nhân viên', items: [['Nhân viên', 'employees', Users], ['Sinh trắc học', 'biometrics', Fingerprint], ['Lịch làm việc', 'schedule', CalendarDays]] },
         { label: 'Vận hành', items: [['Theo dõi chấm công', 'attendance', Clock], ['Thiết bị', 'devices', Server]] },
         { label: 'Tài chính', items: [['Bảng lương', 'payroll', Banknote], ['Báo cáo & thống kê', 'reports', BarChart3]] }
     ] : [{ label: 'Công việc', items: [['Tổng quan', 'dashboard', LayoutDashboard], ['Lịch làm việc', 'schedule', CalendarDays], ['Theo dõi chấm công', 'attendance', Clock]] }, { label: 'Cá nhân', items: [['Sinh trắc học', 'biometrics', ScanFace], ['Bảng lương', 'payroll', Banknote], ['Hồ sơ', '/app/account/profile', User]] }];
@@ -25,7 +25,7 @@ export const Sidebar: React.FC<{
     return <>{isOpen && <div className="sf-nav-backdrop lg:hidden" onClick={onClose}/>}
  <aside inert={mobile && !isOpen} aria-hidden={mobile && !isOpen ? true : undefined} ref={ref} role={isOpen ? 'dialog' : undefined} aria-modal={isOpen ? true : undefined} aria-label="Điều hướng SmartFace" className={`sf-sidebar ${isOpen ? 'is-open' : ''}`}>
  <div className="sf-brand"><ScanFace size={30}/><span>SmartFace</span><button className="sf-icon-button lg:hidden ml-auto" aria-label="Đóng điều hướng" onClick={onClose}><X size={20}/></button></div>
- <div className="px-5 pb-5 text-xs text-slate-500">Chấm công · Nhân sự · Tiền lương</div>
+ <div className="px-5 pb-5 text-xs text-slate-500">Chấm công · Nhân viên · Tiền lương</div>
  <nav className="flex-1 overflow-y-auto px-3">
    {groups.map(group => <div className="mb-6" key={group.label}>
      <p className="sf-nav-label">{group.label}</p>

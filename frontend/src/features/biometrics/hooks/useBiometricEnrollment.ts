@@ -324,7 +324,7 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
           ? 'Quản lý chỉ có quyền xóa sinh trắc học của nhân viên trong phòng ban của mình!'
           : 'Quản lý không có quyền xóa sinh trắc học của Quản lý khác!',
         'error',
-        "Không thể thu hồi vân tay");
+        "Không thể xóa vân tay");
       return;
     }
 
@@ -333,9 +333,9 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
       await queryClient.invalidateQueries({ queryKey: ['employees'] });
       await queryClient.invalidateQueries({ queryKey: ['biometrics'] });
       await queryClient.invalidateQueries({ queryKey: ['fingerprint-current'] });
-      showToast(`Đã thu hồi vân tay của ${emp.full_name} (${emp.employee_id}). Pi sẽ xóa mẫu trên cảm biến khi kết nối.`, 'success', 'Thu hồi vân tay thành công');
+      showToast(`Đã xóa vân tay của ${emp.full_name} (${emp.employee_id}). Pi sẽ xóa mẫu trên cảm biến khi kết nối.`, 'success', 'Xóa vân tay thành công');
     } catch (err: any) {
-      showToast(`Chưa thu hồi được vân tay của ${emp.full_name} (${emp.employee_id}): ${err?.message || 'Lỗi kết nối máy chủ'}. Kiểm tra trạng thái vân tay trước khi thử lại.`, 'error', "Không thể thu hồi vân tay");
+      showToast(`Chưa xóa được vân tay của ${emp.full_name} (${emp.employee_id}): ${err?.message || 'Lỗi kết nối máy chủ'}. Kiểm tra trạng thái vân tay trước khi thử lại.`, 'error', "Không thể xóa vân tay");
     }
 
   }, [currentUser, isManager, managerDept, role, showToast, updateEmployee]);

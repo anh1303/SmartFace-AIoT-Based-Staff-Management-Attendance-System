@@ -201,7 +201,7 @@ export const ManagerBiometrics: React.FC = () => {
 
             {!currentEmp ? (
               <div className="py-12 text-center text-slate-500 dark:text-slate-400 text-xs">
-                Phòng ban hiện chưa có nhân sự nào khác để cập nhật dữ liệu sinh trắc học.
+                Phòng ban hiện chưa có nhân viên nào khác để cập nhật dữ liệu sinh trắc học.
               </div>
             ) : (
               <>
@@ -234,7 +234,7 @@ export const ManagerBiometrics: React.FC = () => {
                     hasEnrolledFingerprint={Boolean(currentEmp?.fingerprint_enrolled)}
                     onDeleteFingerprint={() => {
                       if (!currentEmp) return;
-                      if (window.confirm(`Bạn có chắc chắn muốn xóa dữ liệu vân tay của nhân viên ${currentEmp.full_name} (${currentEmp.employee_id}) không? Mẫu vân tay sẽ được thu hồi và xóa khỏi thiết bị.`)) {
+                      if (window.confirm(`Bạn có chắc chắn muốn xóa dữ liệu vân tay của nhân viên ${currentEmp.full_name} (${currentEmp.employee_id}) không? Mẫu vân tay sẽ bị xóa khỏi hệ thống. Pi sẽ xóa mẫu trên cảm biến khi kết nối.`)) {
                         return handleDeleteFingerprint(currentEmp);
                       }
                     }}

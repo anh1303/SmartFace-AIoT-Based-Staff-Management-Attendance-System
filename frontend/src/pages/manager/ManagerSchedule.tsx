@@ -274,7 +274,7 @@ export const ManagerSchedule: React.FC = () => {
     }
 
     if (targetEmps.length === 0) {
-      showToast('Không có nhân sự hợp lệ nào để phân ca (đã loại trừ tài khoản cá nhân và Quản lý khác)!', 'error', "Không thể phân công ca làm việc");
+      showToast('Không có nhân viên hợp lệ nào để phân ca (đã loại trừ tài khoản cá nhân và Quản lý khác)!', 'error', "Không thể phân công ca làm việc");
       return;
     }
 

@@ -35,7 +35,7 @@ export const PayrollFinalizeModal: React.FC<PayrollFinalizeModalProps> = ({
       subtitle={`Kỳ quyết toán: Tháng ${selectedPeriod}`}
     >
       <div className="space-y-4">
-        {isPeriodActive ? (
+        {isPeriodActive && (
           <div className="p-4 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 rounded-xl text-xs text-rose-800 dark:text-rose-300 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
             <div>
@@ -44,17 +44,6 @@ export const PayrollFinalizeModal: React.FC<PayrollFinalizeModalProps> = ({
                 Hệ thống chỉ cho phép chốt bảng lương định kỳ khi ngày làm việc cuối cùng của kỳ đã kết thúc
                 để tránh phát sinh sai lệch giờ công và ca làm việc chưa diễn ra.
                 Nếu có nhân viên nghỉ việc trước hạn, vui lòng sử dụng chức năng <strong>Quyết toán sớm</strong> riêng cho nhân viên đó.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-            <div>
-              <p className="font-bold">Lưu ý bảo mật:</p>
-              <p className="mt-1 text-slate-600 dark:text-slate-300">
-                Sau khi chốt sổ, các phiếu thuộc quyền được chốt sẽ được khóa (read-only), nhân viên có thể xem
-                phiếu lương chi tiết và kế toán sẽ tiến hành giải ngân qua ngân hàng.
               </p>
             </div>
           </div>

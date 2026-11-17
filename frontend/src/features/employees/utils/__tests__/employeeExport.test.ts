@@ -114,7 +114,7 @@ describe('employeeExport utility', () => {
     expect(XLSX.writeFile).toHaveBeenCalledTimes(1);
     const [wb, fileName] = (XLSX.writeFile as any).mock.calls[0];
     expect(fileName).toBe('Danh_sach_nhan_su_test.xlsx');
-    expect(wb.SheetNames).toContain('Danh sách nhân sự');
+    expect(wb.SheetNames).toContain('Danh sách nhân viên');
     expect(showToast).not.toHaveBeenCalled();
   });
 });

@@ -327,7 +327,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                   <div className="flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-blue-500" />
                     <span>
-                      <strong>{dept.employee_count}</strong> nhân sự
+                      <strong>{dept.employee_count}</strong> nhân viên
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -349,7 +349,7 @@ export const DepartmentTabContent: React.FC<DepartmentTabContentProps> = ({
                         </p>
                         {dept.employee_count > 0 && (
                           <p className="text-[11px] text-rose-600 dark:text-rose-300 mt-0.5">
-                            Lưu ý: Có <strong>{dept.employee_count}</strong> nhân sự đang thuộc
+                            Lưu ý: Có <strong>{dept.employee_count}</strong> nhân viên đang thuộc
                             phòng ban này. Hệ thống sẽ tự động gỡ liên kết phòng ban an toàn trên CSDL.
                           </p>
                         )}

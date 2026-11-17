@@ -318,7 +318,7 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
                 Xác Thực Face ID Qua Camera
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Nhân sự: <strong className="text-slate-900 dark:text-white">{employeeName}</strong> ({employeeCode})
+                Nhân viên: <strong className="text-slate-900 dark:text-white">{employeeName}</strong> ({employeeCode})
               </p>
             </div>
           </div>

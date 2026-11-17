@@ -48,7 +48,7 @@ describe('Frontend UI Timezone Mismatch (Scenario 5)', () => {
     const bodyHtml = document.body.innerHTML;
     // The modal should recognize that October 2026 has ended in VN time
     expect(bodyHtml).not.toContain('Kỳ lương chưa kết thúc');
-    expect(bodyHtml).toContain('Lưu ý bảo mật');
+    expect(bodyHtml).not.toContain('Lưu ý bảo mật');
     // Button must be enabled
     const buttons = Array.from(document.body.querySelectorAll('button'));
     const finalizeBtn = buttons.find((b) => b.textContent?.includes('Đồng ý chốt bảng lương'));

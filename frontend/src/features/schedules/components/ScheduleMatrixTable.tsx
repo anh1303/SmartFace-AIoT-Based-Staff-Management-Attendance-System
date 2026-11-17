@@ -2,6 +2,7 @@ import {Avatar} from '../../../components/common/Avatar';
 import React from 'react';
 import { Employee, WorkShift } from '../../../types';
 import { getTodayVNString } from '../../../utils/dateUtils';
+import { ScheduleShiftBadge } from './ScheduleShiftBadge';
 
 export interface DayOfWeekItem {
   name: string;
@@ -25,51 +26,6 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
 }) => {
   const todayVN = getTodayVNString();
 
-  const renderShiftBadge = (shift: WorkShift | undefined, isPast = false) => {
-    if (!shift || shift.shift_type === 'OFF') {
-      return (
-        <div className={`py-2 px-1 rounded-lg bg-slate-100 dark:bg-[#0b0d19] text-slate-400 dark:text-slate-500 text-[11px] text-center border border-slate-200/80 dark:border-[#21264b] transition-colors truncate flex items-center justify-center gap-1 ${isPast ? 'opacity-70' : 'group-hover:border-slate-300 dark:group-hover:border-blue-900/50'}`}>
-          <span>Nghỉ ca</span>
-          {isPast && <span className="text-[10px] opacity-75" title="Đã qua (Đã khóa)">🔒</span>}
-        </div>
-      );
-    }
-
-    let colorClass = 'bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/40';
-    let typeName = 'Hành chính';
-
-    if (shift.shift_type === 'MORNING') {
-      colorClass = 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40';
-      typeName = 'Ca Sáng';
-    } else if (shift.shift_type === 'AFTERNOON') {
-      colorClass = 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/40';
-      typeName = 'Ca Chiều';
-    } else if (shift.shift_type === 'OTHER') {
-      colorClass = 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/40';
-      typeName = 'Ca khác';
-    }
-
-    const tooltipText = shift.note
-      ? `${typeName} (${shift.start_time} - ${shift.end_time})\nChú thích: ${shift.note}`
-      : `${typeName} (${shift.start_time} - ${shift.end_time})`;
-
-    return (
-      <div
-        className={`py-1.5 px-1.5 xl:px-2 rounded-lg border text-xs text-center transition-all shadow-xs ${colorClass} ${isPast ? 'opacity-85 saturate-75 border-dashed' : ''} w-full overflow-hidden`}
-        title={tooltipText + (isPast ? '\n[Ca đã qua - Chỉ xem chi tiết]' : '')}
-      >
-        <div className="flex items-center justify-center gap-1">
-          <p className="font-bold tracking-tight truncate text-[11px] xl:text-xs text-center">
-            {typeName}
-          </p>
-          {isPast && <span className="text-[10px] shrink-0" title="Đã qua (Đã khóa)">🔒</span>}
-        </div>
-        <p className="font-mono text-[10px] xl:text-[11px] text-slate-700 dark:text-slate-200 mt-0.5 truncate text-center">
-          {shift.start_time} - {shift.end_time}
-        </p>
-      </div>
-    );
-  };
 
   return (
     <div className="bg-white dark:bg-[#13162b] border border-slate-300 dark:border-[#28305c] rounded-xl overflow-hidden shadow-xs">
@@ -164,7 +120,7 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
                           disabled={isInactive}
                           onClick={() => onCellClick(emp.employee_id, emp.full_name, day.date, `${day.name} (${day.label})`)}
                         >
-                          {renderShiftBadge(shift, isPast)}
+                          <ScheduleShiftBadge shift={shift} isPast={isPast}/>
                         </button>
                       </td>
                     );

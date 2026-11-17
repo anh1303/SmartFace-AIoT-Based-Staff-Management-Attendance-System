@@ -17,10 +17,10 @@ it('keeps each bulk-action error below its own button rather than adding toolbar
   const root = createRoot(host)
   try {
     await act(async () => root.render(<FloatingNotificationBubble />))
-    const read = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('Đánh dấu đã đọc'))!
-    const clear = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('Xóa tất cả'))!
+    const read = [...document.querySelectorAll('button')].find(button => button.textContent?.includes('Đánh dấu đã đọc'))!
+    const clear = [...document.querySelectorAll('button')].find(button => button.textContent?.includes('Xóa tất cả'))!
     await act(async () => { read.click(); clear.click() })
-    const errors = host.querySelectorAll('[role=alert]')
+    const errors = document.querySelectorAll('[role=alert]')
     expect(errors).toHaveLength(2)
     for (const error of errors) expect(error.parentElement?.querySelectorAll('button')).toHaveLength(1)
     expect(errors[0].parentElement?.contains(read)).toBe(true)

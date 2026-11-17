@@ -33,6 +33,12 @@ export interface PayrollRecord {
   total_late_early: number;
   total_absence_penalty?: number;
   approved_absence_count?: number | null;
+  calculation_range?: {
+    start_date: string;
+    end_date: string;
+    as_of: string;
+    is_partial: boolean;
+  } | null;
   allowance: number;
   net_salary: number;
   status: PayrollStatus;

@@ -366,7 +366,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
                   <div className="flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-indigo-500" />
                     <span>
-                      <strong>{pos.employee_count}</strong> nhân sự đang giữ chức vụ này
+                      <strong>{pos.employee_count}</strong> nhân viên đang giữ chức vụ này
                     </span>
                   </div>
                 </div>
@@ -382,7 +382,7 @@ export const PositionTabContent: React.FC<PositionTabContentProps> = ({
                         </p>
                         {pos.employee_count > 0 && (
                           <p className="text-[11px] text-rose-600 dark:text-rose-300 mt-0.5">
-                            Lưu ý: Có <strong>{pos.employee_count}</strong> nhân sự đang giữ
+                            Lưu ý: Có <strong>{pos.employee_count}</strong> nhân viên đang giữ
                             chức vụ này. Hệ thống sẽ tự động gỡ liên kết an toàn trên CSDL.
                           </p>
                         )}

@@ -115,7 +115,7 @@ export const FingerprintEnrollmentSection: React.FC<Props> = props => {
             {props.hasEnrolledFingerprint ? 'Đăng ký lại vân tay mới' : 'Bắt đầu lấy mẫu thật'}
           </ActionButton>
           {props.hasEnrolledFingerprint && props.onDeleteFingerprint && (
-            <ActionButton busyLabel="Đang thu hồi…"
+            <ActionButton busyLabel="Đang xóa…"
               type="button"
               className="rounded-lg border border-red-500/40 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 px-3.5 py-2 text-sm font-medium disabled:opacity-40 flex items-center gap-1.5 transition-colors cursor-pointer"
               disabled={props.disabled || busy}

@@ -124,7 +124,6 @@ export async function updateEmployeeApi(id: string, updates: Partial<Employee>) 
       status: updates.status,
       hourly_rate: updates.hourly_rate,
       avatar_url: updates.avatar,
-      fingerprint_enrolled: updates.fingerprint_enrolled,
       expectedVersion: updates.updated_at,
     }),
   });

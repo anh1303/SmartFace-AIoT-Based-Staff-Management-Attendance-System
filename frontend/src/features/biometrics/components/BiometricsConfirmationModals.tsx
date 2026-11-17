@@ -27,7 +27,7 @@ export const FaceConfirmModal: React.FC<FaceConfirmModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Xác nhận cập nhật dữ liệu khuôn mặt"
-      subtitle={`Nhân sự: ${currentEmp?.full_name} (${currentEmp?.employee_id})`}
+      subtitle={`Nhân viên: ${currentEmp?.full_name} (${currentEmp?.employee_id})`}
       maxWidth="md"
     >
       <div className="space-y-4">
@@ -65,7 +65,7 @@ export const FaceConfirmModal: React.FC<FaceConfirmModalProps> = ({
                 <span>Đang trích xuất & lưu...</span>
               </>
             ) : (
-              <span>Xác nhận lưu thay đổi</span>
+              <span>Xác nhận</span>
             )}
           </ActionButton>
         </div>
@@ -94,7 +94,7 @@ export const FaceResultModal: React.FC<FaceResultModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Thông báo kết quả trích xuất sinh trắc học khuôn mặt"
-      subtitle={`Nhân sự: ${currentEmp?.full_name} (${currentEmp?.employee_id})`}
+      subtitle={`Nhân viên: ${currentEmp?.full_name} (${currentEmp?.employee_id})`}
       maxWidth="md"
     >
       <div className="space-y-4">
@@ -208,7 +208,7 @@ export const FingerprintConfirmModal: React.FC<FingerprintConfirmModalProps> = (
       isOpen={isOpen}
       onClose={onClose}
       title="Xác nhận cập nhật mẫu vân tay"
-      subtitle={`Nhân sự: ${currentEmp?.full_name} (${currentEmp?.employee_id})`}
+      subtitle={`Nhân viên: ${currentEmp?.full_name} (${currentEmp?.employee_id})`}
       maxWidth="md"
     >
       <div className="space-y-4">

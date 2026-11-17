@@ -1,4 +1,4 @@
-import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
+import { ActionError, ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '../../../components/common/Modal';
@@ -176,7 +176,7 @@ export const ShiftEditModal: React.FC<ShiftEditModalProps> = ({
             />
           </div>
 
-          {error&&<div className="sf-feedback error" role="alert">{error}</div>}
+          <ActionError message={error}/>
           {shiftType === 'OTHER' && !isTimeInvalid && startTime > endTime && <p className="text-xs text-blue-700">Ca qua đêm: kết thúc lúc {endTime} ngày hôm sau, thời lượng {calculateShiftWorkingHours({ start_time: startTime, end_time: endTime })} giờ. Ngày công là ngày bắt đầu ca.</p>}
           </fieldset>
           <div className="pt-4 flex justify-between items-center gap-2 border-t border-slate-200 dark:border-[#21264b]">

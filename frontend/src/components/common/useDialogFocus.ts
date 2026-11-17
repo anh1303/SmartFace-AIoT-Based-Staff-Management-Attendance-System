@@ -14,7 +14,10 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, open: boolean
             document.body.style.overflow = 'hidden';
         }
         stack.push(id);
-        const focusable = () => Array.from(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]') || []).filter(e => e.getClientRects().length > 0);
+        const focusable = () => {
+            const selector = 'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]';
+            return [...Array.from(ref.current?.querySelectorAll<HTMLElement>(selector) || []), ...Array.from(document.querySelectorAll<HTMLElement>('[data-toast-layer] button:not(:disabled)'))].filter(e => e.getClientRects().length > 0);
+        };
         const frame = requestAnimationFrame(() => focusable()[0]?.focus());
         const handle = (e: KeyboardEvent) => { if (stack.at(-1) !== id)
             return; if (e.key === 'Escape') {
@@ -28,11 +31,11 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, open: boolean
                 e.preventDefault();
                 return;
             }
-            if (e.shiftKey && (document.activeElement === first || !ref.current?.contains(document.activeElement))) {
+            if (e.shiftKey && (document.activeElement === first || !nodes.includes(document.activeElement as HTMLElement))) {
                 e.preventDefault();
                 last?.focus();
             }
-            else if (!e.shiftKey && (document.activeElement === last || !ref.current?.contains(document.activeElement))) {
+            else if (!e.shiftKey && (document.activeElement === last || !nodes.includes(document.activeElement as HTMLElement))) {
                 e.preventDefault();
                 first.focus();
             }

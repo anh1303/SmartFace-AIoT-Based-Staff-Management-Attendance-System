@@ -1,4 +1,4 @@
-import { ActionButton } from '@/components/common/ActionFeedback';
+import { ActionError, ActionButton } from '@/components/common/ActionFeedback';
 import React, { useState } from 'react';
 import {
   Wifi,
@@ -165,7 +165,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
 
   return (
     <section className="sf-panel p-5 space-y-5">
-      {actionError && <p role="alert" className="sf-feedback error">{actionError}</p>}
+      <ActionError message={actionError}/>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2.5">

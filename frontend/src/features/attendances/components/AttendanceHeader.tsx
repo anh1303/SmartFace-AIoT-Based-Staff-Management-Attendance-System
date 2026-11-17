@@ -1,6 +1,6 @@
 import { ActionButton } from '@/components/common/ActionFeedback';
 import { ReportExportButton, type ReportFormat } from '@/components/common/ReportExportButton';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Unlock,
   Lock,
@@ -15,7 +15,7 @@ interface AttendanceHeaderProps {
   startDate: string;
   endDate: string;
   isCurrentDateLocked: boolean;
-  onToggleLock: () => void;
+  onToggleLock: () => void | Promise<void>;
   onExportCSV: (format: ReportFormat) => unknown;
   canLock?: boolean;
   canExport?: boolean;
@@ -33,6 +33,7 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
   const { role } = useAuth();
   const isAdmin = role === 'admin';
   const isSameDay = startDate === endDate;
+  const [pendingLabel, setPendingLabel] = useState<string | null>(null);
 
   const canClickLock = isAdmin && Boolean(startDate) && canLock;
 
@@ -43,11 +44,13 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
       title="Giám sát chấm công"
       actions={
         <>
-          {isAdmin && <ActionButton busyLabel={isCurrentDateLocked ? 'Đang mở khóa…' : 'Đang chốt công…'}
+          {isAdmin && <ActionButton busyLabel={pendingLabel ?? (isCurrentDateLocked ? 'Đang mở khóa…' : 'Đang chốt công…')}
             type="button"
-            onClick={() => {
+            onClick={async () => {
               if (canClickLock) {
-                return onToggleLock();
+                setPendingLabel(isCurrentDateLocked ? 'Đang mở khóa…' : 'Đang chốt công…');
+                try { await onToggleLock(); }
+                finally { setPendingLabel(null); }
               }
             }}
             disabled={!canClickLock}

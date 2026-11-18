@@ -53,9 +53,9 @@ export async function loginApi(identifier: string, password?: string, rememberMe
   return normalizeLoginResponse(res);
 }
 
-export function normalizeLoginResponse(res: ApiResponse<any>) {
+export function normalizeLoginResponse(res: ApiResponse<any> | null | undefined) {
 
-  if (res.success && res.data) {
+  if (res?.success && res.data) {
     const { user } = res.data;
     const roleName = (user.role_name || user.role || '').toUpperCase();
     let targetRole: Role = 'employee';
@@ -87,11 +87,11 @@ export function normalizeLoginResponse(res: ApiResponse<any>) {
     return { session, targetRole };
   }
 
-  throw new Error(res.message || 'Xác thực thất bại!');
+  throw new Error(res?.message || 'Xác thực thất bại!');
 }
 
-export async function logoutApi() {
-  await apiFetch('/api/auth/logout', { method: 'POST' });
+export async function logoutApi(signal?: AbortSignal): Promise<void> {
+  await apiFetch('/api/auth/logout', { method: 'POST', signal });
 }
 
 export async function meApi(): Promise<UserSession | null> {

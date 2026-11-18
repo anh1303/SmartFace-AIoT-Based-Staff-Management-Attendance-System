@@ -37,7 +37,7 @@ describe('Streaming camera login dialog', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as any);
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,YWJj');
     api.config.mockResolvedValue(true);
-    api.start.mockResolvedValue({ attemptId: 'a'.repeat(32), expiresAt: Date.now() + 15000, intervalMs: 200 });
+    api.start.mockResolvedValue({ attemptId: 'a'.repeat(32), expiresAt: Date.now() + 15000, remainingMs: 15000, intervalMs: 200 });
     api.frame.mockImplementation(async (_id, seq) => seq >= 5 ? { seq, state: 'verified', nextSeq: seq + 1, guidance: 'ok' } : pending(seq));
     api.cancel.mockResolvedValue(undefined);
     authState.completeFaceLogin.mockResolvedValue({ success: true, role: 'employee' });
@@ -74,18 +74,29 @@ describe('Streaming camera login dialog', () => {
     expect(api.frame.mock.calls[1][2]).toBe('frame2');
   });
 
-  it('shows busy guidance without sequence increment and delays retry by at least 200 ms from busy receipt', async () => {
+  it('shows busy guidance without sequence increment and delays retry by at least 200 ms from busy receipt, while IP_RATE_LIMIT/ATTEMPT_CAPACITY stop without retrying every 200 ms', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // ENGINE_BUSY jitter -> 200 + 100 = 300 ms
     api.frame.mockImplementationOnce(async () => {
       await new Promise(r => setTimeout(r, 150));
-      throw new ApiError('Hệ thống đang bận, vui lòng giữ yên.', 429);
+      throw new ApiError('Hệ thống đang bận, vui lòng giữ yên.', 429, undefined, 'ENGINE_BUSY');
     });
     await openAndScan();
     await act(async () => { await vi.advanceTimersByTimeAsync(150); });
     expect(document.querySelector('[role="status"]')?.textContent).toContain('Hệ thống đang bận');
-    await act(async () => { await vi.advanceTimersByTimeAsync(199); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(299); });
     expect(api.frame).toHaveBeenCalledTimes(1);
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(api.frame.mock.calls.map(call => call[1]).slice(0, 2)).toEqual([1, 1]);
+
+    // When IP_RATE_LIMIT is returned, modal stops scanning and does NOT retry every 200 ms
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    api.frame.mockClear();
+    api.start.mockResolvedValueOnce({ attemptId: 'c'.repeat(32), expiresAt: Date.now() + 15000, remainingMs: 15000, intervalMs: 200 });
+    api.frame.mockRejectedValueOnce(new ApiError('Đã thử quá nhiều lần. Vui lòng chờ một phút.', 429, undefined, 'IP_RATE_LIMIT'));
+    await act(async () => { scanButton().click(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+    expect(api.frame).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Đã thử quá nhiều lần');
   });
 
   it('reconciles an ambiguous network failure through attempt status', async () => {
@@ -138,13 +149,88 @@ describe('Streaming camera login dialog', () => {
   });
 
   it('stops at the attempt deadline without completing', async () => {
-    api.start.mockResolvedValue({ attemptId: 'a'.repeat(32), expiresAt: Date.now() + 1500, intervalMs: 200 });
+    api.start.mockResolvedValue({ attemptId: 'a'.repeat(32), expiresAt: Date.now() + 1500, remainingMs: 1500, intervalMs: 200 });
     api.frame.mockImplementation(async (_id, seq) => pending(seq));
     await openAndScan();
     await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
     expect(authState.completeFaceLogin).not.toHaveBeenCalled();
     expect(api.cancel).toHaveBeenCalled();
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('thời gian');
+  });
+
+  it('uses remainingMs with performance.now() even when client clock is skewed ±10 minutes, subtracts network RTT, and never extends deadline on status', async () => {
+    // Client clock is 10 minutes ahead of server expiresAt (so Date.now() >= expiresAt immediately),
+    // yet remainingMs is 3000 ms so scanning must still proceed using monotonic budget.
+    api.start.mockResolvedValue({
+      attemptId: 'a'.repeat(32),
+      expiresAt: Date.now() - 10 * 60 * 1000,
+      remainingMs: 3000,
+      intervalMs: 200,
+    });
+    api.frame.mockRejectedValueOnce(new TypeError('network glitch'));
+    // Status returns an artificially larger remainingMs (10000), which must NOT extend the local deadline (>3000)
+    api.status.mockResolvedValueOnce({
+      state: 'ready',
+      nextSeq: 2,
+      expiresAt: Date.now() + 600000,
+      remainingMs: 10000,
+    });
+    api.frame.mockImplementation(async (_id, seq, _f, signal?: AbortSignal) => new Promise((_res, rej) => {
+      signal?.addEventListener('abort', () => rej(new DOMException('Aborted', 'AbortError')));
+    }));
+    await openAndScan();
+    // Advance past the original 3000 ms budget (status must not have extended it to 10000 ms)
+    await act(async () => { await vi.advanceTimersByTimeAsync(3100); });
+    expect(authState.completeFaceLogin).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('thời gian');
+    expect(scanButton().disabled).toBe(false);
+  });
+
+  it('aborts hung config/start/frame/status requests via per-request and deadline timers with Vietnamese error messages and unlocks UI', async () => {
+    // 1. Hung config (4s timeout) -> shows Vietnamese error, not raw English DOMException
+    api.config.mockImplementationOnce((signal?: AbortSignal) => new Promise((_res, rej) => {
+      signal?.addEventListener('abort', () => rej(signal.reason ?? new DOMException('The operation timed out.', 'TimeoutError')));
+    }));
+    await act(async () => { root.render(<FaceLoginModal onClose={vi.fn()} onSuccess={vi.fn()}/>); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(4100); });
+    expect(document.querySelector('[role="alert"]')?.textContent).not.toContain('The operation timed out');
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Không nhận diện được trong thời gian cho phép');
+    await act(async () => root.unmount());
+    root = createRoot(host);
+
+    // 2. Hung start (4s timeout) -> aborts and unlocks UI with Vietnamese message
+    api.start.mockImplementationOnce((signal?: AbortSignal) => new Promise((_res, rej) => {
+      signal?.addEventListener('abort', () => rej(signal.reason ?? new DOMException('The operation timed out.', 'TimeoutError')));
+    }));
+    await openAndScan();
+    await act(async () => { await vi.advanceTimersByTimeAsync(4100); });
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Không nhận diện được trong thời gian cho phép');
+    expect(scanButton().disabled).toBe(false);
+
+    // 3. Hung status (2s timeout after ambiguous frame network failure) -> aborts and unlocks UI with Vietnamese message
+    api.start.mockResolvedValueOnce({ attemptId: 'a'.repeat(32), expiresAt: Date.now() + 15000, remainingMs: 15000, intervalMs: 200 });
+    api.frame.mockRejectedValueOnce(new TypeError('network error'));
+    api.status.mockImplementationOnce((_id: string, signal?: AbortSignal) => new Promise((_res, rej) => {
+      signal?.addEventListener('abort', () => rej(signal.reason ?? new DOMException('The operation timed out.', 'TimeoutError')));
+    }));
+    await act(async () => { scanButton().click(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Không nhận diện được trong thời gian cho phép');
+    expect(scanButton().disabled).toBe(false);
+
+    // 4. Hung frame (attempt deadline 1.5s) -> aborts via independent deadline timer and unlocks UI
+    api.start.mockResolvedValueOnce({ attemptId: 'a'.repeat(32), expiresAt: Date.now() + 1500, remainingMs: 1500, intervalMs: 200 });
+    api.frame.mockImplementationOnce(async (_id, _seq, _frame, signal?: AbortSignal) => {
+      return await new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')));
+      });
+    });
+    const { success } = await openAndScan();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1600); });
+    expect(success).not.toHaveBeenCalled();
+    expect(authState.completeFaceLogin).not.toHaveBeenCalled();
+    expect(scanButton().disabled).toBe(false);
+    expect(backButton().disabled).toBe(false);
   });
 
   it('shows a terminal biometric failure without reporting success', async () => {

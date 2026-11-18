@@ -4,13 +4,26 @@ import { Modal } from '../../../components/common/Modal';
 import { useAuth } from '../../../context/AuthContext';
 import { FaceLoginHttpError, faceLoginApi } from '../api/faceLoginApi';
 import { cameraDelay, captureJpeg, stopCamera } from '../lib/faceCamera';
+import { FACE_LOGIN_TIMEOUTS, withBoundedSignal } from '../lib/faceLoginRequest';
 
 const MIN_INTERVAL_MS = 200;
+const TIMEOUT_MESSAGE = 'Không nhận diện được trong thời gian cho phép. Vui lòng thử lại.';
+
+function isAbortOrTimeoutError(failure: unknown): boolean {
+  const name = (failure as { name?: string } | null)?.name;
+  const message = (failure as { message?: string } | null)?.message ?? '';
+  return (
+    name === 'TimeoutError' ||
+    name === 'AbortError' ||
+    message === 'The operation timed out.' ||
+    message === 'The operation was aborted.'
+  );
+}
 
 /**
  * Streaming face login: one fresh frame per acknowledged request, at most one
- * in flight, at least 200 ms between frame starts. Stops at verification and
- * calls the explicit completion step (the only request that sets the cookie).
+ * in flight, at least 200 ms between frame starts. Uses monotonic performance.now()
+ * with server remainingMs (subtracting request RTT) and an independent deadline timer.
  */
 export function FaceLoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { completeFaceLogin, isLoggingOut } = useAuth();
@@ -18,6 +31,7 @@ export function FaceLoginModal({ onClose, onSuccess }: { onClose: () => void; on
   const stream = useRef<MediaStream | null>(null);
   const controller = useRef<AbortController | null>(null);
   const scanController = useRef<AbortController | null>(null);
+  const deadlineTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mounted = useRef(true);
   const locked = useRef(false);
   const completing = useRef(false);
@@ -31,8 +45,16 @@ export function FaceLoginModal({ onClose, onSuccess }: { onClose: () => void; on
   const [message, setMessage] = useState('Đang chuẩn bị camera…');
   const [error, setError] = useState('');
 
+  function clearDeadlineTimer() {
+    if (deadlineTimer.current !== null) {
+      clearTimeout(deadlineTimer.current);
+      deadlineTimer.current = null;
+    }
+  }
+
   function cancelActive() {
     generation.current += 1; // fence stale responses before the async cancel
+    clearDeadlineTimer();
     scanController.current?.abort();
     scanController.current = null;
     const id = activeAttempt.current;
@@ -46,7 +68,8 @@ export function FaceLoginModal({ onClose, onSuccess }: { onClose: () => void; on
     controller.current = abort;
     async function open() {
       try {
-        if (!(await faceLoginApi.config(abort.signal))) throw new Error('Đăng nhập khuôn mặt chưa được bật. Bạn có thể đăng nhập bằng mật khẩu.');
+        const enabled = await withBoundedSignal(FACE_LOGIN_TIMEOUTS.CONFIG_MS, abort.signal, (sig) => faceLoginApi.config(sig));
+        if (!enabled) throw new Error('Đăng nhập khuôn mặt chưa được bật. Bạn có thể đăng nhập bằng mật khẩu.');
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera cần HTTPS hoặc localhost và trình duyệt hỗ trợ camera.');
         const camera = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } });
         if (abort.signal.aborted) { stopCamera(camera); return; }
@@ -63,6 +86,7 @@ export function FaceLoginModal({ onClose, onSuccess }: { onClose: () => void; on
           setMessage('Chưa thể bắt đầu nhận diện.');
           const denied = failure instanceof DOMException && failure.name === 'NotAllowedError';
           setError(denied ? 'Chưa được phép dùng camera. Hãy cho phép camera trong trình duyệt rồi mở lại.'
+            : isAbortOrTimeoutError(failure) ? TIMEOUT_MESSAGE
             : failure instanceof Error ? failure.message : 'Không mở được camera. Vui lòng thử lại.');
         }
       }
@@ -79,47 +103,108 @@ export function FaceLoginModal({ onClose, onSuccess }: { onClose: () => void; on
     const scanAbort = new AbortController();
     scanController.current = scanAbort;
     const signal = scanAbort.signal;
-    const current = () => !modalSignal.aborted && !signal.aborted && generation.current === myGeneration && mounted.current;
+    let deadlineExpired = false;
+    const current = () => !modalSignal.aborted && !signal.aborted && !deadlineExpired && generation.current === myGeneration && mounted.current;
+
+    let localDeadlineMono = Infinity;
+    const scheduleDeadlineTimer = (newDeadlineMono: number) => {
+      localDeadlineMono = Math.min(localDeadlineMono, newDeadlineMono);
+      clearDeadlineTimer();
+      const delayMs = Math.max(0, localDeadlineMono - performance.now());
+      deadlineTimer.current = setTimeout(() => {
+        deadlineExpired = true;
+        scanAbort.abort(new Error(TIMEOUT_MESSAGE));
+      }, delayMs);
+    };
+
     try {
-      const attempt = await faceLoginApi.start(signal);
+      const tStartReq = performance.now();
+      const attempt = await withBoundedSignal(FACE_LOGIN_TIMEOUTS.START_MS, signal, (sig) => faceLoginApi.start(sig));
+      const tStartRecv = performance.now();
       if (!current()) { void faceLoginApi.cancel(attempt.attemptId); return; }
       activeAttempt.current = attempt.attemptId;
+
+      const rawRemainingMs = typeof attempt.remainingMs === 'number'
+        ? attempt.remainingMs
+        : Math.max(0, attempt.expiresAt - Date.now());
+      const initialRemaining = Math.max(0, rawRemainingMs - (tStartRecv - tStartReq));
+      scheduleDeadlineTimer(tStartRecv + initialRemaining);
+
       setMessage('Nhìn thẳng và giữ khuôn mặt trong khung.');
       const interval = Math.max(MIN_INTERVAL_MS, attempt.intervalMs);
       let seq = 1;
       let verified = false;
       let lastStart = -Infinity;
+      let nextDelayMs = interval;
       while (!verified) {
-        const wait = lastStart + interval - Date.now();
+        const wait = lastStart + nextDelayMs - performance.now();
         if (wait > 0) await cameraDelay(wait, signal);
-        if (!current()) return;
-        if (!video.current || Date.now() >= attempt.expiresAt) throw new Error('Không nhận diện được trong thời gian cho phép. Vui lòng thử lại.');
-        lastStart = Date.now();
+        if (!current()) {
+          if (deadlineExpired) throw new Error(TIMEOUT_MESSAGE);
+          return;
+        }
+        const remBeforeFrame = localDeadlineMono - performance.now();
+        if (!video.current || remBeforeFrame <= 0) throw new Error(TIMEOUT_MESSAGE);
+        lastStart = performance.now();
+        nextDelayMs = interval;
         const frame = captureJpeg(video.current); // newest image, captured only when a send is possible
         try {
-          const result = await faceLoginApi.frame(attempt.attemptId, seq, frame, signal);
-          if (!current()) return;
+          const frameTimeout = Math.min(FACE_LOGIN_TIMEOUTS.FRAME_MS, Math.max(1, remBeforeFrame));
+          const result = await withBoundedSignal(frameTimeout, signal, (sig) =>
+            faceLoginApi.frame(attempt.attemptId, seq, frame, sig, remBeforeFrame),
+          );
+          if (!current()) {
+            if (deadlineExpired) throw new Error(TIMEOUT_MESSAGE);
+            return;
+          }
           setMessage(result.guidance);
           verified = result.state === 'verified';
           seq = result.nextSeq;
         } catch (failure) {
+          if (deadlineExpired || (signal.aborted && generation.current === myGeneration && mounted.current && !modalSignal.aborted)) {
+            throw new Error(TIMEOUT_MESSAGE);
+          }
           if (!current()) return;
           if (failure instanceof FaceLoginHttpError) {
             if (failure.statusCode === 429) {
+              const code = failure.code;
+              if (code === 'IP_RATE_LIMIT' || code === 'ATTEMPT_CAPACITY') {
+                throw failure;
+              }
               setMessage(failure.message || 'Hệ thống đang bận, đang thử lại…');
-              lastStart = Date.now(); // delay fresh frame retry by at least 200 ms from busy receipt
+              lastStart = performance.now();
+              nextDelayMs = code === 'ENGINE_BUSY'
+                ? 200 + Math.floor(Math.random() * 201)
+                : MIN_INTERVAL_MS;
               continue;
             }
             throw failure;
           }
-          // Ambiguous network failure: ask the server which sequence it expects.
-          const status = await faceLoginApi.status(attempt.attemptId, signal);
-          if (!current()) return;
+          // Ambiguous network failure: ask the server which sequence it expects within status timeout & remaining budget.
+          const remBeforeStatus = localDeadlineMono - performance.now();
+          if (remBeforeStatus <= 0) throw new Error(TIMEOUT_MESSAGE);
+          const tStatusReq = performance.now();
+          const status = await withBoundedSignal(
+            Math.min(FACE_LOGIN_TIMEOUTS.STATUS_MS, Math.max(1, remBeforeStatus)),
+            signal,
+            (sig) => faceLoginApi.status(attempt.attemptId, sig),
+          );
+          const tStatusRecv = performance.now();
+          if (!current()) {
+            if (deadlineExpired) throw new Error(TIMEOUT_MESSAGE);
+            return;
+          }
+          if (typeof status.remainingMs === 'number') {
+            const statusRemaining = Math.max(0, status.remainingMs - (tStatusRecv - tStatusReq));
+            // Status can only shorten the local deadline, never extend it.
+            scheduleDeadlineTimer(tStatusRecv + statusRemaining);
+          }
           if (status.state === 'verified') verified = true;
           else if (status.state === 'ready') seq = status.nextSeq;
           else throw new Error('Lượt nhận diện đã kết thúc. Vui lòng thử lại.');
         }
       }
+      clearDeadlineTimer();
       if (!current() || loggingOut.current) {
         const id = activeAttempt.current; activeAttempt.current = null;
         if (id) void faceLoginApi.cancel(id);
@@ -130,22 +215,31 @@ export function FaceLoginModal({ onClose, onSuccess }: { onClose: () => void; on
       setMessage('Đang hoàn tất đăng nhập…');
       const result = await completeFaceLogin(attempt.attemptId);
       activeAttempt.current = null;
+      if (!mounted.current || modalSignal.aborted || generation.current !== myGeneration || loggingOut.current) {
+        return;
+      }
       if (!result.success) throw new Error(result.message || 'Không thể xác thực. Vui lòng thử lại.');
       stopCamera(stream.current); stream.current = null;
       onSuccess();
     } catch (failure) {
-      if (current() || completing.current) {
+      clearDeadlineTimer();
+      const shouldReportError = (current() || completing.current || deadlineExpired) && mounted.current && !modalSignal.aborted && generation.current === myGeneration;
+      if (shouldReportError) {
         if (activeAttempt.current && !completing.current) {
           const id = activeAttempt.current;
           activeAttempt.current = null;
           await faceLoginApi.cancel(id);
         }
         if (mounted.current) {
-          setError(failure instanceof Error ? failure.message : 'Không thể xác thực. Vui lòng thử lại.');
+          const msg = (deadlineExpired || isAbortOrTimeoutError(failure))
+            ? TIMEOUT_MESSAGE
+            : failure instanceof Error ? failure.message : 'Không thể xác thực. Vui lòng thử lại.';
+          setError(msg);
           setMessage('Nhìn thẳng vào camera để bắt đầu lại.');
         }
       }
     } finally {
+      clearDeadlineTimer();
       completing.current = false; locked.current = false;
       if (mounted.current) { setIsCompleting(false); setBusy(false); }
     }

@@ -14,22 +14,88 @@ const frameSchema = z.object({
 })
 export type EngineFrame = z.infer<typeof frameSchema>
 
+function isTimeoutError(error: unknown, signal?: AbortSignal): boolean {
+  const name = (error as { name?: string } | null)?.name
+  if (name === 'TimeoutError') return true
+  if (name === 'AbortError' && (signal?.reason as { name?: string } | null)?.name === 'TimeoutError') return true
+  return false
+}
+
+async function readBoundedBody(response: Response, maxBytes: number, signal: AbortSignal): Promise<string> {
+  const contentLength = response.headers?.get('content-length')
+  if (contentLength !== null && contentLength !== undefined && contentLength.trim() !== '') {
+    const declared = Number(contentLength)
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      try { await response.body?.cancel() } catch { /* ignore */ }
+      throw new EngineError('invalid')
+    }
+  }
+
+  if (!response.body) {
+    let text: string
+    try {
+      text = await response.text()
+    } catch (error) {
+      throw new EngineError(isTimeoutError(error, signal) ? 'timeout' : 'unavailable')
+    }
+    if (Buffer.byteLength(text, 'utf8') > maxBytes) throw new EngineError('invalid')
+    return text
+  }
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let totalBytes = 0
+  try {
+    while (true) {
+      let piece: Awaited<ReturnType<typeof reader.read>>
+      try {
+        piece = await reader.read()
+      } catch (error) {
+        try { await reader.cancel() } catch { /* ignore */ }
+        throw new EngineError(isTimeoutError(error, signal) ? 'timeout' : 'unavailable')
+      }
+      if (piece.done) break
+      const value = piece.value
+      if (!value) continue
+      totalBytes += value.byteLength
+      if (totalBytes > maxBytes) {
+        try { await reader.cancel() } catch { /* ignore */ }
+        throw new EngineError('invalid')
+      }
+      chunks.push(value)
+    }
+  } finally {
+    try { reader.releaseLock() } catch { /* ignore */ }
+  }
+
+  const merged = new Uint8Array(totalBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    merged.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return new TextDecoder('utf-8', { fatal: false }).decode(merged)
+}
+
 async function call(path: string, body: unknown, timeoutMs: number, maxBytes = 40_000) {
+  const signal = AbortSignal.timeout(Math.max(1, timeoutMs))
   let response: Response
   try {
     response = await fetch(`${env.FACE_AUTH_URL}/internal/face-login${path}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Face-Auth-Key': env.FACE_AUTH_INTERNAL_KEY },
-      body: JSON.stringify(body), signal: AbortSignal.timeout(Math.max(1, timeoutMs)),
+      body: JSON.stringify(body), signal,
     })
   } catch (error) {
-    throw new EngineError((error as Error)?.name === 'TimeoutError' ? 'timeout' : 'unavailable')
+    throw new EngineError(isTimeoutError(error, signal) ? 'timeout' : 'unavailable')
   }
-  if (response.status === 429) throw new EngineError('busy')
-  if (response.status === 410 || response.status === 404) throw new EngineError('gone')
-  if (response.status === 409) throw new EngineError('conflict')
-  if (!response.ok) throw new EngineError('unavailable')
-  const text = await response.text()
-  if (text.length > maxBytes) throw new EngineError('invalid')
+  if (!response.ok) {
+    try { await response.body?.cancel() } catch { /* ignore */ }
+    if (response.status === 429) throw new EngineError('busy')
+    if (response.status === 410 || response.status === 404) throw new EngineError('gone')
+    if (response.status === 409) throw new EngineError('conflict')
+    throw new EngineError('unavailable')
+  }
+  const text = await readBoundedBody(response, maxBytes, signal)
   try { return JSON.parse(text) as unknown } catch { throw new EngineError('invalid') }
 }
 
@@ -58,7 +124,7 @@ export async function engineFrame(
   if (data.attempt_id !== attemptId || data.seq !== seq || data.model_version !== env.FACE_AUTH_MODEL_VERSION) {
     throw new EngineError('invalid')
   }
-  if (operationId && data.operation_id !== undefined && data.operation_id !== operationId) {
+  if (operationId && data.operation_id !== operationId) {
     throw new EngineError('invalid')
   }
   if (data.boot_id !== bootId) throw new EngineError('gone') // Python restarted: PAD evidence lost

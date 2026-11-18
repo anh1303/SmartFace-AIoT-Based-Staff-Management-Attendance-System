@@ -4,6 +4,19 @@ import { AppError } from '../../common/AppError.js';
 import { loginSchema, registerSchema } from './auth.dto.js';
 import * as service from './auth.service.js';
 import { env } from '../../config/env.js';
+import {
+  FACE_LOGIN_BINDING_COOKIE,
+  clearFaceLoginBindingCookie,
+} from './face-login/face-login.cookies.js';
+import {
+  dropCompletedFaceLoginRecovery,
+  invalidateFaceLoginBinding,
+} from './face-login/face-login.service.js';
+
+const isAllowedOrigin = (origin: string | undefined): boolean => {
+  if (!origin) return false;
+  return env.CORS_ORIGIN.split(',').map(value => value.trim()).includes(origin);
+};
 
 export const getCookieOptions = (rememberMe = false): import('express').CookieOptions => ({
   httpOnly: true,
@@ -18,13 +31,19 @@ export const getCookieOptions = (rememberMe = false): import('express').CookieOp
 export const login = async (req: Request, res: Response) => {
   const body = loginSchema.parse(req.body);
   const result = await service.login(body);
+  dropCompletedFaceLoginRecovery(req.cookies?.[FACE_LOGIN_BINDING_COOKIE]);
   res.cookie('token', result.accessToken, getCookieOptions(Boolean(body.rememberMe)));
   successResponse(res, { user: result.user }, 'Logged in');
 };
 
-export const logout = (_req: Request, res: Response) => {
-  const { maxAge, expires, ...clearOptions } = getCookieOptions(false);
+export const logout = (req: Request, res: Response) => {
+  if (isAllowedOrigin(req.get('origin'))) {
+    invalidateFaceLoginBinding(req.cookies?.[FACE_LOGIN_BINDING_COOKIE]);
+  }
+  const baseOptions = getCookieOptions(false);
+  const { maxAge, expires, ...clearOptions } = baseOptions;
   res.clearCookie('token', clearOptions);
+  clearFaceLoginBindingCookie(res, baseOptions);
   successResponse(res, null, 'Logged out');
 };
 

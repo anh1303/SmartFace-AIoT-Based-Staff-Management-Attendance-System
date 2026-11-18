@@ -81,14 +81,21 @@ export class AttemptStore {
 
   /** Reserve an attempt for one frame. Returns a cached result for an exact duplicate. */
   startFrame(a: Attempt, seq: number, digest: string): { op: string } | { cached: FrameResult } {
-    if (a.last && a.last.seq === seq) {
+    const now = this.now()
+    if (ACTIVE.includes(a.state) && a.state !== 'COMPLETING' && a.deadline <= now) {
+      a.state = 'EXPIRED'
+    }
+    if (a.state === 'EXPIRED' || a.state === 'CANCELLED') throw new AttemptError(410, 'gone')
+    if (a.state === 'FAILED') throw new AttemptError(410, 'gone')
+    if (a.state === 'PROCESSING' || a.state === 'COMPLETING' || a.state === 'COMPLETED') {
+      throw new AttemptError(409, 'conflict')
+    }
+    if ((a.state === 'READY' || a.state === 'VERIFIED') && a.last && a.last.seq === seq) {
       if (a.last.digest === digest) return { cached: a.last.result }
       throw new AttemptError(409, 'conflict')
     }
-    if (a.state === 'EXPIRED' || a.state === 'CANCELLED') throw new AttemptError(410, 'gone')
     if (a.state !== 'READY' || seq !== a.nextSeq) throw new AttemptError(409, 'conflict')
     if (a.frames >= MAX_ATTEMPT_FRAMES) { a.state = 'FAILED'; throw new AttemptError(410, 'exhausted') }
-    const now = this.now()
     a.frameTimes = a.frameTimes.filter(t => t > now - 1000)
     if (a.frameTimes.length >= this.maxPerSecond) throw new AttemptError(429, 'frame_rate')
     a.state = 'PROCESSING'
@@ -174,6 +181,43 @@ export class AttemptStore {
   recover(a: Attempt): Completion | null {
     if (a.state !== 'COMPLETED' || !a.completion || a.completion.expiresAt <= this.now()) return null
     return { user: a.completion.user, accessToken: a.completion.accessToken }
+  }
+
+  /** Invalidates all active attempts and completed recovery caches for a browser binding. */
+  invalidateBinding(binding: string): string[] {
+    if (!binding) return []
+    const bindingHash = hashBinding(binding)
+    const cancelledIds: string[] = []
+    for (const [id, a] of this.items) {
+      if (a.bindingHash !== bindingHash) continue
+      if (ACTIVE.includes(a.state)) {
+        a.state = 'CANCELLED'
+        cancelledIds.push(id)
+      }
+      a.operation = null
+      a.candidate = null
+      a.count = 0
+      a.verifiedAt = null
+      a.last = null
+      a.completion = null
+      this.items.delete(id)
+    }
+    return cancelledIds
+  }
+
+  /** Drops only COMPLETED recovery entries for a browser binding without cancelling active attempts. */
+  dropCompletedRecovery(binding: string): void {
+    if (!binding) return
+    const bindingHash = hashBinding(binding)
+    for (const [id, a] of this.items) {
+      if (a.bindingHash !== bindingHash) continue
+      if (a.state === 'COMPLETED' || a.completion !== null) {
+        a.completion = null
+        if (a.state === 'COMPLETED') {
+          this.items.delete(id)
+        }
+      }
+    }
   }
 }
 

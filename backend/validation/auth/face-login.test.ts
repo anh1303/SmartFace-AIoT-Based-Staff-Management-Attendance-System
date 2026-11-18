@@ -18,6 +18,7 @@ import {
   cancelAttempt,
   completeAttempt,
   faceLoginConfigured,
+  invalidateFaceLoginBinding,
   processAttemptFrame,
   startAttempt,
 } from '../../src/modules/auth/face-login/face-login.service.js'
@@ -38,14 +39,20 @@ describe('Face login policies and attempt store', () => {
     expect(faceSessionAllowed(undefined, 'ADMIN', false)).toBe(true)
 
     Object.assign(env, { FACE_LOGIN_ENABLED: true, FACE_AUTH_INTERNAL_KEY: 'x'.repeat(32) })
+    delete process.env.ATTENDANCE_STABLE_COUNT
+    expect(faceLoginConfigured()).toBe(true)
+    process.env.ATTENDANCE_STABLE_COUNT = '   '
+    expect(faceLoginConfigured()).toBe(true)
+    process.env.ATTENDANCE_STABLE_COUNT = ' 4 '
+    expect(faceLoginConfigured()).toBe(true)
     process.env.ATTENDANCE_STABLE_COUNT = '1'
     expect(faceLoginConfigured()).toBe(true)
     process.env.ATTENDANCE_STABLE_COUNT = '6'
     expect(faceLoginConfigured()).toBe(true)
-    process.env.ATTENDANCE_STABLE_COUNT = '0'
-    expect(faceLoginConfigured()).toBe(false)
-    process.env.ATTENDANCE_STABLE_COUNT = '7'
-    expect(faceLoginConfigured()).toBe(false)
+    for (const invalid of ['0', '7', '-1', '2.5', '3abc', 'NaN', 'Infinity', '+3', '1e1']) {
+      process.env.ATTENDANCE_STABLE_COUNT = invalid
+      expect(faceLoginConfigured()).toBe(false)
+    }
     process.env.ATTENDANCE_STABLE_COUNT = '3'
   })
 
@@ -124,6 +131,46 @@ describe('Face login policies and attempt store', () => {
     expect(() => store.assertCompletable(b)).toThrowError(expect.objectContaining({ status: 410 }))
     expect(b.state).toBe('EXPIRED')
   })
+
+  it('checks terminal and deadline states before replay cache lookup and supports invalidateBinding / dropCompletedRecovery', () => {
+    let now = 1000
+    const store = new AttemptStore(() => now, 20, 5)
+    const a = store.create('browser-a', 2)
+    const r1 = store.startFrame(a, 1, 'd1') as { op: string }
+    const res1 = store.finishFrame(a, r1.op, 1, 'd1', { employeeId: 'A' }, 'ok')
+    expect(store.startFrame(a, 1, 'd1')).toEqual({ cached: res1 })
+
+    // Terminal state CANCELLED/EXPIRED/FAILED/COMPLETED must NOT return last cached frame replay
+    store.cancel(a)
+    expect(() => store.startFrame(a, 1, 'd1')).toThrowError(expect.objectContaining({ status: 410 }))
+
+    const b = store.create('browser-a', 1)
+    const rb = store.startFrame(b, 1, 'd1') as { op: string }
+    const resB = store.finishFrame(b, rb.op, 1, 'd1', { employeeId: 'A' }, 'ok')
+    // VERIFIED allows exact replay of the last frame before deadline
+    expect(store.startFrame(b, 1, 'd1')).toEqual({ cached: resB })
+    // Once COMPLETED, replay is rejected
+    store.commit(b, { user: { id: 'u' }, accessToken: 'tok-b' })
+    expect(() => store.startFrame(b, 1, 'd1')).toThrowError(expect.objectContaining({ status: 409 }))
+
+    // dropCompletedRecovery removes only COMPLETED recovery entries for the binding without touching active attempts
+    const c = store.create('browser-c', 1)
+    store.dropCompletedRecovery('browser-c')
+    expect(store.get(c.id, 'browser-c').state).toBe('READY')
+    store.dropCompletedRecovery('browser-a')
+    expect(() => store.get(b.id, 'browser-a')).toThrowError(expect.objectContaining({ status: 404 }))
+
+    // invalidateBinding marks active attempts CANCELLED, clears evidence/operation, and deletes from map
+    const d = store.create('browser-a', 2)
+    const rd = store.startFrame(d, 1, 'd1') as { op: string }
+    const cancelledIds = store.invalidateBinding('browser-a')
+    expect(cancelledIds).toEqual([d.id])
+    expect(d.state).toBe('CANCELLED')
+    expect(d.operation).toBeNull()
+    expect(d.candidate).toBeNull()
+    expect(() => store.finishFrame(d, rd.op, 1, 'd1', { employeeId: 'A' }, 'ok')).toThrowError(expect.objectContaining({ status: 410 }))
+    expect(() => store.get(d.id, 'browser-a')).toThrowError(expect.objectContaining({ status: 404 }))
+  })
 })
 
 describe('Streaming service and Python RPC boundary', () => {
@@ -165,11 +212,12 @@ describe('Streaming service and Python RPC boundary', () => {
     const binding = nextBinding()
     const { attemptId } = await startAttempt(binding)
     for (let seq = 1; seq <= 4; seq++) {
-      const res = await processAttemptFrame(attemptId, binding, seq, `YWJj${seq}`)
+      const f = Buffer.from(`img-${seq}`).toString('base64')
+      const res = await processAttemptFrame(attemptId, binding, seq, f)
       expect(res.state).toBe('pending')
     }
     expect(createFaceSession).not.toHaveBeenCalled()
-    const fifth = await processAttemptFrame(attemptId, binding, 5, 'YWJj5')
+    const fifth = await processAttemptFrame(attemptId, binding, 5, Buffer.from('img-5').toString('base64'))
     expect(fifth.state).toBe('verified')
     expect(createFaceSession).not.toHaveBeenCalled()
 
@@ -208,6 +256,32 @@ describe('Streaming service and Python RPC boundary', () => {
     expect(attemptStatus(second.attemptId, binding2).state).toBe('failed')
   })
 
+  it('invalidate_during_account_lookup_prevents_commit and startAttempt drops old completed recovery', async () => {
+    stubEngine()
+    process.env.ATTENDANCE_STABLE_COUNT = '1'
+    const binding = nextBinding()
+    const { attemptId } = await startAttempt(binding)
+    await processAttemptFrame(attemptId, binding, 1, 'YWJj1')
+    let release!: (value: any) => void
+    vi.mocked(createFaceSession).mockImplementationOnce(() => new Promise(r => { release = r }) as any)
+    const pendingComplete = completeAttempt(attemptId, binding)
+    invalidateFaceLoginBinding(binding)
+    release({ user: { id: 'u' }, accessToken: 'late-token' })
+    await expect(pendingComplete).rejects.toMatchObject({ statusCode: 410 })
+    expect(() => attemptStatus(attemptId, binding)).toThrowError(expect.objectContaining({ statusCode: 404 }))
+
+    // Completed recovery is dropped when a new attempt starts on the same binding
+    const binding2 = nextBinding()
+    const first = await startAttempt(binding2)
+    await processAttemptFrame(first.attemptId, binding2, 1, 'YWJj1')
+    const committed = await completeAttempt(first.attemptId, binding2)
+    expect(committed.accessToken).toBe('signed-session')
+
+    const second = await startAttempt(binding2)
+    expect(second.attemptId).not.toBe(first.attemptId)
+    await expect(completeAttempt(first.attemptId, binding2)).rejects.toMatchObject({ statusCode: 404 })
+  })
+
   it('fails closed on Python restart (boot_id change), wrong model, unnormalized vector, timeout or spoof', async () => {
     const cases: Array<(id: string, body: any) => Response> = [
       (id, b) => new Response(JSON.stringify({ attempt_id: id, boot_id: 'restarted-boot', seq: b.seq, operation_id: b.operation_id, model_version: env.FACE_AUTH_MODEL_VERSION, status: 'pending', reason: 'ok' })),
@@ -224,5 +298,33 @@ describe('Streaming service and Python RPC boundary', () => {
       expect(createFaceSession).not.toHaveBeenCalled()
     }
     expect(frameBody.safeParse({ seq: 1, frame: 'YWJj', employee_id: 'x' }).success).toBe(false)
+  })
+
+  it('returns remainingMs clamped >= 0 on startAttempt and attemptStatus, and concurrent completeAttempt returns consistent cached token', async () => {
+    stubEngine()
+    process.env.ATTENDANCE_STABLE_COUNT = '1'
+    const binding = nextBinding()
+    const started = await startAttempt(binding)
+    expect(typeof (started as any).remainingMs).toBe('number')
+    expect((started as any).remainingMs).toBeGreaterThan(0)
+    expect((started as any).remainingMs).toBeLessThanOrEqual(15_000)
+
+    await processAttemptFrame(started.attemptId, binding, 1, 'YWJj1')
+    const st = attemptStatus(started.attemptId, binding)
+    expect(typeof (st as any).remainingMs).toBe('number')
+    expect((st as any).remainingMs).toBeGreaterThanOrEqual(0)
+
+    let callNum = 0
+    vi.mocked(createFaceSession).mockImplementation(async () => {
+      const n = ++callNum
+      await new Promise(r => setTimeout(r, 5))
+      return { user: { id: 'user-a' }, accessToken: `token-${n}` } as any
+    })
+    const [c1, c2] = await Promise.all([
+      completeAttempt(started.attemptId, binding),
+      completeAttempt(started.attemptId, binding),
+    ])
+    expect(c1.accessToken).toBe(c2.accessToken)
+    expect(c1.accessToken).toBe('token-1')
   })
 })

@@ -22,15 +22,18 @@ const GUIDANCE: Record<string, string> = {
   no_match: 'Đang xác nhận danh tính…',
 }
 
-function parseRecognitionCount() {
+function parseRecognitionCount(): number {
   const raw = process.env.ATTENDANCE_STABLE_COUNT
-  if (raw === undefined || raw.trim() === '') return 3
-  return Number.parseInt(raw, 10)
+  if (raw === undefined) return 3
+  const trimmed = raw.trim()
+  if (trimmed === '') return 3
+  if (!/^\d+$/.test(trimmed)) return Number.NaN
+  return Number(trimmed)
 }
 
 export function recognitionCount() {
   const parsed = parseRecognitionCount()
-  return Number.isInteger(parsed) && parsed >= 1 ? parsed : 3
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 6 ? parsed : 3
 }
 
 export function faceLoginConfigured() {
@@ -41,25 +44,52 @@ export function faceLoginConfigured() {
 
 const toAppError = (error: unknown): never => {
   if (error instanceof AttemptError) {
-    const message = error.status === 410 ? 'Lượt nhận diện đã kết thúc. Vui lòng thử lại.'
-      : error.status === 429 ? 'Hệ thống đang bận. Vui lòng thử lại sau.' : 'Yêu cầu nhận diện không hợp lệ.'
-    throw new AppError(error.status, message)
+    if (error.status === 410) {
+      throw new AppError(410, 'Lượt nhận diện đã kết thúc. Vui lòng thử lại.')
+    }
+    if (error.status === 429) {
+      const code = error.code === 'frame_rate' ? 'FRAME_RATE_LIMIT' : 'ATTEMPT_CAPACITY'
+      throw new AppError(429, 'Hệ thống đang bận. Vui lòng thử lại sau.', undefined, code)
+    }
+    throw new AppError(error.status, 'Yêu cầu nhận diện không hợp lệ.')
   }
   throw error
+}
+
+export function invalidateFaceLoginBinding(binding: string | undefined): void {
+  if (!binding) return
+  const cancelledIds = attempts.invalidateBinding(binding)
+  for (const id of cancelledIds) {
+    engineCancel(id)
+  }
+}
+
+export function dropCompletedFaceLoginRecovery(binding: string | undefined): void {
+  if (!binding) return
+  attempts.dropCompletedRecovery(binding)
 }
 
 export async function startAttempt(binding: string) {
   let attempt: Attempt
   try { attempt = attempts.create(binding, recognitionCount()) } catch (error) { return toAppError(error) }
+  attempts.dropCompletedRecovery(binding)
   try {
     attempt.bootId = await engineCreate(attempt.id, attempt.epoch, ATTEMPT_TTL_MS)
   } catch (error) {
     attempts.fail(attempt)
-    throw new AppError(error instanceof EngineError && error.kind === 'busy' ? 429 : 503,
+    if (error instanceof EngineError && error.kind === 'busy') {
+      throw new AppError(429, 'Dịch vụ nhận diện chưa sẵn sàng. Vui lòng thử lại hoặc đăng nhập bằng mật khẩu.', undefined, 'ATTEMPT_CAPACITY')
+    }
+    throw new AppError(503,
       'Dịch vụ nhận diện chưa sẵn sàng. Vui lòng thử lại hoặc đăng nhập bằng mật khẩu.')
   }
   if (attempt.state !== 'READY') { engineCancel(attempt.id); throw new AppError(409, 'Lượt nhận diện đã bị thay thế.') }
-  return { attemptId: attempt.id, expiresAt: attempt.deadline, intervalMs: 200 }
+  return {
+    attemptId: attempt.id,
+    expiresAt: attempt.deadline,
+    remainingMs: Math.max(0, attempt.deadline - Date.now()),
+    intervalMs: 200,
+  }
 }
 
 async function matchEmployee(embedding: number[]) {
@@ -88,7 +118,7 @@ export async function processAttemptFrame(id: string, binding: string | undefine
   } catch (error) {
     if (error instanceof EngineError && error.kind === 'busy') {
       attempts.releaseFrame(attempt, op)
-      throw new AppError(429, 'Hệ thống đang bận, đang thử lại.')
+      throw new AppError(429, 'Hệ thống đang bận, đang thử lại.', undefined, 'ENGINE_BUSY')
     }
     // Timeout/restart/invalid: inference may still be running, never reopen.
     attempts.fail(attempt); engineCancel(attempt.id)
@@ -150,7 +180,12 @@ export function cancelAttempt(id: string, binding: string | undefined) {
 export function attemptStatus(id: string, binding: string | undefined) {
   try {
     const a = attempts.get(id, binding)
-    return { state: a.state.toLowerCase(), nextSeq: a.nextSeq, expiresAt: a.deadline }
+    return {
+      state: a.state.toLowerCase(),
+      nextSeq: a.nextSeq,
+      expiresAt: a.deadline,
+      remainingMs: Math.max(0, a.deadline - Date.now()),
+    }
   } catch (error) { return toAppError(error) }
 }
 

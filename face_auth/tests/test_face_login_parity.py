@@ -63,6 +63,17 @@ class WebcamParityTests(unittest.TestCase):
         self.assertEqual(result['reason'], 'pad_rejected')
         self.assertEqual(result['embeddings'], [])
 
+    def test_early_stop_sequence_RRRRRSSS_verifies_at_frame_5_while_full_8_frame_batch_rejects(self):
+        # Streaming stops as soon as frame 5 reaches 3 consecutive embeddings (frames 3, 4, 5).
+        streaming_prefix = self.evaluate([True, True, True, True, True], recognition_count=3)
+        self.assertEqual(streaming_prefix['reason'], 'verified')
+        self.assertEqual(len(streaming_prefix['embeddings']), 3)
+
+        # Evaluating all 8 frames [R,R,R,R,R,S,S,S] without early stopping resets on frame 6..8.
+        full_batch = self.evaluate([True, True, True, True, True, False, False, False], recognition_count=3)
+        self.assertEqual(full_batch['reason'], 'pad_rejected')
+        self.assertEqual(full_batch['embeddings'], [])
+
 
 if __name__ == '__main__':
     unittest.main()

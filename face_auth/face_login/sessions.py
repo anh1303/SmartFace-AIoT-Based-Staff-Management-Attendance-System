@@ -54,11 +54,24 @@ class SessionStore:
         self._lock = threading.Lock()
         self._items = {}
 
+    def _sweep_locked(self, now):
+        for key in [k for k, s in self._items.items() if (s.closed or s.deadline <= now) and not s.busy]:
+            del self._items[key]
+
     def sweep(self):
         now = self._clock()
         with self._lock:
-            for key in [k for k, s in self._items.items() if s.deadline <= now and not s.busy]:
-                del self._items[key]
+            self._sweep_locked(now)
+
+    def try_sweep(self) -> bool:
+        """Non-blocking sweep for async periodic cleanup so the event loop never waits on threading.Lock."""
+        if not self._lock.acquire(blocking=False):
+            return False
+        try:
+            self._sweep_locked(self._clock())
+            return True
+        finally:
+            self._lock.release()
 
     def create(self, attempt_id, epoch, ttl_seconds):
         self.sweep()
@@ -101,7 +114,9 @@ class SessionStore:
         with self._lock:
             session.busy = False
             if session.closed or session.deadline <= now:
-                return None  # fenced: late result after cancel/expiry is discarded
+                if self._items.get(session.id) is session:
+                    del self._items[session.id]
+                return None  # fenced: late result after cancel/expiry is discarded and session is cleaned
             session.frames += 1
             session.next_seq = seq + 1
             session.last_receipt_time = now

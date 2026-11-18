@@ -114,10 +114,112 @@ class StoreTests(unittest.TestCase):
         store.close('a' * 32)  # cancel while inference runs
         self.assertEqual(len(store), 1)  # physical cleanup waits for work
         self.assertIsNone(store.finish(session, 2, {'status': 'embedding'}, 'digest-2'))  # late result discarded
-        store.sweep()
+        # finish() must immediately delete a closed/expired session once inference finishes
         self.assertEqual(len(store), 0)
         with self.assertRaises(LookupError):  # never recreated
             store.begin('a' * 32, 1, 3, 'digest-3')
+
+    def test_try_sweep_non_blocking_when_lock_held_and_cleans_idle_expired_without_traffic(self):
+        now = [0.0]
+        store = SessionStore(clock=lambda: now[0], maximum=5, gap_seconds=2.0)
+        store.create('a' * 32, 1, 15)
+        now[0] = 16.0  # Expired with no new traffic
+
+        # Hold the internal lock on another thread: try_sweep() must return False immediately without blocking
+        import threading
+        lock_acquired = threading.Event()
+        release_lock = threading.Event()
+
+        def hold_lock():
+            with store._lock:
+                lock_acquired.set()
+                release_lock.wait(timeout=2.0)
+
+        holder = threading.Thread(target=hold_lock, daemon=True)
+        holder.start()
+        self.assertTrue(lock_acquired.wait(timeout=1.0))
+        try:
+            self.assertFalse(store.try_sweep())
+        finally:
+            release_lock.set()
+            holder.join(timeout=1.0)
+
+        # Once lock is free, try_sweep() returns True and cleans expired idle session
+        self.assertTrue(store.try_sweep())
+        self.assertEqual(len(store), 0)
+
+    def test_concurrent_try_sweep_begin_finish_close_and_Router_startup_shutdown_sweeper(self):
+        import asyncio
+        import threading
+        now = [0.0]
+        store = SessionStore(clock=lambda: now[0], maximum=20, gap_seconds=2.0)
+
+        # Event/barrier test: cancel/expiry during blocked inference keeps slot until inference finishes
+        entered_inference = threading.Event()
+        release_inference = threading.Event()
+
+        def blocking_predict(*_a):
+            entered_inference.set()
+            release_inference.wait(timeout=2.0)
+            return {'is_real': True, 'pad_score': 2.0, 'threshold_logit': 0.0}
+
+        m = SimpleNamespace(
+            detector=SimpleNamespace(detect=lambda _f: [FACE]),
+            embedder=None,
+            predictor=SimpleNamespace(predict_frame=blocking_predict),
+        )
+        router = build_router(lambda: m, lambda _k: None, store=store)
+        app = FastAPI()
+        app.include_router(router)
+        client = Client(app)
+
+        ok, img = cv2.imencode('.jpg', FRAME)
+        self.assertTrue(ok)
+        jpeg = base64.b64encode(img).decode()
+        aid = 'd' * 32
+        client.post('/internal/face-login/attempts', json={'attempt_id': aid, 'epoch': 1, 'ttl_ms': 15000})
+
+        frame_results = []
+        worker = threading.Thread(
+            target=lambda: frame_results.append(
+                client.post(f'/internal/face-login/attempts/{aid}/frames', json={'epoch': 1, 'seq': 1, 'operation_id': 'op1', 'frame': jpeg})
+            ),
+            daemon=True,
+        )
+        worker.start()
+        self.assertTrue(entered_inference.wait(timeout=1.0))
+
+        # Cancel while inference is blocked: slot must STILL be held (second attempt gets 429 busy)
+        client.post(f'/internal/face-login/attempts/{aid}/cancel', json={})
+        aid2 = 'e' * 32
+        client.post('/internal/face-login/attempts', json={'attempt_id': aid2, 'epoch': 1, 'ttl_ms': 15000})
+        busy_res = client.post(f'/internal/face-login/attempts/{aid2}/frames', json={'epoch': 1, 'seq': 1, 'operation_id': 'op2', 'frame': jpeg})
+        self.assertEqual(busy_res.status_code, 429)
+
+        # Release inference: late result gets 410 Gone and session aid is immediately deleted from store
+        release_inference.set()
+        worker.join(timeout=1.0)
+        self.assertEqual(frame_results[0].status_code, 410)
+        self.assertNotIn(aid, store._items)
+
+        # Startup/shutdown lifecycle test: sweeper cleans expired idle session and leaves no orphan task after shutdown
+        async def run_lifecycle():
+            for fn in router.on_startup:
+                res = fn()
+                if asyncio.iscoroutine(res):
+                    await res
+            self.assertIsNotNone(getattr(router, 'sweeper_task', None))
+            self.assertFalse(router.sweeper_task.done())
+            now[0] = 20.0  # expire aid2
+            await asyncio.sleep(1.15)
+            self.assertEqual(len(store), 0)
+            for fn in router.on_shutdown:
+                res = fn()
+                if asyncio.iscoroutine(res):
+                    await res
+            self.assertTrue(router.sweeper_task.done())
+
+        asyncio.run(run_lifecycle())
 
 
 class StreamingHttpTests(unittest.TestCase):

@@ -1,4 +1,5 @@
 """Private incremental extraction API: never searches identities or writes attendance."""
+import asyncio
 import base64
 import hashlib
 import io
@@ -79,6 +80,31 @@ def build_router(get_models, require_key, *, store=None):
     state_store = store if store is not None else SessionStore()
     router.state_store = state_store
     router.inference_slot = slot
+    router.sweeper_task = None
+
+    async def _periodic_sweep():
+        try:
+            while True:
+                await asyncio.sleep(1.0)
+                state_store.try_sweep()
+        except asyncio.CancelledError:
+            raise
+
+    async def _start_sweeper():
+        if router.sweeper_task is None or router.sweeper_task.done():
+            router.sweeper_task = asyncio.create_task(_periodic_sweep())
+
+    async def _stop_sweeper():
+        task = router.sweeper_task
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    router.on_startup.append(_start_sweeper)
+    router.on_shutdown.append(_stop_sweeper)
 
     @router.post('/attempts')
     def create_attempt(req: AttemptCreate):

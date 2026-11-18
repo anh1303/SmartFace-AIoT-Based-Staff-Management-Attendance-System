@@ -1,6 +1,9 @@
-"""Private extraction API: never searches identities or writes attendance."""
+"""Private incremental extraction API: never searches identities or writes attendance."""
+import asyncio
 import base64
+import hashlib
 import io
+import re
 from threading import BoundedSemaphore
 import warnings
 
@@ -13,9 +16,11 @@ from pydantic import BaseModel, Field, StrictStr
 
 import config
 from alignment.aligner import get_input_face
-from .pipeline import extract_sequence
+from .pipeline import process_frame
+from .sessions import BOOT_ID, MAX_FRAMES, SessionStore
 
-MAX_BODY = 2_250_000
+MAX_BODY = 300 * 1024
+ATTEMPT_ID = re.compile(r'^[a-f0-9]{32}$')
 
 
 def decode_jpeg(value):
@@ -39,22 +44,22 @@ def decode_jpeg(value):
         raise ValueError('Invalid JPEG') from exc
 
 
-class LoginExtraction(BaseModel):
+class AttemptCreate(BaseModel):
     model_config = {'extra': 'forbid'}
-    request_id: str = Field(pattern=r'^[a-f0-9]{32}$')
-    frames: list[StrictStr] = Field(min_length=8, max_length=8)
-    recognition_count: int = Field(ge=1, le=6)
+    attempt_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    epoch: int = Field(ge=1)
+    ttl_ms: int = Field(ge=1000, le=30000)
 
 
-def extract_login_embeddings(frames, models, recognition_count):
-    result = extract_sequence(
-        frames, detector=models.detector, embedder=models.embedder, predictor=models.predictor,
-        align_face=get_input_face, recognition_count=recognition_count, already_decoded=True,
-    )
-    return result['embeddings']
+class AttemptFrame(BaseModel):
+    model_config = {'extra': 'forbid'}
+    epoch: int = Field(ge=1)
+    seq: int = Field(ge=1, le=MAX_FRAMES)
+    operation_id: str = Field(default='', max_length=32)
+    frame: StrictStr = Field(max_length=273068)
 
 
-def build_router(get_models, require_key):
+def build_router(get_models, require_key, *, store=None):
     class LimitedRoute(APIRoute):
         def get_route_handler(self):
             original = super().get_route_handler()
@@ -72,29 +77,93 @@ def build_router(get_models, require_key):
 
     router = APIRouter(prefix='/internal/face-login', route_class=LimitedRoute)
     slot = BoundedSemaphore(1)
+    state_store = store if store is not None else SessionStore()
+    router.state_store = state_store
+    router.inference_slot = slot
+    router.sweeper_task = None
 
-    @router.post('/extract')
-    def extract(req: LoginExtraction):
+    async def _periodic_sweep():
+        try:
+            while True:
+                await asyncio.sleep(1.0)
+                state_store.try_sweep()
+        except asyncio.CancelledError:
+            raise
+
+    async def _start_sweeper():
+        if router.sweeper_task is None or router.sweeper_task.done():
+            router.sweeper_task = asyncio.create_task(_periodic_sweep())
+
+    async def _stop_sweeper():
+        task = router.sweeper_task
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    router.on_startup.append(_start_sweeper)
+    router.on_shutdown.append(_stop_sweeper)
+
+    @router.post('/attempts')
+    def create_attempt(req: AttemptCreate):
+        try:
+            state_store.create(req.attempt_id, req.epoch, req.ttl_ms / 1000)
+        except OverflowError:
+            raise HTTPException(429, 'Busy') from None
+        except KeyError:
+            raise HTTPException(409, 'Exists') from None
+        return {'attempt_id': req.attempt_id, 'boot_id': BOOT_ID, 'model_version': config.EMBEDDING_MODEL_VERSION}
+
+    @router.post('/attempts/{attempt_id}/frames')
+    def attempt_frame(attempt_id: str, req: AttemptFrame):
+        if not ATTEMPT_ID.fullmatch(attempt_id):
+            raise HTTPException(404, 'Missing')
+        digest = hashlib.sha256(req.frame.encode('ascii', 'ignore')).hexdigest()
+        try:
+            session, cached, gap_expired = state_store.begin(attempt_id, req.epoch, req.seq, digest)
+        except LookupError:
+            raise HTTPException(410, 'Gone') from None
+        except ValueError:
+            raise HTTPException(409, 'Conflict') from None
+        if cached is not None:
+            return {**cached, 'operation_id': req.operation_id}
         if not slot.acquire(blocking=False):
+            state_store.abort(session)
             raise HTTPException(429, 'Busy')
         try:
             try:
                 models = get_models()
             except Exception:
-                raise HTTPException(503, 'Face login is unavailable') from None
+                models = None
             if models is None:
+                state_store.abort(session)
                 raise HTTPException(503, 'Face login is unavailable')
             try:
-                frames = [decode_jpeg(value) for value in req.frames]
+                frame = decode_jpeg(req.frame)
+                if gap_expired:
+                    session.reset()
+                    outcome = {'status': 'reset', 'reason': 'frame_gap'}
+                else:
+                    outcome = process_frame(session, frame, detector=models.detector, predictor=models.predictor,
+                                            embedder=models.embedder, align_face=get_input_face)
             except ValueError:
-                return {'request_id': req.request_id, 'status': 'rejected'}
-            embeddings = extract_login_embeddings(frames, models, req.recognition_count)
-            if not embeddings:
-                return {'request_id': req.request_id, 'status': 'rejected'}
-            return {'request_id': req.request_id, 'status': 'ok',
-                    'model_version': config.EMBEDDING_MODEL_VERSION,
-                    'embeddings': [embedding.tolist() for embedding in embeddings]}
+                outcome = {'status': 'reset', 'reason': 'invalid_image'}
+                session.reset()
+            except Exception:
+                outcome = {'status': 'error', 'reason': 'processing_error'}
         finally:
             slot.release()
+        result = {'attempt_id': attempt_id, 'boot_id': BOOT_ID, 'seq': req.seq,
+                  'operation_id': req.operation_id, 'model_version': config.EMBEDDING_MODEL_VERSION, **outcome}
+        if state_store.finish(session, req.seq, result, digest) is None:
+            raise HTTPException(410, 'Gone')
+        return result
+
+    @router.post('/attempts/{attempt_id}/cancel')
+    def cancel_attempt(attempt_id: str):
+        state_store.close(attempt_id)
+        return {'status': 'cancelled'}
 
     return router

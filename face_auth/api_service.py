@@ -73,6 +73,12 @@ def startup_event():
         max_size=config.DB_POOL_MAX_SIZE,
     )
     print(f"[api_service] VectorDB pool ready: min={config.DB_POOL_MIN_SIZE}, max={config.DB_POOL_MAX_SIZE}")
+    # Preload PAD so the first streaming frame is not delayed by ONNX session creation.
+    try:
+        if get_face_login_models() is not None:
+            print("[api_service] Face login PAD preloaded")
+    except Exception as exc:
+        print(f"[api_service] Face login PAD preload failed: {type(exc).__name__}")
     print("[api_service] Ready on :5000")
 
 

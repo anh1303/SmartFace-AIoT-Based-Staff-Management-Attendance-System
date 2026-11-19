@@ -1,4 +1,4 @@
-import { timeAttendanceQuery } from '../common/attendance-timing.js'
+import { timeAttendanceQuery } from '../common/perf-trace.js'
 import { PrismaClient } from '@prisma/client'
 
 const prismaGlobal = globalThis as unknown as { prisma?: PrismaClient }

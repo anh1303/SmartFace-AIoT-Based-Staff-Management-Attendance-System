@@ -3,7 +3,7 @@ vi.mock('../../src/config/database.js', () => ({ prisma: {
   employee: { findMany: vi.fn() }, employee_shifts: { findMany: vi.fn() }, attendance_logs: { findMany: vi.fn() },
 } }))
 vi.mock('../../src/modules/employees/public.js', async () => ({ ...(await import('../../src/modules/employees/employees.report-queries.js')), getEmployeeScope: vi.fn(async () => ({})) }))
-vi.mock('../../src/modules/shifts/public.js', async () => ({ ...(await import('../../src/modules/shifts/shifts.report-queries.js')), getActiveWorkShiftsCatalog: vi.fn(async () => []) }))
+vi.mock('../../src/modules/shifts/public.js', async () => ({ ...(await import('../../src/modules/shifts/shifts.report-queries.js')), ...(await import('../../src/modules/shifts/shift.format.js')), getActiveWorkShiftsCatalog: vi.fn(async () => []) }))
 vi.mock('../../src/modules/attendance/public.js', async () => ({ ...(await import('../../src/modules/attendance/attendance.report-queries.js')), determinePunctuality: (await import('../../src/modules/attendance/attendance.format.js')).determinePunctuality }))
 import { prisma } from '../../src/config/database.js'
 import { getTodayDashboard } from '../../src/modules/dashboard/dashboard.service.js'

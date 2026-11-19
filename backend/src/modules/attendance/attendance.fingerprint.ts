@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { prisma } from '../../config/database.js'
-import { timeAttendanceStage } from '../../common/attendance-timing.js'
+import { timeAttendanceStage } from '../../common/perf-trace.js'
 import { AppError } from '../../common/AppError.js'
 import { scanSchema, requireFingerprintBinding } from '../biometrics/fingerprint.public.js'
 import { MAX_PAIR_MS } from './attendance.policy.js'

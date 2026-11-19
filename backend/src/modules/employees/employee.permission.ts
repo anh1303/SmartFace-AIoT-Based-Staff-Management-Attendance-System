@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../common/AppError.js';
-import { buildIdOrCodeWhere } from '../../common/utils.js';
+import { buildIdOrCodeWhere } from './employee.model.js';
 
 /**
  * Kiểm tra xem một nhân viên có vai trò hoặc chức vụ là Quản lý/Admin không

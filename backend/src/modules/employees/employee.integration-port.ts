@@ -1,6 +1,6 @@
 import { env } from '../../config/env.js'
 
-type EmployeeIntegration = Pick<typeof import('../auth/public.js'), 'findAuthUserByUsername' | 'createAuthUser' | 'updateAuthUser' | 'getDefaultRole' | 'deleteAuthUser'>
+type EmployeeIntegration = Pick<typeof import('../auth/public.js'), 'findAuthUserByUsername' | 'createAuthUser' | 'updateAuthUser' | 'getDefaultRole' | 'deleteAuthUser' | 'generateRandomPassword'>
   & Pick<typeof import('../biometrics/public.js'), 'deleteBiometricsForEmployee' | 'faceEnrollmentSummarySelect' | 'hasActiveFaceEnrollment'>
   & Pick<typeof import('../shifts/public.js'), 'deleteShiftsForEmployee'>
   & Pick<typeof import('../attendance/public.js'), 'hasAttendanceActivity'>

@@ -9,8 +9,8 @@
     "allowedCompositionPortExceptions": 4
   },
   "currentCounts": {
-    "pendingMoveCommonFiles": 3,
-    "pendingMoveCommonUtilsExports": 6,
+    "pendingMoveCommonFiles": 0,
+    "pendingMoveCommonUtilsExports": 0,
     "runtimeModuleCycles": 0,
     "transitionalExceptions": 0,
     "allowedCompositionPortExceptions": 4
@@ -22,20 +22,6 @@
       "status": "allowed",
       "reason": "Lớp chuẩn hóa lỗi HTTP/application dùng chung toàn backend",
       "representativeCallers": ["middlewares/errorHandler.ts", "modules/attendance/attendance.service.ts", "modules/payroll/payroll.service.ts"]
-    },
-    {
-      "path": "common/attendance-timing.ts",
-      "owner": "attendance",
-      "status": "pending-move",
-      "reason": "Logic tính mốc giờ ca, grace period và trạng thái đi trễ/về sớm thuộc domain attendance (chờ di chuyển ở Pha 2)",
-      "representativeCallers": ["modules/attendance/attendance.format.ts", "modules/attendance/attendance.policy.ts", "modules/reports/reports.service.ts"]
-    },
-    {
-      "path": "common/biometric-crypto.ts",
-      "owner": "biometrics",
-      "status": "pending-move",
-      "reason": "Mã hóa/giải mã vector sinh trắc học thuộc domain biometrics (chờ di chuyển ở Pha 2)",
-      "representativeCallers": ["modules/biometrics/biometric.jobs.ts", "modules/biometrics/biometric.service.ts"]
     },
     {
       "path": "common/constants.ts",
@@ -50,13 +36,6 @@
       "status": "allowed",
       "reason": "Schema Zod kiểm tra định dạng ngày/tháng dùng chung cho DTO các module",
       "representativeCallers": ["modules/attendance/attendance.dto.ts", "modules/payroll/payroll.dto.ts", "modules/shifts/shift.dto.ts"]
-    },
-    {
-      "path": "common/device-auth.ts",
-      "owner": "devices",
-      "status": "pending-move",
-      "reason": "Xác thực chữ ký/secret thiết bị IoT thuộc domain devices (chờ di chuyển ở Pha 2)",
-      "representativeCallers": ["modules/attendance/attendance.webhook.ts", "modules/biometrics/fingerprint.routes.ts", "modules/devices/device.service.ts"]
     },
     {
       "path": "common/email.service.ts",
@@ -80,11 +59,32 @@
       "representativeCallers": ["modules/employees/employee.service.ts", "modules/shifts/shift.service.ts"]
     },
     {
+      "path": "common/lock-keys.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Quy ước chuỗi khóa PostgreSQL advisory lock dùng chung giữa employees, shifts và payroll (khóa hợp đồng byte-for-byte qua lock-keys.test.ts)",
+      "representativeCallers": ["modules/employees/employee.service.ts", "modules/payroll/payroll.service.ts", "modules/shifts/shift.service.ts"]
+    },
+    {
       "path": "common/logger.ts",
       "owner": "shared",
       "status": "allowed",
       "reason": "Logger hạ tầng dùng chung toàn backend",
       "representativeCallers": ["server.ts", "config/mqtt.ts", "modules/attendance/attendance.service.ts"]
+    },
+    {
+      "path": "common/payload-crypto.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích mã hóa/giải mã AES-256-GCM dùng chung giữa biometrics và operations (tránh chu trình operations <-> biometrics)",
+      "representativeCallers": ["modules/biometrics/fingerprint.service.ts", "modules/operations/operation.crypto.ts"]
+    },
+    {
+      "path": "common/perf-trace.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích đo hiệu năng truy vấn/giai đoạn dùng AsyncLocalStorage, được config/database.ts và attendance sử dụng",
+      "representativeCallers": ["config/database.ts", "modules/attendance/attendance.controller.ts", "modules/attendance/attendance.service.ts"]
     },
     {
       "path": "common/response.ts",
@@ -97,7 +97,7 @@
       "path": "common/utils.ts",
       "owner": "shared",
       "status": "allowed",
-      "reason": "Tiện ích thời gian/UUID dùng chung và một số helper domain đã kiểm kê chi tiết trong commonUtilsExports",
+      "reason": "Chỉ còn các tiện ích định dạng ngày giờ múi giờ Việt Nam và UUID dùng chung toàn backend",
       "representativeCallers": ["modules/attendance/attendance.service.ts", "modules/payroll/payroll.service.ts", "modules/employees/employee.service.ts"]
     }
   ],
@@ -121,12 +121,6 @@
       "reason": "Định dạng giờ HH:mm:ss theo múi giờ Việt Nam dùng chung toàn backend"
     },
     {
-      "exportName": "formatShiftTime",
-      "owner": "shifts",
-      "status": "pending-move",
-      "reason": "Định dạng giờ ca làm việc từ cột TIME thuộc domain shifts (chờ di chuyển ở Pha 2)"
-    },
-    {
       "exportName": "getTodayVNString",
       "owner": "shared",
       "status": "allowed",
@@ -143,36 +137,6 @@
       "owner": "shared",
       "status": "allowed",
       "reason": "Hàm kiểm tra định dạng UUID dùng chung toàn backend"
-    },
-    {
-      "exportName": "buildIdOrCodeWhere",
-      "owner": "employees",
-      "status": "pending-move",
-      "reason": "Tạo mệnh đề Prisma where cho bảng Employee theo id hoặc employee_code thuộc domain employees (chờ di chuyển ở Pha 2)"
-    },
-    {
-      "exportName": "buildEmployeeWhere",
-      "owner": "employees",
-      "status": "pending-move",
-      "reason": "Alias truy vấn Employee theo id hoặc employee_code thuộc domain employees (chờ di chuyển ở Pha 2)"
-    },
-    {
-      "exportName": "generateRandomPassword",
-      "owner": "auth",
-      "status": "pending-move",
-      "reason": "Sinh mật khẩu khởi tạo tài khoản thuộc domain auth (chờ di chuyển ở Pha 2)"
-    },
-    {
-      "exportName": "employeeLockKey",
-      "owner": "employees",
-      "status": "pending-move",
-      "reason": "Sinh khóa advisory lock theo nhân viên thuộc domain employees (chờ di chuyển ở Pha 2)"
-    },
-    {
-      "exportName": "payrollPeriodLockKey",
-      "owner": "payroll",
-      "status": "pending-move",
-      "reason": "Sinh khóa advisory lock theo kỳ lương thuộc domain payroll (chờ di chuyển ở Pha 2)"
     }
   ],
   "runtimeModuleCycles": [],

@@ -6,14 +6,15 @@ import { randomUUID } from 'node:crypto'
 import { enqueueOperation, findOperationByKey } from '../operations/public.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { buildIdOrCodeWhere, generateRandomPassword } from '../../common/utils.js'
+import { buildIdOrCodeWhere } from './employee.model.js'
 import { generateUniqueEmployeeCode } from './employee.code.js'
 import { sendAccountCredentialsEmail, type EmailSendResult } from '../../common/email.service.js'
 import { logAction } from '../audit-logs/public.js'
 import { employeeIntegration } from './employee.integration-port.js'
 import { employeeInclude } from './employee.model.js'
 import { recordHourlyRateChange, nextPayrollPeriod } from './employee.wage.js'
-import { vnDay, payrollPeriodLockKey } from '../../common/utils.js'
+import { vnDay } from '../../common/utils.js'
+import { payrollPeriodLockKey } from '../../common/lock-keys.js'
 import { assertCanAccessEmployeeDetail, assertCanManageEmployee, getEmployeeScope, isEmployeeManager, type EmployeeActor } from './employee.permission.js'
 
 export async function list(query: Record<string, unknown>, actor?: EmployeeActor) {
@@ -168,7 +169,7 @@ export async function create(data: {
   }
 
   // 4. Sinh mật khẩu ngẫu nhiên 8 ký tự và băm mật khẩu bằng bcrypt
-  const rawPassword = generateRandomPassword(8)
+  const rawPassword = employeeIntegration().generateRandomPassword(8)
   const hashedPassword = await bcrypt.hash(rawPassword, 10)
 
   // 5. Tìm vai trò EMPLOYEE mặc định cho nhân viên mới qua auth module
@@ -455,7 +456,7 @@ export async function resetPassword(idOrCode: string, actorUserId?: string, acto
   let userId = existing.user_id
   let username = existing.users?.username || existing.employee_code
 
-  const rawPassword = generateRandomPassword(8)
+  const rawPassword = employeeIntegration().generateRandomPassword(8)
   const hashedPassword = await bcrypt.hash(rawPassword, 10)
 
   if (userId) {

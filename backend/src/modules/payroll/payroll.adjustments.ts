@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { buildIdOrCodeWhere } from '../../common/utils.js'
+import { buildIdOrCodeWhere } from '../employees/public.js'
 import {
   assertCanAccessEmployeeDetail,
   assertCannotModifyOtherManager,

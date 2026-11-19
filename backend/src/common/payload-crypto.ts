@@ -6,6 +6,7 @@ export function encryptPayload(payload: unknown, secret: string): Buffer {
   const data = Buffer.concat([cipher.update(JSON.stringify(payload), 'utf8'), cipher.final()])
   return Buffer.concat([nonce, cipher.getAuthTag(), data])
 }
+
 export function decryptPayload(data: Buffer, secret: string): any {
   const decipher = createDecipheriv('aes-256-gcm', createHash('sha256').update(secret).digest(), data.subarray(0, 12))
   decipher.setAuthTag(data.subarray(12, 28))

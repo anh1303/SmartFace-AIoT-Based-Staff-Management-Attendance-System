@@ -103,10 +103,10 @@ Nguyên tắc xuyên suốt:
      - **Test hợp đồng bắt buộc (Rolling-Deploy Lock Compatibility Test):** bổ sung unit test xác nhận byte-for-byte rằng `employeeLockKey('emp-123') === 'employee:emp-123'` và `payrollPeriodLockKey('2026-10') === 'payroll:2026-10'` giống hệt Pha 1, đảm bảo khi triển khai song song hai phiên bản backend vẫn khóa chung cùng một tài nguyên trong PostgreSQL.
 
 **Kiểm chứng Batch 2:**
-- [ ] Cập nhật `backend/validation/architecture/boundary-baseline.json` (`currentCounts.pendingMoveCommonFiles: 0`, `currentCounts.pendingMoveCommonUtilsExports: 0`; giữ nguyên `initialCounts`).
-- [ ] Chạy `npm.cmd run build`, `npx.cmd tsc --noEmit -p prisma/tsconfig.json`, `npx.cmd vitest run validation`.
+- [x] Cập nhật `backend/validation/architecture/boundary-baseline.json` (`currentCounts.pendingMoveCommonFiles: 0`, `currentCounts.pendingMoveCommonUtilsExports: 0`; giữ nguyên `initialCounts`).
+- [x] Chạy `npm.cmd run build`, `npx.cmd tsc --noEmit -p prisma/tsconfig.json`, `npx.cmd vitest run validation`.
 - [ ] Chạy `npm.cmd run test:neon` cho các bộ integration chạm tới `attendance`, `payroll`, `employees`, `shifts`.
-- [ ] Chốt commit Batch 2.
+- [x] Chốt commit Batch 2.
 
 ---
 

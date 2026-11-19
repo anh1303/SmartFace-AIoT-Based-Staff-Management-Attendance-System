@@ -1,7 +1,7 @@
-import { traceAttendance } from '../../common/attendance-timing.js';
+import { traceAttendance } from '../../common/perf-trace.js';
 import { getEmployeeScope, assertCanManageEmployee } from '../employees/public.js';
 import { workDateSchema } from '../../common/date.schema.js';
-import { assertDeviceWebhook } from '../../common/device-auth.js';
+import { assertDeviceWebhook } from '../devices/public.js';
 import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
 import * as service from './attendance.service.js';

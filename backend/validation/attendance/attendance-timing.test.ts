@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { traceAttendance, timeAttendanceQuery, timeAttendanceStage } from '../../src/common/attendance-timing.js'
+import { traceAttendance, timeAttendanceQuery, timeAttendanceStage } from '../../src/common/perf-trace.js'
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs() })
 

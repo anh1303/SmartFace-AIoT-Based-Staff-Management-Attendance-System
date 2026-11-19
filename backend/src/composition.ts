@@ -17,6 +17,7 @@ configureEmployeeIntegration({
   get updateAuthUser() { return auth.updateAuthUser },
   get getDefaultRole() { return auth.getDefaultRole },
   get deleteAuthUser() { return auth.deleteAuthUser },
+  get generateRandomPassword() { return auth.generateRandomPassword },
   get deleteBiometricsForEmployee() { return biometrics.deleteBiometricsForEmployee },
   get faceEnrollmentSummarySelect() { return biometrics.faceEnrollmentSummarySelect },
   get hasActiveFaceEnrollment() { return biometrics.hasActiveFaceEnrollment },

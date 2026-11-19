@@ -2,7 +2,9 @@ import type { Prisma } from '@prisma/client'
 import { shiftAttendance } from './shift.attendance-port.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { buildIdOrCodeWhere, formatVNDateISO, getTodayVNString, employeeLockKey, payrollPeriodLockKey } from '../../common/utils.js'
+import { formatVNDateISO, getTodayVNString } from '../../common/utils.js'
+import { employeeLockKey, payrollPeriodLockKey } from '../../common/lock-keys.js'
+import { buildIdOrCodeWhere } from '../employees/public.js'
 import { logAction } from '../audit-logs/public.js'
 import {
   assertCanManageEmployee,

@@ -1,6 +1,6 @@
 import type { Request } from 'express'
 import { timingSafeEqual } from 'node:crypto'
-import { AppError } from './AppError.js'
+import { AppError } from '../../common/AppError.js'
 
 /** Only the trusted ThingsBoard REST node may call device webhooks. */
 export function assertDeviceWebhook(req: Request) {

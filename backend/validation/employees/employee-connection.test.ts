@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 const findFirst = vi.hoisted(() => vi.fn())
 vi.mock('../../src/config/database.js', () => ({ prisma: { employee: { findFirst } } }))
-vi.mock('../../src/modules/employees/employee.model.js', () => ({ employeeInclude: {} }))
+vi.mock('../../src/modules/employees/employee.model.js', async (importOriginal) => ({ ...(await importOriginal<any>()), employeeInclude: {} }))
 import { findEmployeeByIdOrCode } from '../../src/modules/employees/employee.queries.js'
 beforeEach(() => { findFirst.mockReset() })
 it('retries a closed connection once for a read outside a transaction', async () => {

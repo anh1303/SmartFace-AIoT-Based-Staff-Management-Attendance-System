@@ -11,7 +11,7 @@ vi.mock('../../src/modules/employees/public.js', () => ({ assertCanManageEmploye
 vi.mock('../../src/modules/devices/device.service.js', () => ({ triggerDeviceAction: vi.fn(async () => ({})) }))
 vi.mock('../../src/common/event-bus.js', () => ({ eventBus: { publish: vi.fn() } }))
 import { eventBus } from '../../src/common/event-bus.js'
-import { encryptPayload } from '../../src/common/biometric-crypto.js'
+import { encryptPayload } from '../../src/common/payload-crypto.js'
 import { publicFingerprintSession, confirmFingerprintSession, cancelFingerprintSession, fingerprintProgress,
   acknowledgeFingerprintBinding, fingerprintManifest, fingerprintTemplateForDevice, startFingerprintSession } from '../../src/modules/biometrics/fingerprint.service.js'
 import { processFingerprintAttendance } from '../../src/modules/attendance/attendance.fingerprint.js'

@@ -11,7 +11,7 @@ export function findDepartmentByIdOrCode(value: string | number) {
 export function findPositionByName(name: string) {
   return prisma.position.findFirst({ where: { name: { equals: name.trim(), mode: 'insensitive' } } })
 }
-import { buildIdOrCodeWhere } from '../../common/utils.js'
+import { buildIdOrCodeWhere } from './employee.model.js'
 import { employeeInclude } from './employee.model.js'
 
 const identitySelect = { id: true, employee_code: true, full_name: true, user_id: true, status: true, departmentId: true,

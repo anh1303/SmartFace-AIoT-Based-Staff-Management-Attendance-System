@@ -12,7 +12,7 @@ vi.mock('../../src/modules/attendance/public.js', async () => {
   const { determinePunctuality } = await import('../../src/modules/attendance/attendance.format.js')
   return { determinePunctuality, ...(await import('../../src/modules/attendance/attendance.report-queries.js')) }
 })
-vi.mock('../../src/modules/shifts/public.js', async () => ({ ...(await import('../../src/modules/shifts/shifts.report-queries.js')), getActiveWorkShiftsCatalog: vi.fn().mockResolvedValue([]) }))
+vi.mock('../../src/modules/shifts/public.js', async () => ({ ...(await import('../../src/modules/shifts/shifts.report-queries.js')), ...(await import('../../src/modules/shifts/shift.format.js')), getActiveWorkShiftsCatalog: vi.fn().mockResolvedValue([]) }))
 
 import { getTodayDashboard } from '../../src/modules/dashboard/dashboard.service.js'
 

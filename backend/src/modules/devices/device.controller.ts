@@ -1,4 +1,4 @@
-import { assertDeviceWebhook } from '../../common/device-auth.js';
+import { assertDeviceWebhook } from './device.auth.js';
 import { Request, Response } from 'express';
 import { successResponse } from '../../common/response.js';
 import { eventBus } from '../../common/event-bus.js';

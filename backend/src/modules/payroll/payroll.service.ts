@@ -29,7 +29,9 @@ import { AppError } from '../../common/AppError.js'
 import { DEFAULT_PAYROLL_POLICY, assertResolvedPayroll, currentPayrollPeriod, hasMultiplierSnapshot, nextPayrollPeriod, policyForPeriod } from './payroll.policy.js'
 import { calculateNetSalary } from './payroll-rates.js'
 import { updateBonusPenaltySchema } from './payroll.dto.js'
-import { buildIdOrCodeWhere, vnDay, employeeLockKey, payrollPeriodLockKey } from '../../common/utils.js'
+import { vnDay } from '../../common/utils.js'
+import { employeeLockKey, payrollPeriodLockKey } from '../../common/lock-keys.js'
+import { buildIdOrCodeWhere } from '../employees/public.js'
 import {
   getEmployeeScope,
   getManagedEmployeeIds,

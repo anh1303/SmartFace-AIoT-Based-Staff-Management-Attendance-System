@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 vi.mock('../../src/modules/attendance/attendance.alert-dedup.js', () => ({ claimAlert: vi.fn(async () => true) }))
 vi.mock('../../src/config/database.js', () => ({prisma:{$queryRaw:vi.fn(async () => []),employee:{findFirst:vi.fn(async () => null),findMany:vi.fn(async () => [{ id: 'employee-a' }])}}}))
 import { handleThingsBoardWebhook } from '../../src/modules/attendance/attendance.service.js'
-import { assertDeviceWebhook } from '../../src/common/device-auth.js'
+import { assertDeviceWebhook } from '../../src/modules/devices/public.js'
 import { prisma } from '../../src/config/database.js'
 import type { Request } from 'express'
 const payload = () => ({device_id:'TEST_PI',mode:'CHECK_IN',event_id:'test-event-1234',client_timestamp:Date.now(),event_kind:'VERIFY_ONLY',recognition_id:'recognition-test-1234',antispoof_score:.9,embedding:Array(512).fill(.1)})

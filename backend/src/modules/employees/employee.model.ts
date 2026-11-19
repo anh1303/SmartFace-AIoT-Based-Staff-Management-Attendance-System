@@ -1,7 +1,19 @@
 import { prisma } from '../../config/database.js'
+import { UUID_REGEX } from '../../common/utils.js'
 import { faceEnrollmentSummarySelect } from './employee.integration-port.js'
 
 export const employeeModel = prisma.employee
+
+/**
+ * Builds a Prisma `where` clause for the `Employee` model:
+ * If the input is a UUID, filters by `{ id }`. Otherwise, filters by `{ employee_code }`.
+ */
+export function buildIdOrCodeWhere(idOrCode: string): { id: string } | { employee_code: string } {
+  if (UUID_REGEX.test(idOrCode)) {
+    return { id: idOrCode }
+  }
+  return { employee_code: idOrCode }
+}
 
 // Include đúng theo Prisma schema:
 // - department (relation qua departmentId)

@@ -1,4 +1,4 @@
-import { timeAttendanceStage } from '../../common/attendance-timing.js'
+import { timeAttendanceStage } from '../../common/perf-trace.js'
 import { processFingerprintAttendance } from './attendance.fingerprint.js'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'

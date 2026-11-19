@@ -1,6 +1,15 @@
 {
   "phase": 1,
+  "baselineSnapshot": "e395c9b8",
   "initialCounts": {
+    "pendingMoveContextFiles": 5,
+    "pendingMoveTypeFiles": 7,
+    "pendingMoveUtilFiles": 3,
+    "pendingMoveFeatureEdges": 3,
+    "featureCycles": 0,
+    "transitionalExceptions": 0
+  },
+  "currentCounts": {
     "pendingMoveContextFiles": 5,
     "pendingMoveTypeFiles": 7,
     "pendingMoveUtilFiles": 3,

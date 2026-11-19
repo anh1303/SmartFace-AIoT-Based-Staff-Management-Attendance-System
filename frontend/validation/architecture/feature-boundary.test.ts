@@ -3,16 +3,20 @@ import path from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+export interface FrontendBoundaryCounts {
+  pendingMoveContextFiles: number;
+  pendingMoveTypeFiles: number;
+  pendingMoveUtilFiles: number;
+  pendingMoveFeatureEdges: number;
+  featureCycles: number;
+  transitionalExceptions: number;
+}
+
 export interface FrontendBoundaryBaseline {
   phase: number;
-  initialCounts: {
-    pendingMoveContextFiles: number;
-    pendingMoveTypeFiles: number;
-    pendingMoveUtilFiles: number;
-    pendingMoveFeatureEdges: number;
-    featureCycles: number;
-    transitionalExceptions: number;
-  };
+  baselineSnapshot: string;
+  initialCounts: FrontendBoundaryCounts;
+  currentCounts: FrontendBoundaryCounts;
   contextFiles: Array<{
     path: string;
     owner: string;
@@ -391,21 +395,31 @@ describe('Frontend Feature-Based Architecture Boundaries', () => {
     expect(result.staleExceptions[0].source).toBe('context/AuthContext.tsx');
   });
 
-  it('keeps initial counts in boundary-baseline.json synchronized with manifest entries', () => {
-    expect(baseline.contextFiles.filter(f => f.status === 'pending-move')).toHaveLength(
+  it('keeps currentCounts synchronized with manifest entries and never above frozen initialCounts', () => {
+    const liveCounts: FrontendBoundaryCounts = {
+      pendingMoveContextFiles: baseline.contextFiles.filter(f => f.status === 'pending-move').length,
+      pendingMoveTypeFiles: baseline.typeFiles.filter(f => f.status === 'pending-move').length,
+      pendingMoveUtilFiles: baseline.utilFiles.filter(f => f.status === 'pending-move').length,
+      pendingMoveFeatureEdges: baseline.featureDependencyMatrix.filter(e => e.status === 'pending-move').length,
+      featureCycles: baseline.featureCycles.length,
+      transitionalExceptions: baseline.exceptions.filter(e => e.status === 'pending-move').length,
+    };
+
+    expect(liveCounts).toEqual(baseline.currentCounts);
+    expect(baseline.currentCounts.pendingMoveContextFiles).toBeLessThanOrEqual(
       baseline.initialCounts.pendingMoveContextFiles,
     );
-    expect(baseline.typeFiles.filter(f => f.status === 'pending-move')).toHaveLength(
+    expect(baseline.currentCounts.pendingMoveTypeFiles).toBeLessThanOrEqual(
       baseline.initialCounts.pendingMoveTypeFiles,
     );
-    expect(baseline.utilFiles.filter(f => f.status === 'pending-move')).toHaveLength(
+    expect(baseline.currentCounts.pendingMoveUtilFiles).toBeLessThanOrEqual(
       baseline.initialCounts.pendingMoveUtilFiles,
     );
-    expect(baseline.featureDependencyMatrix.filter(e => e.status === 'pending-move')).toHaveLength(
+    expect(baseline.currentCounts.pendingMoveFeatureEdges).toBeLessThanOrEqual(
       baseline.initialCounts.pendingMoveFeatureEdges,
     );
-    expect(baseline.featureCycles).toHaveLength(baseline.initialCounts.featureCycles);
-    expect(baseline.exceptions.filter(e => e.status === 'pending-move')).toHaveLength(
+    expect(baseline.currentCounts.featureCycles).toBeLessThanOrEqual(baseline.initialCounts.featureCycles);
+    expect(baseline.currentCounts.transitionalExceptions).toBeLessThanOrEqual(
       baseline.initialCounts.transitionalExceptions,
     );
   });

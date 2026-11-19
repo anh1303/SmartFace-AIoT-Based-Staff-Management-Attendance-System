@@ -1,6 +1,14 @@
 {
   "phase": 1,
+  "baselineSnapshot": "e395c9b8",
   "initialCounts": {
+    "pendingMoveCommonFiles": 3,
+    "pendingMoveCommonUtilsExports": 6,
+    "runtimeModuleCycles": 0,
+    "transitionalExceptions": 7,
+    "allowedCompositionPortExceptions": 4
+  },
+  "currentCounts": {
     "pendingMoveCommonFiles": 3,
     "pendingMoveCommonUtilsExports": 6,
     "runtimeModuleCycles": 0,

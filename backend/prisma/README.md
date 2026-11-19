@@ -1,9 +1,9 @@
 # 🗄️ SmartFace AIoT Database & Prisma ORM Architecture Specification
 
 
-Prisma CLI ??c th? m?c `prisma/` theo c?u h?nh trong `backend/package.json`. File `schema.prisma` khai b?o generator v? datasource. Th?m model ho?c enum v?o file nghi?p v? t??ng ?ng trong `domains/`. Quan h? gi?a c?c file tham chi?u tr?c ti?p t?n model. Migration d?ng chung trong `migrations/`. Seed n?m trong `seeds/`; script b?o tr? n?m trong `backend/scripts/maintenance/`.
+Prisma CLI đọc thư mục `prisma/schema/` theo cấu hình `"prisma": { "schema": "prisma/schema" }` trong `backend/package.json`. File `prisma/schema/schema.prisma` khai báo generator và datasource. Thêm model hoặc enum vào file nghiệp vụ tương ứng trong `prisma/schema/domains/`. Quan hệ giữa các file tham chiếu trực tiếp tên model. Migration dùng chung trong `prisma/migrations/`. Seed nằm trong `prisma/seeds/`; script bảo trì nằm trong `backend/scripts/maintenance/`.
 
-Hướng dẫn chạy từng lệnh tạo phân ca và check-in/out: [README-SEED.md](./README-SEED.md).
+Hướng dẫn chạy từng lệnh tạo phân ca và check-in/out: [README-SEED.md](./seeds/README-SEED.md).
 
 
 > **Tài liệu đặc tả kỹ thuật toàn diện** về Kiến trúc Cơ sở Dữ liệu (Database Architecture), Sơ đồ Thực thể Quan hệ (**ERD**), Các Động cơ Khoa học Dữ liệu (Biometrics Vector Engine, Edge Idempotency, Overtime State Machine, Deterministic Payroll), Hệ thống Di chuyển Dữ liệu (**Migrations**), và Quy trình Khởi tạo Dữ liệu Thực nghiệm 3 Bước Độc lập trong hệ sinh thái **SmartFace AIoT**.
@@ -679,7 +679,7 @@ Seed supports past and future dates, including unfinished shifts, but never date
 ## 🛡️ 8. Quy Trình Quản Trị Vận Hành & Migration (DevOps Runbook)
 
 ### 1. Chu Trình Phát Triển Cục Bộ (Local Schema Evolution)
-Khi có bất kỳ thay đổi nào trong file `schema.prisma`:
+Khi có bất kỳ thay đổi nào trong thư mục `prisma/schema/` (`schema.prisma` hoặc `domains/*.prisma`):
 ```bash
 cd backend
 

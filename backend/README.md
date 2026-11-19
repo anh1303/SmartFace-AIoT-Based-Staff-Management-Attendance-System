@@ -106,7 +106,7 @@ npm run prisma:generate
 ```
 
 ### Bước 2: Chạy Database Migration
-Đồng bộ định nghĩa bảng từ `prisma/schema.prisma` vào CSDL PostgreSQL:
+Đồng bộ định nghĩa bảng từ thư mục schema `prisma/schema/` (`schema.prisma` và `domains/*.prisma`) vào CSDL PostgreSQL:
 ```bash
 # Đối với môi trường phát triển (Development):
 npx prisma migrate dev

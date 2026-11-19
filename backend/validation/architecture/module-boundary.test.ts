@@ -3,15 +3,19 @@ import path from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+export interface BackendBoundaryCounts {
+  pendingMoveCommonFiles: number;
+  pendingMoveCommonUtilsExports: number;
+  runtimeModuleCycles: number;
+  transitionalExceptions: number;
+  allowedCompositionPortExceptions: number;
+}
+
 export interface BackendBoundaryBaseline {
   phase: number;
-  initialCounts: {
-    pendingMoveCommonFiles: number;
-    pendingMoveCommonUtilsExports: number;
-    runtimeModuleCycles: number;
-    transitionalExceptions: number;
-    allowedCompositionPortExceptions: number;
-  };
+  baselineSnapshot: string;
+  initialCounts: BackendBoundaryCounts;
+  currentCounts: BackendBoundaryCounts;
   commonFiles: Array<{
     path: string;
     owner: string;
@@ -391,19 +395,27 @@ describe('Backend Modular Monolith Architecture Boundaries', () => {
     expect(classification.staleExceptions[0].source).toBe('server.ts');
   });
 
-  it('keeps initial counts in boundary-baseline.json synchronized with manifest entries', () => {
-    expect(baseline.commonFiles.filter(f => f.status === 'pending-move')).toHaveLength(
+  it('keeps currentCounts synchronized with manifest entries and never above frozen initialCounts', () => {
+    const liveCounts: BackendBoundaryCounts = {
+      pendingMoveCommonFiles: baseline.commonFiles.filter(f => f.status === 'pending-move').length,
+      pendingMoveCommonUtilsExports: baseline.commonUtilsExports.filter(e => e.status === 'pending-move').length,
+      runtimeModuleCycles: baseline.runtimeModuleCycles.length,
+      transitionalExceptions: baseline.exceptions.filter(e => e.status === 'pending-move').length,
+      allowedCompositionPortExceptions: baseline.exceptions.filter(e => e.status === 'allowed').length,
+    };
+
+    expect(liveCounts).toEqual(baseline.currentCounts);
+    expect(baseline.currentCounts.pendingMoveCommonFiles).toBeLessThanOrEqual(
       baseline.initialCounts.pendingMoveCommonFiles,
     );
-    expect(baseline.commonUtilsExports.filter(e => e.status === 'pending-move')).toHaveLength(
+    expect(baseline.currentCounts.pendingMoveCommonUtilsExports).toBeLessThanOrEqual(
       baseline.initialCounts.pendingMoveCommonUtilsExports,
     );
-    expect(baseline.runtimeModuleCycles).toHaveLength(baseline.initialCounts.runtimeModuleCycles);
-    expect(baseline.exceptions.filter(e => e.status === 'pending-move')).toHaveLength(
-      baseline.initialCounts.transitionalExceptions,
+    expect(baseline.currentCounts.runtimeModuleCycles).toBeLessThanOrEqual(
+      baseline.initialCounts.runtimeModuleCycles,
     );
-    expect(baseline.exceptions.filter(e => e.status === 'allowed')).toHaveLength(
-      baseline.initialCounts.allowedCompositionPortExceptions,
+    expect(baseline.currentCounts.transitionalExceptions).toBeLessThanOrEqual(
+      baseline.initialCounts.transitionalExceptions,
     );
   });
 

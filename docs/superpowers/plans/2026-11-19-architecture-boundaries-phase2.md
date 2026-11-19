@@ -179,14 +179,14 @@ Nguyên tắc xuyên suốt:
 
 ### Batch 6 — Nghiệm Thu Pha 2 Theo Definition of Done
 
-- [ ] Giữ nguyên `initialCounts` (mốc cố định tại `e395c9b8`) trong cả hai file `boundary-baseline.json` làm lịch sử đối chiếu, đồng thời mở rộng `module-boundary.test.ts` và `feature-boundary.test.ts` cưỡng chế trực tiếp điều kiện nghiệm thu Pha 2 (`phase: 2`):
+- [x] Giữ nguyên `initialCounts` (mốc cố định tại `e395c9b8`) trong cả hai file `boundary-baseline.json` làm lịch sử đối chiếu, đồng thời mở rộng `module-boundary.test.ts` và `feature-boundary.test.ts` cưỡng chế trực tiếp điều kiện nghiệm thu Pha 2 (`phase: 2`):
   - Backend: mọi mục trong `currentCounts` thuộc danh sách chuyển tiếp (`pendingMoveCommonFiles`, `pendingMoveCommonUtilsExports`, `transitionalExceptions`, `runtimeModuleCycles`) đều bằng **`0`**; 4 ngoại lệ nối port tại `composition.ts` nằm riêng trong danh sách `allowed`.
   - Frontend: mọi mục trong `currentCounts` (`pendingMoveContextFiles`, `pendingMoveTypeFiles`, `pendingMoveUtilFiles`, `pendingMoveFeatureEdges`, `transitionalExceptions`, `featureCycles`) đều bằng **`0`**.
-- [ ] Chạy đồng thời:
+- [x] Chạy đồng thời:
   - `cd backend && npm.cmd run build && npx.cmd tsc --noEmit -p prisma/tsconfig.json && npx.cmd vitest run validation`
   - `cd backend && npm.cmd run test:neon` (đối chiếu cả phần xanh và danh sách lỗi nền Mục 3)
   - `cd frontend && npm.cmd run build && npx.cmd vitest run validation src/utils/__tests__`
-- [ ] Kiểm tra `git diff --check`, xác nhận không sinh migration mới, lập báo cáo nghiệm thu Pha 2.
+- [x] Kiểm tra `git diff --check`, xác nhận không sinh migration mới, lập báo cáo nghiệm thu Pha 2.
 
 ---
 

@@ -422,6 +422,21 @@ describe('Frontend Feature-Based Architecture Boundaries', () => {
     expect(baseline.currentCounts.transitionalExceptions).toBeLessThanOrEqual(
       baseline.initialCounts.transitionalExceptions,
     );
+
+    if (baseline.phase >= 2) {
+      expect(baseline.currentCounts.pendingMoveContextFiles).toBe(0);
+      expect(baseline.currentCounts.pendingMoveTypeFiles).toBe(0);
+      expect(baseline.currentCounts.pendingMoveUtilFiles).toBe(0);
+      expect(baseline.currentCounts.pendingMoveFeatureEdges).toBe(0);
+      expect(baseline.currentCounts.featureCycles).toBe(0);
+      expect(baseline.currentCounts.transitionalExceptions).toBe(0);
+      expect(baseline.contextFiles.map(f => f.path).sort()).toEqual([
+        'context/AppContext.tsx',
+        'context/ThemeContext.tsx',
+        'context/ToastContext.tsx',
+        'context/index.ts',
+      ]);
+    }
   });
 
   it('classifies every file in src/context/, src/types/, and src/utils/ without unclassified or stale entries', () => {

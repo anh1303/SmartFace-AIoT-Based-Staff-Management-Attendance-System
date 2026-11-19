@@ -417,6 +417,17 @@ describe('Backend Modular Monolith Architecture Boundaries', () => {
     expect(baseline.currentCounts.transitionalExceptions).toBeLessThanOrEqual(
       baseline.initialCounts.transitionalExceptions,
     );
+
+    if (baseline.phase >= 2) {
+      expect(baseline.currentCounts.pendingMoveCommonFiles).toBe(0);
+      expect(baseline.currentCounts.pendingMoveCommonUtilsExports).toBe(0);
+      expect(baseline.currentCounts.runtimeModuleCycles).toBe(0);
+      expect(baseline.currentCounts.transitionalExceptions).toBe(0);
+      for (const ex of baseline.exceptions) {
+        expect(ex.status).toBe('allowed');
+        expect(ex.kind).toBe('composition-port-wiring');
+      }
+    }
   });
 
   it('classifies every file in src/common/ and every export in src/common/utils.ts without unclassified or stale entries', () => {

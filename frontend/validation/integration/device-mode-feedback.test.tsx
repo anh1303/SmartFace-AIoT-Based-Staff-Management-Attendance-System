@@ -5,7 +5,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ ack: false, send: vi.fn() }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }), getActiveSessionId: () => 1 }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }), getActiveSessionId: () => 1 }));
 vi.mock('../../src/context/ToastContext', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
 vi.mock('../../src/features/devices/components/DeviceKioskSettingsPanel', () => ({ DeviceKioskSettingsPanel: () => null }));
 vi.mock('../../src/features/devices', async () => {

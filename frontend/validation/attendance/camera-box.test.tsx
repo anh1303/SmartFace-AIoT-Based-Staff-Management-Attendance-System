@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }) }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }) }));
 vi.mock('../../src/features/devices', async () => {
   const actual = await vi.importActual<typeof import('../../src/features/devices')>('../../src/features/devices');
   return {

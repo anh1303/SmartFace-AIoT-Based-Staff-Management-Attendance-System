@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sparkles, AlertCircle, Lock, Unlock } from 'lucide-react';
 import type { BonusPenaltyPolicy, PayrollRecord } from '../types';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { formatPayrollRateLabel } from '../utils/payrollUtils';
 
 interface PayrollSummaryCardsProps {

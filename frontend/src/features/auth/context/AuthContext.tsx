@@ -1,12 +1,21 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { UserSession, Role } from '@/features/auth';
-import type { Employee } from '@/features/employees';
-import { loginApi, logoutApi, meApi, DEFAULT_USERS, faceLoginApi, FACE_LOGIN_TIMEOUTS, withBoundedSignal } from '@/features/auth';
-import { useToast } from './ToastContext';
-import { useOptionalNotifications } from '../features/notifications';
-import { logger } from '../utils/logger';
-import { ApiError } from '../api/client';
+import type { UserSession, Role } from '../types';
+export interface DevSwitchRoleEmployee {
+  employee_id: string;
+  email?: string;
+  full_name: string;
+  position?: string;
+  department?: string;
+  avatar?: string;
+}
+import { loginApi, logoutApi, meApi, DEFAULT_USERS } from '../api/authApi';
+import { faceLoginApi } from '../api/faceLoginApi';
+import { FACE_LOGIN_TIMEOUTS, withBoundedSignal } from '../lib/faceLoginRequest';
+import { useToast } from '../../../context/ToastContext';
+import { useOptionalNotifications } from '@/features/notifications';
+import { logger } from '../../../utils/logger';
+import { ApiError } from '../../../api/client';
 
 const authLogger = logger.child('AuthContext');
 
@@ -43,7 +52,7 @@ interface AuthContextType {
   login: (identifier: string, password?: string, rememberMe?: boolean) => Promise<{ success: boolean; message?: string; role?: Role }>;
   completeFaceLogin: (attemptId: string) => Promise<FaceCompleteResult>;
   logout: () => Promise<void>;
-  switchRole: (role: Role, employeesFallback?: Employee[]) => void;
+  switchRole: (role: Role, employeesFallback?: DevSwitchRoleEmployee[]) => void;
   setCurrentUserSession: (session: UserSession | null) => void;
 }
 
@@ -393,7 +402,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [queryClient, showToast, notifications]);
 
-  const switchRole = useCallback((newRole: Role, employeesFallback: Employee[] = []) => {
+  const switchRole = useCallback((newRole: Role, employeesFallback: DevSwitchRoleEmployee[] = []) => {
     if (!import.meta.env.DEV) {
       showToast('Tính năng chuyển đổi vai trò chỉ khả dụng ở môi trường Development!', 'error', "Không thể chuyển vai trò");
       return;

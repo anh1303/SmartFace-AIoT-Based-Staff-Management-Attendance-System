@@ -1,7 +1,7 @@
 import { ReportExportButton, type ReportFormat } from '@/components/common/ReportExportButton';
 import React from 'react';
 import { Settings, Plus, Download, Users } from 'lucide-react';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { PageHeaderBanner } from '../../../components/common';
 
 export interface EmployeeListHeaderProps {

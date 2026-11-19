@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Wallet } from 'lucide-react';
 import { FilterSelect, PageHeaderBanner } from '../../components/common';
-import { useAuth } from '../../context/AuthContext';
-import { useEmployeeContext } from '../../context/EmployeeContext';
+import { useAuth } from '@/features/auth';
+import { useEmployeeContext } from '@/features/employees';
 import { usePayrollHistory } from '../../features/payrolls';
 import { PayslipBreakdown } from '../../features/payrolls';
 import { getTodayVNString } from '../../utils/dateUtils';

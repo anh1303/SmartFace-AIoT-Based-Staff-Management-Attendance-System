@@ -6,7 +6,7 @@ import { expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({ request: vi.fn() }));
 const user = vi.hoisted(() => ({ username: 'admin' }));
 vi.mock('../../src/api/client', () => ({ apiFetch: api.request }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ currentUser: user }), getActiveSessionId: () => 1 }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ currentUser: user }), getActiveSessionId: () => 1 }));
 vi.mock('socket.io-client', () => ({ io: () => ({ on: vi.fn(), disconnect: vi.fn() }) }));
 import { useFingerprintEnrollment } from '../../src/features/biometrics/hooks/useFingerprintEnrollment';
 import { ActionButton } from '../../src/components/common/ActionFeedback';

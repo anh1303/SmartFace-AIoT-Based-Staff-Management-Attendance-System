@@ -14,7 +14,7 @@ import {
   Lock
 } from 'lucide-react';
 import type { Employee } from '../types';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { isAnotherManager } from '../utils/permissionUtils';
 
 interface EmployeeDetailHeaderProps {

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { useShifts } from '../features/schedules';
-import type { WorkShift } from '@/features/schedules';
-import { useAuth } from './AuthContext';
+import { useShifts } from '../hooks/useShifts';
+import type { WorkShift } from '../types';
+import { useAuth } from '@/features/auth';
 
 export interface ShiftContextType {
   workShifts: WorkShift[];

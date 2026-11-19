@@ -8,7 +8,7 @@ import { ApiError } from '../../src/api/client';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 const api = vi.hoisted(() => ({ config: vi.fn(), start: vi.fn(), frame: vi.fn(), status: vi.fn(), cancel: vi.fn(), complete: vi.fn() }));
 const authState = vi.hoisted(() => ({ completeFaceLogin: vi.fn(), isLoggingOut: false }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => authState }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => authState }));
 vi.mock('../../src/features/auth/api/faceLoginApi', async () => ({
   faceLoginApi: api, FaceLoginHttpError: (await import('../../src/api/client')).ApiError,
 }));

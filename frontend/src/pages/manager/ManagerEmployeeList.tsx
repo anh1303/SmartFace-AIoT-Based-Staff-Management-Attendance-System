@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { useToast } from '../../context/ToastContext';
-import { useEmployeeContext } from '../../context/EmployeeContext';
+import { useEmployeeContext } from '@/features/employees';
 import type { Employee } from '@/features/employees';
 import {
   getNextEmployeeId,

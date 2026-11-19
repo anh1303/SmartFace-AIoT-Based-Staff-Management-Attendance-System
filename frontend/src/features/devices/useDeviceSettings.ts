@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { apiFetch } from '../../api/client';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 
 export interface DeviceSettings {
   deviceId: string;

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useEmployeeContext } from '../../context/EmployeeContext';
-import { useAuth } from '../../context/AuthContext';
+import { useEmployeeContext } from '@/features/employees';
+import { useAuth } from '@/features/auth';
 import { useDepartmentPositions } from '@/features/employees';
 import { ScanFace, Fingerprint, AlertTriangle } from 'lucide-react';
 import {

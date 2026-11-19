@@ -2,7 +2,7 @@ import {PublicThemeToggle} from '../../components/public/PublicThemeToggle';
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ScanFace, Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { FaceLoginModal } from '../../features/auth';
 export const LoginPage: React.FC = () => {
     const navigate = useNavigate();

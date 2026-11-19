@@ -24,9 +24,9 @@ const state = vi.hoisted(() => ({
 }))
 
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => state }))
-vi.mock('../../src/context/PayrollContext', () => ({ usePayrollContext: () => state }))
-vi.mock('../../src/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ employees: state.employees }) }))
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: state.role, currentUser: state.currentUser }) }))
+vi.mock('../../src/features/payrolls/context/PayrollContext', () => ({ usePayrollContext: () => state }))
+vi.mock('../../src/features/employees/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ employees: state.employees }) }))
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ role: state.role, currentUser: state.currentUser }) }))
 vi.mock('../../src/context/ToastContext', () => ({
   useToast: () => ({ showToast: toastSpy, toasts: [], removeToast: vi.fn(), reportError: vi.fn(), getCheckpoint: () => 0 }),
   ToastProvider: ({ children }: any) => <>{children}</>,

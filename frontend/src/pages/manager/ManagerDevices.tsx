@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Server, Wifi, WifiOff, Wrench, Info, ArrowLeft, CheckCircle, Clock, RotateCcw, Trash2, Pencil } from 'lucide-react';
-import { useAuth, getActiveSessionId } from '../../context/AuthContext';
+import { useAuth, getActiveSessionId } from '@/features/auth';
 import { useToast } from '../../context/ToastContext';
 import { Modal } from '../../components/common/Modal';
 import { PageHeaderBanner } from '../../components/common/PageHeaderBanner';

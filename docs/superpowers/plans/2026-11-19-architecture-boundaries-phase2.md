@@ -171,9 +171,9 @@ Nguyên tắc xuyên suốt:
 - Mọi file **bên trong cùng feature** (hooks, components, api) phải import provider theo **đường dẫn tương đối nội bộ** (ví dụ `../context/AuthContext`), **không** đi vòng qua `features/<name>/index.ts` đang tái xuất chính provider đó.
 
 **Kiểm chứng Batch 5:**
-- [ ] Cập nhật `frontend/validation/architecture/boundary-baseline.json` (`currentCounts.pendingMoveContextFiles: 0`; giữ nguyên `initialCounts`).
-- [ ] Chạy `cd frontend && npm.cmd run build && npx.cmd vitest run validation src/utils/__tests__` (kiểm tra kỹ `logout-login-race.test.tsx`, `attendance-live-pages.test.tsx`, `face-login-modal.test.tsx`).
-- [ ] Chốt commit Batch 5.
+- [x] Cập nhật `frontend/validation/architecture/boundary-baseline.json` (`currentCounts.pendingMoveContextFiles: 0`; giữ nguyên `initialCounts`).
+- [x] Chạy `cd frontend && npm.cmd run build && npx.cmd vitest run validation src/utils/__tests__` (kiểm tra kỹ `logout-login-race.test.tsx`, `attendance-live-pages.test.tsx`, `face-login-modal.test.tsx`).
+- [x] Chốt commit Batch 5.
 
 ---
 

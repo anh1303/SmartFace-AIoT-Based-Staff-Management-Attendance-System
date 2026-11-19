@@ -11,8 +11,8 @@ import {
 import { AdjustmentReviewPanel } from '@/features/payrolls';
 import type { AttendanceRecord } from '@/features/attendances';
 import type { Employee } from '@/features/employees';
-import { useShiftContext } from '../../context/ShiftContext';
-import { useEmployeeContext } from '../../context/EmployeeContext';
+import { useShiftContext } from '@/features/schedules';
+import { useEmployeeContext } from '@/features/employees';
 import { FilterSelect } from '../../components/common/FilterSelect';
 
 interface EmployeeAttendanceTabProps {

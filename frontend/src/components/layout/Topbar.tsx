@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Menu, Sun, Moon, ChevronRight, Clock } from 'lucide-react';
 import { FloatingNotificationBubble } from '../../features/notifications';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { useTheme } from '../../context/ThemeContext';
 
 const labels: Record<string, string> = {

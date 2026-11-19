@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 import { profileApi } from '@/features/auth';
-import { useAuth, getActiveSessionId, getActiveUsername } from '../../../context/AuthContext';
+import { useAuth, getActiveSessionId, getActiveUsername } from '@/features/auth';
 
 export function PasswordForm() {
   const [current, setCurrent] = useState('');

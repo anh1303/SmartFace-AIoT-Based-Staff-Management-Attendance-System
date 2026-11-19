@@ -1,7 +1,7 @@
 import { ActionButton } from '@/components/common/ActionFeedback';
 import React, { useRef, useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { ScanFace, LayoutDashboard, CalendarDays, Clock, User, FileText, Users, Banknote, Fingerprint, LogOut, ExternalLink, Server, X, BarChart3 } from 'lucide-react';
 import { useDialogFocus } from '../common/useDialogFocus';
 import { Avatar } from '../common/Avatar';

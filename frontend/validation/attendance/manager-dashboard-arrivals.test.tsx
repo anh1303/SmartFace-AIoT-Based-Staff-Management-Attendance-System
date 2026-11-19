@@ -58,4 +58,4 @@ describe('Manager dashboard arrivals', () => {
   })
 })
 
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => state.current }))
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => state.current }))

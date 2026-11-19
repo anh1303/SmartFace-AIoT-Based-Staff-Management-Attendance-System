@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-vi.mock('../../src/context/ShiftContext', () => ({ useShiftContext: () => ({ workShifts: [], isLoading: false, isError: false }) }));
+vi.mock('../../src/features/schedules/context/ShiftContext', () => ({ useShiftContext: () => ({ workShifts: [], isLoading: false, isError: false }) }));
 vi.mock('../../src/features/attendances/hooks/useEmployeeOverview', () => ({ useEmployeeOverview: () => ({ data: { period: '2026-11', through_date: '2026-11-06', work_days: null, working_hours: null, overtime_hours: null, late_early_hours: null, absent_days: null, today: [] }, isPending: false, isError: false }) }));
 
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => ({
@@ -32,6 +32,6 @@ describe('employee dashboard missing data', () => {
   });
 });
 
-vi.mock('../../src/context/EmployeeContext', async () => { const app = await import('../../src/context/AppContext'); return { useEmployeeContext: () => app.useApp() }; });
-vi.mock('../../src/context/PayrollContext', async () => { const app = await import('../../src/context/AppContext'); return { usePayrollContext: () => app.useApp() }; });
-vi.mock('../../src/context/AuthContext', async () => { const app = await import('../../src/context/AppContext'); return { useAuth: () => app.useApp() }; });
+vi.mock('../../src/features/employees/context/EmployeeContext', async () => { const app = await import('../../src/context/AppContext'); return { useEmployeeContext: () => app.useApp() }; });
+vi.mock('../../src/features/payrolls/context/PayrollContext', async () => { const app = await import('../../src/context/AppContext'); return { usePayrollContext: () => app.useApp() }; });
+vi.mock('../../src/features/auth/context/AuthContext', async () => { const app = await import('../../src/context/AppContext'); return { useAuth: () => app.useApp() }; });

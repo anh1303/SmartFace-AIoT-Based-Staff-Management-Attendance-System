@@ -4,7 +4,7 @@ import { webcrypto } from 'node:crypto';
 const request = vi.hoisted(() => vi.fn());
 const actor = vi.hoisted(() => ({ username: 'manager-a' }));
 vi.mock('../../src/api/client', () => ({ apiFetch: request, ApiError: class extends Error {} }));
-vi.mock('../../src/context/AuthContext', () => ({ getActiveSessionId: () => 1, getActiveUsername: () => actor.username }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ getActiveSessionId: () => 1, getActiveUsername: () => actor.username }));
 import { commandKey, submitAndWait, waitForOperation, OperationFailedError } from '../../src/features/operations/commandApi';
 const job = { jobId: 'job', type: 'shifts.batch', label: 'Lịch', status: 'running' as const, revision: 1, progress: { total: 2, completed: 0, succeeded: 0, failed: 0, skipped: 0 } };
 beforeEach(() => { request.mockReset(); sessionStorage.clear(); actor.username = 'manager-a'; vi.stubGlobal('crypto', webcrypto); });

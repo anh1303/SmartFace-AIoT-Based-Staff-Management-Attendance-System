@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, ScanFace } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import { FaceLoginHttpError, faceLoginApi } from '../api/faceLoginApi';
 import { cameraDelay, captureJpeg, stopCamera } from '../lib/faceCamera';
 import { FACE_LOGIN_TIMEOUTS, withBoundedSignal } from '../lib/faceLoginRequest';

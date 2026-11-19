@@ -1,6 +1,6 @@
 import { ApiError, apiFetch } from '../../api/client';
 import type { Operation } from './OperationsProvider';
-import { getActiveSessionId, getActiveUsername } from '../../context/AuthContext';
+import { getActiveSessionId, getActiveUsername } from '@/features/auth';
 export class UncertainWriteError extends Error {}
 function assertSession(session: number) {
   if (getActiveSessionId() !== session) throw new UncertainWriteError('Phiên đăng nhập đã thay đổi. Vui lòng tải lại dữ liệu.');

@@ -10,7 +10,7 @@
     "transitionalExceptions": 0
   },
   "currentCounts": {
-    "pendingMoveContextFiles": 5,
+    "pendingMoveContextFiles": 0,
     "pendingMoveTypeFiles": 0,
     "pendingMoveUtilFiles": 0,
     "pendingMoveFeatureEdges": 0,
@@ -23,36 +23,6 @@
       "owner": "shared",
       "status": "allowed",
       "reason": "Provider lắp ráp ứng dụng ở tầng root"
-    },
-    {
-      "path": "context/AttendanceContext.tsx",
-      "owner": "attendances",
-      "status": "pending-move",
-      "reason": "Provider state chấm công thuộc feature attendances (chờ di chuyển ở Batch 5)"
-    },
-    {
-      "path": "context/AuthContext.tsx",
-      "owner": "auth",
-      "status": "pending-move",
-      "reason": "Provider state phiên đăng nhập thuộc feature auth (chờ di chuyển ở Batch 5)"
-    },
-    {
-      "path": "context/EmployeeContext.tsx",
-      "owner": "employees",
-      "status": "pending-move",
-      "reason": "Provider state danh sách nhân viên thuộc feature employees (chờ di chuyển ở Batch 5)"
-    },
-    {
-      "path": "context/PayrollContext.tsx",
-      "owner": "payrolls",
-      "status": "pending-move",
-      "reason": "Provider state bảng lương thuộc feature payrolls (chờ di chuyển ở Batch 5)"
-    },
-    {
-      "path": "context/ShiftContext.tsx",
-      "owner": "schedules",
-      "status": "pending-move",
-      "reason": "Provider state lịch phân ca thuộc feature schedules (chờ di chuyển ở Batch 5)"
     },
     {
       "path": "context/ThemeContext.tsx",
@@ -70,7 +40,7 @@
       "path": "context/index.ts",
       "owner": "shared",
       "status": "allowed",
-      "reason": "Barrel tái xuất các context ở tầng ứng dụng"
+      "reason": "Barrel tái xuất các context dùng chung ở tầng ứng dụng"
     }
   ],
   "typeFiles": [
@@ -147,6 +117,13 @@
     },
     {
       "source": "attendances",
+      "target": "auth",
+      "owner": "attendances",
+      "status": "allowed",
+      "reason": "Hook chấm công đọc trạng thái phiên người dùng hiện tại qua useAuth từ entry công khai của feature auth"
+    },
+    {
+      "source": "attendances",
       "target": "devices",
       "owner": "attendances",
       "status": "allowed",
@@ -165,6 +142,20 @@
       "owner": "attendances",
       "status": "allowed",
       "reason": "Hợp đồng kiểu một chiều (import type WorkShift) để ghép ca làm việc với lượt chấm công"
+    },
+    {
+      "source": "auth",
+      "target": "notifications",
+      "owner": "auth",
+      "status": "allowed",
+      "reason": "AuthProvider dọn lịch sử thông báo cục bộ khi đổi phiên hoặc đăng xuất qua useOptionalNotifications"
+    },
+    {
+      "source": "biometrics",
+      "target": "auth",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Luồng sinh trắc học đọc phiên hiện tại và vai trò qua useAuth từ entry công khai của feature auth"
     },
     {
       "source": "biometrics",
@@ -188,11 +179,18 @@
       "reason": "Bảng log gần nhất trên dashboard dùng helper confidenceColor từ entry công khai của feature attendances"
     },
     {
+      "source": "devices",
+      "target": "auth",
+      "owner": "devices",
+      "status": "allowed",
+      "reason": "Quản lý thiết bị đọc trạng thái xác thực và vai trò qua useAuth từ entry công khai của feature auth"
+    },
+    {
       "source": "employees",
       "target": "auth",
       "owner": "employees",
       "status": "allowed",
-      "reason": "Hợp đồng kiểu một chiều (import type UserSession) cho permissionUtils trong feature employees"
+      "reason": "EmployeeProvider và permissionUtils đọc phiên hiện tại và kiểu UserSession từ entry công khai của feature auth"
     },
     {
       "source": "employees",
@@ -200,6 +198,20 @@
       "owner": "employees",
       "status": "allowed",
       "reason": "Tạo hồ sơ nhân viên và gửi email tài khoản theo dõi tác vụ nền qua entry công khai của feature operations"
+    },
+    {
+      "source": "operations",
+      "target": "auth",
+      "owner": "operations",
+      "status": "allowed",
+      "reason": "OperationsProvider và commandApi gắn định danh phiên người dùng hiện tại từ entry công khai của feature auth"
+    },
+    {
+      "source": "payrolls",
+      "target": "auth",
+      "owner": "payrolls",
+      "status": "allowed",
+      "reason": "PayrollProvider và hook lương đọc trạng thái phiên hiện tại qua useAuth từ entry công khai của feature auth"
     },
     {
       "source": "payrolls",
@@ -214,6 +226,13 @@
       "owner": "payrolls",
       "status": "allowed",
       "reason": "Hợp đồng kiểu một chiều (import type WorkShift) cho panel duyệt thưởng/phạt theo ca"
+    },
+    {
+      "source": "schedules",
+      "target": "auth",
+      "owner": "schedules",
+      "status": "allowed",
+      "reason": "ShiftProvider đọc trạng thái phiên hiện tại qua useAuth từ entry công khai của feature auth"
     },
     {
       "source": "schedules",

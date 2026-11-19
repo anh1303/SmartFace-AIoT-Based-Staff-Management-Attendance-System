@@ -26,3 +26,4 @@ export * from './api/attendanceApi';
 export * from './utils/csvExport';
 export type * from './types';
 export * from './utils/confidence';
+export * from './context/AttendanceContext';

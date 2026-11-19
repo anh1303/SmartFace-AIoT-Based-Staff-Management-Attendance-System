@@ -10,7 +10,7 @@ const state = vi.hoisted(() => ({
   update: vi.fn(), toast: vi.fn(), enroll: vi.fn(), remove: vi.fn(), track: vi.fn(),
 }));
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => ({ employees: state.employees, updateEmployee: state.update, showToast: state.toast }) }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: { employee_id: 'ADMIN' } }), getActiveSessionId: () => 1 }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: { employee_id: 'ADMIN' } }), getActiveSessionId: () => 1 }));
 vi.mock('../../src/features/operations/OperationsProvider', () => ({ useOperations: () => ({ track: state.track }) }));
 vi.mock('../../src/features/biometrics/api/biometricApi', () => ({ enrollFaceJobApi: state.enroll, deleteEmployeeBiometricsApi: state.remove }));
 vi.mock('../../src/features/biometrics/hooks/useFingerprintEnrollment', () => ({ useFingerprintEnrollment: () => ({ step: 'VERIFIED', session: { match_score: 132 }, devices: [], confirm: state.confirmFingerprint, start: vi.fn(), cancel: vi.fn() }) }));
@@ -86,5 +86,5 @@ it('deletes faces through the biometric endpoint without sending an ineffective 
   expect(state.toast).toHaveBeenCalledWith(expect.stringContaining('Đã xóa'), 'success', 'Xóa Face ID thành công');
 });
 
-vi.mock('../../src/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ employees: state.employees, updateEmployee: state.update }) }));
+vi.mock('../../src/features/employees/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ employees: state.employees, updateEmployee: state.update }) }));
 vi.mock('../../src/context/ToastContext', () => ({ useToast: () => ({ showToast: state.toast }) }));

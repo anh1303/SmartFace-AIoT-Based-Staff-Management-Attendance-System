@@ -3,9 +3,9 @@ import { ActionButton } from '../../components/common/ActionFeedback';
 import { submitScheduleBatch, submitScheduleCopy } from '../../features/schedules';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
-import { useEmployeeContext } from '../../context/EmployeeContext';
-import { useShiftContext } from '../../context/ShiftContext';
-import { useAuth } from '../../context/AuthContext';
+import { useEmployeeContext } from '@/features/employees';
+import { useShiftContext } from '@/features/schedules';
+import { useAuth } from '@/features/auth';
 import { isAnotherManager } from '@/features/employees';
 import type { WorkShift } from '@/features/schedules';
 import {

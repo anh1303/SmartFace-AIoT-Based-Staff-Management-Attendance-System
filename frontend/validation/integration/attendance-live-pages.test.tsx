@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 import { expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ handlers: new Map<string, Function>(), toast: vi.fn(), count: 0 }));
 vi.mock('socket.io-client', () => ({ io: () => ({ on: (name: string, handler: Function) => { state.handlers.set(name, handler); }, disconnect: vi.fn() }) }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ currentUser: { employee_id: 'NV1' } }) }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ currentUser: { employee_id: 'NV1' } }) }));
 vi.mock('../../src/context/ToastContext', () => ({ useToast: () => ({ showToast: state.toast }) }));
 vi.mock('../../src/features/attendances/api/attendanceApi', () => ({ fetchAttendanceApi: async () => [], addAttendanceApi: vi.fn() }));
 import { useAttendance } from '../../src/features/attendances/hooks/useAttendance';

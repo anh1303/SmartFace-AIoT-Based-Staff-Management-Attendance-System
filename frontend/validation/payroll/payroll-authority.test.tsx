@@ -19,10 +19,10 @@ const state = vi.hoisted(() => ({
   updateBonusPenalty: vi.fn(),
 }));
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => state }));
-vi.mock('../../src/context/PayrollContext', () => ({ usePayrollContext: () => state }));
-vi.mock('../../src/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ employees: state.employees }) }));
+vi.mock('../../src/features/payrolls/context/PayrollContext', () => ({ usePayrollContext: () => state }));
+vi.mock('../../src/features/employees/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ employees: state.employees }) }));
 vi.mock('../../src/features/payrolls/hooks/usePayrollHistory', () => ({ usePayrollHistory: () => ({ data: state.payroll, isLoading: false, error: null }) }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: state.role, currentUser: state.currentUser }) }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ role: state.role, currentUser: state.currentUser }) }));
 import { useEmployeePayrollDetail } from '../../src/features/payrolls/hooks/useEmployeePayrollDetail';
 import { PayslipBreakdown } from '../../src/features/payrolls/components/PayslipBreakdown';
 import { PayrollSummaryCards } from '../../src/features/payrolls/components/PayrollSummaryCards';

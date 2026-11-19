@@ -3,7 +3,7 @@ import { useRef } from 'react';
 import { fetchEmployeesApi, createEmployeeApi, updateEmployeeApi, deleteEmployeeApi } from '../api/employeeApi';
 import type { Employee } from '../types';
 import { useToast } from '../../../context/ToastContext';
-import { getActiveSessionId } from '../../../context/AuthContext';
+import { getActiveSessionId } from '@/features/auth';
 import { ApiError } from '../../../api/client';
 import { UncertainWriteError } from '../../operations';
 

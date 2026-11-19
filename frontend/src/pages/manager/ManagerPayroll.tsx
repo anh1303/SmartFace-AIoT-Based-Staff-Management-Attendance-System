@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { usePayrollContext } from '../../context/PayrollContext';
-import { useEmployeeContext } from '../../context/EmployeeContext';
+import { usePayrollContext } from '@/features/payrolls';
+import { useEmployeeContext } from '@/features/employees';
 import { useToast } from '../../context/ToastContext';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import type { PayrollRecord } from '@/features/payrolls';
 import { logger } from '../../utils/logger';
 import { nextPayrollPolicyPeriod } from '@/features/payrolls';

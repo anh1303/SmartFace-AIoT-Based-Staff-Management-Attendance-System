@@ -1,6 +1,6 @@
 import { useMemo, useEffect } from 'react';
 import { io } from 'socket.io-client';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchAttendanceApi, addAttendanceApi, FetchAttendanceParams } from '../api/attendanceApi';
 import type { AttendanceRecord } from '../types';

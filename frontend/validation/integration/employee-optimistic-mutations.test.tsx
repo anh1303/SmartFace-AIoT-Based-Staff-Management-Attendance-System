@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const api = vi.hoisted(() => ({ fetchEmployeesApi: vi.fn(), createEmployeeApi: vi.fn(), updateEmployeeApi: vi.fn(), deleteEmployeeApi: vi.fn() }));
 const toast = vi.hoisted(() => vi.fn());
 const session = vi.hoisted(() => ({ id: 1 }));
-vi.mock('../../src/context/AuthContext', () => ({ getActiveSessionId: () => session.id }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ getActiveSessionId: () => session.id }));
 vi.mock('../../src/features/employees/api/employeeApi', () => api);
 vi.mock('../../src/context/ToastContext', () => ({ useToast: () => ({ showToast: toast }) }));
 import { useEmployees } from '../../src/features/employees/hooks/useEmployees';

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PayrollTable } from '../../src/features/payrolls/components/PayrollTable';
 import type { PayrollRecord } from '@/features/payrolls';
 
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: null }) }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: null }) }));
 
 describe('payroll table hours', () => {
   beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-19T10:00:00+07:00')); });

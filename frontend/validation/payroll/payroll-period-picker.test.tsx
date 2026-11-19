@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, expect, it, vi } from 'vitest'
 import { PayrollHeader } from '../../src/features/payrolls/components/PayrollHeader'
 
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }) }))
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }) }))
 ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 let cleanup: (() => Promise<void>) | undefined
 afterEach(async () => { await cleanup?.(); cleanup = undefined })

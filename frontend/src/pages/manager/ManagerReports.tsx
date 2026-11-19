@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
-import { usePayrollContext } from '../../context/PayrollContext';
+import { usePayrollContext } from '@/features/payrolls';
 import { useToast } from '../../context/ToastContext';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import {
   ReportsHeader,
   ReportsSummaryKpis,

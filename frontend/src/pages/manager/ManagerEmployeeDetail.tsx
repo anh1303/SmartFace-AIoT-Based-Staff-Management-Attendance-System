@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
-import { useEmployeeContext } from '../../context/EmployeeContext';
+import { useEmployeeContext } from '@/features/employees';
 import { useToast } from '../../context/ToastContext';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { Users, ShieldAlert, Lock } from 'lucide-react';
 import type { Employee } from '@/features/employees';
 import type { PayrollRecord } from '@/features/payrolls';

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Fingerprint, Trash2 } from 'lucide-react';
 import type { FingerprintDevice } from '../hooks/useFingerprintEnrollment';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { apiFetch } from '../../../api/client';
 
 export type FingerprintStep = 'IDLE' | 'SENDING' | 'QUEUED' | 'WAITING_TOUCH_1' | 'LIFT_FINGER' | 'WAITING_TOUCH_2' | 'VERIFIED' | 'SYNCING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'EXPIRED';

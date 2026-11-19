@@ -1,7 +1,7 @@
 import { usePayrollHistory } from '@/features/payrolls';
 import { useAttendanceSummaries } from '@/features/attendances';
 import { calculateMonthlyAverages } from '@/features/employees';
-import { useShiftContext } from '../../../context/ShiftContext';
+import { useShiftContext } from '@/features/schedules';
 import { getTodayVNString } from '../../../utils/dateUtils';
 import type { Employee } from '@/features/employees';
 

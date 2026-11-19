@@ -13,8 +13,8 @@ const state = vi.hoisted(() => ({
   overview: { data: { period: '2026-11', through_date: '2026-11-06', work_days: 3, working_hours: 24, overtime_hours: 1.5, late_early_hours: 0.5, absent_days: 2, today: [] }, isPending: false, isError: false, fetchStatus: 'idle' },
 }));
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => state.app }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ currentUser: state.app.currentUser, role: 'employee' }) }));
-vi.mock('../../src/context/ShiftContext', () => ({ useShiftContext: () => state.shifts }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ currentUser: state.app.currentUser, role: 'employee' }) }));
+vi.mock('../../src/features/schedules/context/ShiftContext', () => ({ useShiftContext: () => state.shifts }));
 vi.mock('../../src/features/attendances/hooks/useEmployeeOverview', () => ({ useEmployeeOverview: () => state.overview }));
 import { EmployeeDashboard } from '../../src/pages/employee/EmployeeDashboard';
 import { EmployeeSchedule } from '../../src/pages/employee/EmployeeSchedule';
@@ -122,5 +122,5 @@ describe('employee read-only portal', () => {
   });
 });
 
-vi.mock('../../src/context/EmployeeContext', async () => { const app = await import('../../src/context/AppContext'); return { useEmployeeContext: () => app.useApp() }; });
-vi.mock('../../src/context/PayrollContext', async () => { const app = await import('../../src/context/AppContext'); return { usePayrollContext: () => app.useApp() }; });
+vi.mock('../../src/features/employees/context/EmployeeContext', async () => { const app = await import('../../src/context/AppContext'); return { useEmployeeContext: () => app.useApp() }; });
+vi.mock('../../src/features/payrolls/context/PayrollContext', async () => { const app = await import('../../src/context/AppContext'); return { usePayrollContext: () => app.useApp() }; });

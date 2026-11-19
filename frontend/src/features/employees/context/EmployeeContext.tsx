@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { useEmployees } from '../features/employees';
-import type { Employee } from '@/features/employees';
-import { useAuth } from './AuthContext';
+import { useEmployees } from '../hooks/useEmployees';
+import type { Employee } from '../types';
+import { useAuth } from '@/features/auth';
 
 export interface EmployeeContextType {
   employees: Employee[];

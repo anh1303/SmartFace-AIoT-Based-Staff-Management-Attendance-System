@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ request: vi.fn(), toast: vi.fn() }));
 vi.mock('../../src/api/client', () => ({ apiFetch: state.request }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }) }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin' }) }));
 vi.mock('../../src/context/ToastContext', () => ({ useToast: () => ({ showToast: state.toast }) }));
 import { AttendanceHeader } from '../../src/features/attendances/components/AttendanceHeader';
 import { useAttendanceLocks } from '../../src/features/attendances/hooks/useAttendanceLocks';

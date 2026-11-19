@@ -5,7 +5,7 @@ import { queryClient } from '../lib/queryClient';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import { ThemeProvider } from '../context/ThemeContext';
 import { ToastProvider } from '../context/ToastContext';
-import { AuthProvider } from '../context/AuthContext';
+import { AuthProvider } from '@/features/auth';
 import { AppProvider } from '../context/AppContext';
 
 interface AppProvidersProps {

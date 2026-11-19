@@ -10,7 +10,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { EmployeeTable } from '../src/features/employees/components/EmployeeTable';
 
-vi.mock('../src/context/AuthContext', () => ({ useAuth: () => ({ currentUser: { role: 'admin' }, role: 'admin' }) }));
+vi.mock('../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ currentUser: { role: 'admin' }, role: 'admin' }) }));
 vi.mock('../src/context/ToastContext', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
 
 it('cycles employee headers through ascending, descending, and original row order', () => {

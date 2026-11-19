@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, CalendarDays, Clock } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { useEmployeeContext } from '../../context/EmployeeContext';
-import { useShiftContext } from '../../context/ShiftContext';
+import { useAuth } from '@/features/auth';
+import { useEmployeeContext } from '@/features/employees';
+import { useShiftContext } from '@/features/schedules';
 import { PageHeaderBanner } from '../../components/common';
 import { getTodayVNString } from '../../utils/dateUtils';
 import { shiftNames, shortDate } from './employeePresentation';

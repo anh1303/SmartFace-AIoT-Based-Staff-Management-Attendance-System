@@ -6,14 +6,14 @@ import { expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({ currentUser: null as null | { username: string }, isInitializing: false }));
 const reads = vi.hoisted(() => ({ employees: vi.fn(), shifts: vi.fn(), payroll: vi.fn(), policy: vi.fn() }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => state, getActiveSessionId: () => 1 }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => state, getActiveSessionId: () => 1 }));
 vi.mock('../../src/context/ToastContext', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
 vi.mock('../../src/features/employees/api/employeeApi', () => ({ fetchEmployeesApi: reads.employees }));
 vi.mock('../../src/features/schedules/api/shiftApi', () => ({ fetchShiftsApi: reads.shifts }));
 vi.mock('../../src/features/payrolls/api/payrollApi', () => ({ fetchPayrollApi: reads.payroll, fetchBonusPenaltyApi: reads.policy }));
-import { EmployeeProvider } from '../../src/context/EmployeeContext';
-import { ShiftProvider } from '../../src/context/ShiftContext';
-import { PayrollProvider } from '../../src/context/PayrollContext';
+import { EmployeeProvider } from '../../src/features/employees/context/EmployeeContext';
+import { ShiftProvider } from '../../src/features/schedules/context/ShiftContext';
+import { PayrollProvider } from '../../src/features/payrolls/context/PayrollContext';
 
 it('starts shared data reads after the authenticated session is ready', async () => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;

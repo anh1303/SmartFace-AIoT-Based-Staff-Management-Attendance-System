@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { confidenceColor } from '@/features/attendances';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
-import { useAuth } from '../../context/AuthContext';
-import { useShiftContext } from '../../context/ShiftContext';
-import { useEmployeeContext } from '../../context/EmployeeContext';
+import { useAuth } from '@/features/auth';
+import { useShiftContext } from '@/features/schedules';
+import { useEmployeeContext } from '@/features/employees';
 import { getTodayVNString } from '../../utils/dateUtils';
 import { useDepartmentPositions } from '@/features/employees';
 import {

@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import { AuthProvider, useAuth } from '../../src/context/AuthContext';
+import { AuthProvider, useAuth } from '../../src/features/auth/context/AuthContext';
 import { AccountProfilePage } from '../../src/pages/account/AccountProfilePage';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -15,13 +15,16 @@ const mockChangePassword = vi.fn();
 const mockVerifyPassword = vi.fn();
 const mockMeApi = vi.fn().mockResolvedValue(null);
 
-vi.mock('@/features/auth', () => ({
+vi.mock('../../src/features/auth/api/profileApi', () => ({
   profileApi: {
     get: () => mockProfileGet(),
     update: (data: any) => mockProfileUpdate(data),
     changePassword: (...args: any[]) => mockChangePassword(...args),
     verifyPassword: (...args: any[]) => mockVerifyPassword(...args),
   },
+}));
+
+vi.mock('../../src/features/auth/api/authApi', () => ({
   meApi: () => mockMeApi(),
   loginApi: vi.fn(),
   logoutApi: vi.fn(),

@@ -8,10 +8,10 @@ const state = vi.hoisted(() => ({ copy: vi.fn(), batch: vi.fn(), single: vi.fn()
 vi.mock('../../src/features/operations/OperationsProvider', () => ({ useOperations: () => ({ jobs: [], track: state.track }) }));
 vi.mock('../../src/features/schedules/api/shiftApi', () => ({ submitScheduleCopy: state.copy, submitScheduleBatch: state.batch }));
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => ({ employees: [{ employee_id: 'NV1', full_name: 'An', department: 'IT', status: 'ACTIVE', position: 'Dev' }], workShifts: [], assignOrUpdateShift: state.single, showToast: state.toast }) }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: { employee_id: 'ADMIN' } }) }));
-vi.mock('../../src/context/EmployeeContext', async () => { const app = await import('../../src/context/AppContext'); return ({ useEmployeeContext: () => ({ ...app.useApp(), isLoading: false, isError: false }) }) });
-vi.mock('../../src/context/ShiftContext', async () => { const app = await import('../../src/context/AppContext'); return ({ useShiftContext: () => ({ ...app.useApp(), isLoading: false, isError: false, refetchShifts: vi.fn() }) }) });
-vi.mock('../../src/features/employees', () => ({ useDepartmentPositions: () => ({ departmentOptions: ['IT'], positionOptions: ['Dev'], dbDepartments: [] }) }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: { employee_id: 'ADMIN' } }) }));
+vi.mock('../../src/features/employees/context/EmployeeContext', async () => { const app = await import('../../src/context/AppContext'); return ({ useEmployeeContext: () => ({ ...app.useApp(), isLoading: false, isError: false }) }) });
+vi.mock('../../src/features/schedules/context/ShiftContext', async () => { const app = await import('../../src/context/AppContext'); return ({ useShiftContext: () => ({ ...app.useApp(), isLoading: false, isError: false, refetchShifts: vi.fn() }) }) });
+vi.mock('../../src/features/employees', async (importOriginal) => ({ ...(await importOriginal<any>()), useDepartmentPositions: () => ({ departmentOptions: ['IT'], positionOptions: ['Dev'], dbDepartments: [] }) }));
 import { ManagerSchedule } from '../../src/pages/manager/ManagerSchedule';
 
 it('keeps the copy button pending until saving finishes, without posting each cell', async () => {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { LayoutDashboard } from 'lucide-react';
 import { PageHeaderBanner } from '../../components/common';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import {
   useDashboardToday,
   DashboardSummaryKpis,

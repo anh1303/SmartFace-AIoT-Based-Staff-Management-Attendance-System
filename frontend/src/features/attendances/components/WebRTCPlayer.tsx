@@ -9,7 +9,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { apiFetch } from '../../../api/client';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { useDeviceSettings } from '../../devices';
 
 interface WebRTCPlayerProps {

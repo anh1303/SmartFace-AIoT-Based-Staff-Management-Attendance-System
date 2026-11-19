@@ -31,3 +31,4 @@ export * from './api/departmentApi';
 export * from './api/positionApi';
 export type * from './types';
 export * from './utils/permissionUtils';
+export * from './context/EmployeeContext';

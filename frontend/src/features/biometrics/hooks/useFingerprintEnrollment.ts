@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { apiFetch } from '../../../api/client';
 import type { Employee } from '@/features/employees';
-import { useAuth, getActiveSessionId } from '../../../context/AuthContext';
+import { useAuth, getActiveSessionId } from '@/features/auth';
 import type { FingerprintStep } from '../components/FingerprintEnrollmentSection';
 
 export interface FingerprintSession {

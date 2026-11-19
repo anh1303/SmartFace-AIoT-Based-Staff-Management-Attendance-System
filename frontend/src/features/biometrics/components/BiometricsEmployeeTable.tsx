@@ -20,7 +20,7 @@ import {
 } from '../../../components/common';
 import { BiometricStatusBadge } from './BiometricStatusBadge';
 import type { Employee } from '@/features/employees';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { isAnotherManager } from '@/features/employees';
 
 export interface BiometricsEmployeeTableProps {

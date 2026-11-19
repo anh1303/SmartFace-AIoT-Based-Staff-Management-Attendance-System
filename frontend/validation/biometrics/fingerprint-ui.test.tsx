@@ -5,7 +5,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const state = vi.hoisted(() => ({ role: 'manager', apiFetch: vi.fn() }));
 vi.mock('../../src/api/client', () => ({ apiFetch: state.apiFetch }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: state.role, currentUser: { username: 'tester' } }) }));
+vi.mock('../../src/features/auth/context/AuthContext', () => ({ useAuth: () => ({ role: state.role, currentUser: { username: 'tester' } }) }));
 import { FingerprintEnrollmentSection } from '../../src/features/biometrics/components/FingerprintEnrollmentSection';
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 let host: HTMLDivElement; let root: ReturnType<typeof createRoot>;

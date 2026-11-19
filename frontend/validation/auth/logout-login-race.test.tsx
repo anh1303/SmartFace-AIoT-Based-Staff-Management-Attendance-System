@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import { AuthProvider, useAuth } from '../../src/context/AuthContext';
+import { AuthProvider, useAuth } from '../../src/features/auth/context/AuthContext';
 import { Sidebar } from '../../src/components/layout/Sidebar';
 import { ApiError } from '../../src/api/client';
 
@@ -16,20 +16,19 @@ const mockMeApi = vi.fn().mockResolvedValue(null);
 const mockFaceComplete = vi.fn();
 const mockFaceStatus = vi.fn();
 
-vi.mock('@/features/auth', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/features/auth')>();
-  return {
-    ...actual,
-    loginApi: (...args: any[]) => mockLoginApi(...args),
-    logoutApi: (...args: any[]) => mockLogoutApi(...args),
-    meApi: () => mockMeApi(),
-    faceLoginApi: {
-      complete: (...args: any[]) => mockFaceComplete(...args),
-      status: (...args: any[]) => mockFaceStatus(...args),
-    },
-    DEFAULT_USERS: {},
-  };
-});
+vi.mock('../../src/features/auth/api/authApi', () => ({
+  loginApi: (...args: any[]) => mockLoginApi(...args),
+  logoutApi: (...args: any[]) => mockLogoutApi(...args),
+  meApi: () => mockMeApi(),
+  DEFAULT_USERS: {},
+}));
+
+vi.mock('../../src/features/auth/api/faceLoginApi', () => ({
+  faceLoginApi: {
+    complete: (...args: any[]) => mockFaceComplete(...args),
+    status: (...args: any[]) => mockFaceStatus(...args),
+  },
+}));
 
 vi.mock('../../src/context/ToastContext', () => ({
   useToast: () => ({ showToast: vi.fn() }),

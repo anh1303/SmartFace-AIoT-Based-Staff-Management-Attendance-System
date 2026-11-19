@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useAttendanceContext } from '../../../context/AttendanceContext';
+import { useAttendanceContext } from '../context/AttendanceContext';
 import type { Employee } from '@/features/employees';
 import { formatVNDateISO } from '../../../utils/dateUtils';
 

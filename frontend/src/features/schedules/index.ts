@@ -12,4 +12,4 @@ export { useShifts, SHIFTS_QUERY_KEY } from './hooks/useShifts';
 export { ShiftTimeInput } from './components/ShiftTimeInput';
 export * from './api/shiftApi';
 export * from './utils/scheduleExport';
-
+export * from './context/ShiftContext';

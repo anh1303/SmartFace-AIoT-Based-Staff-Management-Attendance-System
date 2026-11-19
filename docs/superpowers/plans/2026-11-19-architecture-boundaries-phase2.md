@@ -57,15 +57,15 @@ Nguyên tắc xuyên suốt:
 | 7 | `server.ts` | `./modules/employees/employee.jobs.js` | `./modules/employees/index.js` | `executeAccountEmail` |
 
 **Các bước thực hiện:**
-- [ ] **1.1.** Tạo `backend/src/modules/operations/index.ts` làm bootstrap entry của module `operations`, xuất hợp đồng router/gateway/worker phục vụ lắp ráp (`operationRouter`, `initializeOperationGateway`, `startOperationWorker`, `stopOperationWorker`, `registerOperationHandler`, `setOperationActorLookup`). Giữ nguyên `operations/public.ts` cho giao tiếp liên module.
-- [ ] **1.2.** Cập nhật 3 bootstrap entry hiện có:
+- [x] **1.1.** Tạo `backend/src/modules/operations/index.ts` làm bootstrap entry của module `operations`, xuất hợp đồng router/gateway/worker phục vụ lắp ráp (`operationRouter`, `initializeOperationGateway`, `startOperationWorker`, `stopOperationWorker`, `registerOperationHandler`, `setOperationActorLookup`). Giữ nguyên `operations/public.ts` cho giao tiếp liên module.
+- [x] **1.2.** Cập nhật 3 bootstrap entry hiện có:
   - `backend/src/modules/biometrics/index.ts`: bổ sung tái xuất `initializeFingerprintGateway` (từ `./fingerprint.gateway.js`) và `executeEnrollment` (từ `./biometric.jobs.js`).
   - `backend/src/modules/shifts/index.ts`: bổ sung tái xuất `executeShiftBatch` (từ `./shift-batch.service.js`).
   - `backend/src/modules/employees/index.ts`: bổ sung tái xuất `executeAccountEmail` (từ `./employee.jobs.js`).
-- [ ] **1.3.** Cập nhật `backend/src/routes.ts` nạp `operationRouter` từ `./modules/operations/index.js`.
-- [ ] **1.4.** Cập nhật `backend/src/server.ts` nạp đủ 6 ký hiệu trên từ `./modules/{operations,biometrics,shifts,employees}/index.js`.
-- [ ] **1.5.** Cập nhật `backend/validation/architecture/boundary-baseline.json`: xóa toàn bộ 7 ngoại lệ `kind: "bootstrap-deep-import"` và hạ `currentCounts.transitionalExceptions` về `0` (giữ nguyên `initialCounts.transitionalExceptions: 7` và 4 ngoại lệ `composition-port-wiring` có `status: "allowed"`).
-- [ ] **1.6.** Kiểm chứng Batch 1:
+- [x] **1.3.** Cập nhật `backend/src/routes.ts` nạp `operationRouter` từ `./modules/operations/index.js`.
+- [x] **1.4.** Cập nhật `backend/src/server.ts` nạp đủ 6 ký hiệu trên từ `./modules/{operations,biometrics,shifts,employees}/index.js`.
+- [x] **1.5.** Cập nhật `backend/validation/architecture/boundary-baseline.json`: xóa toàn bộ 7 ngoại lệ `kind: "bootstrap-deep-import"` và hạ `currentCounts.transitionalExceptions` về `0` (giữ nguyên `initialCounts.transitionalExceptions: 7` và 4 ngoại lệ `composition-port-wiring` có `status: "allowed"`).
+- [x] **1.6.** Kiểm chứng Batch 1:
   - `cd backend && npx.cmd vitest run validation/architecture` (PASS đủ 4 bộ test kiến trúc, `0` chu trình module & file).
   - `cd backend && npm.cmd run build` (PASS).
   - **Kiểm tra khởi động `server.ts` với cấu hình test:** tách hoặc kiểm tra trực tiếp hàm đăng ký bootstrap trong `server.ts` (không chỉ dừng ở nạp `app.js` hay gọi `/health`), xác nhận:

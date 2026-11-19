@@ -9,6 +9,7 @@ import { AppError } from '../../common/AppError.js'
 type Handler = (job: OperationRow) => Promise<void>
 const handlers = new Map<string, Handler>()
 export const registerOperationHandler = (type: string, handler: Handler) => { handlers.set(type, handler) }
+export const listRegisteredOperationHandlers = () => [...handlers.keys()].sort()
 let timer: ReturnType<typeof setInterval> | undefined
 let busy = false
 let stopping = false

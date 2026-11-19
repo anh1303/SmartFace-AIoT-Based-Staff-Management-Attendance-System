@@ -1,5 +1,5 @@
 import { findBestFaceMatch } from './modules/biometrics/public.js'
-import { initializeFingerprintGateway } from './modules/biometrics/fingerprint.gateway.js'
+import { initializeFingerprintGateway, executeEnrollment } from './modules/biometrics/index.js'
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'
 // Server entry point
@@ -11,16 +11,37 @@ import { socketAuthMiddleware, refreshSocketScope } from './sockets/socket.auth.
 import { initializeAttendanceGateway, startAttendanceCron, stopAttendanceCron } from './modules/attendance/index.js'
 import { initializeDeviceGateway, registerDeviceMqttHandlers } from './modules/devices/index.js'
 import { logger } from './common/logger.js'
-import { initializeOperationGateway } from './modules/operations/operation.gateway.js'
-import { startOperationWorker, stopOperationWorker, registerOperationHandler, setOperationActorLookup } from './modules/operations/operation.worker.js'
-import { executeShiftBatch } from './modules/shifts/shift-batch.service.js'
-import { executeEnrollment } from './modules/biometrics/biometric.jobs.js'
-import { executeAccountEmail } from './modules/employees/employee.jobs.js'
+import {
+  initializeOperationGateway,
+  startOperationWorker,
+  stopOperationWorker,
+  registerOperationHandler,
+  setOperationActorLookup,
+} from './modules/operations/index.js'
+import { executeShiftBatch } from './modules/shifts/index.js'
+import { executeAccountEmail } from './modules/employees/index.js'
 import { findEmployeeByIdOrCode } from './modules/employees/public.js'
 import { findAuthUserById } from './modules/auth/public.js'
 
 const serverLogger = logger.child('Server')
 const shutdownLogger = logger.child('Shutdown')
+
+export function registerServerBootstrap(socketServer: Server) {
+  // Authenticate all socket connections before processing
+  socketServer.use(socketAuthMiddleware)
+
+  initializeAttendanceGateway(socketServer)
+  initializeDeviceGateway(socketServer)
+  initializeFingerprintGateway(socketServer)
+  initializeOperationGateway(socketServer, findEmployeeByIdOrCode, {
+    authenticate: socketAuthMiddleware,
+    refresh: refreshSocketScope,
+  })
+  setOperationActorLookup(id => findAuthUserById(id, { includeRoles: true }))
+  registerOperationHandler('shifts.batch', executeShiftBatch)
+  registerOperationHandler('biometric.enroll', executeEnrollment)
+  registerOperationHandler('employee.email', executeAccountEmail)
+}
 
 const httpServer = createServer(app)
 const io = new Server(httpServer, {
@@ -30,17 +51,7 @@ const io = new Server(httpServer, {
   },
 })
 
-// Authenticate all socket connections before processing
-io.use(socketAuthMiddleware)
-
-initializeAttendanceGateway(io)
-initializeDeviceGateway(io)
-initializeFingerprintGateway(io)
-initializeOperationGateway(io, findEmployeeByIdOrCode, { authenticate: socketAuthMiddleware, refresh: refreshSocketScope })
-setOperationActorLookup(id => findAuthUserById(id, { includeRoles: true }))
-registerOperationHandler('shifts.batch', executeShiftBatch)
-registerOperationHandler('biometric.enroll', executeEnrollment)
-registerOperationHandler('employee.email', executeAccountEmail)
+registerServerBootstrap(io)
 
 async function start() {
   // 11. Đảm bảo kết nối CSDL Prisma hoàn tất trước khi mở kết nối MQTT và nhận message
@@ -62,10 +73,12 @@ async function start() {
   httpServer.listen(env.PORT, () => serverLogger.info(`API listening on http://localhost:${env.PORT}`))
 }
 
-start().catch((error) => {
-  serverLogger.error('Failed to start server:', error)
-  process.exit(1)
-})
+if (process.env.VITEST !== 'true' && process.env.SKIP_SERVER_AUTOSTART !== 'true') {
+  start().catch((error) => {
+    serverLogger.error('Failed to start server:', error)
+    process.exit(1)
+  })
+}
 
 let isShuttingDown = false
 

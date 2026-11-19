@@ -5,3 +5,4 @@
 export * from './shift.service.js'
 export * from './shift.dto.js'
 export { shiftRouter } from './shift.routes.js'
+export { executeShiftBatch } from './shift-batch.service.js'

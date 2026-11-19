@@ -12,7 +12,7 @@
     "pendingMoveCommonFiles": 3,
     "pendingMoveCommonUtilsExports": 6,
     "runtimeModuleCycles": 0,
-    "transitionalExceptions": 7,
+    "transitionalExceptions": 0,
     "allowedCompositionPortExceptions": 4
   },
   "commonFiles": [
@@ -177,62 +177,6 @@
   ],
   "runtimeModuleCycles": [],
   "exceptions": [
-    {
-      "source": "routes.ts",
-      "target": "modules/operations/operation.routes.ts",
-      "kind": "bootstrap-deep-import",
-      "owner": "operations",
-      "status": "pending-move",
-      "reason": "routes.ts nạp trực tiếp operation.routes.ts thay vì qua entry công khai modules/operations/index.ts (chuẩn hóa ở Pha 2)"
-    },
-    {
-      "source": "server.ts",
-      "target": "modules/biometrics/fingerprint.gateway.ts",
-      "kind": "bootstrap-deep-import",
-      "owner": "biometrics",
-      "status": "pending-move",
-      "reason": "server.ts khởi tạo fingerprint gateway trực tiếp thay vì qua entry công khai của module biometrics (chuẩn hóa ở Pha 2)"
-    },
-    {
-      "source": "server.ts",
-      "target": "modules/operations/operation.gateway.ts",
-      "kind": "bootstrap-deep-import",
-      "owner": "operations",
-      "status": "pending-move",
-      "reason": "server.ts khởi tạo operation gateway trực tiếp thay vì qua entry công khai của module operations (chuẩn hóa ở Pha 2)"
-    },
-    {
-      "source": "server.ts",
-      "target": "modules/operations/operation.worker.ts",
-      "kind": "bootstrap-deep-import",
-      "owner": "operations",
-      "status": "pending-move",
-      "reason": "server.ts đăng ký worker handler trực tiếp vào operation.worker.ts thay vì qua entry công khai của module operations (chuẩn hóa ở Pha 2)"
-    },
-    {
-      "source": "server.ts",
-      "target": "modules/shifts/shift-batch.service.ts",
-      "kind": "bootstrap-deep-import",
-      "owner": "shifts",
-      "status": "pending-move",
-      "reason": "server.ts lấy job handler executeShiftBatch trực tiếp từ shift-batch.service.ts thay vì qua entry công khai của module shifts (chuẩn hóa ở Pha 2)"
-    },
-    {
-      "source": "server.ts",
-      "target": "modules/biometrics/biometric.jobs.ts",
-      "kind": "bootstrap-deep-import",
-      "owner": "biometrics",
-      "status": "pending-move",
-      "reason": "server.ts lấy job handler executeEnrollment trực tiếp từ biometric.jobs.ts thay vì qua entry công khai của module biometrics (chuẩn hóa ở Pha 2)"
-    },
-    {
-      "source": "server.ts",
-      "target": "modules/employees/employee.jobs.ts",
-      "kind": "bootstrap-deep-import",
-      "owner": "employees",
-      "status": "pending-move",
-      "reason": "server.ts lấy job handler executeAccountEmail trực tiếp từ employee.jobs.ts thay vì qua entry công khai của module employees (chuẩn hóa ở Pha 2)"
-    },
     {
       "source": "composition.ts",
       "target": "modules/shifts/shift.attendance-port.ts",

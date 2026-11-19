@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTableSort } from '../../../hooks/useTableSort';
 import { History } from 'lucide-react';
 import { PayrollRecord } from '../../../types';
 import {
@@ -23,6 +24,9 @@ export const EmployeePayrollTab: React.FC<EmployeePayrollTabProps> = ({
   pastPayrolls,
   onSelectPayslip,
 }) => {
+  const { sortedRows, sortProps } = useTableSort(pastPayrolls, {
+    rate: (a, b) => Number(a.hourly_rate ?? hourlyRate ?? 0) - Number(b.hourly_rate ?? hourlyRate ?? 0),
+  });
   return (
     <div className="space-y-6">
       {/* Past Months Payroll Records Table */}
@@ -43,7 +47,7 @@ export const EmployeePayrollTab: React.FC<EmployeePayrollTabProps> = ({
           <TableHead>
             <TableHeadRow className="h-12">
               <TableHeadCell width="130px" align="center">Tháng</TableHeadCell>
-              <TableHeadCell width="130px" align="center">Lương theo giờ</TableHeadCell>
+              <TableHeadCell width="130px" align="center" {...sortProps('rate')}>Lương theo giờ</TableHeadCell>
               <TableHeadCell width="110px" align="center">Tổng giờ làm</TableHeadCell>
               <TableHeadCell width="110px" align="center">Số giờ tăng ca</TableHeadCell>
               <TableHeadCell width="140px" align="center">Số giờ đi trễ/về sớm</TableHeadCell>
@@ -56,7 +60,7 @@ export const EmployeePayrollTab: React.FC<EmployeePayrollTabProps> = ({
             {pastPayrolls.length === 0 ? (
               <TableEmpty colSpan={8} message="Chưa có lịch sử bảng lương cho nhân viên này." />
             ) : (
-              pastPayrolls.map((p, idx) => {
+              sortedRows.map((p, idx) => {
                 const hourly = Number(p.hourly_rate ?? hourlyRate ?? 0);
                 const working = Number(p.total_working_hours ?? p.working_hours ?? 0);
                 const ot = Number(p.total_overtime ?? 0);

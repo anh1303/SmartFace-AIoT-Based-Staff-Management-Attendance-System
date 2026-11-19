@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTableSort, compareEmployeeNames } from '../../../hooks/useTableSort';
 import { Award, Search } from 'lucide-react';
 import {
   TableContainer,
@@ -57,6 +58,9 @@ export const ReportsEmployeeLeaderboard: React.FC<ReportsEmployeeLeaderboardProp
       return matchSearch && matchDept;
     });
   }, [leaderboardData, searchQuery, selectedDept]);
+  const { sortedRows, sortProps } = useTableSort(filteredList, {
+    name: (a, b) => compareEmployeeNames(a.fullName, b.fullName),
+  });
 
   // Helpers for on-time rate styling and performance evaluation (>=95% green, >=80% yellow, <80% red)
   const getRateBadgeClass = (rate: number) => {
@@ -131,7 +135,7 @@ export const ReportsEmployeeLeaderboard: React.FC<ReportsEmployeeLeaderboardProp
         <TableHead>
           <TableHeadRow>
             <TableHeadCell align="center" width="50px">#</TableHeadCell>
-            <TableHeadCell align="center" width="200px">Nhân viên</TableHeadCell>
+            <TableHeadCell align="center" width="200px" {...sortProps('name')}>Nhân viên</TableHeadCell>
             <TableHeadCell align="center" width="120px">Phòng ban</TableHeadCell>
             <TableHeadCell align="center" width="110px">Số lần chấm công</TableHeadCell>
             <TableHeadCell align="center" width="95px">Tăng ca</TableHeadCell>
@@ -146,7 +150,7 @@ export const ReportsEmployeeLeaderboard: React.FC<ReportsEmployeeLeaderboardProp
           {filteredList.length === 0 ? (
             <TableEmpty colSpan={10} message="Không tìm thấy nhân viên phù hợp." />
           ) : (
-            filteredList.map((item) => {
+            sortedRows.map((item) => {
               const initials = (item.fullName || item.employeeId)
                 .split(' ')
                 .map((w) => w[0])

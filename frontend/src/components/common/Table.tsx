@@ -82,6 +82,7 @@ export const TableHeadRow: React.FC<React.HTMLAttributes<HTMLTableRowElement>> =
  * Ô tiêu đề cột th chuẩn: có vạch kẻ dọc phân chia cột border-r, padding py-4 px-4, căn giữa/trái/phải
  */
 export interface TableHeadCellProps extends React.ThHTMLAttributes<HTMLTableCellElement> {
+  onSort?: () => void;
   children?: React.ReactNode;
   isLast?: boolean;
   align?: 'left' | 'center' | 'right';
@@ -89,6 +90,7 @@ export interface TableHeadCellProps extends React.ThHTMLAttributes<HTMLTableCell
 }
 
 export const TableHeadCell: React.FC<TableHeadCellProps> = ({
+  onSort,
   children,
   className = '',
   isLast = false,
@@ -110,7 +112,7 @@ export const TableHeadCell: React.FC<TableHeadCellProps> = ({
       className={`sticky top-0 z-10 bg-slate-50 dark:bg-[#0c0f1f] border-b border-slate-200 dark:border-[#28305c] py-4 px-4 font-bold ${alignClass} ${borderClass} ${className}`}
       {...props}
     >
-      {children}
+      {onSort ? <button type="button" onClick={onSort} className="w-full cursor-pointer text-inherit font-inherit [text-align:inherit] focus-visible:outline-blue-500">{children}</button> : children}
     </th>
   );
 };

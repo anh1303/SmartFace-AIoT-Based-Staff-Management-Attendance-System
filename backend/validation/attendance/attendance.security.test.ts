@@ -35,7 +35,12 @@ vi.mock('../../src/modules/attendance/index.js', async (importOriginal) => {
 
 vi.mock('../../src/config/database.js', () => {
   const db: any = {
-    $executeRaw: vi.fn(async () => 1),
+    $executeRaw: vi.fn(async (sql: any) => {
+      if (sql?.sql?.includes('INSERT INTO payroll_records')) {
+        for (const row of JSON.parse(sql.values[0])) state.record = { ...state.record, ...row, employee: state.employee }
+      }
+      return 1
+    }),
     fingerprintSession: { findFirst: vi.fn(async () => null) },
     attendanceAggregationState: { findUnique: vi.fn(async () => null) },
     $queryRaw: vi.fn(async () => [{

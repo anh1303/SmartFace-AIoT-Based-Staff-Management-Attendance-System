@@ -1,0 +1,493 @@
+{
+  "period": "2026-11",
+  "measured_at": "2026-11-19T14:08:49.070Z",
+  "method": "real database; generation inside one rollback-only outer transaction; no HTTP/browser timing",
+  "runs": [
+    {
+      "run": 1,
+      "operation": "list_month",
+      "ms": 1305.6,
+      "rows": 20,
+      "stages": [],
+      "prisma_operations": 4,
+      "sql_queries": 11,
+      "sql_duration_ms": 1382,
+      "lock_sql_ms": 0,
+      "sql_groups": [
+        {
+          "group": "list_month:SELECT:daily_attendance_summary",
+          "count": 1,
+          "total_ms": 286
+        },
+        {
+          "group": "list_month:SELECT:employee_shifts",
+          "count": 1,
+          "total_ms": 240
+        },
+        {
+          "group": "list_month:SELECT:employees",
+          "count": 2,
+          "total_ms": 201
+        },
+        {
+          "group": "list_month:SELECT:attendance_adjustments",
+          "count": 1,
+          "total_ms": 154
+        },
+        {
+          "group": "list_month:SELECT:departments",
+          "count": 1,
+          "total_ms": 93
+        },
+        {
+          "group": "list_month:SELECT:positions",
+          "count": 1,
+          "total_ms": 86
+        },
+        {
+          "group": "list_month:SELECT:work_shifts",
+          "count": 1,
+          "total_ms": 86
+        },
+        {
+          "group": "list_month:SELECT:payroll_records",
+          "count": 1,
+          "total_ms": 82
+        },
+        {
+          "group": "list_month:SELECT:roles",
+          "count": 1,
+          "total_ms": 78
+        },
+        {
+          "group": "list_month:SELECT:users",
+          "count": 1,
+          "total_ms": 76
+        }
+      ],
+      "actions": [
+        {
+          "action": "list_month:employee_shifts.findMany",
+          "count": 1,
+          "total_ms": 786.2,
+          "max_ms": 786.2
+        },
+        {
+          "action": "list_month:PayrollRecord.findMany",
+          "count": 1,
+          "total_ms": 511.2,
+          "max_ms": 511.2
+        },
+        {
+          "action": "list_month:AttendanceAdjustment.findMany",
+          "count": 1,
+          "total_ms": 480.7,
+          "max_ms": 480.7
+        },
+        {
+          "action": "list_month:daily_attendance_summary.findMany",
+          "count": 1,
+          "total_ms": 315.5,
+          "max_ms": 315.5
+        }
+      ]
+    },
+    {
+      "run": 1,
+      "operation": "list_all",
+      "ms": 1586.6,
+      "rows": 110,
+      "stages": [],
+      "prisma_operations": 4,
+      "sql_queries": 11,
+      "sql_duration_ms": 1883,
+      "lock_sql_ms": 0,
+      "sql_groups": [
+        {
+          "group": "list_all:SELECT:daily_attendance_summary",
+          "count": 1,
+          "total_ms": 837
+        },
+        {
+          "group": "list_all:SELECT:employees",
+          "count": 2,
+          "total_ms": 174
+        },
+        {
+          "group": "list_all:SELECT:employee_shifts",
+          "count": 1,
+          "total_ms": 161
+        },
+        {
+          "group": "list_all:SELECT:attendance_adjustments",
+          "count": 1,
+          "total_ms": 143
+        },
+        {
+          "group": "list_all:SELECT:payroll_records",
+          "count": 1,
+          "total_ms": 140
+        },
+        {
+          "group": "list_all:SELECT:departments",
+          "count": 1,
+          "total_ms": 94
+        },
+        {
+          "group": "list_all:SELECT:positions",
+          "count": 1,
+          "total_ms": 93
+        },
+        {
+          "group": "list_all:SELECT:users",
+          "count": 1,
+          "total_ms": 84
+        },
+        {
+          "group": "list_all:SELECT:roles",
+          "count": 1,
+          "total_ms": 82
+        },
+        {
+          "group": "list_all:SELECT:work_shifts",
+          "count": 1,
+          "total_ms": 75
+        }
+      ],
+      "actions": [
+        {
+          "action": "list_all:daily_attendance_summary.findMany",
+          "count": 1,
+          "total_ms": 941.3,
+          "max_ms": 941.3
+        },
+        {
+          "action": "list_all:PayrollRecord.findMany",
+          "count": 1,
+          "total_ms": 607.6,
+          "max_ms": 607.6
+        },
+        {
+          "action": "list_all:employee_shifts.findMany",
+          "count": 1,
+          "total_ms": 405.9,
+          "max_ms": 405.9
+        },
+        {
+          "action": "list_all:AttendanceAdjustment.findMany",
+          "count": 1,
+          "total_ms": 147.3,
+          "max_ms": 147.3
+        }
+      ]
+    },
+    {
+      "run": 1,
+      "operation": "generate_rollback",
+      "ms": 6791.5,
+      "rows": 20,
+      "financial_sha256": "865e3437dbbef20581aa63700787842457fce1c6045dc6c2fe0f12bef9c4862f",
+      "stages": [
+        {
+          "stage": "aggregate_month",
+          "ms": 1079.6
+        },
+        {
+          "stage": "generate_payroll",
+          "ms": 5400.7
+        }
+      ],
+      "prisma_operations": 39,
+      "sql_queries": 127,
+      "sql_duration_ms": 6375,
+      "lock_sql_ms": 125,
+      "sql_groups": [
+        {
+          "group": "generate_payroll:SELECT:payroll_records",
+          "count": 41,
+          "total_ms": 1833
+        },
+        {
+          "group": "generate_payroll:SELECT:employees",
+          "count": 22,
+          "total_ms": 986
+        },
+        {
+          "group": "generate_payroll:UPDATE:payroll_records",
+          "count": 20,
+          "total_ms": 912
+        },
+        {
+          "group": "generate_payroll:SELECT:departments",
+          "count": 20,
+          "total_ms": 865
+        },
+        {
+          "group": "aggregate_month:SELECT:daily_attendance_summary",
+          "count": 1,
+          "total_ms": 158
+        },
+        {
+          "group": "generate_payroll:INSERT:audit_logs",
+          "count": 1,
+          "total_ms": 99
+        },
+        {
+          "group": "aggregate_month:SELECT:attendance_logs",
+          "count": 1,
+          "total_ms": 96
+        },
+        {
+          "group": "aggregate_month:SELECT:bonus_penalty",
+          "count": 1,
+          "total_ms": 94
+        },
+        {
+          "group": "aggregate_month:SELECT:attendance_locks",
+          "count": 1,
+          "total_ms": 90
+        },
+        {
+          "group": "aggregate_month:SELECT:employees",
+          "count": 1,
+          "total_ms": 86
+        },
+        {
+          "group": "aggregate_month:SELECT:payroll_records",
+          "count": 1,
+          "total_ms": 86
+        },
+        {
+          "group": "aggregate_month:SELECT:attendance_adjustments",
+          "count": 1,
+          "total_ms": 86
+        },
+        {
+          "group": "aggregate_month:SELECT:control",
+          "count": 1,
+          "total_ms": 85
+        },
+        {
+          "group": "aggregate_month:SELECT:employee_shifts",
+          "count": 1,
+          "total_ms": 85
+        },
+        {
+          "group": "generate_preflight:SELECT:payroll_records",
+          "count": 1,
+          "total_ms": 83
+        },
+        {
+          "group": "generate_preflight:SET:control",
+          "count": 1,
+          "total_ms": 82
+        },
+        {
+          "group": "generate_payroll:SELECT:attendance_adjustments",
+          "count": 1,
+          "total_ms": 82
+        },
+        {
+          "group": "generate_payroll:SELECT:roles",
+          "count": 1,
+          "total_ms": 81
+        },
+        {
+          "group": "generate_payroll:SELECT:users",
+          "count": 1,
+          "total_ms": 80
+        },
+        {
+          "group": "generate_payroll:SELECT:daily_attendance_summary",
+          "count": 1,
+          "total_ms": 77
+        },
+        {
+          "group": "generate_preflight:ROLLBACK:control",
+          "count": 1,
+          "total_ms": 46
+        },
+        {
+          "group": "generate_payroll:SELECT:employee_shifts",
+          "count": 1,
+          "total_ms": 43
+        },
+        {
+          "group": "generate_preflight:SELECT:bonus_penalty",
+          "count": 1,
+          "total_ms": 41
+        },
+        {
+          "group": "aggregate_month:SELECT:work_shifts",
+          "count": 1,
+          "total_ms": 40
+        },
+        {
+          "group": "generate_payroll:SELECT:control",
+          "count": 1,
+          "total_ms": 40
+        },
+        {
+          "group": "generate_payroll:SELECT:positions",
+          "count": 1,
+          "total_ms": 40
+        },
+        {
+          "group": "generate_payroll:SELECT:work_shifts",
+          "count": 1,
+          "total_ms": 40
+        },
+        {
+          "group": "generate_preflight:BEGIN:control",
+          "count": 1,
+          "total_ms": 39
+        }
+      ],
+      "actions": [
+        {
+          "action": "generate_payroll:PayrollRecord.upsert",
+          "count": 20,
+          "total_ms": 4468.4,
+          "max_ms": 435.4
+        },
+        {
+          "action": "aggregate_month:employee_shifts.findMany",
+          "count": 1,
+          "total_ms": 725.4,
+          "max_ms": 725.4
+        },
+        {
+          "action": "aggregate_month:PayrollRecord.findMany",
+          "count": 1,
+          "total_ms": 725.1,
+          "max_ms": 725.1
+        },
+        {
+          "action": "aggregate_month:attendance_logs.findMany",
+          "count": 1,
+          "total_ms": 725,
+          "max_ms": 725
+        },
+        {
+          "action": "aggregate_month:daily_attendance_summary.findMany",
+          "count": 1,
+          "total_ms": 724.9,
+          "max_ms": 724.9
+        },
+        {
+          "action": "aggregate_month:attendance_locks.findMany",
+          "count": 1,
+          "total_ms": 724.8,
+          "max_ms": 724.8
+        },
+        {
+          "action": "aggregate_month:AttendanceAdjustment.findMany",
+          "count": 1,
+          "total_ms": 724.7,
+          "max_ms": 724.7
+        },
+        {
+          "action": "generate_payroll:daily_attendance_summary.findMany",
+          "count": 1,
+          "total_ms": 431.8,
+          "max_ms": 431.8
+        },
+        {
+          "action": "generate_payroll:AttendanceAdjustment.findMany",
+          "count": 1,
+          "total_ms": 431.6,
+          "max_ms": 431.6
+        },
+        {
+          "action": "generate_payroll:employee_shifts.findMany",
+          "count": 1,
+          "total_ms": 431.5,
+          "max_ms": 431.5
+        },
+        {
+          "action": "generate_payroll:PayrollRecord.findMany",
+          "count": 1,
+          "total_ms": 431.4,
+          "max_ms": 431.4
+        },
+        {
+          "action": "generate_payroll:Employee.findMany",
+          "count": 1,
+          "total_ms": 332.9,
+          "max_ms": 332.9
+        },
+        {
+          "action": "generate_payroll:AuditLog.create",
+          "count": 1,
+          "total_ms": 100.8,
+          "max_ms": 100.8
+        },
+        {
+          "action": "aggregate_month:BonusPenalty.findFirst",
+          "count": 1,
+          "total_ms": 95.1,
+          "max_ms": 95.1
+        },
+        {
+          "action": "aggregate_month:Employee.findMany",
+          "count": 1,
+          "total_ms": 89.8,
+          "max_ms": 89.8
+        },
+        {
+          "action": "generate_preflight:PayrollRecord.findMany",
+          "count": 1,
+          "total_ms": 88.9,
+          "max_ms": 88.9
+        },
+        {
+          "action": "aggregate_month:raw.executeRaw",
+          "count": 1,
+          "total_ms": 86.8,
+          "max_ms": 86.8
+        },
+        {
+          "action": "generate_preflight:raw.executeRaw",
+          "count": 1,
+          "total_ms": 85.6,
+          "max_ms": 85.6
+        },
+        {
+          "action": "generate_preflight:BonusPenalty.findFirst",
+          "count": 1,
+          "total_ms": 42,
+          "max_ms": 42
+        },
+        {
+          "action": "generate_payroll:raw.executeRaw",
+          "count": 1,
+          "total_ms": 41.4,
+          "max_ms": 41.4
+        }
+      ]
+    }
+  ],
+  "connection_first_query_ms": 1666.3,
+  "ping_ms": [
+    40.3,
+    39.9,
+    39.5,
+    39.8,
+    39.4
+  ],
+  "data": {
+    "employees": 20,
+    "active_employees": 20,
+    "month_logs": 772,
+    "month_shifts": 545,
+    "month_summaries": 545,
+    "payroll_statuses": [
+      {
+        "_count": 20,
+        "status": "PENDING"
+      }
+    ],
+    "all_payroll_records": 110
+  },
+  "payroll_unchanged_after_rollback": true
+}

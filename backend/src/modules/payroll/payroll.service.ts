@@ -1,4 +1,5 @@
 import { formatPayrollRecord } from './payroll.format.js'
+import { writePayrollBatch, type PayrollBatchRow } from './payroll.batch.js'
 import { approvedAbsenceCount } from './payroll.absence-count.js'
 export { formatPayrollRecord, type RawPayrollRecord } from './payroll.format.js'
 import type { PayrollStatus } from '../../common/constants.js'
@@ -750,7 +751,8 @@ export async function generate(payroll_period: string, employeeId?: string, acto
     ]) : [[], [], [], []]
     const { summaries: elapsedSummaries, shifts: elapsedShifts } = elapsedPayrollSources(allSummaries, allShifts, start, calculationEnd, calculatedAt)
     assertOvernightSummariesCurrent(elapsedSummaries.filter(summary => summary.review_status === 'APPROVED'), elapsedShifts)
-    const results = []
+    const writes: PayrollBatchRow[] = []
+    const employeesById = new Map(employees.map(emp => [emp.id, emp]))
     for (const emp of employees) {
       const empCreatedDay = emp.createdAt ? vnDay(emp.createdAt) : null
       const periodEndDay = vnDay(end)
@@ -785,7 +787,7 @@ export async function generate(payroll_period: string, employeeId?: string, acto
       const net_salary = calculateNetSalary({ hourly_rate, total_working_hours, total_overtime, total_late_early, allowance,
         overtime_rate, late_early_penalty: late_penalty_rate, total_absence_penalty })
       const data = { hourly_rate, total_working_hours, total_overtime, total_late_early, total_absence_penalty, allowance, net_salary,
-        overtime_rate, late_penalty_rate, status: 'PENDING', calculation_details: {
+        overtime_rate, late_penalty_rate, status: 'PENDING' as const, calculation_details: {
           manual: false, field_overrides: {}, legacy_manual_unresolved: false, requires_reconciliation,
           previous_manual_overrides: overrides.legacy || overrides.fields.working_hours || overrides.fields.hourly_rate ? { fields: overrides.fields, legacy: overrides.legacy, hourly_rate: Number(existing?.hourly_rate), total_working_hours: Number(existing?.total_working_hours) } : (existing?.calculation_details as Record<string, any> | null)?.previous_manual_overrides ?? null,
           rate_snapshot_status: 'MULTIPLIER',
@@ -799,11 +801,11 @@ export async function generate(payroll_period: string, employeeId?: string, acto
           applied_policy_snapshot: appliedPolicySnapshot(policy, overtime_rate, late_penalty_rate, approved),
           pending_review_days: summaries.filter(s => (s as any).review_status !== 'APPROVED').map(s => s.work_date.toISOString().slice(0, 10)),
         } }
-      results.push(await tx.payrollRecord.upsert({ where: { employeeId_payroll_period: { employeeId: emp.id, payroll_period } },
-        update: data, create: { employeeId: emp.id, payroll_period, ...data }, include: { employee: { include: { department: true } } } }))
+      writes.push({ employeeId: emp.id, payroll_period, ...data })
     }
+    const results = await writePayrollBatch(tx, writes)
     await tx.auditLog.create({ data: { userId: actorUserId, action: 'GENERATE_PAYROLL', target_table: 'payroll_records', record_id: payroll_period,
       new_values: { employee_count: results.length, employeeId: employeeId || 'ALL', calculation_range: calculationRange } } })
-    return results.map(formatPayrollRecord)
+    return results.map(record => formatPayrollRecord({ ...record, employee: employeesById.get(record.employeeId) }))
   }, { timeout: 60000, maxWait: 20000 })
 }

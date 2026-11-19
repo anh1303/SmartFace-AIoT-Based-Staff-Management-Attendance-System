@@ -9,6 +9,7 @@ import { getEmployeeShiftsForAggregation } from '../shifts/public.js'
 import { attendancePayroll } from './attendance.payroll-port.js'
 import { calculateDay, prepareAttendance, vnDay, MAX_PAIR_MS } from './attendance.policy.js'
 import { syncDayAdjustments, flushAdjustmentBatch } from './attendance.adjustments.js'
+import { aggregationInputFingerprint } from './attendance.aggregation-input.js'
 
 /**
  * Tự động tổng hợp dữ liệu chấm công từ attendance_logs và employee_shifts
@@ -70,6 +71,14 @@ export async function aggregateDailyAttendance(
       const empShifts = shifts.filter(s => s.employee_id === emp.id).map(s => ({ ...s, start_time: s.start_time ?? s.work_shifts.start_time, end_time: s.end_time ?? s.work_shifts.end_time }))
       const prepared = prepareAttendance(empLogs, empShifts)
       const pairing = prepared.pairing
+      const pairedDates = new Map(pairing.pairs.flatMap(pair => [[pair.inId, pair.workDate], [pair.outId, pair.workDate]] as Array<[string, string]>))
+      const logsByDay = new Map<string, typeof empLogs>()
+      for (const log of empLogs) {
+        const date = pairedDates.get(String(log.id)) || prepared.workDate(log.event_time)
+        const dayLogs = logsByDay.get(date) || []
+        dayLogs.push(log)
+        logsByDay.set(date, dayLogs)
+      }
       const pairedOuts = new Set(pairing.pairs.map(p => p.outId))
       const dates = new Set([
         ...shifts.filter(s => s.employee_id === emp.id).map(s => vnDay(s.work_date)),
@@ -84,10 +93,9 @@ export async function aggregateDailyAttendance(
         }
         if (date.slice(0, 7) !== first.slice(0, 7) || date > today || (onlyDate && date !== onlyDate)) continue
         const assigned = empShifts.find(s => vnDay(s.work_date) === date)
-        const calculation = calculateDay(date, empLogs, assigned || null, new Date(), empShifts, prepared)
         const workDate = new Date(`${date}T00:00:00Z`)
         const previous = summaries.find(s => s.employee_id === emp.id && vnDay(s.work_date) === date)
-        const isEmployeeReopened = Boolean(previous && (previous as any).reopened_at !== null)
+        const isEmployeeReopened = Boolean(previous?.reopened_at)
         const isDayLocked = lockedDates.has(date)
         const isPayrollClosed = closedEmployees.has(emp.id)
         const isApproved = (previous as any)?.review_status === 'APPROVED'
@@ -98,7 +106,7 @@ export async function aggregateDailyAttendance(
         // 3. Chưa APPROVED HOẶC nhân viên đã được MỞ KHÓA CÁ NHÂN (reopened_at)
         const canProcessRecord = !isPayrollClosed && (!isDayLocked || isEmployeeReopened) && (!isApproved || isEmployeeReopened)
 
-        if (!canProcessRecord) {
+        const keepPrevious = () => {
           if (previous) {
             details.push({
               employee_code: emp.employee_code,
@@ -113,10 +121,27 @@ export async function aggregateDailyAttendance(
               status: previous.attendance_status,
             })
           }
-          continue
         }
+        if (!canProcessRecord) { keepPrevious(); continue }
 
+        const payroll = periodPayroll.find(p => p.employeeId === emp.id)
+        const oldRate = attendancePayroll().payrollOverrides(payroll ?? null).fields.hourly_rate
+        const hourlyRate = sourceHourlyRate(emp, first.slice(0, 7), payroll?.hourly_rate, Boolean(oldRate))
+        const dayAdjustments = adjustmentRows.filter(row => row.employee_id === emp.id && vnDay(row.work_date) === date)
+        const input = {
+          date, shift: assigned || null, logs: logsByDay.get(date) || [],
+          pairs: pairing.pairs.filter(pair => pair.workDate === date),
+          ignored: pairing.ignored.filter(item => item.date === date),
+          pendingId: pairing.pending && prepared.workDate(pairing.pending.event_time) === date ? String(pairing.pending.id) : undefined,
+          hourlyRate, absenceRate: adjustmentPolicy?.absence_penalty_rate ?? null,
+          adjustments: dayAdjustments, now: new Date(),
+        }
         const previousDetails = previous?.calculation_details as Record<string, unknown> | null
+        const unchanged = previous && !previous.manual_adjustment && !isEmployeeReopened
+          && previousDetails?.aggregation_input === aggregationInputFingerprint(input)
+        if (unchanged) { keepPrevious(); continue }
+
+        const calculation = calculateDay(date, empLogs, assigned || null, input.now, empShifts, prepared)
         const changed = previousDetails?.fingerprint !== calculation.details.fingerprint || previous?.overtime_seconds !== calculation.overtimeSeconds || previous?.late_early_seconds !== calculation.lateEarlySeconds || previousDetails?.policy !== calculation.details.policy
         const invalidatedReview = Boolean(previous?.manual_adjustment && changed)
         const manual = previous?.manual_adjustment && !changed
@@ -163,12 +188,15 @@ export async function aggregateDailyAttendance(
             new_values: { reason: 'SOURCE_CHANGED', overtime: 0 },
           })
         }
-        if (changed || Number(previous?.late_early) !== Number(data.late_early) || previous?.late_early_seconds !== data.late_early_seconds || Number(previous?.total_working_hours) !== Number(data.total_working_hours) || previousDetails?.details_version !== calculation.details.details_version || previous?.policy_version !== calculation.details.policy || previous?.attendance_status !== data.attendance_status || previous?.shift_id !== data.shift_id || (previous as any)?.review_status !== data.review_status) {
-          pendingWrites.push({ employee_id: emp.id, work_date: date, ...data, updated_at: new Date().toISOString() })
+        const batchStart = adjustmentBatch.writes.length
+        await syncDayAdjustments(tx, { ...data, employee_id: emp.id, work_date: workDate }, hourlyRate, adjustmentPolicy?.absence_penalty_rate ?? null, adjustmentBatch)
+        const effectiveAdjustments = new Map(dayAdjustments.map(row => [row.kind, row]))
+        for (const write of adjustmentBatch.writes.slice(batchStart)) effectiveAdjustments.set(write.kind, write as any)
+        const aggregationInput = aggregationInputFingerprint({ ...input, adjustments: [...effectiveAdjustments.values()] })
+        const calculationDetails = { ...calculation.details, aggregation_input: aggregationInput }
+        if (changed || previousDetails?.aggregation_input !== aggregationInput || Number(previous?.late_early) !== Number(data.late_early) || previous?.late_early_seconds !== data.late_early_seconds || Number(previous?.total_working_hours) !== Number(data.total_working_hours) || previousDetails?.details_version !== calculation.details.details_version || previous?.policy_version !== calculation.details.policy || previous?.attendance_status !== data.attendance_status || previous?.shift_id !== data.shift_id || (previous as any)?.review_status !== data.review_status) {
+          pendingWrites.push({ employee_id: emp.id, work_date: date, ...data, calculation_details: calculationDetails, updated_at: new Date().toISOString() })
         }
-        const payroll = periodPayroll.find(p => p.employeeId === emp.id)
-        const oldRate = attendancePayroll().payrollOverrides(payroll ?? null).fields.hourly_rate
-        await syncDayAdjustments(tx, { ...data, employee_id: emp.id, work_date: workDate }, sourceHourlyRate(emp, first.slice(0, 7), payroll?.hourly_rate, Boolean(oldRate)), adjustmentPolicy?.absence_penalty_rate ?? null, adjustmentBatch)
         details.push({
           employee_code: emp.employee_code,
           employee_name: emp.full_name,

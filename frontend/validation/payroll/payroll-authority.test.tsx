@@ -6,6 +6,7 @@ import type { Employee, PayrollRecord } from '../../src/types';
 const state = vi.hoisted(() => ({ payroll: [] as PayrollRecord[], bonusPenalty: null, role: 'manager' }));
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => state }));
 vi.mock('../../src/context/PayrollContext', () => ({ usePayrollContext: () => state }));
+vi.mock('../../src/features/payrolls/hooks/usePayrollHistory', () => ({ usePayrollHistory: () => ({ data: state.payroll, isLoading: false, error: null }) }));
 vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: state.role }) }));
 import { useEmployeePayrollDetail } from '../../src/features/payrolls/hooks/useEmployeePayrollDetail';
 import { PayslipBreakdown } from '../../src/features/payrolls/components/PayslipBreakdown';

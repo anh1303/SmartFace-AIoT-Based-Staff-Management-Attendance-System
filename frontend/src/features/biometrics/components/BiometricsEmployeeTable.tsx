@@ -1,5 +1,6 @@
 import { Avatar } from '../../../components/common/Avatar';
 import React from 'react';
+import { useTableSort, compareEmployeeNames, compareEmployeeCodes } from '../../../hooks/useTableSort';
 import { Lock } from 'lucide-react';
 import {
   SearchInput,
@@ -52,6 +53,10 @@ export const BiometricsEmployeeTable: React.FC<BiometricsEmployeeTableProps> = (
   onOpenManageModal,
 }) => {
   const { role, currentUser } = useAuth();
+  const { sortedRows, sortProps } = useTableSort(filteredEmployees, {
+    name: (a, b) => compareEmployeeNames(a.full_name, b.full_name),
+    code: (a, b) => compareEmployeeCodes(a.employee_id, b.employee_id),
+  });
 
   return (
     <div className="space-y-4">
@@ -87,8 +92,8 @@ export const BiometricsEmployeeTable: React.FC<BiometricsEmployeeTableProps> = (
       <TableContainer minWidth="950px">
         <TableHead>
           <TableHeadRow>
-            <TableHeadCell width="240px" align="center">Nhân viên</TableHeadCell>
-            <TableHeadCell width="130px">Mã NV</TableHeadCell>
+            <TableHeadCell width="240px" align="center" {...sortProps('name')}>Nhân viên</TableHeadCell>
+            <TableHeadCell width="130px" {...sortProps('code')}>Mã NV</TableHeadCell>
             <TableHeadCell width="180px">Phòng ban & Chức vụ</TableHeadCell>
             <TableHeadCell width="160px">Khuôn mặt</TableHeadCell>
             <TableHeadCell width="160px">Vân tay</TableHeadCell>
@@ -99,7 +104,7 @@ export const BiometricsEmployeeTable: React.FC<BiometricsEmployeeTableProps> = (
           {filteredEmployees.length === 0 ? (
             <TableEmpty colSpan={6} message="Không tìm thấy nhân viên phù hợp với bộ lọc" />
           ) : (
-            filteredEmployees.map((emp) => (
+            sortedRows.map((emp) => (
               <TableRow key={emp.employee_id}>
                 <TableCell align="left" className="px-5 max-w-[240px]">
                   <div className="flex items-center gap-3.5 min-w-0 text-left" title={emp.full_name}>

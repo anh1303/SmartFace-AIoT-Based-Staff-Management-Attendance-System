@@ -12,24 +12,23 @@ import {
 } from '../api/payrollApi';
 import { PayrollRecord, BonusPenaltyPolicy } from '../../../types';
 import { useToast } from '../../../context/ToastContext';
+import { getTodayVNString } from '../../../utils/dateUtils';
 
 export const PAYROLL_QUERY_KEY = ['payroll'];
 export const BONUS_PENALTY_QUERY_KEY = ['bonusPenalty'];
+const periodKey = (period: string) => [...PAYROLL_QUERY_KEY, 'period', period];
 export type { PayrollItemUpdates };
 
 export function usePayroll(enabled = true) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
-  const [selectedPeriod, setSelectedPeriod] = useState<string>(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [selectedPeriod, setSelectedPeriod] = useState(() => getTodayVNString().slice(0, 7));
 
   const payrollQuery = useQuery({
-    queryKey: PAYROLL_QUERY_KEY,
+    queryKey: periodKey(selectedPeriod),
     enabled,
-    queryFn: fetchPayrollApi,
+    queryFn: () => fetchPayrollApi(selectedPeriod),
     staleTime: 1000 * 60 * 5,
     retry: 1,
   });
@@ -44,10 +43,20 @@ export function usePayroll(enabled = true) {
 
   const generatePayrollMutation = useMutation({
     mutationFn: (period: string) => generatePayrollApi(period),
-    onSuccess: (_records, period) => {
+    onMutate: period => queryClient.cancelQueries({ queryKey: periodKey(period) }),
+    onSuccess: async (records, period) => {
+      const key = periodKey(period);
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<PayrollRecord[]>(key);
+      const generated = new Map(records.map(record => [record.payroll_id, record]));
+      queryClient.setQueryData<PayrollRecord[]>(key, [
+        ...(previous || []).map(record => generated.get(record.payroll_id) || record),
+        ...records.filter(record => !previous?.some(saved => saved.payroll_id === record.payroll_id)),
+      ]);
+      if (!previous) queryClient.invalidateQueries({ queryKey: key });
       setSelectedPeriod(period);
       showToast(`Đã tính lại bảng lương kỳ ${period}. Kiểm tra số liệu trước khi chốt lương.`, 'success', "Tính bảng lương thành công");
-      queryClient.invalidateQueries({ queryKey: PAYROLL_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: [...PAYROLL_QUERY_KEY, 'history'] });
       queryClient.invalidateQueries({ queryKey: ['attendanceAdjustments'] });
     },
     onError: (err: Error, period) => {

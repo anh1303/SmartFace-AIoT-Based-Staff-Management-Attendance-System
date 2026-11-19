@@ -11,8 +11,11 @@ export async function previewPayrollItemApi(id: string, allowance: number, updat
   return res.data;
 }
 
-export async function fetchPayrollApi(): Promise<PayrollRecord[]> {
-  const res = await apiFetch('/api/payroll');
+export async function fetchPayrollApi(period?: string, employeeId?: string): Promise<PayrollRecord[]> {
+  const params = new URLSearchParams();
+  if (period) params.set('payroll_period', period);
+  if (employeeId) params.set('employeeId', employeeId);
+  const res = await apiFetch(`/api/payroll${params.size ? `?${params}` : ''}`);
   if (res.success && Array.isArray(res.data)) {
     return res.data;
   }

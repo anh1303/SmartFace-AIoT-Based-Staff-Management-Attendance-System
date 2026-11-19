@@ -11,3 +11,4 @@ export * from './hooks/useEmployeePayrollDetail';
 export * from './hooks/usePayroll';
 export * from './api/payrollApi';
 export * from './payrollExportEligibility';
+export * from './hooks/usePayrollHistory';

@@ -1,19 +1,27 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PayrollTable } from '../../src/features/payrolls/components/PayrollTable';
 import type { PayrollRecord } from '../../src/types';
 
 vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: null }) }));
 
 describe('payroll table hours', () => {
-  it.each([[true, 'PENDING', 'Tạm tính'], [false, 'PENDING', 'Đã tính'], [true, 'FINALIZED', 'Đã tính']] as const)('shows the saved calculation range rather than assuming a full month (partial=%s, status=%s)', (partial, status, label) => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-19T10:00:00+07:00')); });
+  afterEach(() => vi.useRealTimers());
+  it.each([[true, 'PENDING', '11', true], [false, 'PENDING', '10', false], [true, 'PENDING', '10', false], [true, 'FINALIZED', '11', false]] as const)('only shows a short yellow range for a provisional current month (partial=%s, status=%s, month=%s)', (partial, status, month, visible) => {
     const record = {
       payroll_id: 'range', employee_id: 'NV-001', employee_name: 'Employee', status,
-      calculation_range: { start_date: '2026-10-01', end_date: partial ? '2026-10-15' : '2026-10-31', as_of: '2026-10-15T10:00:00Z', is_partial: partial },
+      calculation_range: { start_date: `2026-${month}-01`, end_date: `2026-${month}-${partial ? '17' : '31'}`, as_of: '2026-11-17T10:00:00Z', is_partial: partial },
     } as PayrollRecord;
     const html = renderToStaticMarkup(<PayrollTable selectedPeriod="2026-10" currentRecords={[record]} allPeriodRecords={[record]} employees={[]} searchTerm="" onSearchChange={() => {}} departmentFilter="ALL" onDepartmentFilterChange={() => {}} isFinalized={false} onOpenEdit={() => {}}/>);
-    expect(html).toContain(`${label}: 01/10/2026 – ${partial ? '15' : '31'}/10/2026`);
+    expect(html).not.toContain('Đã tính:');
+    if (visible) {
+      expect(html).toContain('Tạm tính: 01/11 – 17/11');
+      expect(html).toContain('text-amber-700 dark:text-amber-300');
+    } else {
+      expect(html).not.toContain('Tạm tính:');
+    }
   });
 
   it('shows saved payroll hours even when attendance contains a short uncredited scan', () => {

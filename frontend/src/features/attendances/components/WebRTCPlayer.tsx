@@ -335,7 +335,7 @@ const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative overflow-hidden rounded-2xl bg-slate-900 border border-slate-700/60 shadow-xl transition-all"
+      className="relative flex flex-col h-[500px] lg:h-[560px] min-h-0 overflow-hidden rounded-2xl bg-slate-900 border border-slate-700/60 shadow-xl fullscreen:h-screen"
     >
       {/* Top Header Bar */}
       <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
@@ -425,13 +425,13 @@ const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       </div>
 
       {/* Video Element Viewport */}
-      <div className="relative aspect-video w-full bg-slate-950 flex items-center justify-center">
+      <div className="relative flex-1 min-h-0 w-full bg-slate-950 flex items-center justify-center">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          className={`h-full w-full object-contain transition-opacity duration-500 ${
+          className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-500 ${
             isLive ? 'opacity-100' : 'opacity-0'
           }`}
         />
@@ -485,23 +485,22 @@ const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
       </div>
 
       {/* Bottom Info Footer */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-t border-slate-800 text-xs text-slate-400">
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 font-medium text-slate-300">
-            <Video className="w-3.5 h-3.5 text-blue-400" />
-            Kênh: <span className="text-emerald-400 font-mono">{!settings.streamEnabled ? 'STREAM PAUSED' : `WebRTC WHEP (${iceState.toUpperCase()})`}</span>
-          </span>
-          <span className="hidden md:inline-block">|</span>
-          <span className="hidden md:flex items-center gap-1.5">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
-            AI Pipeline: <span className="text-slate-200 font-mono">SCRFD + MiniFASNet R7 + ArcFace</span>
-          </span>
+      <div className="grid grid-cols-3 h-14 shrink-0 gap-3 items-center whitespace-nowrap overflow-hidden px-4 bg-slate-900 border-t border-slate-800 text-xs text-slate-400">
+        <div className="flex min-w-0 items-center gap-1.5 font-medium text-slate-300">
+          <Video className="w-3.5 h-3.5 shrink-0 text-blue-400" />
+          <span className="shrink-0">Kênh:</span>
+          <span className="truncate text-emerald-400 font-mono" title={!settings.streamEnabled ? 'STREAM PAUSED' : `WebRTC WHEP (${iceState.toUpperCase()})`}>{!settings.streamEnabled ? 'STREAM PAUSED' : `WebRTC WHEP (${iceState.toUpperCase()})`}</span>
+        </div>
+        <div className="flex min-w-0 items-center gap-1.5" title="AI Pipeline: SCRFD + MiniFASNet R7 + ArcFace">
+          <SlidersHorizontal className="w-3.5 h-3.5 shrink-0 text-blue-400" />
+          <span className="shrink-0">AI Pipeline:</span>
+          <span className="truncate text-slate-200 font-mono">SCRFD + MiniFASNet R7 + ArcFace</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-slate-400">Chế độ hiện tại:</span>
+        <div className="flex min-w-0 items-center gap-2" title={`Chế độ hiện tại: ${activeMode === 'CHECK_IN' ? 'CHECK-IN' : activeMode === 'CHECK_OUT' ? 'CHECK-OUT' : activeMode === 'AUTO' ? 'TỰ ĐỘNG (AUTO)' : 'TẮT / CHỜ CẢM BIẾN'}`}>
+          <span className="shrink-0 text-[11px] text-slate-400">Chế độ hiện tại:</span>
           <span
-            className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] ${
+            className={`truncate min-w-0 px-2 py-0.5 rounded font-mono font-bold text-[10px] ${
               activeMode === 'CHECK_IN'
                 ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                 : activeMode === 'CHECK_OUT'

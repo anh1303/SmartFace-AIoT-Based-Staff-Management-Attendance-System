@@ -26,6 +26,7 @@ import {
   useRawLogsPagination,
 } from '@/features/attendances';
 import { AttendanceRecord } from '../../types';
+import { useTableSort, compareEmployeeNames } from '../../hooks/useTableSort';
 import { ChevronLeft, ChevronRight, RefreshCw, FileText } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAttendanceApi } from '@/features/attendances';
@@ -54,7 +55,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   const paramDate = searchParams.get('date');
   const paramSearch = searchParams.get('search') || searchParams.get('employeeId');
 
-  const { liveEvents, isSocketConnected, clearEvents } = useAttendanceSocket({ showToast });
+  const { liveEvents, isLoadingEvents, eventsError, refetchEvents } = useAttendanceSocket({ showToast });
 
   const [startDate, setStartDate] = useState<string>(() => paramDate || getTodayVNString());
   const [endDate, setEndDate] = useState<string>(() => paramDate || getTodayVNString());
@@ -284,6 +285,9 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   };
 
   // PHÂN TRANG RAW LOGS: Xem lịch sử quẹt thẻ toàn hệ thống không bị giới hạn ở 5000 bản ghi
+  const { sortProps: rawLogSortProps } = useTableSort<AttendanceRecord, 'name'>([], {
+    name: (a, b) => compareEmployeeNames(a.employee_name || a.employee_id, b.employee_name || b.employee_id),
+  });
   const {
     showRawLogs,
     setShowRawLogs,
@@ -297,6 +301,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     startDate,
     endDate,
     pageSize: 50,
+    employeeNameSort: rawLogSortProps('name')['aria-sort'],
     showToast,
   });
 
@@ -358,11 +363,12 @@ export const ManagerAttendanceMonitor: React.FC = () => {
             showToast={showToast}
           />
         </div>}
-        <div className="lg:col-span-1 h-full min-h-[360px]">
+        <div className="lg:col-span-1 min-w-0">
           <LiveEventFeed
             events={liveEvents}
-            onClear={clearEvents}
-            isSocketConnected={isSocketConnected}
+            isLoading={isLoadingEvents}
+            isError={eventsError}
+            onRetry={refetchEvents}
           />
         </div>
       </div>
@@ -411,7 +417,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => loadRawLogsPage(rawLogPage)}
+                onClick={() => loadRawLogsPage(rawLogPage, true)}
                 disabled={isLoadingRawLogs}
                 className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-[#0f1224] transition-colors cursor-pointer disabled:opacity-50"
                 title="Làm mới"
@@ -449,7 +455,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
               <thead className="bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-[#21264b]">
                 <tr>
                   <th className="py-2.5 px-3">Thời gian ghi nhận</th>
-                  <th className="py-2.5 px-3">Nhân viên</th>
+                  <th aria-sort={rawLogSortProps('name')['aria-sort']} className="py-2.5 px-3"><button type="button" onClick={rawLogSortProps('name').onSort} className="w-full text-left cursor-pointer focus-visible:outline-blue-500">Nhân viên</button></th>
                   <th className="py-2.5 px-3">Loại sự kiện</th>
                   <th className="py-2.5 px-3">Phương thức</th>
                   <th className="py-2.5 px-3">Thiết bị</th>

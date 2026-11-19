@@ -21,7 +21,12 @@ vi.mock('../../src/modules/attendance/index.js', async (importOriginal) => {
 })
 vi.mock('../../src/config/database.js', () => {
   const db: any = {
-    $executeRaw: vi.fn(async () => 1),
+    $executeRaw: vi.fn(async (sql: any) => {
+      if (sql?.sql?.includes('INSERT INTO payroll_records')) {
+        for (const row of JSON.parse(sql.values[0])) state.record = { ...state.record, ...row, updated_at: new Date(+state.record.updated_at + 1) }
+      }
+      return 1
+    }),
     attendanceAggregationState: { findUnique: vi.fn(async () => null) },
     employee: { findMany: vi.fn(async () => [state.employee]), findFirst: vi.fn(async () => state.employee) },
     bonusPenalty: { findFirst: vi.fn(async () => ({ id: 1, overtime_rate: 2.0, late_early_penalty: 1.5, absence_penalty_rate: 2.0 })) },

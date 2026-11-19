@@ -1,5 +1,6 @@
 import {Avatar} from '../../../components/common/Avatar';
 import React from 'react';
+import { useTableSort, compareEmployeeNames } from '../../../hooks/useTableSort';
 import { Employee, WorkShift } from '../../../types';
 import { getTodayVNString } from '../../../utils/dateUtils';
 import { ScheduleShiftBadge } from './ScheduleShiftBadge';
@@ -25,6 +26,9 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
   onCellClick,
 }) => {
   const todayVN = getTodayVNString();
+  const { sortedRows, sortProps } = useTableSort(filteredEmployees, {
+    name: (a, b) => compareEmployeeNames(a.full_name, b.full_name),
+  });
 
 
   return (
@@ -33,8 +37,8 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
         <table className="w-full min-w-[1050px] table-fixed text-left text-xs border-collapse">
           <thead className="sticky top-0 z-20 bg-slate-200 dark:bg-[#0c0f1f] border-b-2 border-slate-300 dark:border-[#28305c] text-slate-800 dark:text-slate-200 font-mono text-[11px] uppercase tracking-wider font-bold">
             <tr>
-              <th className="py-3.5 px-3 w-40 sm:w-44 lg:w-48 sticky left-0 top-0 bg-slate-200 dark:bg-[#0c0f1f] z-30 border-r border-b-2 border-slate-300 dark:border-[#222956] text-center">
-                Nhân viên
+              <th aria-sort={sortProps('name')['aria-sort']} className="py-3.5 px-3 w-40 sm:w-44 lg:w-48 sticky left-0 top-0 bg-slate-200 dark:bg-[#0c0f1f] z-30 border-r border-b-2 border-slate-300 dark:border-[#222956] text-center">
+                <button type="button" onClick={sortProps('name').onSort} className="w-full cursor-pointer uppercase focus-visible:outline-blue-500">Nhân viên</button>
               </th>
               {daysOfWeek.map((d, index) => (
                 <th
@@ -55,7 +59,7 @@ export const ScheduleMatrixTable: React.FC<ScheduleMatrixTableProps> = ({
             </tr>
           </thead>
           <tbody className="text-slate-700 dark:text-slate-300">
-            {filteredEmployees.map((emp) => {
+            {sortedRows.map((emp) => {
               const isInactive = emp.status !== 'ACTIVE';
               return (
                 <tr

@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+vi.mock('../../src/features/payrolls/hooks/usePayrollHistory', () => ({ usePayrollHistory: () => ({ data: state.app.payroll, isLoading: false, error: null }) }));
 
 const state = vi.hoisted(() => ({
   app: { currentUser: { employee_id: 'E1', full_name: 'Nhân viên A' }, employees: [{ id: 'uuid-1', employee_id: 'E1' }], payroll: [] as any[], isLoadingPayroll: false, payrollError: null },

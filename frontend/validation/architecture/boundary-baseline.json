@@ -13,7 +13,7 @@
     "pendingMoveContextFiles": 5,
     "pendingMoveTypeFiles": 7,
     "pendingMoveUtilFiles": 3,
-    "pendingMoveFeatureEdges": 3,
+    "pendingMoveFeatureEdges": 0,
     "featureCycles": 0,
     "transitionalExceptions": 0
   },
@@ -221,31 +221,10 @@
     },
     {
       "source": "employees",
-      "target": "attendances",
-      "owner": "employees",
-      "status": "pending-move",
-      "reason": "Tab chi tiết nhân viên ghép trực tiếp dữ liệu chấm công từ feature attendances (rà soát lắp ghép ở tầng pages trong Pha 2)"
-    },
-    {
-      "source": "employees",
-      "target": "biometrics",
-      "owner": "employees",
-      "status": "pending-move",
-      "reason": "Tab tổng quan nhân viên ghép trực tiếp thành phần sinh trắc học từ feature biometrics (rà soát lắp ghép ở tầng pages trong Pha 2)"
-    },
-    {
-      "source": "employees",
       "target": "operations",
       "owner": "employees",
       "status": "allowed",
       "reason": "Tạo hồ sơ nhân viên và gửi email tài khoản theo dõi tác vụ nền qua entry công khai của feature operations"
-    },
-    {
-      "source": "employees",
-      "target": "payrolls",
-      "owner": "employees",
-      "status": "pending-move",
-      "reason": "View chi tiết nhân viên ghép trực tiếp modal phiếu lương từ feature payrolls (rà soát lắp ghép ở tầng pages trong Pha 2)"
     },
     {
       "source": "schedules",

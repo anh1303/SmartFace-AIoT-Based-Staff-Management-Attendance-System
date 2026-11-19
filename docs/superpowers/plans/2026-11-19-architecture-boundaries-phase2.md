@@ -105,7 +105,7 @@ Nguyên tắc xuyên suốt:
 **Kiểm chứng Batch 2:**
 - [x] Cập nhật `backend/validation/architecture/boundary-baseline.json` (`currentCounts.pendingMoveCommonFiles: 0`, `currentCounts.pendingMoveCommonUtilsExports: 0`; giữ nguyên `initialCounts`).
 - [x] Chạy `npm.cmd run build`, `npx.cmd tsc --noEmit -p prisma/tsconfig.json`, `npx.cmd vitest run validation`.
-- [ ] Chạy `npm.cmd run test:neon` cho các bộ integration chạm tới `attendance`, `payroll`, `employees`, `shifts`.
+- [x] Chạy `npm.cmd run test:neon` cho các bộ integration chạm tới `attendance`, `payroll`, `employees`, `shifts`.
 - [x] Chốt commit Batch 2.
 
 ---
@@ -123,10 +123,10 @@ Nguyên tắc xuyên suốt:
 - `employees -> payrolls` (`EmployeeAttendanceTab.tsx`, `EmployeeMonthlyAverages.tsx`, `EmployeePayslipModal.tsx`)
 
 **Các bước thực hiện:**
-- [ ] Đưa các view lắp ghép đa domain lên tầng `frontend/src/pages/manager/ManagerEmployeeDetail.tsx` (hoặc tách thành slot/props do `pages/` lắp ghép từ entry công khai của từng feature `attendances`, `biometrics`, `payrolls`, `employees`).
-- [ ] Cập nhật `frontend/validation/architecture/boundary-baseline.json` (`currentCounts.pendingMoveFeatureEdges: 0`, xóa 3 cạnh đã gỡ khỏi `featureDependencyMatrix`; giữ nguyên `initialCounts`).
-- [ ] Kiểm chứng: `cd frontend && npm.cmd run build && npx.cmd vitest run validation src/utils/__tests__`.
-- [ ] Chốt commit Batch 3.
+- [x] Đưa các view lắp ghép đa domain lên tầng `frontend/src/pages/manager/ManagerEmployeeDetail.tsx` (hoặc tách thành slot/props do `pages/` lắp ghép từ entry công khai của từng feature `attendances`, `biometrics`, `payrolls`, `employees`).
+- [x] Cập nhật `frontend/validation/architecture/boundary-baseline.json` (`currentCounts.pendingMoveFeatureEdges: 0`, xóa 3 cạnh đã gỡ khỏi `featureDependencyMatrix`; giữ nguyên `initialCounts`).
+- [x] Kiểm chứng: `cd frontend && npm.cmd run build && npx.cmd vitest run validation src/utils/__tests__`.
+- [x] Chốt commit Batch 3.
 
 ---
 

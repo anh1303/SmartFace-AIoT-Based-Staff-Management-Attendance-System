@@ -2,8 +2,7 @@ import React from 'react';
 import { Printer } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
 import { PayrollRecord, Employee } from '../../../types';
-import { PayslipBreakdown } from '../../payrolls';
-
+import { PayslipBreakdown } from '@/features/payrolls';
 
 interface EmployeePayslipModalProps {
   payslip: PayrollRecord | null;
@@ -32,7 +31,6 @@ export const EmployeePayslipModal: React.FC<EmployeePayslipModalProps> = ({
       maxWidth="2xl"
     >
       <div className="space-y-4">
-        {/* Header Info */}
         <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0f1224] border border-slate-200/80 dark:border-[#21264b] flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-slate-900 dark:text-white">
@@ -63,7 +61,7 @@ export const EmployeePayslipModal: React.FC<EmployeePayslipModalProps> = ({
           </span>
         </div>
 
-        <PayslipBreakdown record={payslip} otRate={otRate} penaltyRate={penaltyRate}/>
+        <PayslipBreakdown record={payslip} otRate={otRate} penaltyRate={penaltyRate} />
 
         <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-[#21264b]">
           <button

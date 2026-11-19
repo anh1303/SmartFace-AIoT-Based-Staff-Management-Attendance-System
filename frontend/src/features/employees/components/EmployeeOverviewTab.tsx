@@ -1,5 +1,4 @@
 import { Avatar } from '../../../components/common/Avatar';
-import { EmployeeMonthlyAverages } from './EmployeeMonthlyAverages';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -8,18 +7,21 @@ import {
 } from 'lucide-react';
 import { Employee } from '../../../types';
 import { formatVNDate } from '../../../utils/dateUtils';
-import { BiometricStatusBadge } from '@/features/biometrics';
 
 interface EmployeeOverviewTabProps {
   currentEmp: Employee;
   hourlyRate: number;
   onOpenEditModal: () => void;
+  renderBiometricStatus?: (enrolled?: boolean) => React.ReactNode;
+  monthlyAveragesSlot?: React.ReactNode;
 }
 
 export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
   currentEmp,
   hourlyRate,
-  onOpenEditModal,
+  onOpenEditModal: _onOpenEditModal,
+  renderBiometricStatus,
+  monthlyAveragesSlot,
 }) => {
   const navigate = useNavigate();
 
@@ -132,7 +134,7 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
                   <ScanFace className={`w-4 h-4 ${currentEmp.face_enrolled ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`} />
                   <span className="text-xs font-bold text-slate-900 dark:text-white">Nhận diện khuôn mặt (Face ID)</span>
                 </div>
-                <BiometricStatusBadge enrolled={currentEmp.face_enrolled} />
+                {renderBiometricStatus?.(currentEmp.face_enrolled)}
               </div>
 
               <button
@@ -155,7 +157,7 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
                   <Fingerprint className={`w-4 h-4 ${currentEmp.fingerprint_enrolled ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`} />
                   <span className="text-xs font-bold text-slate-900 dark:text-white">Cảm biến vân tay (FAP30)</span>
                 </div>
-                <BiometricStatusBadge enrolled={currentEmp.fingerprint_enrolled} />
+                {renderBiometricStatus?.(currentEmp.fingerprint_enrolled)}
               </div>
 
               <button
@@ -174,7 +176,7 @@ export const EmployeeOverviewTab: React.FC<EmployeeOverviewTabProps> = ({
         </div>
       </div>
 
-      <EmployeeMonthlyAverages employee={currentEmp} />
+      {monthlyAveragesSlot}
 
     </div>
   );

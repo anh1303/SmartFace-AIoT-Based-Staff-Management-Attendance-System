@@ -10,14 +10,16 @@ import { getTodayVNString } from '@/utils/dateUtils';
 import {
   EmployeeDetailHeader,
   EmployeeOverviewTab,
-  EmployeeAttendanceTab,
   EmployeePayrollTab,
   EmployeeScheduleTab,
   EmployeeAccountTab,
-  EmployeePayslipModal,
   EditEmployeeModal,
   useDepartmentPositions,
 } from '@/features/employees';
+import { BiometricStatusBadge } from '@/features/biometrics';
+import { EmployeeAttendanceTab } from '../components/EmployeeAttendanceTab';
+import { EmployeeMonthlyAverages } from './components/EmployeeMonthlyAverages';
+import { EmployeePayslipModal } from './components/EmployeePayslipModal';
 import { useEmployeeDetailData } from './hooks/useEmployeeDetailData';
 
 export const ManagerEmployeeDetail: React.FC = () => {
@@ -345,6 +347,8 @@ export const ManagerEmployeeDetail: React.FC = () => {
           currentEmp={currentEmp}
           hourlyRate={hourlyRate}
           onOpenEditModal={handleOpenEditModal}
+          renderBiometricStatus={enrolled => <BiometricStatusBadge enrolled={enrolled} />}
+          monthlyAveragesSlot={<EmployeeMonthlyAverages employee={currentEmp} />}
         />
       )}
 

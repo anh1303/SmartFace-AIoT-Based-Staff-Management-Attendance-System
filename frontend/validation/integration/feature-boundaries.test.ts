@@ -35,7 +35,7 @@ describe('feature public boundaries', () => {
   it('does not rebuild a combined domain context for every provider update', () => {
     expect(readFileSync(resolve('src/context/AppContext.tsx'), 'utf8')).not.toContain('AppConsumerBridge');
   });
-  it.each(['src/features/payrolls/hooks/useEmployeePayrollDetail.ts', 'src/features/employees/components/EmployeeMonthlyAverages.tsx'])('%s reads payroll from its domain context', file => {
+  it.each(['src/features/payrolls/hooks/useEmployeePayrollDetail.ts', 'src/pages/manager/components/EmployeeMonthlyAverages.tsx'])('%s reads payroll from its domain context', file => {
     expect(readFileSync(resolve(file), 'utf8')).not.toContain('useApp(');
   });
   it.each([

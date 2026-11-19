@@ -3,7 +3,7 @@ import { Clock } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useEmployeeContext } from '../../context/EmployeeContext';
-import { EmployeeAttendanceTab } from '../../features/employees';
+import { EmployeeAttendanceTab } from '../components/EmployeeAttendanceTab';
 import { PageHeaderBanner } from '../../components/common';
 import { getTodayVNString } from '../../utils/dateUtils';
 import type { Employee } from '../../types';

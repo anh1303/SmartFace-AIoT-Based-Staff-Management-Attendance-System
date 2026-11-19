@@ -68,7 +68,7 @@ function elapsedPayrollSources(
   start: Date, end: Date, asOf = new Date(),
 ) {
   const today = vnDay(asOf)
-  const cutoff = new Date(Math.min(+end, +new Date(`${today}T00:00:00Z`) + 86400000))
+  const cutoff = new Date(Math.min(+end, +new Date(`${today}T00:00:00Z`)))
   const inRange = (date: Date) => date >= start && date < cutoff
   const dayKey = (row: { employee_id: string; work_date: Date }) => `${row.employee_id}:${vnDay(row.work_date)}`
   const shiftsByDay = new Map(shifts.map(shift => [dayKey(shift), shift]))
@@ -712,13 +712,14 @@ export async function generate(payroll_period: string, employeeId?: string, acto
   const { year, month, start, end } = validatePeriod(payroll_period)
   const calculatedAt = new Date()
   const today = vnDay(calculatedAt)
-  const calculationEnd = new Date(Math.min(+end, +new Date(`${today}T00:00:00Z`) + 86400000))
-  const calculationRange = {
+  // Current-day attendance is not eligible until the following Vietnamese day.
+  const calculationEnd = new Date(Math.min(+end, +new Date(`${today}T00:00:00Z`)))
+  const calculationRange = calculationEnd > start ? {
     start_date: start.toISOString().slice(0, 10),
     end_date: new Date(+calculationEnd - 86400000).toISOString().slice(0, 10),
     as_of: calculatedAt.toISOString(),
     is_partial: payroll_period === today.slice(0, 7),
-  }
+  } : null
   if (payroll_period > today.slice(0, 7)) throw AppError.badRequest('Không tính lương cho kỳ tương lai')
   if (!actorUser || !['ADMIN', 'MANAGER'].includes(actorUser.role || '')) throw AppError.forbidden()
   const employeeScope = await getEmployeeScope(actorUser, 'manage')

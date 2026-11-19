@@ -1,4 +1,5 @@
 import React from 'react';
+import { TableSortIndicator } from '../../../components/common/Table';
 import { useTableSort, compareEmployeeNames } from '../../../hooks/useTableSort';
 import { confidenceColor } from '../../../utils/confidence';
 import { Briefcase } from 'lucide-react';
@@ -27,7 +28,7 @@ export const DashboardRecentLogsTable: React.FC<DashboardRecentLogsTableProps> =
         <table className="w-full text-left text-xs border-collapse">
           <thead className="bg-slate-50 dark:bg-[#181c38] text-slate-500 dark:text-slate-400 font-semibold sticky top-0 z-10">
             <tr>
-              <th aria-sort={sortProps('name')['aria-sort']} className="py-2.5 px-3"><button type="button" onClick={sortProps('name').onSort} className="w-full text-left cursor-pointer focus-visible:outline-blue-500">Nhân viên</button></th>
+              <th aria-sort={sortProps('name')['aria-sort']} className="relative py-2.5 px-3"><button type="button" onClick={sortProps('name').onSort} className="inline-flex w-full items-center justify-center px-3 text-center cursor-pointer focus-visible:outline-blue-500">Nhân viên<TableSortIndicator direction={sortProps('name')['aria-sort']} /></button></th>
               <th className="py-2.5 px-3 text-center">Sự kiện</th>
               <th className="py-2.5 px-3 text-center">Thời điểm</th>
               <th className="py-2.5 px-3 text-center">Thiết bị</th>

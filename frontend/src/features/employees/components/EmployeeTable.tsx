@@ -59,7 +59,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
     <TableContainer minWidth="1000px">
       <TableHead>
         <TableHeadRow>
-          <TableHeadCell width="230px" align="left" {...sortProps('name')}>Nhân viên</TableHeadCell>
+          <TableHeadCell width="230px" align="center" {...sortProps('name')}>Nhân viên</TableHeadCell>
           <TableHeadCell width="110px" {...sortProps('code')}>Mã NV</TableHeadCell>
           <TableHeadCell width="180px">Phòng ban & Chức vụ</TableHeadCell>
           <TableHeadCell width="210px">Liên hệ</TableHeadCell>

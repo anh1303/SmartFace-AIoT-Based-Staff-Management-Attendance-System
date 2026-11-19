@@ -26,6 +26,7 @@ import {
   useRawLogsPagination,
 } from '@/features/attendances';
 import { AttendanceRecord } from '../../types';
+import { TableSortIndicator } from '../../components/common/Table';
 import { useTableSort, compareEmployeeNames } from '../../hooks/useTableSort';
 import { ChevronLeft, ChevronRight, RefreshCw, FileText } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -455,7 +456,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
               <thead className="bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-[#21264b]">
                 <tr>
                   <th className="py-2.5 px-3">Thời gian ghi nhận</th>
-                  <th aria-sort={rawLogSortProps('name')['aria-sort']} className="py-2.5 px-3"><button type="button" onClick={rawLogSortProps('name').onSort} className="w-full text-left cursor-pointer focus-visible:outline-blue-500">Nhân viên</button></th>
+                  <th aria-sort={rawLogSortProps('name')['aria-sort']} className="relative py-2.5 px-3"><button type="button" onClick={rawLogSortProps('name').onSort} className="inline-flex w-full items-center justify-center px-3 text-center cursor-pointer focus-visible:outline-blue-500">Nhân viên<TableSortIndicator direction={rawLogSortProps('name')['aria-sort']} /></button></th>
                   <th className="py-2.5 px-3">Loại sự kiện</th>
                   <th className="py-2.5 px-3">Phương thức</th>
                   <th className="py-2.5 px-3">Thiết bị</th>

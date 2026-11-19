@@ -91,7 +91,8 @@ it('toggles only requested columns, sorts money numerically, and preserves sourc
     click(2); expect(order()).toEqual(['NV-10', 'NV-2', 'NV-1']);
     expect(rows.map(row => row.code)).toEqual(['NV-10', 'NV-2', 'NV-1']);
     expect(host.querySelectorAll('th')[3].querySelector('button')).toBeNull();
-    expect(host.querySelector('svg')).toBeNull();
+    expect(host.querySelectorAll('thead svg')).toHaveLength(6);
+    expect(host.querySelectorAll('th')[3].querySelector('svg')).toBeNull();
   } finally { act(() => root.unmount()); }
 });
 

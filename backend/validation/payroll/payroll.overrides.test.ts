@@ -108,20 +108,22 @@ describe('Manual payroll calculation cutoff', () => {
     state.adjustments.push({ ...absence('2026-10-30', 4n), kind: 'LATE_EARLY', hours: 4 }, { ...absence('2026-10-31', 5n), kind: 'OVERTIME', hours: 4 })
     const [result] = await calculate()
     expect(result).toMatchObject({ total_working_hours: 8, total_overtime: 0, total_late_early: 0, total_absence_penalty: 200000, approved_absence_count: 1, net_salary: 2100000 })
-    expect(result.calculation_details.calculation_range).toEqual({ start_date: '2026-10-01', end_date: '2026-10-30', as_of: '2026-10-30T05:00:00.000Z', is_partial: true })
-    expect(vi.mocked(prisma.attendanceAdjustment.findMany).mock.calls.at(-1)![0]!.where!.work_date).toEqual({ gte: day('2026-10-01'), lt: day('2026-10-31') })
+    expect(result.calculation_details.calculation_range).toEqual({ start_date: '2026-10-01', end_date: '2026-10-29', as_of: '2026-10-30T05:00:00.000Z', is_partial: true })
+    expect(vi.mocked(prisma.attendanceAdjustment.findMany).mock.calls.at(-1)![0]!.where!.work_date).toEqual({ gte: day('2026-10-01'), lt: day('2026-10-30') })
     expect((await list('2026-10'))[0].needs_recalculation).toBe(false)
     await expect(previewItem('1', { allowance: 1500000, updated_at: state.record.updated_at.toISOString() }, actor)).resolves.toMatchObject({ net_salary: 2100000 })
     await expect(updateItem('1', { allowance: 1500000, updated_at: state.record.updated_at.toISOString(), reason: 'Same allowance' }, actor)).resolves.toMatchObject({ net_salary: 2100000 })
   })
 
-  it('does not call an unfinished shift missing attendance, then includes it when it finishes', async () => {
+  it('excludes today even after the shift finishes, and includes its approved work on the next day', async () => {
     vi.setSystemTime(new Date('2026-10-30T12:00:00+07:00'))
     state.shifts = [shift('2026-10-29'), shift('2026-10-30')]
     expect((await calculate())[0].approved_absence_count).toBe(0)
     vi.setSystemTime(new Date('2026-10-30T18:00:00+07:00'))
     state.summaries = [summary('2026-10-29', 8), summary('2026-10-30', 8)]
     expect((await list('2026-10'))[0].needs_recalculation).toBe(true)
+    expect((await calculate())[0].total_working_hours).toBe(8)
+    vi.setSystemTime(new Date('2026-10-31T00:05:00+07:00'))
     expect((await calculate())[0].total_working_hours).toBe(16)
   })
 
@@ -145,8 +147,33 @@ describe('Manual payroll calculation cutoff', () => {
 
   it('uses the Vietnamese day at a UTC date boundary and rejects future periods', async () => {
     vi.setSystemTime(new Date('2026-10-30T18:00:00Z'))
-    expect((await calculate())[0].calculation_details.calculation_range.end_date).toBe('2026-10-31')
+    expect((await calculate())[0].calculation_details.calculation_range.end_date).toBe('2026-10-30')
     await expect(generate('2026-11', state.employee.id, actor.id, actor)).rejects.toThrow(/tương lai/)
+  })
+
+  it('on November 19 only uses approved completed work through November 18', async () => {
+    vi.setSystemTime(new Date('2026-11-19T21:00:00+07:00'))
+    state.record.payroll_period = '2026-11'
+    state.shifts = [shift('2026-11-17'), shift('2026-11-18'), shift('2026-11-19')]
+    state.summaries = [
+      { ...summary('2026-11-17', 50), review_status: 'PENDING' },
+      summary('2026-11-18', 8), summary('2026-11-19', 100),
+    ]
+    state.adjustments = [{ ...absence('2026-11-19', 10n), kind: 'OVERTIME', hours: 10 }]
+    const [result] = await generate('2026-11', state.employee.id, actor.id, actor)
+    expect(result.calculation_range).toMatchObject({ start_date: '2026-11-01', end_date: '2026-11-18', is_partial: true })
+    expect(result).toMatchObject({ total_working_hours: 8, total_overtime: 0, total_absence_penalty: 0 })
+    expect((await list('2026-11'))[0].needs_recalculation).toBe(false)
+  })
+
+  it('does not save a reversed calculation range on the first day of a month', async () => {
+    vi.setSystemTime(new Date('2026-11-01T12:00:00+07:00'))
+    state.record.payroll_period = '2026-11'
+    state.summaries = [summary('2026-11-01', 8)]
+    state.shifts = [shift('2026-11-01')]
+    const [result] = await generate('2026-11', state.employee.id, actor.id, actor)
+    expect(result.total_working_hours).toBe(0)
+    expect(result.calculation_range).toBeNull()
   })
 
   it.each([['2024-02', '2024-02-29'], ['2025-12', '2025-12-31']])('uses the actual last day of historical period %s', async (period, lastDay) => {

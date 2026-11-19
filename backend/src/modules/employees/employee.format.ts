@@ -1,3 +1,5 @@
+import { hasActiveFaceEnrollment } from './employee.integration-port.js'
+
 export interface RawEmployeeDb {
   id: string
   employee_code?: string | null
@@ -60,7 +62,7 @@ export function formatEmployee(emp: RawEmployeeDb) {
     is_manager: isManager,
     created_at: emp.createdAt ? emp.createdAt.toISOString() : new Date().toISOString(),
     updated_at: emp.updatedAt ? emp.updatedAt.toISOString() : new Date().toISOString(),
-    face_enrolled: Array.isArray(emp.face_embeddings) && emp.face_embeddings.length > 0,
+    face_enrolled: hasActiveFaceEnrollment(emp.face_embeddings),
     fingerprint_enrolled: Boolean(emp.fingerprint_enrolled),
     avatar: emp.avatar_url || '',
     hourly_rate: emp.hourly_rate ? Number(emp.hourly_rate) : 0,

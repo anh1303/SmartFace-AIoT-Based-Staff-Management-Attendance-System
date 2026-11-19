@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { monthlyHourlyRate, recordHourlyRateChange } from '../../src/modules/employees/employee.wage.js'
-import { nextPayrollPeriod } from '../../src/common/payroll-policy.js'
+import { nextPayrollPeriod } from '../../src/modules/payroll/payroll.policy.js'
 
 afterEach(() => vi.useRealTimers())
 

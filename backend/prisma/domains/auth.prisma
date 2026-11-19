@@ -1,0 +1,26 @@
+model User {
+  operations    BackgroundOperation[]
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username      String     @unique @db.VarChar(50)
+  profile       Json?
+  passwordHash  String     @map("password_hash") @db.VarChar(255)
+  role_id       Int
+  is_active     Boolean    @default(true)
+  last_login_at DateTime?  @db.Timestamptz(6)
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at    DateTime   @default(now()) @db.Timestamptz(6)
+  auditLogs     AuditLog[]
+  employees     Employee?
+  roles         roles      @relation(fields: [role_id], references: [id], onUpdate: NoAction)
+  notifications SystemNotification[]
+
+  @@index([username], map: "idx_users_username")
+  @@map("users")
+}
+
+model roles {
+  id          Int     @id @default(autoincrement())
+  role_name   String  @unique @db.VarChar(50)
+  description String?
+  users       User[]
+}

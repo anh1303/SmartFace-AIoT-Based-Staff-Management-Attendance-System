@@ -9,7 +9,7 @@ import {
   roundHours,
   ATTENDANCE_POLICY_VERSION,
 } from '../../src/modules/attendance/attendance.policy.js'
-import { calculateNetSalary } from '../../src/common/utils.js'
+import { calculateNetSalary } from '../../src/modules/payroll/public.js'
 
 describe('Audit Verification Tests - Comprehensive 6 Issues', () => {
   describe('Issue 1: Early arrival (> 1h before shift) preservation, auto-close & payroll calculation', () => {

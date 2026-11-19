@@ -1,10 +1,10 @@
-import { prisma } from '../src/config/database.js'
-import { aggregateDailyAttendance, createAttendanceSnapshot } from '../src/modules/attendance/attendance.service.js'
-import { generate, finalizePeriod } from '../src/modules/payroll/payroll.service.js'
-import { vnDay, shiftBounds } from '../src/modules/attendance/attendance.policy.js'
-import { syncDayAdjustments } from '../src/modules/attendance/attendance.adjustments.js'
-import { sourceHourlyRate } from '../src/modules/employees/employee.wage.js'
-import { policyForPeriod } from '../src/common/payroll-policy.js'
+import { prisma } from '../../src/config/database.js'
+import { aggregateDailyAttendance, createAttendanceSnapshot } from '../../src/modules/attendance/attendance.service.js'
+import { generate, finalizePeriod } from '../../src/modules/payroll/payroll.service.js'
+import { vnDay, shiftBounds } from '../../src/modules/attendance/attendance.policy.js'
+import { syncDayAdjustments } from '../../src/modules/attendance/attendance.adjustments.js'
+import { sourceHourlyRate } from '../../src/modules/employees/employee.wage.js'
+import { policyForPeriod } from '../../src/modules/payroll/payroll.policy.js'
 import { Prisma } from '@prisma/client'
 
 /**

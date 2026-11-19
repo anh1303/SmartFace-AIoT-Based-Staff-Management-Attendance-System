@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
-import { seedShifts } from '../../prisma/seed-shifts.js'
-import { chooseScenario, seedAttendance } from '../../prisma/seed-attendance.js'
+import { seedShifts } from '../../prisma/seeds/shifts.js'
+import { chooseScenario, seedAttendance } from '../../prisma/seeds/attendance.js'
 
 // In-memory Prisma boundary: exercise the actual transaction/seed code without a live DB.
 function fixture() {
@@ -107,23 +107,24 @@ describe('seed persistence and replacement', () => {
     expect((await seedAttendance(db, range, 'skip', now)).skipped).toBe(1)
     expect(rows.attendance_logs).toEqual([])
   })
-  it('does not generate future scans or open shifts', async () => {
+  it('creates future attendance and persists biometric metadata', async () => {
     const { db, rows } = fixture()
-    const result = await seedAttendance(db, range, 'overwrite', new Date('2026-11-02T09:00:00+07:00'))
-    expect(result.unfinished).toBe(1)
-    expect(rows.attendance_logs).toEqual([])
-    expect(rows.daily_attendance_summary).toEqual([])
+    const result = await seedAttendance(db, range, 'overwrite', new Date('2026-10-01T00:00:00Z'))
+    expect(result.days).toBe(1)
+    expect(result.logs).toBeGreaterThan(0)
+    for (const log of rows.attendance_logs) {
+      expect(['FACE', 'FINGERPRINT']).toContain(log.method)
+      if (log.method === 'FACE') expect(log.verification_score).toBeGreaterThanOrEqual(0.8)
+      else expect(log.verification_score).toBeNull()
+    }
+    expect(rows.daily_attendance_summary[0].total_working_hours).toBeGreaterThan(0)
   })
-  it('does not turn future OFF_WORK events into a zero-duration midnight pair', async () => {
+  it('does not seed shifts or attendance before the employee profile exists', async () => {
     const { db, rows } = fixture()
-    const offWorker = Array.from({ length: 1000 }, (_, i) => `off-${i}`).find(id => chooseScenario(`${id}:${range.from}`, true) === 'OFF_WORK')!
-    rows.employee.push({ ...rows.employee[0], id: offWorker, employee_code: 'NV-002' })
-    const off = { ...rows.employee_shifts[1], shift_type: 'OFF', start_time: new Date('1970-01-01T00:00:00Z'), end_time: new Date('1970-01-01T00:00:00Z') }
-    rows.employee_shifts = [off, { ...off, id: 20n, employee_id: offWorker }]
-    const result = await seedAttendance(db, range, 'overwrite', new Date('2026-11-02T09:00:00+07:00'))
-    expect(result.unfinished).toBe(1)
+    rows.employee[0].createdAt = new Date('2027-01-01T00:00:00Z')
+    await expect(seedAttendance(db, range, 'overwrite', now)).rejects.toThrow()
+    await expect(seedShifts(db, range, 'overwrite')).rejects.toThrow()
     expect(rows.attendance_logs).toEqual([])
-    expect(rows.daily_attendance_summary).toHaveLength(1)
   })
   it('never generates rest-day work immediately after an actual night shift', async () => {
     const { db, rows } = fixture()

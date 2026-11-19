@@ -1,0 +1,24 @@
+model Device {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String    @db.VarChar(100)
+  location  String    @db.VarChar(100)
+  ip        String?   @db.VarChar(45)
+  status    String    @default("OFFLINE") @db.VarChar(20)
+  last_seen DateTime? @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("devices")
+}
+
+model FingerprintDevice {
+  device_id          String @id
+  capacity           Int
+  ready              Boolean @default(false)
+  roundtrip_verified Boolean @default(false)
+  wak_verified       Boolean @default(false)
+  attendance_enabled Boolean @default(false)
+  polling_fallback   Boolean @default(false)
+  last_seen          DateTime @default(now()) @db.Timestamptz(6)
+  error              String?
+  @@map("fingerprint_devices")
+}

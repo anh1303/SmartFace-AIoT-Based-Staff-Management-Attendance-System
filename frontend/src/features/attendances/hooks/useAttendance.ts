@@ -78,8 +78,19 @@ export function useAttendance(params?: FetchAttendanceParams) {
     },
   });
 
+  const normalizedAttendance = useMemo(() => {
+    if (!query.data) return [];
+    const mapped = query.data.map(record => ({
+      ...record,
+      work_date: record.work_date ?? null,
+    })) as typeof query.data;
+    mapped.isTruncated = query.data.isTruncated;
+    mapped.totalLoaded = query.data.totalLoaded;
+    return mapped;
+  }, [query.data]);
+
   return {
-    attendance: query.data || [],
+    attendance: normalizedAttendance,
     isLoading: query.isLoading,
     isError: query.isError,
     isTruncated: Boolean((query.data as any)?.isTruncated),

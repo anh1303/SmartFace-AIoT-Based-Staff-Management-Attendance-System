@@ -113,3 +113,14 @@ export async function updateBonusPenaltyApi(data: Partial<Omit<BonusPenaltyPolic
   }
   throw new Error(res.message || 'Lỗi cập nhật thưởng/phạt');
 }
+
+export async function fetchPayrollExportApi(period: string, recordIds: string[]): Promise<PayrollRecord[]> {
+  const res = await apiFetch(`/api/payroll/period/${encodeURIComponent(period)}/export`, {
+    method: 'POST',
+    body: JSON.stringify({ recordIds }),
+  });
+  if (res.success && Array.isArray(res.data)) {
+    return res.data;
+  }
+  throw new Error(res.message || 'Không thể xuất báo cáo bảng lương');
+}

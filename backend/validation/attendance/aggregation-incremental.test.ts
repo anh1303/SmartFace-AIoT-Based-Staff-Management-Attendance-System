@@ -25,7 +25,15 @@ vi.mock('../../src/config/database.js', () => {
 import { configureAttendancePayroll } from '../../src/modules/attendance/attendance.payroll-port.js'
 import { aggregateDailyAttendance } from '../../src/modules/attendance/attendance.aggregation.js'
 import * as policy from '../../src/modules/attendance/attendance.policy.js'
-configureAttendancePayroll({ findPeriodPayrolls: async () => [], payrollOverrides: () => ({ fields: {}, legacy: false }) } as any)
+const getAdjustmentPolicy = vi.fn(async (_period: string, tx: any) => {
+  expect(tx).toBeDefined()
+  return { id: 0, overtime_rate: 2, late_early_penalty: 1.5, absence_penalty_rate: 2, effective_period: null }
+})
+configureAttendancePayroll({
+  findPeriodPayrolls: async () => [],
+  payrollOverrides: () => ({ fields: {}, legacy: false }),
+  getAdjustmentPolicy,
+} as any)
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); })
 
 it('reuses unchanged days, rebuilds only the changed day, and skips locked days before calculating', async () => {

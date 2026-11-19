@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../../../api/client';
 import { useAuth } from '../../../context/AuthContext';
-import { useDeviceSettings } from '../hooks/useDeviceSettings';
+import { useDeviceSettings } from '../../devices';
 
 interface WebRTCPlayerProps {
   streamUrl?: string; // e.g. http://10.52.138.36:8889/pi4_cam/whep

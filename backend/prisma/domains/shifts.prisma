@@ -1,0 +1,41 @@
+model work_shifts {
+  id                       Int                        @id @default(autoincrement())
+  shift_name               String                     @db.VarChar(50)
+  start_time               DateTime                   @db.Time(6)
+  end_time                 DateTime                   @db.Time(6)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  daily_attendance_summary daily_attendance_summary[]
+  employee_shifts          employee_shifts[]
+}
+
+model employee_shifts {
+  version     Int         @default(1)
+  id          BigInt      @id @default(autoincrement())
+  employee_id String      @db.Uuid
+  shift_id    Int         @default(1)
+  work_date   DateTime    @db.Date
+  work_day    String?     @default("Thứ Hai") @db.VarChar(50)
+  shift_type  String?     @default("OFFICE_HOURS") @db.VarChar(50)
+  start_time  DateTime?   @db.Time(6)
+  end_time    DateTime?   @db.Time(6)
+  note        String?     @db.VarChar(255)
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+  employees   Employee    @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  work_shifts work_shifts @relation(fields: [shift_id], references: [id], onUpdate: NoAction)
+
+  @@unique([employee_id, work_date], map: "uq_emp_shift_date")
+  @@index([employee_id, work_date], map: "idx_emp_shifts_lookup")
+  @@index([shift_type], map: "idx_emp_shifts_type")
+}
+
+// Reusable presets: applying one copies its hours/note into an OTHER assignment.
+// Editing a preset never rewrites historical employee shifts.
+model ShiftTemplate {
+  id String @id @default(cuid())
+  name String @unique @db.VarChar(50)
+  start_time String @db.VarChar(5)
+  end_time String @db.VarChar(5)
+  note String @default("") @db.VarChar(300)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@map("shift_templates")
+}

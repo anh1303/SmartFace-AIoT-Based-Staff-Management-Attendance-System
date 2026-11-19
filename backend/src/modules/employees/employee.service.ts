@@ -12,9 +12,8 @@ import { sendAccountCredentialsEmail, type EmailSendResult } from '../../common/
 import { logAction } from '../audit-logs/public.js'
 import { employeeIntegration } from './employee.integration-port.js'
 import { employeeInclude } from './employee.model.js'
-import { recordHourlyRateChange } from './employee.wage.js'
+import { recordHourlyRateChange, nextPayrollPeriod } from './employee.wage.js'
 import { vnDay, payrollPeriodLockKey } from '../../common/utils.js'
-import { nextPayrollPeriod } from '../../common/payroll-policy.js'
 import { assertCanAccessEmployeeDetail, assertCanManageEmployee, getEmployeeScope, isEmployeeManager, type EmployeeActor } from './employee.permission.js'
 
 export async function list(query: Record<string, unknown>, actor?: EmployeeActor) {

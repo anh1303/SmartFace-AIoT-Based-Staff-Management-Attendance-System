@@ -126,7 +126,7 @@ npm run prisma:seed             # Tạo 3 Roles, 6 Phòng ban, 18 Chức vụ, t
 npm run prisma:seed:shifts      # Tạo lịch phân ca làm việc trong tháng
 npm run prisma:seed:attendance  # Tạo dữ liệu quẹt thẻ và tổng hợp chấm công mẫu
 ```
-> **Lưu ý bảo mật:** Toàn bộ thông tin cấu hình tài khoản và dữ liệu kiểm thử cục bộ được định nghĩa trong mã nguồn seed tại [prisma/seed.ts](file:///e:/PBL6/SmartFace-AIoT-Based-Staff-Management-Attendance-System/backend/prisma/seed.ts).
+> **Lưu ý bảo mật:** Toàn bộ thông tin cấu hình tài khoản và dữ liệu kiểm thử cục bộ được định nghĩa trong mã nguồn seed tại [prisma/seeds/index.ts](file:///e:/PBL6/SmartFace-AIoT-Based-Staff-Management-Attendance-System/backend/prisma/seeds/index.ts).
 
 
 ### Bước 4: Kiểm tra kết nối CSDL qua Prisma Studio
@@ -230,7 +230,7 @@ Backend được tổ chức theo kiến trúc **Modular Monolith** phân chia t
 ```text
 backend/
 ├── prisma/
-│   ├── schema.prisma          # Database schema (15 models + pgvector)
+│   ├── schema.prisma          # Generator v? datasource PostgreSQL
 │   ├── migrations/            # Lịch sử các phiên bản migration
 │   ├── seed.ts                # Seed master data, tài khoản, 18 nhân viên
 │   ├── seed-shifts.ts         # Seed lịch phân ca mẫu

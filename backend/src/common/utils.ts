@@ -1,7 +1,3 @@
-import { computePayrollBreakdown, type SalaryCalculationInput, type PayrollBreakdown } from './payroll-rates.js';
-export { computePayrollBreakdown };
-export type { SalaryCalculationInput, PayrollBreakdown };
-
 const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
 
 /**
@@ -125,14 +121,6 @@ export function buildIdOrCodeWhere(idOrCode: string): { id: string } | { employe
  * Alias for buildIdOrCodeWhere with descriptive naming
  */
 export const buildEmployeeWhere = buildIdOrCodeWhere;
-
-
-/**
- * Pure Function để tính lương thực lĩnh (net_salary) dùng chung thống nhất toàn hệ thống.
- */
-export function calculateNetSalary(params: SalaryCalculationInput): number {
-  return computePayrollBreakdown(params).net_salary;
-}
 
 /**
  * Sinh mật khẩu ngẫu nhiên độ dài mặc định 8 ký tự.

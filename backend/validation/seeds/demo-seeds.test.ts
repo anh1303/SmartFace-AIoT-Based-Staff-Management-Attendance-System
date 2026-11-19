@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { parseRange, datesInRange, ownedLogDates, shouldSkip } from '../../prisma/seed-utils.js'
-import { buildShiftPlan } from '../../prisma/seed-shifts.js'
-import { buildScenarioLogs, chooseScenario, WORK_CASES, CASE_WEIGHTS } from '../../prisma/seed-attendance.js'
+import { parseRange, datesInRange, ownedLogDates, shouldSkip } from '../../prisma/seeds/utils.js'
+import { buildShiftPlan } from '../../prisma/seeds/shifts.js'
+import { buildScenarioLogs, chooseScenario, WORK_CASES, CASE_WEIGHTS } from '../../prisma/seeds/attendance.js'
 import { calculateDay } from '../../src/modules/attendance/attendance.policy.js'
 
 describe('seed input and overwrite scope', () => {
@@ -10,7 +10,7 @@ describe('seed input and overwrite scope', () => {
     expect(datesInRange(parseRange(['2026-10-31', '2026-11-02']))).toEqual(['2026-10-31', '2026-11-01', '2026-11-02'])
     expect(parseRange(['2026-11-02'])).toEqual({ from: '2026-11-02', to: '2026-11-02' })
   })
-  it.each([['2026-02-29'], ['2026-13'], ['2026-11-10', '2026-11-01'], ['2026-01-01', '2028-01-01'], []])('rejects invalid input %j', (...args) => {
+  it.each([['2026-02-29'], ['2026-13'], ['2026-11-10', '2026-11-01'], []])('rejects invalid input %j', (...args) => {
     expect(() => parseRange(args as string[])).toThrow()
   })
   it('preserves existing employee-days only in skip mode and always protects closed days', () => {
@@ -130,4 +130,17 @@ describe('attendance case coverage using the production policy', () => {
     expect(starts.size).toBeGreaterThan(80)
     expect(overtimeMinutes.size).toBeGreaterThan(80)
   })
+})
+
+it('generates approximately 20% fingerprint logs and scores only face logs', () => {
+  const shift = { shift_type: 'OFFICE_HOURS', start_time: '08:00', end_time: '17:00' }
+  const logs = Array.from({ length: 1000 }, (_, i) => buildScenarioLogs('2026-11-02', shift, 'ON_TIME', `method-${i}`)).flat()
+  const fingerprints = logs.filter(l => l.method === 'FINGERPRINT')
+  expect(fingerprints.length / logs.length).toBeGreaterThan(0.17)
+  expect(fingerprints.length / logs.length).toBeLessThan(0.23)
+  expect(fingerprints.every(l => l.verification_score === null)).toBe(true)
+  const faces = logs.filter(l => l.method === 'FACE')
+  expect(faces.every(l => l.verification_score! >= 0.8 && l.verification_score! <= 0.99)).toBe(true)
+  expect(new Set(faces.map(l => l.verification_score)).size).toBeGreaterThan(10)
+  expect(parseRange(['2026-01-01', '2028-01-01']).to).toBe('2028-01-01')
 })

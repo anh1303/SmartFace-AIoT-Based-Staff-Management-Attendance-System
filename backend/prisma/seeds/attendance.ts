@@ -1,12 +1,12 @@
 import 'dotenv/config'
 import { createHash } from 'node:crypto'
 import type { Prisma, PrismaClient } from '@prisma/client'
-import { prisma } from '../src/config/database.js'
-import { calculateDay, shiftBounds, vnDay, type DatedPolicyShift, type PolicyLog } from '../src/modules/attendance/attendance.policy.js'
-import { syncDayAdjustments, flushAdjustmentBatch } from '../src/modules/attendance/attendance.adjustments.js'
-import { monthlyHourlyRate } from '../src/modules/employees/employee.wage.js'
-import { policyForPeriod } from '../src/common/payroll-policy.js'
-import { addDays, dateValue, dayKey, isMain, loadSeedState, markPayrollsStale, printCoverage, readSeedInput, seededRandom, shouldSkip, type SeedMode, type SeedRange } from './seed-utils.js'
+import { prisma } from '../../src/config/database.js'
+import { calculateDay, shiftBounds, vnDay, type DatedPolicyShift, type PolicyLog } from '../../src/modules/attendance/attendance.policy.js'
+import { syncDayAdjustments, flushAdjustmentBatch } from '../../src/modules/attendance/attendance.adjustments.js'
+import { monthlyHourlyRate } from '../../src/modules/employees/employee.wage.js'
+import { policyForPeriod } from '../../src/modules/payroll/payroll.policy.js'
+import { addDays, dateValue, dayKey, isMain, loadSeedState, markPayrollsStale, printCoverage, readSeedInput, seededRandom, shouldSkip, type SeedMode, type SeedRange } from './utils.js'
 
 export const WORK_CASES = ['ON_TIME', 'LATE', 'EARLY_LEAVE', 'LATE_AND_EARLY', 'ABSENT', 'MISSING_IN', 'MISSING_OUT',
   'UNDER_MINIMUM', 'MULTIPLE_PAIRS', 'REPEATED_IN', 'FLAGGED', 'OT_BELOW_THRESHOLD', 'OVERTIME', 'OT_OVER_LIMIT'] as const
@@ -65,11 +65,15 @@ export function buildScenarioLogs(date: string, shift: DatedPolicyShift, scenari
     case 'OT_OVER_LIMIT': logs = pair(arrival, +end + between(241 * 60, 300 * 60) * 1000); break
     default: logs = pair()
   }
-  return logs.map((log, index) => ({ ...log, id: index + 1 }))
+  const biometricRandom = seededRandom(`biometrics:${key}:${scenario}`)
+  return logs.map((log, index) => {
+    const method = biometricRandom() < 0.2 ? 'FINGERPRINT' : 'FACE'
+    return { ...log, id: index + 1, method,
+      verification_score: method === 'FACE' ? Number((0.8 + biometricRandom() * 0.19).toFixed(4)) : null }
+  })
 }
 
 export async function seedAttendance(db: PrismaClient, range: SeedRange, mode: SeedMode, now = new Date()) {
-  if (range.from > vnDay(now)) throw new Error('Không tạo lượt chấm công trong tương lai.')
   return db.$transaction(async tx => {
     const state = await loadSeedState(tx, range)
     const assignments = state.shifts.filter(s => {
@@ -91,18 +95,17 @@ export async function seedAttendance(db: PrismaClient, range: SeedRange, mode: S
         continue
       }
       const bounds = shiftBounds(date, assignment)
-      if (date > vnDay(now) || +bounds.end > +now || (!bounds.off && bounds.isZeroDuration)) { result.unfinished++; continue }
+      if (!bounds.off && bounds.isZeroDuration) { result.unfinished++; continue }
       const key = dayKey(assignment.employee_id, date)
       const previous = state.shifts.find(s => s.employee_id === assignment.employee_id && vnDay(s.work_date) === addDays(date, -1))
       const recovering = bounds.off && previous && previous.shift_type !== 'OFF' && previous.end_time < previous.start_time
       let scenario: Scenario = recovering ? 'OFF_REST' : chooseScenario(key, bounds.off)
       let logs = buildScenarioLogs(date, assignment, scenario, key)
-      // Do not truncate a case and silently turn it into an unrelated missing-scan case.
-      if (!bounds.off && (logs.some(l => +new Date(l.event_time) > +now) || +bounds.end - +bounds.start < 3 * 3600000 || +bounds.end - +bounds.start > 19 * 3600000)) {
+      // Keep generated cases compatible with unusually short or long shifts.
+      if (!bounds.off && (+bounds.end - +bounds.start < 3 * 3600000 || +bounds.end - +bounds.start > 19 * 3600000)) {
         scenario = 'ON_TIME'
         logs = buildScenarioLogs(date, assignment, scenario, key)
       }
-      if (logs.some(l => +new Date(l.event_time) > +now)) { result.unfinished++; continue }
       if (exists) result.replaced++
       plans.push({ assignment, date, scenario, logs })
     }
@@ -118,7 +121,7 @@ export async function seedAttendance(db: PrismaClient, range: SeedRange, mode: S
       await tx.daily_attendance_summary.deleteMany({ where: key })
       if (oldIds.length) await tx.attendance_logs.deleteMany({ where: { id: { in: oldIds } } })
       for (const [index, log] of plan.logs.entries()) {
-        writes.push({ ...key, event_time: new Date(log.event_time), type: log.type, status: log.status, method: 'FACE',
+        writes.push({ ...key, event_time: new Date(log.event_time), type: log.type, status: log.status, method: log.method, verification_score: log.verification_score,
           device_info: log.device_info, event_key: createHash('sha256').update(`demo:${employee_id}:${plan.date}:${plan.scenario}:${index}`).digest('hex'),
         })
       }
@@ -134,7 +137,9 @@ export async function seedAttendance(db: PrismaClient, range: SeedRange, mode: S
     for (const plan of plans) {
       const employee = state.employees.find(e => e.id === plan.assignment.employee_id)!
       const employeeShifts = state.shifts.filter(s => s.employee_id === employee.id)
-      const calculation = calculateDay(plan.date, allLogs.filter(l => l.employee_id === employee.id), plan.assignment, now, employeeShifts)
+      // Evaluate demo days after their shift and generated scans have finished.
+      const calculationTime = new Date(Math.max(+now, +shiftBounds(plan.date, plan.assignment).end + 86400000, ...plan.logs.map(l => +new Date(l.event_time) + 1)))
+      const calculation = calculateDay(plan.date, allLogs.filter(l => l.employee_id === employee.id), plan.assignment, calculationTime, employeeShifts)
       const pending = calculation.requiresReview || calculation.overtimeCandidateHours > 0 || calculation.lateEarlyHours > 0 || calculation.absenceCandidate
       const summary = { employee_id: employee.id, work_date: dateValue(plan.date), shift_id: plan.assignment.shift_id,
         first_check_in: calculation.first, last_check_out: calculation.last, total_working_hours: calculation.workingHours,
@@ -165,7 +170,7 @@ if (isMain(import.meta.url)) {
     const input = await readSeedInput(false)
     if (input) {
       const result = await seedAttendance(prisma, input.range, input.mode)
-      console.log(`Chấm công ${input.range.from} → ${input.range.to}: ${result.days} ngày công, ${result.logs} lượt quét; thay ${result.replaced}, bỏ qua ${result.skipped}, bảo vệ ${result.protected}, ca chưa kết thúc/không có giờ ${result.unfinished}.`)
+      console.log(`Chấm công ${input.range.from} → ${input.range.to}: ${result.days} ngày công, ${result.logs} lượt quét; thay ${result.replaced}, bỏ qua ${result.skipped}, bảo vệ ${result.protected}, ca không có giờ hợp lệ ${result.unfinished}.`)
       printCoverage(result.counts, [...WORK_CASES, 'OFF_REST', 'OFF_WORK', 'OVERNIGHT'], CASE_WEIGHTS)
     }
   } catch (error) { console.error(error); process.exitCode = 1 }

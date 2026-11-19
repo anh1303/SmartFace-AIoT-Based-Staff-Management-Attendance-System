@@ -1,12 +1,12 @@
 import { prisma } from '../../config/database.js'
-import { env } from '../../config/env.js'
+import { faceEnrollmentSummarySelect } from './employee.integration-port.js'
 
 export const employeeModel = prisma.employee
 
 // Include đúng theo Prisma schema:
 // - department (relation qua departmentId)
 // - employee_shifts (relation nhiều-nhiều với work_shifts)
-// - face_embeddings (biometric data)
+// - face_embeddings (biometric data read projection owned by biometrics)
 // KHÔNG có: shift, biometricData (tên này không tồn tại trong schema)
 export const employeeInclude = {
   department: true,
@@ -30,12 +30,7 @@ export const employeeInclude = {
     orderBy: { work_date: 'desc' as const },
     take: 1,
   },
-  face_embeddings: {
-    where: {
-      is_active: true,
-      embedding_type: 'CENTROID',
-      model_version: env.FACE_AUTH_MODEL_VERSION,
-    },
-    select: { id: true, model_version: true, sample_tag: true, quality_score: true, created_at: true },
+  get face_embeddings() {
+    return faceEnrollmentSummarySelect()
   },
 } as const

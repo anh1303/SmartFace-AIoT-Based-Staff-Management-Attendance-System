@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { useShifts } from '../features/schedules/hooks/useShifts';
+import { useShifts } from '../features/schedules';
 import { WorkShift } from '../types';
 import { useAuth } from './AuthContext';
 

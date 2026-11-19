@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { apiFetch } from '../../../api/client';
-import { useAuth } from '../../../context/AuthContext';
+import { apiFetch } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 
 export interface DeviceSettings {
   deviceId: string;
@@ -112,19 +112,31 @@ export function useDeviceSettings(deviceId = 'PI4_FRONT_GATE') {
   const [isUpdating, setIsUpdating] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const activeDeviceIdRef = useRef(deviceId);
+  const fetchSeqRef = useRef(0);
+  activeDeviceIdRef.current = deviceId;
 
-  // 1. Tải cài đặt từ Backend
+  // 1. Tải cài đặt từ Backend (chặn phản hồi thiết bị cũ ghi đè thiết bị mới)
   const fetchSettings = useCallback(async () => {
+    const requestedDeviceId = deviceId;
+    const seq = ++fetchSeqRef.current;
     try {
       setIsLoading(true);
-      const res = await apiFetch<DeviceSettings>(`/api/devices/${deviceId}/settings`);
-      if (res.success && res.data) {
+      const res = await apiFetch<DeviceSettings>(`/api/devices/${requestedDeviceId}/settings`);
+      if (
+        res.success &&
+        res.data &&
+        activeDeviceIdRef.current === requestedDeviceId &&
+        fetchSeqRef.current === seq
+      ) {
         setSettings(res.data);
       }
     } catch (err) {
       console.warn('[useDeviceSettings] Dùng fallback mặc định do lỗi fetch:', err);
     } finally {
-      setIsLoading(false);
+      if (activeDeviceIdRef.current === requestedDeviceId && fetchSeqRef.current === seq) {
+        setIsLoading(false);
+      }
     }
   }, [deviceId]);
 

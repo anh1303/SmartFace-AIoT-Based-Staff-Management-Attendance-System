@@ -11,13 +11,13 @@
     "test:neon": "node validation/tools/run-neon-tests.mjs",
     "payroll:repair": "tsx scripts/payroll-rate-repair.ts",
     "prisma:migrate": "prisma migrate deploy",
-    "prisma:seed": "tsx prisma/seed.ts",
-    "prisma:seed:shifts": "tsx prisma/seed-shifts.ts",
-    "prisma:seed:attendance": "tsx prisma/seed-attendance.ts",
+    "prisma:seed": "tsx prisma/seeds/index.ts",
+    "prisma:seed:shifts": "tsx prisma/seeds/shifts.ts",
+    "prisma:seed:attendance": "tsx prisma/seeds/attendance.ts",
     "prisma:studio": "prisma studio",
     "prisma:generate": "prisma generate",
-    "prisma:seed:scenarios": "tsx prisma/seed-scenarios.ts",
-    "prisma:seed:all": "tsx prisma/seed.ts && tsx prisma/seed-shifts.ts && tsx prisma/seed-attendance.ts"
+    "prisma:seed:scenarios": "tsx prisma/seeds/scenarios.ts",
+    "prisma:seed:all": "tsx prisma/seeds/index.ts && tsx prisma/seeds/shifts.ts && tsx prisma/seeds/attendance.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
@@ -54,6 +54,7 @@
     "vitest": "^2.1.2"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "schema": "prisma",
+    "seed": "tsx prisma/seeds/index.ts"
   }
 }

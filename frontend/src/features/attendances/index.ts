@@ -18,7 +18,6 @@ export * from './hooks/useAttendancePairs';
 export * from './hooks/useEmployeeAttendanceDetail';
 export * from './hooks/useRawLogsPagination';
 export * from './hooks/useEmployeeOverview';
-export * from './hooks/useDeviceSettings';
 
 // Api
 export * from './api/attendanceApi';

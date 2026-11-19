@@ -26,11 +26,13 @@ import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { DEFAULT_PAYROLL_POLICY, assertResolvedPayroll, currentPayrollPeriod, hasMultiplierSnapshot, nextPayrollPeriod, policyForPeriod } from '../../common/payroll-policy.js'
+import { DEFAULT_PAYROLL_POLICY, assertResolvedPayroll, currentPayrollPeriod, hasMultiplierSnapshot, nextPayrollPeriod, policyForPeriod } from './payroll.policy.js'
+import { calculateNetSalary } from './payroll-rates.js'
 import { updateBonusPenaltySchema } from './payroll.dto.js'
-import { buildIdOrCodeWhere, calculateNetSalary, vnDay, employeeLockKey, payrollPeriodLockKey } from '../../common/utils.js'
+import { buildIdOrCodeWhere, vnDay, employeeLockKey, payrollPeriodLockKey } from '../../common/utils.js'
 import {
   getEmployeeScope,
+  getManagedEmployeeIds,
   assertCanManageEmployee,
   monthlyHourlyRate,
   sourceHourlyRate,
@@ -188,14 +190,23 @@ export async function updateBonusPenalty(data: {
 export async function list(payroll_period?: string, employeeIdOrCode?: string, requester?: { id?: string; role?: string }) {
   const scope = requester ? await getEmployeeScope(requester, 'read') : {}
   if (requester && employeeIdOrCode) await assertCanAccessEmployeeDetail(requester, employeeIdOrCode)
-  const records = await prisma.payrollRecord.findMany({ where: {
+  const rawRecords = await prisma.payrollRecord.findMany({ where: {
     ...(payroll_period ? { payroll_period } : {}),
     employee: { AND: [scope, employeeIdOrCode ? buildIdOrCodeWhere(employeeIdOrCode) : {}] },
   }, include: { employee: { include: { department: true, position: true, users: { include: { roles: true } } } } }, orderBy: { payroll_period: 'desc' } })
+  const records = rawRecords.filter(row => {
+    if (row.status !== 'PENDING') return true
+    const createdAt = (row.employee as { createdAt?: Date | string | null } | null)?.createdAt
+    return !createdAt || vnDay(createdAt).slice(0, 7) <= row.payroll_period
+  })
   const pending = records.filter(row => row.status === 'PENDING')
-  if (!pending.length) return records.map(formatPayrollRecord)
+  const pendingEmployeeIds = [...new Set(pending.map(row => row.employeeId))]
+  const managedIds = requester
+    ? await getManagedEmployeeIds(requester, pendingEmployeeIds)
+    : new Set<string>()
+  if (!pending.length) return records.map(row => formatPayrollRecord({ ...row, can_edit: false }))
   const periods = pending.map(row => row.payroll_period).sort()
-  const ids = [...new Set(pending.map(row => row.employeeId))]
+  const ids = pendingEmployeeIds
   const dateRange = { gte: validatePeriod(periods[0]).start, lt: validatePeriod(periods.at(-1)!).end }
   const [allSummaries, adjustments, shifts] = await Promise.all([
     findDailyAttendanceSummaries({ employeeIds: ids, workDate: dateRange }),
@@ -204,7 +215,8 @@ export async function list(payroll_period?: string, employeeIdOrCode?: string, r
   ])
   const { summaries } = elapsedPayrollSources(allSummaries, shifts, dateRange.gte, dateRange.lt)
   return records.map(row => {
-    if (row.status !== 'PENDING') return formatPayrollRecord(row)
+    if (row.status !== 'PENDING') return formatPayrollRecord({ ...row, can_edit: false })
+    const can_edit = managedIds.has(row.employeeId)
     const source = summaries.filter(s => s.employee_id === row.employeeId && s.work_date.toISOString().slice(0, 7) === row.payroll_period)
     const approvedDates = new Set(source.filter(s => (s as any).review_status === 'APPROVED').map(s => vnDay(s.work_date)))
     const eligibleAdjustments = adjustments.filter(a => a.employee_id === row.employeeId && a.work_date.toISOString().slice(0, 7) === row.payroll_period && a.status === 'APPROVED' && approvedDates.has(vnDay(a.work_date)))
@@ -213,7 +225,7 @@ export async function list(payroll_period?: string, employeeIdOrCode?: string, r
     const requires_reconciliation = requiresHoursReconciliation(overrides.fields, overrides.legacy, workingHoursFingerprint(source))
     const needs_recalculation = details.source_fingerprint !== summaryFingerprint(source) || details.adjustment_fingerprint !== adjustmentFingerprint(eligibleAdjustments)
       || !overrides.fields.hourly_rate && Number(row.hourly_rate) !== monthlyHourlyRate(row.employee, row.payroll_period, row.hourly_rate)
-    return formatPayrollRecord({ ...row, calculation_details: { ...details, requires_reconciliation, needs_recalculation } })
+    return formatPayrollRecord({ ...row, can_edit, calculation_details: { ...details, requires_reconciliation, needs_recalculation } })
   })
 }
 
@@ -694,7 +706,7 @@ export async function finalizeEarlySettlement(
   })
 }
 
-export async function unlockPeriod(period: string, actorUserId?: string) {
+export async function unlockPeriod(period: string, actorUserId?: string, actorUser?: { id?: string; role?: string }) {
   validatePeriod(period)
   await prisma.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${period}`}))`
@@ -705,7 +717,7 @@ export async function unlockPeriod(period: string, actorUserId?: string) {
     await tx.payrollRecord.updateMany({ where: { id: { in: eligible.map(row => row.id) } }, data: { status: 'PENDING' } })
     await tx.auditLog.create({ data: { userId: actorUserId, action: 'UNLOCK_PAYROLL_PERIOD', target_table: 'payroll_records', record_id: period, new_values: { period } } })
   })
-  return list(period)
+  return list(period, undefined, actorUser ?? (actorUserId ? { id: actorUserId, role: 'ADMIN' } : undefined))
 }
 
 export async function generate(payroll_period: string, employeeId?: string, actorUserId?: string, actorUser?: { id?: string; role?: string }) {
@@ -807,6 +819,6 @@ export async function generate(payroll_period: string, employeeId?: string, acto
     const results = await writePayrollBatch(tx, writes)
     await tx.auditLog.create({ data: { userId: actorUserId, action: 'GENERATE_PAYROLL', target_table: 'payroll_records', record_id: payroll_period,
       new_values: { employee_count: results.length, employeeId: employeeId || 'ALL', calculation_range: calculationRange } } })
-    return results.map(record => formatPayrollRecord({ ...record, employee: employeesById.get(record.employeeId) }))
+    return results.map(record => formatPayrollRecord({ ...record, can_edit: true, employee: employeesById.get(record.employeeId) }))
   }, { timeout: 60000, maxWait: 20000 })
 }

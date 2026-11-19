@@ -213,4 +213,26 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
     expect(unchanged.policy_version).toBe('2026-10-25-v4');expect(unchanged.calculation_details.pairs[0]).not.toHaveProperty('credited_regular_seconds')
   })
 
+  it('applies historical policy multiplier inside a transaction and rolls back uncommitted policy writes', async () => {
+    const date = '2024-11-04'
+    const emp = await fixture(date)
+    await expect(
+      db.$transaction(async (tx: any) => {
+        await tx.bonusPenalty.upsert({
+          where: { effective_period: '2024-11' },
+          create: { effective_period: '2024-11', overtime_rate: 2.5, late_early_penalty: 1.5, absence_penalty_rate: 3.0, description: 'Historical tx test' },
+          update: { absence_penalty_rate: 3.0 },
+        })
+        const { getAdjustmentPolicy } = await import('../../src/modules/payroll/public.js')
+        const txPolicy = await getAdjustmentPolicy('2024-11', tx)
+        expect(txPolicy?.absence_penalty_rate).toBe(3.0)
+        throw new Error('rollback-historical-policy-tx')
+      })
+    ).rejects.toThrow('rollback-historical-policy-tx')
+
+    const rolledBack = await db.bonusPenalty.findUnique({ where: { effective_period: '2024-11' } })
+    expect(rolledBack).toBeNull()
+    expect(emp.id).toBeDefined()
+  })
+
 })

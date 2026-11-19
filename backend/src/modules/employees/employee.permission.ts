@@ -57,6 +57,23 @@ export async function getEmployeeScope(
   return { id: { in: ids } };
 }
 
+export async function getManagedEmployeeIds(
+  actor: EmployeeActor | undefined,
+  employeeIds: readonly string[],
+  tx?: Prisma.TransactionClient
+): Promise<Set<string>> {
+  const uniqueIds = [...new Set(employeeIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return new Set<string>();
+  const scope = await getEmployeeScope(actor, 'manage', tx);
+  const rows = await (tx ?? prisma).employee.findMany({
+    where: {
+      AND: [scope, { id: { in: uniqueIds } }],
+    },
+    select: { id: true },
+  });
+  return new Set<string>(rows.map(row => row.id));
+}
+
 export async function assertCanAccessEmployeeDetail(
   actor: EmployeeActor | undefined,
   targetIdOrCode: string,

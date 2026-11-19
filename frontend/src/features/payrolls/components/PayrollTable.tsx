@@ -4,9 +4,7 @@ import { Lock, Pencil } from 'lucide-react';
 import { SearchInput, FilterSelect, FilterSelectOption, FilterBar, TableContainer, TableHead, TableHeadRow, TableHeadCell, TableBody, TableRow, TableCell, TableEmpty } from '../../../components/common';
 import { Avatar } from '../../../components/common/Avatar';
 import { PayrollRecord, Employee } from '../../../types';
-import { useAuth } from '../../../context/AuthContext';
 import { getTodayVNString } from '../../../utils/dateUtils';
-import { isAnotherManager, isDifferentDepartment } from '../../../utils/permissionUtils';
 
 interface PayrollTableProps {
   selectedPeriod: string;
@@ -30,7 +28,6 @@ interface PayrollTableProps {
 const money = (n: number) => `${Number(n).toLocaleString('vi-VN')} ₫`;
 
 export const PayrollTable: React.FC<PayrollTableProps> = ({ currentRecords, employees, searchTerm, onSearchChange, departmentFilter, onDepartmentFilterChange, departmentOptions = [], allDepartmentLabel = 'Tất cả phòng ban', positionFilter = 'ALL', onPositionFilterChange = () => {}, positionOptions = [], isFinalized, onOpenEdit, onOpenEarlySettlement }) => {
-  const { role, currentUser } = useAuth();
   const currentMonth = getTodayVNString().slice(0, 7);
   const employeeNames = new Map(employees.map(employee => [employee.employee_id, employee.full_name]));
   const recordName = (record: PayrollRecord) => employeeNames.get(record.employee_id) || record.employee_name || record.employee_id;
@@ -44,10 +41,15 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({ currentRecords, empl
       <TableBody>{!currentRecords.length && <TableEmpty colSpan={9} message="Không tìm thấy phiếu lương phù hợp với bộ lọc."/>}{sortedRows.map(record => {
         const emp = employees.find(e => e.employee_id === record.employee_id);
         const name = emp?.full_name || record.employee_name || record.employee_id;
-        const self = !!(emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email));
-        const other = isAnotherManager(emp, currentUser), different = isDifferentDepartment(emp, currentUser);
-        const blocked = isFinalized || record.status !== 'PENDING' || (role !== 'admin' && (self || other || different));
-        const reason = isFinalized ? 'Kỳ lương đã khóa' : record.status !== 'PENDING' ? 'Chỉ sửa được phiếu chờ duyệt' : self ? 'Không được tự sửa phiếu lương' : other ? 'Không được sửa phiếu của quản lý khác' : different ? 'Ngoài phòng ban được phụ trách' : '';
+        const canEditRecord = Boolean(record.can_edit) && record.status === 'PENDING' && !isFinalized;
+        const blocked = !canEditRecord;
+        const reason = isFinalized
+          ? 'Kỳ lương đã khóa'
+          : record.status !== 'PENDING'
+            ? 'Chỉ sửa được phiếu chờ duyệt'
+            : !record.can_edit
+              ? 'Không có quyền chỉnh sửa phiếu lương này'
+              : '';
         const hours = record.total_working_hours ?? record.working_hours;
         const range = record.calculation_range;
         return <TableRow key={record.payroll_id}>

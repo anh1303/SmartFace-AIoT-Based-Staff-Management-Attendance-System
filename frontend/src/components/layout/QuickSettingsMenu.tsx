@@ -24,7 +24,7 @@ import {
   Filter,
   Users
 } from 'lucide-react';
-import { useDeviceSettings, BluetoothDevice } from '../../features/attendances/hooks/useDeviceSettings';
+import { useDeviceSettings, BluetoothDevice } from '../../features/devices';
 
 // Icon sóng Wi-Fi động theo cường độ tín hiệu (%)
 const renderWifiSignalIcon = (signal: number, className = 'w-4 h-4 shrink-0') => {

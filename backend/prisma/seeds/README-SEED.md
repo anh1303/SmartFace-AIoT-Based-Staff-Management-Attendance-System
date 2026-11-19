@@ -4,8 +4,8 @@ Có hai seed chạy riêng:
 
 | Seed | Lệnh npm | Dữ liệu tạo |
 | --- | --- | --- |
-| `seed-shifts.ts` | `prisma:seed:shifts` | Danh mục ca còn thiếu và lịch phân ca theo tháng |
-| `seed-attendance.ts` | `prisma:seed:attendance` | Lượt check-in/out, bản tổng hợp công và khoản cần duyệt |
+| `seeds/shifts.ts` | `prisma:seed:shifts` | Danh mục ca còn thiếu và lịch phân ca theo tháng |
+| `seeds/attendance.ts` | `prisma:seed:attendance` | Lượt check-in/out, bản tổng hợp công và khoản cần duyệt |
 
 **Thứ tự: tạo phân ca → tạo check-in/out → kiểm tra công đã được tự chốt/duyệt → tính lại lương.** Cả hai seed lấy nhân viên `ACTIVE` từ database, không tạo hồ sơ nhân viên mới và không tạo dữ liệu trước ngày tuyển.
 
@@ -147,7 +147,7 @@ npm.cmd run prisma:seed:shifts -- 2026-11 --mode skip
 npm.cmd run prisma:seed:attendance -- 2026-10-25 2026-11-02 --mode overwrite
 ```
 
-Hai lệnh phân ca trên bổ sung lịch cho **cả tháng** tương ứng; lệnh chấm công chỉ tác động khoảng ngày đã nhập. Khoảng chấm công tối đa 366 ngày, ngày bắt đầu phải không lớn hơn ngày kết thúc.
+Hai lệnh phân ca trên bổ sung lịch cho **cả tháng** tương ứng; lệnh chấm công chỉ tác động khoảng ngày đã nhập. The date range must be ascending; there is no 366-day cap.
 
 ### Nhập thời gian và chế độ theo câu hỏi trên terminal
 
@@ -198,7 +198,7 @@ Các kịch bản được hỗ trợ:
 
 Bản tổng hợp dùng chính sách tính công hiện tại; không tự duyệt công/OT và không tạo phiếu lương. Ngày `OFF` được xét riêng: khoảng 98% nghỉ không quét và 2% có lượt quét; ngày nghỉ ngay sau ca đêm luôn nghỉ không quét. Quét trên ca `OFF` có trong lượt gốc nhưng không tự được tính thành giờ làm hoặc OT theo chính sách hiện tại.
 
-Giờ quét có dao động đến giây: người đúng giờ vào sớm tối đa 10 phút, ra muộn tối đa 10 phút; đi trễ phần lớn 16–25 phút (vượt ngưỡng 15 phút của chính sách), về sớm phần lớn 5–15 phút. OT thông thường chủ yếu 31–90 phút, tối đa 120 phút; trường hợp hiếm vượt ngưỡng là 241–300 phút. Khi giờ dự kiến còn ở tương lai, seed chuyển sang đúng giờ nếu phù hợp hoặc bỏ qua, không cắt cụt lượt quét. Kết quả được tái lập theo nhân viên + ngày; chạy lại cùng dữ liệu không tự xáo trộn tình huống.
+Giờ quét có dao động đến giây: người đúng giờ vào sớm tối đa 10 phút, ra muộn tối đa 10 phút; đi trễ phần lớn 16–25 phút (vượt ngưỡng 15 phút của chính sách), về sớm phần lớn 5–15 phút. OT thông thường chủ yếu 31–90 phút, tối đa 120 phút; trường hợp hiếm vượt ngưỡng là 241–300 phút. Kết quả được tái lập theo nhân viên + ngày; chạy lại cùng dữ liệu không tự xáo trộn tình huống.
 
 **Đây là xác suất mục tiêu, không phải thống kê của công ty hoặc hạn ngạch bắt buộc.** Tỉ lệ thực tế dao động theo quy mô dữ liệu, lịch ca và trạng thái bảo vệ. Một ngày hoặc ít nhân viên có thể chỉ có tình huống bình thường; trường hợp hiếm không bị ép xuất hiện để làm sai phân bố. Cuối lần chạy có bảng số lượng, tỉ lệ mục tiêu/thực tế trên ngày làm vừa tạo và danh sách còn thiếu. Chọn khoảng đã kết thúc dài hơn để có nhiều ngày đủ điều kiện hơn.
 
@@ -213,7 +213,7 @@ Cả hai chế độ đều giữ ngày đang khóa, ngày đã duyệt/điều 
 
 Ngày công của ca đêm là **ngày bắt đầu ca**. Ví dụ ca 31/10 lúc 22:00 đến 01/11 lúc 06:00 thuộc ngày công 31/10; ghi đè chấm công ngày 01/11 sẽ giữ lượt check-out của ca 31/10.
 
-Seed không tạo lượt quét tương lai và bỏ qua ca chưa kết thúc. Ví dụ chạy cho tháng đang diễn ra thì chỉ tạo dữ liệu đủ điều kiện đến thời điểm chạy. Chạy lại sau khi ca kết thúc để bổ sung phần trước đó được bỏ qua.
+Seed supports past and future dates, including unfinished shifts, but never dates before employee profile creation. Working shifts with zero duration are skipped. Demo summaries are evaluated after the generated shift/events end; real attendance rules are unchanged.
 
 Các phiếu lương `PENDING` bị ảnh hưởng được đánh dấu cần tính lại. Mỗi lần chạy dùng một transaction: lỗi sẽ rollback cả lần chạy. Nên chạy seed trên DB phát triển/demo, khi không có tác vụ thu nhận chấm công thật chạy đồng thời.
 
@@ -249,3 +249,5 @@ Xem cú pháp lệnh, không chạy seed hay truy cập database:
 npm.cmd run prisma:seed:shifts -- --help
 npm.cmd run prisma:seed:attendance -- --help
 ```
+
+Attendance methods are sampled per scan: FINGERPRINT 20%, FACE 80% (approximate proportions). FACE verification_score is random from 0.80 to 0.99; FINGERPRINT verification_score is null. Reruns use stable randomness per employee/day/scenario.

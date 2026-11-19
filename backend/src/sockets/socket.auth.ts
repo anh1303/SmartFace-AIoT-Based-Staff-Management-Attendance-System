@@ -2,8 +2,7 @@ import jwt from 'jsonwebtoken'
 import type { Socket } from 'socket.io'
 import { env } from '../config/env.js'
 import type { AuthUser } from '../middlewares/auth.middleware.js'
-import { readAuthUser } from '../modules/auth/auth.read.js'
-import { assertFaceSession } from '../modules/auth/public.js'
+import { assertFaceSession, readAuthUser } from '../modules/auth/public.js'
 
 export async function refreshSocketScope(socket: Socket): Promise<void> {
   socket.data._refreshSeq = (socket.data._refreshSeq || 0) + 1

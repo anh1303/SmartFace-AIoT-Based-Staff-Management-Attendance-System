@@ -44,7 +44,14 @@ beforeEach(() => {
     last_check_out: new Date('2026-10-02T17:00:00+07:00'),
     calculation_details: { scheduledEnd: '2026-10-02T17:00:00+07:00', scheduledShiftSeconds: 32400, pairs: [{}], fingerprint: 'test', policy: 'test' },
   }))
-  configureAttendancePayroll({ findPeriodPayrolls: async () => [], payrollOverrides: () => ({ fields: {} }) } as any)
+  configureAttendancePayroll({
+    findPeriodPayrolls: async () => [],
+    payrollOverrides: () => ({ fields: {} }),
+    getAdjustmentPolicy: vi.fn(async (_period: string, tx: any) => {
+      expect(tx).toBeDefined()
+      return { id: 0, overtime_rate: 2, late_early_penalty: 1.5, absence_penalty_rate: 2, effective_period: null }
+    }),
+  } as any)
 })
 
 it('commits small bounded batches instead of exhausting one transaction for the entire month', async () => {
@@ -82,7 +89,14 @@ it('preserves a manager reopen for 24 hours even when the work month is historic
 it('preserves historical attendance belonging to a closed payroll', async () => {
   state.rows = [state.rows[0]]
   state.rows[0].work_date = new Date('2026-08-02T00:00:00Z')
-  configureAttendancePayroll({ findPeriodPayrolls: async () => [{ employeeId: state.rows[0].employee_id, status: 'FINALIZED' }], payrollOverrides: () => ({ fields: {} }) } as any)
+  configureAttendancePayroll({
+    findPeriodPayrolls: async () => [{ employeeId: state.rows[0].employee_id, status: 'FINALIZED' }],
+    payrollOverrides: () => ({ fields: {} }),
+    getAdjustmentPolicy: vi.fn(async (_period: string, tx: any) => {
+      expect(tx).toBeDefined()
+      return { id: 0, overtime_rate: 2, late_early_penalty: 1.5, absence_penalty_rate: 2, effective_period: null }
+    }),
+  } as any)
   expect((await autoCloseDueAttendance(new Date('2026-11-10T09:00:00+07:00'))).closedCount).toBe(0)
   expect(state.rows[0].review_status).toBe('NONE')
 })

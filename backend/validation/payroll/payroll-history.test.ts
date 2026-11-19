@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { historicalBreakdown, historicalAdjustmentAmount, reconciliationSchema } from '../../src/common/payroll-history.js'
+import { historicalBreakdown, historicalAdjustmentAmount, reconciliationSchema } from '../../src/modules/payroll/payroll-history.js'
 
 const snapshot = { source_reference: 'backup-before-migration#PR-1', overtime: { value: 100000, unit: 'FIXED_PER_HOUR' }, late: { value: 50000, unit: 'FIXED_PER_HOUR' } }
 describe('Verified historical payroll', () => {

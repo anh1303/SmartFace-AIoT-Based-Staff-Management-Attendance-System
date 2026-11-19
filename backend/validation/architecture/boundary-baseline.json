@@ -1,0 +1,261 @@
+{
+  "phase": 1,
+  "initialCounts": {
+    "pendingMoveCommonFiles": 3,
+    "pendingMoveCommonUtilsExports": 6,
+    "runtimeModuleCycles": 0,
+    "transitionalExceptions": 7,
+    "allowedCompositionPortExceptions": 4
+  },
+  "commonFiles": [
+    {
+      "path": "common/AppError.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Lớp chuẩn hóa lỗi HTTP/application dùng chung toàn backend",
+      "representativeCallers": ["middlewares/errorHandler.ts", "modules/attendance/attendance.service.ts", "modules/payroll/payroll.service.ts"]
+    },
+    {
+      "path": "common/attendance-timing.ts",
+      "owner": "attendance",
+      "status": "pending-move",
+      "reason": "Logic tính mốc giờ ca, grace period và trạng thái đi trễ/về sớm thuộc domain attendance (chờ di chuyển ở Pha 2)",
+      "representativeCallers": ["modules/attendance/attendance.format.ts", "modules/attendance/attendance.policy.ts", "modules/reports/reports.service.ts"]
+    },
+    {
+      "path": "common/biometric-crypto.ts",
+      "owner": "biometrics",
+      "status": "pending-move",
+      "reason": "Mã hóa/giải mã vector sinh trắc học thuộc domain biometrics (chờ di chuyển ở Pha 2)",
+      "representativeCallers": ["modules/biometrics/biometric.jobs.ts", "modules/biometrics/biometric.service.ts"]
+    },
+    {
+      "path": "common/constants.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Hằng số hệ thống và ngưỡng cấu hình dùng chung nhiều module",
+      "representativeCallers": ["modules/attendance/attendance.service.ts", "modules/biometrics/biometric.service.ts"]
+    },
+    {
+      "path": "common/date.schema.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Schema Zod kiểm tra định dạng ngày/tháng dùng chung cho DTO các module",
+      "representativeCallers": ["modules/attendance/attendance.dto.ts", "modules/payroll/payroll.dto.ts", "modules/shifts/shift.dto.ts"]
+    },
+    {
+      "path": "common/device-auth.ts",
+      "owner": "devices",
+      "status": "pending-move",
+      "reason": "Xác thực chữ ký/secret thiết bị IoT thuộc domain devices (chờ di chuyển ở Pha 2)",
+      "representativeCallers": ["modules/attendance/attendance.webhook.ts", "modules/biometrics/fingerprint.routes.ts", "modules/devices/device.service.ts"]
+    },
+    {
+      "path": "common/email.service.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Adapter hạ tầng gửi email SMTP dùng chung",
+      "representativeCallers": ["modules/employees/employee.jobs.ts", "modules/auth/auth.service.ts"]
+    },
+    {
+      "path": "common/event-bus.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "In-process event bus hạ tầng dùng chung",
+      "representativeCallers": ["common/index.ts"]
+    },
+    {
+      "path": "common/index.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Barrel công khai cho các tiện ích hạ tầng trong src/common",
+      "representativeCallers": ["modules/employees/employee.service.ts", "modules/shifts/shift.service.ts"]
+    },
+    {
+      "path": "common/logger.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Logger hạ tầng dùng chung toàn backend",
+      "representativeCallers": ["server.ts", "config/mqtt.ts", "modules/attendance/attendance.service.ts"]
+    },
+    {
+      "path": "common/response.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Helper chuẩn hóa HTTP response envelope dùng chung cho các controller",
+      "representativeCallers": ["modules/attendance/attendance.controller.ts", "modules/payroll/payroll.controller.ts"]
+    },
+    {
+      "path": "common/utils.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích thời gian/UUID dùng chung và một số helper domain đã kiểm kê chi tiết trong commonUtilsExports",
+      "representativeCallers": ["modules/attendance/attendance.service.ts", "modules/payroll/payroll.service.ts", "modules/employees/employee.service.ts"]
+    }
+  ],
+  "commonUtilsExports": [
+    {
+      "exportName": "formatVNDateISO",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Định dạng ngày YYYY-MM-DD theo múi giờ Việt Nam dùng chung toàn backend"
+    },
+    {
+      "exportName": "vnDay",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Chuẩn hóa ngày YYYY-MM-DD theo múi giờ Việt Nam dùng chung toàn backend"
+    },
+    {
+      "exportName": "formatVNTime",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Định dạng giờ HH:mm:ss theo múi giờ Việt Nam dùng chung toàn backend"
+    },
+    {
+      "exportName": "formatShiftTime",
+      "owner": "shifts",
+      "status": "pending-move",
+      "reason": "Định dạng giờ ca làm việc từ cột TIME thuộc domain shifts (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "exportName": "getTodayVNString",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Lấy chuỗi ngày hiện tại theo múi giờ Việt Nam dùng chung toàn backend"
+    },
+    {
+      "exportName": "UUID_REGEX",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Biểu thức chính quy kiểm tra UUID dùng chung toàn backend"
+    },
+    {
+      "exportName": "isValidUuid",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Hàm kiểm tra định dạng UUID dùng chung toàn backend"
+    },
+    {
+      "exportName": "buildIdOrCodeWhere",
+      "owner": "employees",
+      "status": "pending-move",
+      "reason": "Tạo mệnh đề Prisma where cho bảng Employee theo id hoặc employee_code thuộc domain employees (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "exportName": "buildEmployeeWhere",
+      "owner": "employees",
+      "status": "pending-move",
+      "reason": "Alias truy vấn Employee theo id hoặc employee_code thuộc domain employees (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "exportName": "generateRandomPassword",
+      "owner": "auth",
+      "status": "pending-move",
+      "reason": "Sinh mật khẩu khởi tạo tài khoản thuộc domain auth (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "exportName": "employeeLockKey",
+      "owner": "employees",
+      "status": "pending-move",
+      "reason": "Sinh khóa advisory lock theo nhân viên thuộc domain employees (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "exportName": "payrollPeriodLockKey",
+      "owner": "payroll",
+      "status": "pending-move",
+      "reason": "Sinh khóa advisory lock theo kỳ lương thuộc domain payroll (chờ di chuyển ở Pha 2)"
+    }
+  ],
+  "runtimeModuleCycles": [],
+  "exceptions": [
+    {
+      "source": "routes.ts",
+      "target": "modules/operations/operation.routes.ts",
+      "kind": "bootstrap-deep-import",
+      "owner": "operations",
+      "status": "pending-move",
+      "reason": "routes.ts nạp trực tiếp operation.routes.ts thay vì qua entry công khai modules/operations/index.ts (chuẩn hóa ở Pha 2)"
+    },
+    {
+      "source": "server.ts",
+      "target": "modules/biometrics/fingerprint.gateway.ts",
+      "kind": "bootstrap-deep-import",
+      "owner": "biometrics",
+      "status": "pending-move",
+      "reason": "server.ts khởi tạo fingerprint gateway trực tiếp thay vì qua entry công khai của module biometrics (chuẩn hóa ở Pha 2)"
+    },
+    {
+      "source": "server.ts",
+      "target": "modules/operations/operation.gateway.ts",
+      "kind": "bootstrap-deep-import",
+      "owner": "operations",
+      "status": "pending-move",
+      "reason": "server.ts khởi tạo operation gateway trực tiếp thay vì qua entry công khai của module operations (chuẩn hóa ở Pha 2)"
+    },
+    {
+      "source": "server.ts",
+      "target": "modules/operations/operation.worker.ts",
+      "kind": "bootstrap-deep-import",
+      "owner": "operations",
+      "status": "pending-move",
+      "reason": "server.ts đăng ký worker handler trực tiếp vào operation.worker.ts thay vì qua entry công khai của module operations (chuẩn hóa ở Pha 2)"
+    },
+    {
+      "source": "server.ts",
+      "target": "modules/shifts/shift-batch.service.ts",
+      "kind": "bootstrap-deep-import",
+      "owner": "shifts",
+      "status": "pending-move",
+      "reason": "server.ts lấy job handler executeShiftBatch trực tiếp từ shift-batch.service.ts thay vì qua entry công khai của module shifts (chuẩn hóa ở Pha 2)"
+    },
+    {
+      "source": "server.ts",
+      "target": "modules/biometrics/biometric.jobs.ts",
+      "kind": "bootstrap-deep-import",
+      "owner": "biometrics",
+      "status": "pending-move",
+      "reason": "server.ts lấy job handler executeEnrollment trực tiếp từ biometric.jobs.ts thay vì qua entry công khai của module biometrics (chuẩn hóa ở Pha 2)"
+    },
+    {
+      "source": "server.ts",
+      "target": "modules/employees/employee.jobs.ts",
+      "kind": "bootstrap-deep-import",
+      "owner": "employees",
+      "status": "pending-move",
+      "reason": "server.ts lấy job handler executeAccountEmail trực tiếp từ employee.jobs.ts thay vì qua entry công khai của module employees (chuẩn hóa ở Pha 2)"
+    },
+    {
+      "source": "composition.ts",
+      "target": "modules/shifts/shift.attendance-port.ts",
+      "kind": "composition-port-wiring",
+      "owner": "shifts",
+      "status": "allowed",
+      "reason": "Điểm lắp ráp composition.ts nối port attendance cho module shifts"
+    },
+    {
+      "source": "composition.ts",
+      "target": "modules/employees/employee.integration-port.ts",
+      "kind": "composition-port-wiring",
+      "owner": "employees",
+      "status": "allowed",
+      "reason": "Điểm lắp ráp composition.ts nối port tích hợp liên module cho module employees"
+    },
+    {
+      "source": "composition.ts",
+      "target": "modules/auth/auth.biometrics-port.ts",
+      "kind": "composition-port-wiring",
+      "owner": "auth",
+      "status": "allowed",
+      "reason": "Điểm lắp ráp composition.ts nối port biometrics cho module auth"
+    },
+    {
+      "source": "composition.ts",
+      "target": "modules/attendance/attendance.payroll-port.ts",
+      "kind": "composition-port-wiring",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Điểm lắp ráp composition.ts nối port payroll cho module attendance"
+    }
+  ]
+}

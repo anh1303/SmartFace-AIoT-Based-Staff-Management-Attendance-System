@@ -130,3 +130,30 @@ it('gives a repeated unhandled action failure a new five-second card', async () 
     expect(toast.toasts).toHaveLength(0);
   } finally { act(() => root.unmount()); host.remove(); vi.useRealTimers(); }
 });
+
+it('dismisses toast safely when NotificationProvider is absent and invokes optional onOpenNotifications callback', async () => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  let toast!: ReturnType<typeof useToast>;
+  const onOpenNotifications = vi.fn();
+  function Probe({ withCallback }: { withCallback?: boolean }) {
+    toast = useToast();
+    return <ToastContainer onOpenNotifications={withCallback ? onOpenNotifications : undefined} />;
+  }
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(<ToastProvider><Probe /></ToastProvider>));
+    await act(async () => toast.showToast('Không có NotificationProvider', 'info'));
+    expect(toast.toasts).toHaveLength(1);
+    const card = document.querySelector<HTMLElement>('[data-toast-layer] article')!;
+    await act(async () => card.click());
+    expect(toast.toasts).toHaveLength(0);
+    expect(onOpenNotifications).not.toHaveBeenCalled();
+
+    await act(async () => root.render(<ToastProvider><Probe withCallback /></ToastProvider>));
+    await act(async () => toast.showToast('Có callback prop', 'info'));
+    const card2 = document.querySelector<HTMLElement>('[data-toast-layer] article')!;
+    await act(async () => card2.click());
+    expect(toast.toasts).toHaveLength(0);
+    expect(onOpenNotifications).toHaveBeenCalledTimes(1);
+  } finally { act(() => root.unmount()); host.remove(); }
+});

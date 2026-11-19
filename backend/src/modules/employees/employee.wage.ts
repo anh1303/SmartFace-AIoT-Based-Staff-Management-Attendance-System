@@ -44,3 +44,8 @@ export function recordHourlyRateChange(employee: WageProfile, rate: number, peri
   if (!history.length) history.push({ period: BASELINE_PERIOD, rate: Number(employee.hourly_rate ?? 0) })
   return [...history.filter(row => row.period !== period), { period, rate }].sort((a, b) => a.period.localeCompare(b.period))
 }
+
+export function nextPayrollPeriod(period = vnDate.format(new Date()).slice(0, 7)): string {
+  const [year, month] = period.split('-').map(Number)
+  return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7)
+}

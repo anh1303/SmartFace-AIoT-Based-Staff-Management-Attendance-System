@@ -1,5 +1,5 @@
-import { prisma } from '../config/database.js'
-import { AppError } from './AppError.js'
+import { prisma } from '../../config/database.js'
+import { AppError } from '../../common/AppError.js'
 import type { Prisma } from '@prisma/client'
 
 export const DEFAULT_PAYROLL_POLICY = Object.freeze({ overtime_rate: 2, late_early_penalty: 1.5, absence_penalty_rate: 2 })

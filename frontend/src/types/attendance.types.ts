@@ -12,6 +12,7 @@ export interface AttendanceRecord {
   avatar_url?: string | null;
   type: AttendanceType;
   timestamp: string;       // ISO datetime
+  work_date?: string | null; // YYYY-MM-DD | null
   method: AttendanceMethod;
   device_id: string;
   verification_score: number | null; // 0-1

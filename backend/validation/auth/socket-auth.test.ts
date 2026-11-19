@@ -1,8 +1,14 @@
 // Keep these behavioral tests independent of the auth SQL adapter (covered by auth-projection.test).
-vi.mock('../../src/modules/auth/auth.read.js', () => ({ readAuthUser: async (id: string) => {
-  const user = records.users.get(id)
-  return user ? { ...user, employees: records.employees.get(id) || null } : null
-} }))
+vi.mock('../../src/modules/auth/public.js', async () => {
+  const actual = await vi.importActual<typeof import('../../src/modules/auth/public.js')>('../../src/modules/auth/public.js')
+  return {
+    ...actual,
+    readAuthUser: async (id: string) => {
+      const user = records.users.get(id)
+      return user ? { ...user, employees: records.employees.get(id) || null } : null
+    },
+  }
+})
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'

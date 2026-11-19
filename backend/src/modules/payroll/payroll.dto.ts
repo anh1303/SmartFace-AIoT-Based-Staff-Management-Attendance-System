@@ -51,3 +51,15 @@ export const earlySettlementSchema = z.object({
 })
 
 export type EarlySettlementDto = z.infer<typeof earlySettlementSchema>
+
+export const payrollPeriodParamSchema = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Kỳ lương phải có dạng YYYY-MM')
+
+export const exportPayrollSchema = z
+  .object({
+    recordIds: z.array(z.string().trim().min(1)).min(1, 'Danh sách ID phiếu lương không được rỗng'),
+  })
+  .strict()
+
+export type ExportPayrollDto = z.infer<typeof exportPayrollSchema>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { usePayroll, type PayrollItemUpdates } from '../features/payrolls/hooks/usePayroll';
+import { usePayroll, type PayrollItemUpdates } from '../features/payrolls';
 import { PayrollRecord, BonusPenaltyPolicy } from '../types';
 import { useAuth } from './AuthContext';
 

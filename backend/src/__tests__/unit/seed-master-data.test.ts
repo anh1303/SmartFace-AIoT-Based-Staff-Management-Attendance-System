@@ -23,7 +23,7 @@ function fixture(existingModel?: string) {
     }
   }
   db.$transaction = vi.fn(async (callback: any) => callback(db))
-  const source = readFileSync(new URL('../../../prisma/seed.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../../../prisma/seeds/index.ts', import.meta.url), 'utf8')
     .replace(/^import .*$/gm, '').split('\nmain()')[0] + '\nreturn main()'
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
   const run = () => new Function('PrismaClient', 'bcrypt', code)(function () { return db }, { hash: async () => 'hashed' })

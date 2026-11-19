@@ -16,16 +16,20 @@ const mockMeApi = vi.fn().mockResolvedValue(null);
 const mockFaceComplete = vi.fn();
 const mockFaceStatus = vi.fn();
 
-vi.mock('@/features/auth', () => ({
-  loginApi: (...args: any[]) => mockLoginApi(...args),
-  logoutApi: (...args: any[]) => mockLogoutApi(...args),
-  meApi: () => mockMeApi(),
-  faceLoginApi: {
-    complete: (...args: any[]) => mockFaceComplete(...args),
-    status: (...args: any[]) => mockFaceStatus(...args),
-  },
-  DEFAULT_USERS: {},
-}));
+vi.mock('@/features/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/features/auth')>();
+  return {
+    ...actual,
+    loginApi: (...args: any[]) => mockLoginApi(...args),
+    logoutApi: (...args: any[]) => mockLogoutApi(...args),
+    meApi: () => mockMeApi(),
+    faceLoginApi: {
+      complete: (...args: any[]) => mockFaceComplete(...args),
+      status: (...args: any[]) => mockFaceStatus(...args),
+    },
+    DEFAULT_USERS: {},
+  };
+});
 
 vi.mock('../../src/context/ToastContext', () => ({
   useToast: () => ({ showToast: vi.fn() }),

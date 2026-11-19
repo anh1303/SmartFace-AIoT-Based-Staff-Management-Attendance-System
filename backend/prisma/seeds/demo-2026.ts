@@ -2,13 +2,13 @@
 import 'dotenv/config'
 import { writeFileSync } from 'node:fs'
 import { Prisma } from '@prisma/client'
-import { prisma } from '../src/config/database.js'
-import { calculateDay, prepareAttendance, shiftBounds, vnDay, roundHours } from '../src/modules/attendance/attendance.policy.js'
-import { createAttendanceSnapshot } from '../src/modules/attendance/attendance.snapshot.js'
-import { syncDayAdjustments, flushAdjustmentBatch } from '../src/modules/attendance/attendance.adjustments.js'
-import { generate, finalizePeriod } from '../src/modules/payroll/payroll.service.js'
-import { policyForPeriod } from '../src/common/payroll-policy.js'
-import { sourceHourlyRate } from '../src/modules/employees/employee.wage.js'
+import { prisma } from '../../src/config/database.js'
+import { calculateDay, prepareAttendance, shiftBounds, vnDay, roundHours } from '../../src/modules/attendance/attendance.policy.js'
+import { createAttendanceSnapshot } from '../../src/modules/attendance/attendance.snapshot.js'
+import { syncDayAdjustments, flushAdjustmentBatch } from '../../src/modules/attendance/attendance.adjustments.js'
+import { generate, finalizePeriod } from '../../src/modules/payroll/payroll.service.js'
+import { policyForPeriod } from '../../src/modules/payroll/payroll.policy.js'
+import { sourceHourlyRate } from '../../src/modules/employees/employee.wage.js'
 
 const START = new Date('2026-09-01T00:00:00Z'), END = new Date('2026-12-01T00:00:00Z')
 const range = { gte: START, lt: END }
@@ -201,7 +201,7 @@ async function main() {
   }
   const after = await protectedFingerprint()
   if (JSON.stringify(before) !== JSON.stringify(after)) throw new Error('Protected records changed; inspect before completing')
-  writeFileSync(new URL('../../docs/demo/seed-demo-2026-11-02-result.json', import.meta.url),JSON.stringify({ seededAt: now.toISOString(), protectedRecordsUnchanged: true, protectedFingerprints: after, cases },null,2))
+  writeFileSync(new URL('../../../docs/demo/seed-demo-2026-11-02-result.json', import.meta.url),JSON.stringify({ seededAt: now.toISOString(), protectedRecordsUnchanged: true, protectedFingerprints: after, cases },null,2))
   console.log('DONE: protected masters, biometrics and out-of-window attendance unchanged')
 }
 main().catch(e => { console.error('Seed failed:', e.code || e.name, e.message?.replace(/postgres(?:ql)?:\/\/\S+/g,'[REDACTED]')); process.exitCode=1 }).finally(() => prisma.$disconnect())

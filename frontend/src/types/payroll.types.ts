@@ -42,6 +42,7 @@ export interface PayrollRecord {
   allowance: number;
   net_salary: number;
   status: PayrollStatus;
+  can_edit?: boolean;
   reason?: string;
   overtime_rate?: number | null;
   late_penalty_rate?: number | null;

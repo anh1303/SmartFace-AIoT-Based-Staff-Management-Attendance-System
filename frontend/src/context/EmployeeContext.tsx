@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { useEmployees } from '../features/employees/hooks/useEmployees';
+import { useEmployees } from '../features/employees';
 import { Employee } from '../types';
 import { useAuth } from './AuthContext';
 

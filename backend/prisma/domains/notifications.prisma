@@ -1,0 +1,26 @@
+model SystemNotification {
+  id         BigInt   @id @default(autoincrement())
+  user_id    String   @db.Uuid
+  employee_id String? @db.Uuid
+  event_key  String   @db.VarChar(120)
+  title      String   @db.VarChar(160)
+  message    String   @db.Text
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  read_at    DateTime? @db.Timestamptz(6)
+  deleted_at DateTime? @db.Timestamptz(6)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  employee   Employee? @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, event_key])
+  @@index([user_id, created_at(sort: Desc)])
+  @@map("system_notifications")
+}
+
+model WebhookAlertDedup {
+  event_key  String   @id @db.Char(64)
+  kind       String   @db.VarChar(20)
+  expires_at DateTime @db.Timestamptz(6)
+
+  @@index([expires_at])
+  @@map("webhook_alert_dedup")
+}

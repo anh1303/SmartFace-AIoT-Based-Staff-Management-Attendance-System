@@ -2,7 +2,7 @@ import 'dotenv/config'
 import { readFile } from 'node:fs/promises'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../src/config/database.js'
-import { historicalBreakdown, reconciliationSchema } from '../src/common/payroll-history.js'
+import { historicalBreakdown, reconciliationSchema } from '../src/modules/payroll/payroll-history.js'
 
 // Default mode is a read-only audit. Applying requires a verified input file and
 // optimistic checks against both the saved timestamp and saved net salary.

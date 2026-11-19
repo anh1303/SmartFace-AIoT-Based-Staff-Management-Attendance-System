@@ -5,8 +5,8 @@ import {
   prepareAttendance,
   DatedPolicyShift,
   PolicyLog,
-} from '../src/modules/attendance/attendance.policy.js'
-import { aggregateDailyAttendance } from '../src/modules/attendance/attendance.service.js'
+} from '../../src/modules/attendance/attendance.policy.js'
+import { aggregateDailyAttendance } from '../../src/modules/attendance/attendance.service.js'
 
 const prisma = new PrismaClient()
 

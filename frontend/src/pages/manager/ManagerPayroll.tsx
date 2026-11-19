@@ -3,10 +3,9 @@ import { usePayrollContext } from '../../context/PayrollContext';
 import { useEmployeeContext } from '../../context/EmployeeContext';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
-import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionUtils';
 import { PayrollRecord } from '../../types';
 import { logger } from '../../utils/logger';
-import { nextPayrollPolicyPeriod, wasHiredByPayrollPeriod } from '../../utils/payrollUtils';
+import { nextPayrollPolicyPeriod } from '../../utils/payrollUtils';
 import { useDepartmentPositions } from '@/features/employees';
 import {
   PayrollHeader,
@@ -22,9 +21,9 @@ import {
   buildPayrollItemUpdates,
   earlySettlementPayrollApi,
   fetchBonusPenaltyApi,
+  fetchPayrollExportApi,
 } from '@/features/payrolls';
 import { exportToExcel } from '@/utils/excelExport';
-import { canExportPayroll } from '@/features/payrolls';
 
 const payrollLogger = logger.child('ManagerPayroll');
 
@@ -125,45 +124,22 @@ export const ManagerPayroll: React.FC = () => {
   const [isSavingItem, setIsSavingItem] = useState(false);
   const [earlySettlementRecord, setEarlySettlementRecord] = useState<PayrollRecord | null>(null);
 
-  // All records for the selected period (for status & total metrics)
-  // Chốt chặn phân quyền: Quản lý chỉ xem được phiếu lương của chính mình và nhân viên phòng ban mình phụ trách
-  const allPeriodRecords = payroll.filter((p) => {
-    const isPeriodMatch = p.period === selectedPeriod || p.payroll_period === selectedPeriod;
-    if (!isPeriodMatch) return false;
-    const employee = employees.find(e => e.employee_id === p.employee_id || e.id === p.employee_id);
-    if (!wasHiredByPayrollPeriod(employee?.created_at, selectedPeriod)) return false;
-
-    if (role !== 'admin') {
-      const emp = employees.find((e) => e.employee_id === p.employee_id);
-      const isSelf = Boolean(
-        currentUser && (
-          p.employee_id === currentUser.employee_id ||
-          (emp && (emp.employee_id === currentUser.employee_id || emp.email?.toLowerCase() === currentUser.email?.toLowerCase()))
-        )
-      );
-
-      // Nếu là chính mình: Luôn cho phép xem lương của bản thân
-      if (isSelf) return true;
-
-      // Nếu là Manager xem người khác:
-      if (isManager && managerDept) {
-        const empDept = emp?.department || p.department;
-        // Nhân viên phòng ban khác: HOÀN TOÀN KHÔNG HIỆN
-        if (!empDept || empDept.toLowerCase() !== managerDept.toLowerCase()) {
-          return false;
-        }
-        // Quản lý khác trong cùng phòng: HOÀN TOÀN KHÔNG HIỆN
-        if (emp && isAnotherManager(emp, currentUser)) {
-          return false;
-        }
-      } else return false;
-    }
-    return true;
-  });
-  const controlledPeriodRecords = allPeriodRecords.filter(p => role === 'admin' || p.employee_id !== currentUser?.employee_id);
+  // All records for the selected period (authoritative scope comes directly from the payroll API)
+  const allPeriodRecords = payroll.filter(
+    (p) => p.period === selectedPeriod || p.payroll_period === selectedPeriod
+  );
+  const controlledPeriodRecords = allPeriodRecords.filter(
+    (p) => Boolean(p.can_edit) || p.status !== 'PENDING'
+  );
   const isFinalized =
     controlledPeriodRecords.length > 0 && controlledPeriodRecords.every((p) => p.status !== 'PENDING');
-  const canExport = !isLoadingPayroll && !payrollError && canExportPayroll(allPeriodRecords);
+  const isPeriodExportEligible =
+    allPeriodRecords.some((record) => {
+      const details = record.calculation_details as { early_settlement?: { is_early_settlement?: boolean } } | null | undefined;
+      return !details?.early_settlement?.is_early_settlement;
+    }) &&
+    allPeriodRecords.every((record) => ['FINALIZED', 'CONFIRMED', 'PAID'].includes(record.status));
+  const canExport = !isLoadingPayroll && !payrollError && isPeriodExportEligible;
 
   // Compute metrics
   const totalExpense = allPeriodRecords.reduce((sum, r) => sum + (r.net_salary || 0), 0);
@@ -171,7 +147,7 @@ export const ManagerPayroll: React.FC = () => {
   // Filter records by selected period, search term, and position/department
   const currentRecords = allPeriodRecords.filter((p) => {
     const emp = employees.find((e) => e.employee_id === p.employee_id);
-    const dept = emp?.department || p.department || '';
+    const dept = p.department || emp?.department || '';
     const pos = emp?.position || '';
 
     if (departmentFilter !== 'ALL' && dept !== departmentFilter) {
@@ -202,24 +178,11 @@ export const ManagerPayroll: React.FC = () => {
       showToast('Bảng lương kỳ này đã bị Khóa. Cần mở khóa kỳ trước khi sửa phiếu lương!', 'error', "Không thể chỉnh sửa phiếu lương");
       return;
     }
-    const emp = employees.find((e) => e.employee_id === record.employee_id);
-    if (role !== 'admin') {
-      const isSelf = Boolean(
-        emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
-      );
-      if (isSelf) {
-        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error', "Không thể chỉnh sửa phiếu lương");
-        return;
-      }
-      if (isAnotherManager(emp, currentUser)) {
-        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error', "Không thể chỉnh sửa phiếu lương");
-        return;
-      }
-      if (isDifferentDepartment(emp, currentUser)) {
-        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error', "Không thể chỉnh sửa phiếu lương");
-        return;
-      }
+    if (!record.can_edit) {
+      showToast('Bạn không có quyền chỉnh sửa phiếu lương này!', 'error', "Không thể chỉnh sửa phiếu lương");
+      return;
     }
+    const emp = employees.find((e) => e.employee_id === record.employee_id);
 
     setEditingItem({
       record,
@@ -238,23 +201,9 @@ export const ManagerPayroll: React.FC = () => {
       return;
     }
 
-    const emp = employees.find((e) => e.employee_id === editingItem.record.employee_id);
-    if (role !== 'admin') {
-      const isSelf = Boolean(
-        emp && currentUser && (emp.employee_id === currentUser.employee_id || emp.email === currentUser.email)
-      );
-      if (isSelf) {
-        showToast('Chốt chặn an toàn: Bạn không thể tự sửa phiếu lương của chính mình!', 'error', "Không thể cập nhật phiếu lương");
-        return;
-      }
-      if (isAnotherManager(emp, currentUser)) {
-        showToast('Quản lý không có quyền sửa phiếu lương của Quản lý khác!', 'error', "Không thể cập nhật phiếu lương");
-        return;
-      }
-      if (isDifferentDepartment(emp, currentUser)) {
-        showToast('Quản lý chỉ có quyền xem/sửa phiếu lương của nhân viên thuộc phòng ban mình phụ trách!', 'error', "Không thể cập nhật phiếu lương");
-        return;
-      }
+    if (!editingItem.record.can_edit) {
+      showToast('Bạn không có quyền chỉnh sửa phiếu lương này!', 'error', "Không thể cập nhật phiếu lương");
+      return;
     }
 
     try {
@@ -315,13 +264,34 @@ export const ManagerPayroll: React.FC = () => {
     }
   };
 
-  const handleExportCSV = (format: 'excel' | 'pdf') => {
+  const handleExportCSV = async (format: 'excel' | 'pdf') => {
     if (!canExport) {
-      showToast('Chỉ xuất Excel khi kỳ lương đã chốt và dữ liệu đã sẵn sàng.', 'error', "Không thể xuất báo cáo");
+      showToast('Chỉ xuất báo cáo khi kỳ lương đã chốt và dữ liệu đã sẵn sàng.', 'error', "Không thể xuất báo cáo");
       return;
     }
-    if (allPeriodRecords.length === 0) {
-      showToast(`Kỳ ${selectedPeriod} chưa có dữ liệu bảng lương để xuất Excel!`, 'error', "Không thể xuất báo cáo");
+    if (currentRecords.length === 0) {
+      showToast(`Không có phiếu lương nào khớp bộ lọc hiện tại trong kỳ ${selectedPeriod} để xuất báo cáo!`, 'error', "Không thể xuất báo cáo");
+      return;
+    }
+
+    const recordIds = currentRecords
+      .map((r) => String(r.payroll_id || r.id || ''))
+      .filter(Boolean);
+    if (recordIds.length === 0) {
+      showToast(`Không có phiếu lương hợp lệ trong kỳ ${selectedPeriod} để xuất báo cáo!`, 'error', "Không thể xuất báo cáo");
+      return;
+    }
+
+    let recordsToExport: PayrollRecord[];
+    try {
+      recordsToExport = await fetchPayrollExportApi(selectedPeriod, recordIds);
+    } catch (err: any) {
+      showToast(err?.message || 'Kỳ lương chưa đủ điều kiện xuất báo cáo chính thức.', 'error', "Không thể xuất báo cáo");
+      return;
+    }
+
+    if (!recordsToExport.length) {
+      showToast('Không có dữ liệu bảng lương trong phạm vi được phép xuất.', 'error', "Không thể xuất báo cáo");
       return;
     }
 
@@ -339,10 +309,8 @@ export const ManagerPayroll: React.FC = () => {
       'Trạng Thái',
     ];
 
-    const recordsToExport = currentRecords.length > 0 ? currentRecords : allPeriodRecords;
     const rows = recordsToExport.map((r) => {
-      const emp = employees.find((e) => e.employee_id === r.employee_id);
-      const name = emp?.full_name || r.employee_name || r.employee_id;
+      const name = r.employee_name || r.employee_id;
       const statusStr = r.status === 'PAID'
         ? 'Đã Thanh Toán'
         : r.status === 'FINALIZED'

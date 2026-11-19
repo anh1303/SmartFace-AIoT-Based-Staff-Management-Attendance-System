@@ -1,0 +1,251 @@
+{
+  "phase": 1,
+  "initialCounts": {
+    "pendingMoveContextFiles": 5,
+    "pendingMoveTypeFiles": 7,
+    "pendingMoveUtilFiles": 3,
+    "pendingMoveFeatureEdges": 3,
+    "featureCycles": 0,
+    "transitionalExceptions": 0
+  },
+  "contextFiles": [
+    {
+      "path": "context/AppContext.tsx",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Provider lắp ráp ứng dụng ở tầng root"
+    },
+    {
+      "path": "context/AttendanceContext.tsx",
+      "owner": "attendances",
+      "status": "pending-move",
+      "reason": "Provider state chấm công thuộc feature attendances (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "context/AuthContext.tsx",
+      "owner": "auth",
+      "status": "pending-move",
+      "reason": "Provider state phiên đăng nhập thuộc feature auth (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "context/EmployeeContext.tsx",
+      "owner": "employees",
+      "status": "pending-move",
+      "reason": "Provider state danh sách nhân viên thuộc feature employees (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "context/PayrollContext.tsx",
+      "owner": "payrolls",
+      "status": "pending-move",
+      "reason": "Provider state bảng lương thuộc feature payrolls (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "context/ShiftContext.tsx",
+      "owner": "schedules",
+      "status": "pending-move",
+      "reason": "Provider state lịch phân ca thuộc feature schedules (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "context/ThemeContext.tsx",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Provider quản lý giao diện sáng/tối dùng chung toàn ứng dụng"
+    },
+    {
+      "path": "context/ToastContext.tsx",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Provider hiển thị toast thông báo dùng chung toàn ứng dụng"
+    },
+    {
+      "path": "context/index.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Barrel tái xuất các context ở tầng ứng dụng"
+    }
+  ],
+  "typeFiles": [
+    {
+      "path": "types/api.types.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Kiểu envelope phản hồi API và phân trang dùng chung toàn frontend"
+    },
+    {
+      "path": "types/attendance.types.ts",
+      "owner": "attendances",
+      "status": "pending-move",
+      "reason": "Kiểu dữ liệu bản ghi chấm công và tổng hợp ngày công thuộc feature attendances (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "types/auth.types.ts",
+      "owner": "auth",
+      "status": "pending-move",
+      "reason": "Kiểu phiên đăng nhập và vai trò thuộc feature auth (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "types/biometric.types.ts",
+      "owner": "biometrics",
+      "status": "pending-move",
+      "reason": "Kiểu dữ liệu sinh trắc học thuộc feature biometrics (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "types/common.types.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Kiểu giao diện dùng chung (ToastMessage, tùy chọn lọc chung)"
+    },
+    {
+      "path": "types/department.types.ts",
+      "owner": "employees",
+      "status": "pending-move",
+      "reason": "Kiểu phòng ban và chức vụ thuộc feature employees (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "types/employee.types.ts",
+      "owner": "employees",
+      "status": "pending-move",
+      "reason": "Kiểu hồ sơ nhân viên thuộc feature employees (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "types/index.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Barrel tái xuất các kiểu dữ liệu dùng chung và chuyển tiếp"
+    },
+    {
+      "path": "types/payroll.types.ts",
+      "owner": "payrolls",
+      "status": "pending-move",
+      "reason": "Kiểu phiếu lương và chính sách thưởng/phạt thuộc feature payrolls (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "types/shift.types.ts",
+      "owner": "schedules",
+      "status": "pending-move",
+      "reason": "Kiểu ca làm việc thuộc feature schedules (chờ di chuyển ở Pha 2)"
+    }
+  ],
+  "utilFiles": [
+    {
+      "path": "utils/confidence.ts",
+      "owner": "attendances",
+      "status": "pending-move",
+      "reason": "Hàm định màu độ tin cậy nhận diện chấm công thuộc feature attendances (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "utils/dateUtils.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích định dạng ngày tháng theo múi giờ Việt Nam dùng chung toàn ứng dụng"
+    },
+    {
+      "path": "utils/excelExport.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích xuất bảng Excel dùng chung cho nhiều trang báo cáo"
+    },
+    {
+      "path": "utils/index.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Barrel tái xuất các tiện ích dùng chung và chuyển tiếp"
+    },
+    {
+      "path": "utils/logger.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Logger phía client dùng chung toàn ứng dụng"
+    },
+    {
+      "path": "utils/payrollUtils.ts",
+      "owner": "payrolls",
+      "status": "pending-move",
+      "reason": "Hàm tính hiển thị hệ số lương và kỳ chính sách thuộc feature payrolls (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "utils/permissionUtils.ts",
+      "owner": "employees",
+      "status": "pending-move",
+      "reason": "Helper kiểm tra phạm vi xem hồ sơ nhân viên thuộc feature employees (chờ di chuyển ở Pha 2)"
+    },
+    {
+      "path": "utils/reportPrint.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích dựng HTML và in báo cáo dùng chung"
+    },
+    {
+      "path": "utils/saveWorkbook.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Adapter lưu workbook Excel xuống trình duyệt dùng chung"
+    },
+    {
+      "path": "utils/timeUtils.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích định dạng và phân tích chuỗi giờ HH:mm dùng chung"
+    }
+  ],
+  "featureDependencyMatrix": [
+    {
+      "source": "account",
+      "target": "auth",
+      "owner": "account",
+      "status": "allowed",
+      "reason": "Trang tài khoản cá nhân sử dụng API hồ sơ và xác thực lại mật khẩu từ entry công khai của feature auth"
+    },
+    {
+      "source": "attendances",
+      "target": "devices",
+      "owner": "attendances",
+      "status": "allowed",
+      "reason": "WebRTCPlayer đọc trạng thái/cấu hình thiết bị qua entry công khai của feature devices"
+    },
+    {
+      "source": "biometrics",
+      "target": "operations",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Luồng đăng ký sinh trắc học theo dõi tác vụ nền qua entry công khai của feature operations"
+    },
+    {
+      "source": "employees",
+      "target": "attendances",
+      "owner": "employees",
+      "status": "pending-move",
+      "reason": "Tab chi tiết nhân viên ghép trực tiếp dữ liệu chấm công từ feature attendances (rà soát lắp ghép ở tầng pages trong Pha 2)"
+    },
+    {
+      "source": "employees",
+      "target": "biometrics",
+      "owner": "employees",
+      "status": "pending-move",
+      "reason": "Tab tổng quan nhân viên ghép trực tiếp thành phần sinh trắc học từ feature biometrics (rà soát lắp ghép ở tầng pages trong Pha 2)"
+    },
+    {
+      "source": "employees",
+      "target": "operations",
+      "owner": "employees",
+      "status": "allowed",
+      "reason": "Tạo hồ sơ nhân viên và gửi email tài khoản theo dõi tác vụ nền qua entry công khai của feature operations"
+    },
+    {
+      "source": "employees",
+      "target": "payrolls",
+      "owner": "employees",
+      "status": "pending-move",
+      "reason": "View chi tiết nhân viên ghép trực tiếp modal phiếu lương từ feature payrolls (rà soát lắp ghép ở tầng pages trong Pha 2)"
+    },
+    {
+      "source": "schedules",
+      "target": "operations",
+      "owner": "schedules",
+      "status": "allowed",
+      "reason": "Phân ca hàng loạt theo dõi tiến trình xử lý qua entry công khai của feature operations"
+    }
+  ],
+  "featureCycles": [],
+  "exceptions": []
+}

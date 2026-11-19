@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { UserSession, Role, Employee } from '../types';
-import { loginApi, logoutApi, meApi, DEFAULT_USERS, faceLoginApi } from '@/features/auth';
-import { FACE_LOGIN_TIMEOUTS, withBoundedSignal } from '../features/auth/lib/faceLoginRequest';
+import { loginApi, logoutApi, meApi, DEFAULT_USERS, faceLoginApi, FACE_LOGIN_TIMEOUTS, withBoundedSignal } from '@/features/auth';
 import { useToast } from './ToastContext';
 import { useOptionalNotifications } from '../features/notifications';
 import { logger } from '../utils/logger';

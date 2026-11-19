@@ -35,7 +35,6 @@ import {
 } from '../employees/public.js'
 import { getEmployeeNearShifts, getEmployeeShiftsForRecalculation, getEmployeeShiftsByFilter } from '../shifts/public.js'
 import { AppError } from '../../common/AppError.js'
-import { policyForPeriod } from '../../common/payroll-policy.js'
 import { buildIdOrCodeWhere, formatVNDateISO, formatVNTime } from '../../common/utils.js'
 import { attendanceInclude } from './attendance.model.js'
 import { logAction } from '../audit-logs/public.js'
@@ -81,25 +80,24 @@ export async function list(
     : (typeof query.to === 'string' && query.to ? query.to : undefined)
 
   const singleDate = typeof query.date === 'string' && query.date ? query.date : undefined
+  const fromDate = singleDate || startDate
+  const toDate = singleDate || endDate
 
-  if (startDate && endDate) {
-    where.event_time = {
-      gte: new Date(`${startDate}T00:00:00+07:00`),
-      lt: new Date(`${endDate}T23:59:59.999+07:00`),
+  if (fromDate || toDate) {
+    const workDateFilter: Record<string, Date> = {}
+    const eventTimeFilter: Record<string, Date> = {}
+    if (fromDate) {
+      workDateFilter.gte = new Date(`${fromDate}T00:00:00.000Z`)
+      eventTimeFilter.gte = new Date(`${fromDate}T00:00:00+07:00`)
     }
-  } else if (startDate) {
-    where.event_time = {
-      gte: new Date(`${startDate}T00:00:00+07:00`),
+    if (toDate) {
+      workDateFilter.lte = new Date(`${toDate}T00:00:00.000Z`)
+      eventTimeFilter.lt = new Date(`${toDate}T23:59:59.999+07:00`)
     }
-  } else if (endDate) {
-    where.event_time = {
-      lt: new Date(`${endDate}T23:59:59.999+07:00`),
-    }
-  } else if (singleDate) {
-    where.event_time = {
-      gte: new Date(`${singleDate}T00:00:00+07:00`),
-      lt: new Date(`${singleDate}T23:59:59.999+07:00`),
-    }
+    where.OR = [
+      { work_date: workDateFilter },
+      { work_date: null, event_time: eventTimeFilter },
+    ]
   }
 
   if (typeof query.type === 'string') {
@@ -350,7 +348,7 @@ export async function adjustAttendance(
         reopened_by: null,
       },
     })
-    const adjustmentPolicy = await policyForPeriod(data.date.slice(0, 7), tx)
+    const adjustmentPolicy = await attendancePayroll().getAdjustmentPolicy(data.date.slice(0, 7), tx)
     const wageSnapshot = await attendancePayroll().getPayrollWageSnapshot(emp.id, data.date.slice(0, 7), tx)
     await syncDayAdjustments(tx, updated, sourceHourlyRate(emp, data.date.slice(0, 7), wageSnapshot?.hourly_rate, Boolean(attendancePayroll().payrollOverrides(wageSnapshot).fields.hourly_rate)), adjustmentPolicy?.absence_penalty_rate ?? null)
 
@@ -855,7 +853,7 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
       })) {
         throw AppError.conflict('Ca chưa kết thúc, bao gồm ca qua đêm; chưa thể khóa ngày')
       }
-      const adjustmentPolicy = await policyForPeriod(dateStr.slice(0, 7), tx)
+      const adjustmentPolicy = await attendancePayroll().getAdjustmentPolicy(dateStr.slice(0, 7), tx)
       for (const day of activeDays) {
         // VẤN ĐỀ 6: Nếu ngày công đã APPROVED và KHÔNG bị mở khóa (reopened_at === null),
         // giữ nguyên quyết định đã duyệt riêng trước đó, không ghi đè người duyệt hay phân loại lại!
@@ -1016,7 +1014,7 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
       }
     } else {
       const activeDays = days.filter(d => !closedEmpIds.has(d.employee_id))
-      const adjustmentPolicy = await policyForPeriod(dateStr.slice(0, 7), tx)
+      const adjustmentPolicy = await attendancePayroll().getAdjustmentPolicy(dateStr.slice(0, 7), tx)
       for (const day of activeDays) {
         const snapshot = (day as any).pre_approval_snapshot as Record<string, any> | null
         let restoredRecord: any
@@ -1157,7 +1155,7 @@ export async function unlockEmployeeAttendance(
 
     const snapshot = (summary as any).pre_approval_snapshot as Record<string, any> | null
     const period = dateStr.slice(0, 7)
-    const adjustmentPolicy = await policyForPeriod(period, tx)
+    const adjustmentPolicy = await attendancePayroll().getAdjustmentPolicy(period, tx)
 
     let updated: any
     if (snapshot && !snapshot.reconstructed) {
@@ -1424,7 +1422,7 @@ export async function autoCloseDueAttendance(asOf = new Date()) {
         // 1. Khóa kỳ lương đồng bộ với các thao tác tính lương và tổng hợp
         const [lock] = await tx.$queryRaw<Array<{ locked: boolean }>>`SELECT pg_try_advisory_xact_lock(hashtext(${`payroll:${period}`})) AS locked`
         if (!lock?.locked) return false
-        const adjustmentPolicy = await policyForPeriod(period, tx)
+        const adjustmentPolicy = await attendancePayroll().getAdjustmentPolicy(period, tx)
 
         // 2. Giới hạn truy vấn vào đúng kỳ đang xử lý (tránh áp dụng sai chính sách tháng)
         const unapproved = await tx.daily_attendance_summary.findMany({

@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { exportScheduleToExcel } from '../../src/features/schedules/utils/scheduleExport';
-import { canExportPayroll } from '../../src/features/payrolls/payrollExportEligibility';
 
 vi.mock('../../src/utils/excelExport', () => ({ exportToExcel: vi.fn().mockResolvedValue(false) }));
 import { exportToExcel } from '../../src/utils/excelExport';
@@ -20,16 +19,5 @@ describe('schedule Excel eligibility', () => {
     vi.mocked(exportToExcel).mockClear();
     exportScheduleToExcel({ filteredEmployees: [{ employee_id: 'a' }] as any, daysOfWeek: [{ date: '2026-11-02' }] as any, workShifts: [{ employee_id: 'a', date: '2026-11-02', shift_type: 'OFF' }] as any, weekNumber: 45, startLabel: '', endLabel: '' });
     expect(exportToExcel).not.toHaveBeenCalled();
-  });
-});
-
-describe('payroll Excel eligibility', () => {
-  it('requires a finalized regular period and no pending exported records', () => {
-    const regular = { status: 'FINALIZED' };
-    const early = { status: 'FINALIZED', calculation_details: { early_settlement: { is_early_settlement: true } } };
-    expect(canExportPayroll([] as any)).toBe(false);
-    expect(canExportPayroll([early] as any)).toBe(false);
-    expect(canExportPayroll([regular, { status: 'PENDING' }] as any)).toBe(false);
-    expect(canExportPayroll([regular, early] as any)).toBe(true);
   });
 });

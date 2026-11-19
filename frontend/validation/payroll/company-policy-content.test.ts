@@ -15,7 +15,7 @@ describe('Published company policy', () => {
     expect(content).not.toContain('25% tiền công')
     expect(content).not.toContain('2.550.000₫')
     const documentation = readFileSync(fileURLToPath(new URL('../../../docs/rule/COMPANY_POLICY.md', import.meta.url)), 'utf8')
-    const defaults = readFileSync(fileURLToPath(new URL('../../../backend/src/common/payroll-policy.ts', import.meta.url)), 'utf8')
+    const defaults = readFileSync(fileURLToPath(new URL('../../../backend/src/modules/payroll/payroll.policy.ts', import.meta.url)), 'utf8')
     expect(documentation).toContain('1.600.000 đồng')
     expect(documentation).toContain('19.825.000 đồng')
     expect(defaults).toMatch(/overtime_rate:\s*2,\s*late_early_penalty:\s*1\.5,\s*absence_penalty_rate:\s*2/)

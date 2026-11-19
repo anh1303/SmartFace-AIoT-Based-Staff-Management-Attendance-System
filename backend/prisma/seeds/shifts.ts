@@ -1,9 +1,9 @@
 import 'dotenv/config'
 import type { PrismaClient } from '@prisma/client'
-import { prisma } from '../src/config/database.js'
-import { STANDARD_SHIFT_CONFIGS } from '../src/modules/shifts/shift.queries.js'
-import { vnDay } from '../src/modules/attendance/attendance.policy.js'
-import { addDays, dateValue, datesInRange, dayKey, isMain, loadSeedState, markPayrollsStale, printCoverage, readSeedInput, shouldSkip, type SeedMode, type SeedRange } from './seed-utils.js'
+import { prisma } from '../../src/config/database.js'
+import { STANDARD_SHIFT_CONFIGS } from '../../src/modules/shifts/shift.queries.js'
+import { vnDay } from '../../src/modules/attendance/attendance.policy.js'
+import { addDays, dateValue, datesInRange, dayKey, isMain, loadSeedState, markPayrollsStale, printCoverage, readSeedInput, shouldSkip, type SeedMode, type SeedRange } from './utils.js'
 
 const TYPES = ['OFFICE_HOURS', 'MORNING', 'AFTERNOON', 'OTHER', 'OFF'] as const
 const time = (clock: string) => new Date(`1970-01-01T${clock}:00Z`)

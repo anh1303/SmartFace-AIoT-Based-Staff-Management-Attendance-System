@@ -18,6 +18,8 @@ configureEmployeeIntegration({
   get getDefaultRole() { return auth.getDefaultRole },
   get deleteAuthUser() { return auth.deleteAuthUser },
   get deleteBiometricsForEmployee() { return biometrics.deleteBiometricsForEmployee },
+  get faceEnrollmentSummarySelect() { return biometrics.faceEnrollmentSummarySelect },
+  get hasActiveFaceEnrollment() { return biometrics.hasActiveFaceEnrollment },
   get deleteShiftsForEmployee() { return shifts.deleteShiftsForEmployee },
   get hasAttendanceActivity() { return attendance.hasAttendanceActivity },
   get hasPayrollActivity() { return payroll.hasPayrollActivity },

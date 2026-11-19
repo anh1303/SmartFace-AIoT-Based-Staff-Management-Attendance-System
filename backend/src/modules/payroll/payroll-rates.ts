@@ -1,4 +1,4 @@
-import { AppError } from './AppError.js';
+import { AppError } from '../../common/AppError.js';
 
 export interface SalaryCalculationInput {
   hourly_rate: number;
@@ -39,4 +39,11 @@ export function computePayrollBreakdown(params: SalaryCalculationInput): Payroll
     throw AppError.badRequest('Số tiền vượt giới hạn lưu trữ phiếu lương');
   }
   return { base_salary, overtime_pay, late_early_deduction, absence_deduction: total_absence_penalty, allowance, net_salary };
+}
+
+/**
+ * Pure Function để tính lương thực lĩnh (net_salary) dùng chung thống nhất trong domain payroll.
+ */
+export function calculateNetSalary(params: SalaryCalculationInput): number {
+  return computePayrollBreakdown(params).net_salary;
 }

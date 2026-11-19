@@ -1,5 +1,8 @@
 # 🗄️ SmartFace AIoT Database & Prisma ORM Architecture Specification
 
+
+Prisma CLI ??c th? m?c `prisma/` theo c?u h?nh trong `backend/package.json`. File `schema.prisma` khai b?o generator v? datasource. Th?m model ho?c enum v?o file nghi?p v? t??ng ?ng trong `domains/`. Quan h? gi?a c?c file tham chi?u tr?c ti?p t?n model. Migration d?ng chung trong `migrations/`. Seed n?m trong `seeds/`; script b?o tr? n?m trong `backend/scripts/maintenance/`.
+
 Hướng dẫn chạy từng lệnh tạo phân ca và check-in/out: [README-SEED.md](./README-SEED.md).
 
 
@@ -579,7 +582,7 @@ Bảng `attendance_locks` thực thi nguyên tắc bảo mật và toàn vẹn d
 
 ## 7. Master Data Seed
 
-- **File:** `prisma/seed.ts`
+- **File:** `prisma/seeds/index.ts`
 - **Nội dung khởi tạo:**
   - 3 Vai trò hệ thống: `ADMIN`, `MANAGER`, `EMPLOYEE`.
   - 6 Phòng ban: `Nhân sự (HR)`, `Kế toán (ACC)`, `Kinh doanh (SALE)`, `Marketing (MKT)`, `IT (IT)`, `CSKH (CS)`.
@@ -634,7 +637,7 @@ cd backend
 npm run prisma:seed:attendance
 ```
 
-Nhập một trong ba dạng trên terminal: `2026-11`, `2026-11-02`, hoặc `2026-10-25 2026-11-02`. Khoảng ngày bao gồm cả hai đầu, tối đa 366 ngày. Sau đó chọn `1` (xóa/tạo lại) hoặc `2` (bỏ qua).
+Nhập một trong ba dạng trên terminal: `2026-11`, `2026-11-02`, hoặc `2026-10-25 2026-11-02`. Khoảng ngày bao gồm cả hai đầu. Sau đó chọn `1` (xóa/tạo lại) hoặc `2` (bỏ qua).
 
 ```bash
 npm run prisma:seed:attendance -- 2026-11 --mode overwrite
@@ -651,7 +654,7 @@ Tạo bản tổng hợp bằng `calculateDay` và các khoản cần duyệt b�
 ### Phạm vi và báo cáo của hai seed
 
 - Luôn giữ ngày đang khóa, ngày đã duyệt/điều chỉnh thủ công, khoản đã duyệt/từ chối và kỳ lương không còn `PENDING`; báo số ngày được bảo vệ.
-- Không tạo lượt quét tương lai; bỏ qua ca chưa kết thúc và ca làm chưa có giờ hợp lệ. Phân ca tương lai vẫn được phép tạo.
+Seed supports past and future dates, including unfinished shifts, but never dates before employee profile creation. Working shifts with zero duration are skipped. Demo summaries are evaluated after the generated shift/events end; real attendance rules are unchanged.
 - Mỗi lần chạy ghi trong một transaction; lỗi sẽ rollback cả lần chạy. Không chạy seed đồng thời với tác vụ thu nhận dữ liệu thật.
 - Cuối lần chạy in số bản ghi tạo/thay thế/bỏ qua/bảo vệ và bảng số lượng từng loại ca/kịch bản **vừa tạo**. Nếu dữ liệu đủ điều kiện quá ít để có đủ loại, báo rõ loại còn thiếu; có thể chọn khoảng dài hơn hoặc thêm nhân viên/phân ca phù hợp.
 - Trên PowerShell chặn `npm.ps1`, dùng `npm.cmd` thay cho `npm`. Dùng `--help` để xem cú pháp mà không truy cập database.

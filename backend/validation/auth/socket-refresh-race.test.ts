@@ -1,19 +1,23 @@
 // Keep these behavioral tests independent of the auth SQL adapter (covered by auth-projection.test).
-vi.mock('../../src/modules/auth/auth.read.js', () => ({ readAuthUser: async (id: string) => {
-  return db.user.findUnique({ where: { id } })
-} }))
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import jwt from 'jsonwebtoken'
 
-const { db, secret } = vi.hoisted(() => ({
+const { db, secret, assertFaceSessionMock } = vi.hoisted(() => ({
   db: { user: { findUnique: vi.fn() } },
   secret: 'test-jwt-secret-at-least-32-chars-long-security',
+  assertFaceSessionMock: vi.fn(async () => {}),
 }))
 
+vi.mock('../../src/modules/auth/public.js', () => ({
+  readAuthUser: async (id: string) => db.user.findUnique({ where: { id } }),
+  assertFaceSession: assertFaceSessionMock,
+}))
 vi.mock('../../src/config/env.js', () => ({ env: { JWT_SECRET: secret } }))
 vi.mock('../../src/config/database.js', () => ({ prisma: db }))
 
-import { refreshSocketScope } from '../../src/sockets/socket.auth.js'
+import { refreshSocketScope, socketAuthMiddleware } from '../../src/sockets/socket.auth.js'
 
 describe('Socket scope refresh concurrency and race conditions', () => {
   const secret = 'test-jwt-secret-at-least-32-chars-long-security'
@@ -124,5 +128,57 @@ describe('Socket scope refresh concurrency and race conditions', () => {
 
     expect(rooms.has('department:1')).toBe(false)
     expect(rooms.has('department:2')).toBe(true)
+  })
+
+  it('consumes readAuthUser via auth/public.ts and revokes rooms when account is deactivated or face session expires after connect', async () => {
+    const source = readFileSync(resolve('src/sockets/socket.auth.ts'), 'utf8')
+    expect(source).not.toMatch(/from\s+['"]\.\.\/modules\/auth\/auth\.read\.js['"]/)
+    expect(source).toMatch(/from\s+['"]\.\.\/modules\/auth\/public\.js['"]/)
+
+    const rooms = new Set<string>()
+    const socket: any = {
+      rooms,
+      data: {},
+      handshake: {
+        auth: { token: jwt.sign({ id: 'user-face', role: 'EMPLOYEE', amr: ['face'] }, secret) },
+        headers: {},
+      },
+      join: vi.fn(async (room: string) => { rooms.add(room) }),
+      leave: vi.fn(async (room: string) => { rooms.delete(room) }),
+    }
+
+    // 1. Handshake succeeds
+    db.user.findUnique.mockResolvedValueOnce({
+      id: 'user-face',
+      is_active: true,
+      roles: { role_name: 'EMPLOYEE' },
+      employees: { id: 'emp-face', status: 'ACTIVE', departmentId: 1 },
+      profile: { token_version: 1 },
+    })
+    let handshakeErr: Error | undefined
+    await socketAuthMiddleware(socket, (err) => { handshakeErr = err })
+    expect(handshakeErr).toBeUndefined()
+    expect(rooms.has('user:user-face')).toBe(true)
+
+    // 2. Account deactivated after connect -> refresh rejects and leaves rooms
+    db.user.findUnique.mockResolvedValueOnce({
+      id: 'user-face',
+      is_active: false,
+      roles: { role_name: 'EMPLOYEE' },
+      employees: { id: 'emp-face', status: 'ACTIVE', departmentId: 1 },
+      profile: { token_version: 1 },
+    })
+    await expect(refreshSocketScope(socket)).rejects.toThrow(/Account unavailable/)
+    expect(rooms.has('user:user-face')).toBe(false)
+
+    // 3. Face session expired/revoked -> refresh rejects
+    db.user.findUnique.mockResolvedValueOnce({
+      id: 'user-face',
+      is_active: true,
+      roles: { role_name: 'EMPLOYEE' },
+      employees: { id: 'emp-face', status: 'INACTIVE', departmentId: 1 },
+      profile: { token_version: 1 },
+    })
+    await expect(refreshSocketScope(socket)).rejects.toThrow(/Employee inactive|Face session revoked/)
   })
 })

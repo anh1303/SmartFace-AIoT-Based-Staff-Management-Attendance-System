@@ -13,8 +13,8 @@ import {
 } from '../employees/public.js'
 import { payrollOverrides } from './payroll.overrides.js'
 import { findAttendanceAdjustmentsWithScope, findAttendanceLocks } from '../attendance/public.js'
-import { policyForPeriod, validMultiplier } from '../../common/payroll-policy.js'
-import { historicalAdjustmentAmount } from '../../common/payroll-history.js'
+import { policyForPeriod, validMultiplier } from './payroll.policy.js'
+import { historicalAdjustmentAmount } from './payroll-history.js'
 
 type Actor = { id?: string; role?: string }
 const bounds = (period: string) => {

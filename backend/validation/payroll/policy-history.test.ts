@@ -6,7 +6,7 @@ vi.mock('../../src/config/database.js', () => ({ prisma: {
     .filter(row => !where || where.effective_period?.lte && row.effective_period != null && row.effective_period <= where.effective_period.lte)
     .sort((a, b) => (b.effective_period ?? '').localeCompare(a.effective_period ?? '') || b.id - a.id)[0] ?? null) },
 } }))
-import { policyForPeriod } from '../../src/common/payroll-policy.js'
+import { policyForPeriod } from '../../src/modules/payroll/payroll.policy.js'
 import { getBonusPenalty } from '../../src/modules/payroll/payroll.service.js'
 import { updateBonusPenaltySchema } from '../../src/modules/payroll/payroll.dto.js'
 
@@ -35,5 +35,33 @@ describe('Effective payroll policies', () => {
   })
   it.each([-1, 50.0001, 1.23456, Infinity, NaN])('rejects an invalid or lossy multiplier %s', value => {
     expect(updateBonusPenaltySchema.safeParse({ overtime_rate: value }).success).toBe(false)
+  })
+
+  it('exposes getAdjustmentPolicy on payroll public API and forwards transaction client', async () => {
+    const payrollPublic = await import('../../src/modules/payroll/public.js')
+    expect(typeof (payrollPublic as any).getAdjustmentPolicy).toBe('function')
+    const txBonusPenalty = {
+      findFirst: vi.fn(async () => ({
+        id: 77,
+        effective_period: '2025-05',
+        overtime_rate: 2.5,
+        late_early_penalty: 1.75,
+        absence_penalty_rate: 3.0,
+        description: 'Historical tx policy',
+      })),
+    }
+    const tx = { bonusPenalty: txBonusPenalty } as any
+    const result = await (payrollPublic as any).getAdjustmentPolicy('2025-05', tx)
+    expect(txBonusPenalty.findFirst).toHaveBeenCalledWith({
+      where: { effective_period: { lte: '2025-05' } },
+      orderBy: [{ effective_period: 'desc' }, { id: 'desc' }],
+    })
+    expect(result).toMatchObject({
+      id: 77,
+      effective_period: '2025-05',
+      overtime_rate: 2.5,
+      late_early_penalty: 1.75,
+      absence_penalty_rate: 3.0,
+    })
   })
 })

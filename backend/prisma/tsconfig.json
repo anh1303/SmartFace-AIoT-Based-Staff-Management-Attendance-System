@@ -4,5 +4,5 @@
     "noEmit": true,
     "rootDir": ".."
   },
-  "include": ["*.ts", "../src/middlewares/auth.middleware.ts"]
+  "include": ["seeds/**/*.ts", "../scripts/maintenance/**/*.ts", "../src/middlewares/auth.middleware.ts"]
 }

@@ -16,6 +16,7 @@ payrollRouter.get('/', asyncHandler(controller.list));
 payrollRouter.post('/generate', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.generate));
 payrollRouter.put('/:id', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.updateItem));
 payrollRouter.post('/period/:period/finalize', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.finalizePeriod));
+payrollRouter.post('/period/:period/export', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.exportPeriod));
 payrollRouter.post('/early-settlement', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.finalizeEarlySettlement));
 payrollRouter.post('/early-settlement/preview', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.previewEarlySettlement));
 payrollRouter.post('/:id/preview', authorize('ADMIN', 'MANAGER'), asyncHandler(controller.previewItem));

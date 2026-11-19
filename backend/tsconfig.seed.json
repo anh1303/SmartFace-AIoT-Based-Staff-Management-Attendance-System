@@ -8,5 +8,5 @@
     "declarationMap": false,
     "sourceMap": false
   },
-  "include": ["prisma/seed.ts"]
+  "include": ["prisma/seeds/index.ts"]
 }

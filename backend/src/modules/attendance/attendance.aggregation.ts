@@ -2,7 +2,6 @@ import { Prisma } from '@prisma/client'
 import { setImmediate as yieldToRequests } from 'node:timers/promises'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { policyForPeriod } from '../../common/payroll-policy.js'
 import { buildIdOrCodeWhere } from '../../common/utils.js'
 import { sourceHourlyRate, findEmployeesWithFilter } from '../employees/public.js'
 import { getEmployeeShiftsForAggregation } from '../shifts/public.js'
@@ -64,7 +63,7 @@ export async function aggregateDailyAttendance(
     const pendingWrites: Array<Record<string, unknown>> = []
     const invalidations: Prisma.AuditLogCreateManyInput[] = []
     const details: Array<Record<string, unknown>> = []
-    const adjustmentPolicy = await policyForPeriod(first.slice(0, 7), tx)
+    const adjustmentPolicy = await attendancePayroll().getAdjustmentPolicy(first.slice(0, 7), tx)
     let lastYield = performance.now()
     for (const emp of employees) {
       const empLogs = logs.filter(l => l.employee_id === emp.id)

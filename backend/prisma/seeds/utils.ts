@@ -4,8 +4,8 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createHash } from 'node:crypto'
 import type { Prisma } from '@prisma/client'
-import { workDateSchema } from '../src/common/date.schema.js'
-import { prepareAttendance, vnDay, type DatedPolicyShift, type PolicyLog } from '../src/modules/attendance/attendance.policy.js'
+import { workDateSchema } from '../../src/common/date.schema.js'
+import { prepareAttendance, vnDay, type DatedPolicyShift, type PolicyLog } from '../../src/modules/attendance/attendance.policy.js'
 
 export type SeedMode = 'overwrite' | 'skip'
 export type SeedRange = { from: string; to: string }
@@ -36,7 +36,7 @@ export function parseRange(values: string[], monthOnly = false): SeedRange {
     to ??= from
     workDateSchema.parse(to)
   }
-  if (from > to || +dateValue(to) - +dateValue(from) > 365 * 86400000) throw new Error('Khoảng ngày phải tăng dần và không dài quá 366 ngày.')
+  if (from > to) throw new Error('Khoảng ngày phải tăng dần.')
   return { from, to }
 }
 

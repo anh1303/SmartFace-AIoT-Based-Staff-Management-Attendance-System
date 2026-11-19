@@ -3,16 +3,31 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Employee, PayrollRecord } from '../../src/types';
 
-const state = vi.hoisted(() => ({ payroll: [] as PayrollRecord[], bonusPenalty: null, role: 'manager' }));
+const state = vi.hoisted(() => ({
+  payroll: [] as PayrollRecord[],
+  employees: [] as Employee[],
+  bonusPenalty: null,
+  role: 'manager',
+  currentUser: { employee_id: 'MGR01', department: 'IT', email: 'mgr@company.vn' } as any,
+  selectedPeriod: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+  setSelectedPeriod: vi.fn(),
+  generatePayroll: vi.fn(),
+  updatePayrollItem: vi.fn(),
+  finalizePayrollPeriod: vi.fn(),
+  unlockPayrollPeriod: vi.fn(),
+  updateBonusPenalty: vi.fn(),
+}));
 vi.mock('../../src/context/AppContext', () => ({ useApp: () => state }));
 vi.mock('../../src/context/PayrollContext', () => ({ usePayrollContext: () => state }));
+vi.mock('../../src/context/EmployeeContext', () => ({ useEmployeeContext: () => ({ employees: state.employees }) }));
 vi.mock('../../src/features/payrolls/hooks/usePayrollHistory', () => ({ usePayrollHistory: () => ({ data: state.payroll, isLoading: false, error: null }) }));
-vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: state.role }) }));
+vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: state.role, currentUser: state.currentUser }) }));
 import { useEmployeePayrollDetail } from '../../src/features/payrolls/hooks/useEmployeePayrollDetail';
 import { PayslipBreakdown } from '../../src/features/payrolls/components/PayslipBreakdown';
 import { PayrollSummaryCards } from '../../src/features/payrolls/components/PayrollSummaryCards';
 import { AttendanceHeader } from '../../src/features/attendances/components/AttendanceHeader';
 import { ManagerDevices } from '../../src/pages/manager/ManagerDevices';
+import { ManagerPayroll } from '../../src/pages/manager/ManagerPayroll';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '../../src/context/ToastContext';
@@ -102,5 +117,84 @@ describe('Payroll source of truth', () => {
     expect(html).toContain('123 ₫');
     expect(html).toContain('2 khoản');
     expect(canReviewAdjustment({ ...adjustment, can_review: true })).toBe(false);
+  });
+
+  it('displays the exact API payroll scope even before employees load and gates row editing strictly by backend can_edit', () => {
+    const managerRecord = {
+      ...record,
+      id: '1',
+      payroll_id: 'PR-202611-001',
+      employee_id: 'MGR01',
+      employee_name: 'Manager Self',
+      department: 'IT',
+      status: 'PENDING',
+      can_edit: false,
+    } as PayrollRecord;
+    const subordinateRecord = {
+      ...record,
+      id: '2',
+      payroll_id: 'PR-202611-002',
+      employee_id: 'EMP01',
+      employee_name: 'Subordinate One',
+      department: 'IT',
+      status: 'PENDING',
+      can_edit: true,
+    } as PayrollRecord;
+    const transferredRecord = {
+      ...record,
+      id: '3',
+      payroll_id: 'PR-202611-003',
+      employee_id: 'EMP02',
+      employee_name: 'Moved Department',
+      department: 'IT',
+      status: 'PENDING',
+      can_edit: false,
+    } as PayrollRecord;
+
+    state.payroll = [managerRecord, subordinateRecord, transferredRecord];
+    state.employees = []; // Employees not loaded yet!
+
+    const htmlWithoutEmployees = renderToStaticMarkup(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <ToastProvider>
+            <ManagerPayroll />
+          </ToastProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+
+    expect(htmlWithoutEmployees).toContain('MGR01');
+    expect(htmlWithoutEmployees).toContain('EMP01');
+    expect(htmlWithoutEmployees).toContain('EMP02');
+
+    // Now load employees with stale/mismatched department or email: displayed set and editability must remain identical
+    state.employees = [
+      { id: 'u1', employee_id: 'MGR01', full_name: 'Manager Self', department: 'IT', email: 'different@company.vn' } as Employee,
+      { id: 'u2', employee_id: 'EMP01', full_name: 'Subordinate One', department: 'HR' } as Employee,
+      { id: 'u3', employee_id: 'EMP02', full_name: 'Moved Department', department: 'IT' } as Employee,
+    ];
+
+    const htmlWithEmployees = renderToStaticMarkup(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <ToastProvider>
+            <ManagerPayroll />
+          </ToastProvider>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+
+    expect(htmlWithEmployees).toContain('MGR01');
+    expect(htmlWithEmployees).toContain('EMP01');
+    expect(htmlWithEmployees).toContain('EMP02');
+
+    // Exactly 1 record (EMP01 with can_edit: true) has an enabled "Sửa" button; the 2 with can_edit: false are disabled
+    const editBtnRegex = /<button[^>]*>(?:(?!<\/button>)[^])*?Sửa<\/button>/g;
+    const editButtonsWithoutEmp = [...htmlWithoutEmployees.matchAll(editBtnRegex)].map(m => m[0]);
+    const editButtonsWithEmp = [...htmlWithEmployees.matchAll(editBtnRegex)].map(m => m[0]);
+    expect(editButtonsWithoutEmp).toHaveLength(3);
+    expect(editButtonsWithoutEmp.filter(btn => !btn.includes('disabled'))).toHaveLength(1);
+    expect(editButtonsWithEmp.filter(btn => !btn.includes('disabled'))).toHaveLength(1);
   });
 });

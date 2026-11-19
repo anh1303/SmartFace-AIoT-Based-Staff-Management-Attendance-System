@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 vi.mock('../../src/config/database.js', () => ({ prisma: {} }))
-import { calculateNetSalary } from '../../src/common/utils.js'
+import { calculateNetSalary } from '../../src/modules/payroll/payroll-rates.js'
 import { workDateSchema } from '../../src/common/date.schema.js'
 import { updatePayrollSchema, generatePayrollSchema } from '../../src/modules/payroll/payroll.dto.js'
 

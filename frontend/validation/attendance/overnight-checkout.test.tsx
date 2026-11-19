@@ -253,5 +253,105 @@ describe('Overnight checkout and UNASSIGNED row deduplication', () => {
     expect(unassignedRow.isUnassigned).toBe(true)
     expect(unassignedRow.rawEvents.some((e: any) => e.id === 'log-out-morning-extra')).toBe(true)
   })
+
+  it('indexes overnight checkout by backend work_date (2026-11-18) exactly once even when summary is absent, excludes 2026-11-19 checkout, and shows null work_date logs in undetermined group', async () => {
+    const nov18Shift: WorkShift = {
+      id: 'shift-nov18',
+      employee_id: 'EMP001',
+      date: '2026-11-18',
+      shift_type: 'NIGHT',
+      start_time: '22:00',
+      end_time: '06:00',
+    }
+    const nov18CheckIn: AttendanceRecord = {
+      id: 'log-nov18-in',
+      attendance_id: 'ATT-nov18-in',
+      employee_id: 'EMP001',
+      type: 'CHECK_IN',
+      timestamp: '2026-11-18T22:00:00+07:00',
+      work_date: '2026-11-18',
+      method: 'FACE',
+      device_id: 'PI-01',
+      verification_score: 0.98,
+      status: 'VALID',
+    } as any
+    const nov19OvernightCheckout: AttendanceRecord = {
+      id: 'log-nov19-out-1',
+      attendance_id: 'ATT-nov19-out-1',
+      employee_id: 'EMP001',
+      type: 'CHECK_OUT',
+      timestamp: '2026-11-19T06:10:00+07:00',
+      work_date: '2026-11-18',
+      method: 'FACE',
+      device_id: 'PI-01',
+      verification_score: 0.97,
+      status: 'VALID',
+    } as any
+    const nov19OtherCheckout: AttendanceRecord = {
+      id: 'log-nov19-out-2',
+      attendance_id: 'ATT-nov19-out-2',
+      employee_id: 'EMP001',
+      type: 'CHECK_OUT',
+      timestamp: '2026-11-19T18:00:00+07:00',
+      work_date: '2026-11-19',
+      method: 'FACE',
+      device_id: 'PI-01',
+      verification_score: 0.96,
+      status: 'VALID',
+    } as any
+    const nullWorkDateLog: AttendanceRecord = {
+      id: 'log-null-wd',
+      attendance_id: 'ATT-null-wd',
+      employee_id: 'EMP001',
+      type: 'CHECK_IN',
+      timestamp: '2026-11-18T12:15:00+07:00',
+      work_date: null,
+      method: 'FACE',
+      device_id: 'PI-01',
+      verification_score: 0.95,
+      status: 'VALID',
+    } as any
+
+    let pairs: any[] = []
+
+    function TestComponent() {
+      const result = useAttendancePairs(
+        [mockEmployee],
+        [nov18Shift],
+        [nov18CheckIn, nov19OvernightCheckout, nov19OtherCheckout, nullWorkDateLog],
+        '2026-11-18',
+        '2026-11-18',
+        '',
+        'ALL',
+        {},
+        {},
+        'ALL',
+        'ALL',
+        {} // summary is absent!
+      )
+      pairs = result
+      return <div data-testid="count">{result.length}</div>
+    }
+
+    await act(async () => {
+      root.render(<TestComponent />)
+    })
+
+    const shiftRow = pairs.find(p => p.date === '2026-11-18' && !p.isUnassigned)
+    expect(shiftRow).toBeDefined()
+    expect(shiftRow.rawEvents.map((e: any) => e.id)).toEqual(['log-nov18-in', 'log-nov19-out-1'])
+    expect(shiftRow.events[1].time).toBe('06:10:00')
+
+    // First checkout appears exactly once across all returned rows; 19/11 checkout does not appear
+    const allRawIds = pairs.flatMap(p => p.rawEvents.map((e: any) => e.id))
+    expect(allRawIds.filter(id => id === 'log-nov19-out-1')).toHaveLength(1)
+    expect(allRawIds).not.toContain('log-nov19-out-2')
+
+    // Null work_date log is visible in the separate undetermined (unassigned) group
+    const undeterminedRow = pairs.find(p => p.isUnassigned)
+    expect(undeterminedRow).toBeDefined()
+    expect(undeterminedRow.rawEvents.map((e: any) => e.id)).toEqual(['log-null-wd'])
+    expect(undeterminedRow.workingHours).toBe(0)
+  })
 })
 

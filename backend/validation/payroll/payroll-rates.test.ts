@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 vi.mock('../../src/config/database.js', () => ({ prisma: {} }))
-import * as utils from '../../src/common/utils.js'
+import * as utils from '../../src/modules/payroll/payroll-rates.js'
 import { updateBonusPenaltySchema, updatePayrollSchema } from '../../src/modules/payroll/payroll.dto.js'
 
 const salary = {

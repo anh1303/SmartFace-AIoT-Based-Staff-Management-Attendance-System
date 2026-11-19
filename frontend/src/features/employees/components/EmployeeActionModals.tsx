@@ -1,7 +1,7 @@
 import { ActionButton } from '@/components/common/ActionFeedback';
 import React from 'react';
 import { Modal } from '../../../components/common/Modal';
-import { Employee } from '../../../types';
+import type { Employee } from '../types';
 
 interface ConfirmDeleteEmployeeModalProps {
   employee: Employee | null;

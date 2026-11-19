@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { confidenceColor } from '../src/utils/confidence';
+import { confidenceColor } from '@/features/attendances';
 
 describe('confidence colors', () => {
   it('uses the same thresholds for fractional and percentage scores', () => {

@@ -1,4 +1,4 @@
-import { Employee } from '../../../types';
+import type { Employee } from '../types';
 
 export function getNextEmployeeId(employeesList: Employee[]): string {
   const maxNum = employeesList.reduce((max, emp) => {

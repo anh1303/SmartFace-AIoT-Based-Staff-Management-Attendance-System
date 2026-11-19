@@ -17,8 +17,6 @@ export * from './components/PositionTabContent';
 // Detail & Tab Components
 export * from './components/EmployeeDetailHeader';
 export * from './components/EmployeeOverviewTab';
-export * from './components/EmployeePayrollTab';
-export * from './components/EmployeeScheduleTab';
 export * from './components/EmployeeAccountTab';
 
 // Hooks
@@ -31,4 +29,5 @@ export * from './hooks/useEmployees';
 export * from './api/employeeApi';
 export * from './api/departmentApi';
 export * from './api/positionApi';
-
+export type * from './types';
+export * from './utils/permissionUtils';

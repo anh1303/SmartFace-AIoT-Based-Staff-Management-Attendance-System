@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { wasHiredByPayrollPeriod } from '../../src/utils/payrollUtils'
+import { wasHiredByPayrollPeriod } from '@/features/payrolls';
 
 it('excludes employees hired after the selected VN month, retaining mid-month hires', () => {
   expect(wasHiredByPayrollPeriod('2026-09-01T01:00:00Z', '2026-08')).toBe(false)

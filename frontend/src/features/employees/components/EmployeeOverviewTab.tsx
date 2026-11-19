@@ -5,7 +5,7 @@ import {
   ScanFace,
   Fingerprint,
 } from 'lucide-react';
-import { Employee } from '../../../types';
+import type { Employee } from '../types';
 import { formatVNDate } from '../../../utils/dateUtils';
 
 interface EmployeeOverviewTabProps {

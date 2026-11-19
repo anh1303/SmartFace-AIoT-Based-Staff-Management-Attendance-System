@@ -1,5 +1,5 @@
 import { apiFetch } from '../../../api/client';
-import { AttendanceRecord } from '../../../types';
+import type { AttendanceRecord } from '../types';
 
 export interface FetchAttendanceParams {
   startDate?: string;

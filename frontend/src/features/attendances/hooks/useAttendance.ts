@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import { useAuth } from '../../../context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchAttendanceApi, addAttendanceApi, FetchAttendanceParams } from '../api/attendanceApi';
-import { AttendanceRecord } from '../../../types';
+import type { AttendanceRecord } from '../types';
 import { useToast } from '../../../context/ToastContext';
 
 export const ATTENDANCE_QUERY_KEY = ['attendance'] as const;

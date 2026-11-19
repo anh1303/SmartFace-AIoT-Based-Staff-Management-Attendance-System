@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTableSort } from '../../../hooks/useTableSort';
 import { History } from 'lucide-react';
-import { PayrollRecord } from '../../../types';
+import type { PayrollRecord } from '@/features/payrolls';
 import {
   TableContainer,
   TableHead,

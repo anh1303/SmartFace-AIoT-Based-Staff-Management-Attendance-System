@@ -1,7 +1,8 @@
 import React from 'react';
 import { Printer } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
-import { PayrollRecord, Employee } from '../../../types';
+import type { PayrollRecord } from '@/features/payrolls';
+import type { Employee } from '@/features/employees';
 import { PayslipBreakdown } from '@/features/payrolls';
 
 interface EmployeePayslipModalProps {

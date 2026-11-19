@@ -1,4 +1,5 @@
-import { Employee, WorkShift } from '@/types';
+import type { Employee } from '@/features/employees';
+import type { WorkShift } from '../types';
 import { DayOfWeekItem } from '../components/ScheduleMatrixTable';
 import { calculateShiftWorkingHours } from '@/utils/timeUtils';
 import { exportToExcel } from '@/utils/excelExport';

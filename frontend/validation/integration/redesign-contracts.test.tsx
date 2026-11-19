@@ -8,7 +8,7 @@ import {confirmsRequestedMode} from '../../src/features/devices/deviceModeState'
 import {canReviewAdjustment,filterAdjustments,type AttendanceAdjustment} from '../../src/features/payrolls/components/AdjustmentReviewPanel';
 import {PayslipBreakdown} from '../../src/features/payrolls/components/PayslipBreakdown';
 import {attendanceEventLabel} from '../../src/components/common/AttendanceEventBadge';
-import type {PayrollRecord} from '../../src/types';
+import type { PayrollRecord } from '@/features/payrolls';
 const item:AttendanceAdjustment={id:'a1',employee_id:'NV1',employee_name:'Nguyễn Minh An',date:'2026-10-28',kind:'OVERTIME',hours:1,amount:100000,status:'PENDING',note:null,reviewed_by:null,reviewed_at:null,updated_at:'2026-10-28T01:00:00Z',can_review:true};
 describe('device registration and truthful ACKs',()=>{
  it('allows optional blank IP and IPv4/IPv6, rejects URLs and invalid octets',()=>{for(const ip of ['', '192.168.1.10','::1','2001:db8::1'])expect(validDeviceIp(ip),ip).toBe(true);for(const ip of ['999.1.1.1','01.2.3.4','http://192.168.1.1','192.168.1','hello','1:2:3'])expect(validDeviceIp(ip),ip).toBe(false);});

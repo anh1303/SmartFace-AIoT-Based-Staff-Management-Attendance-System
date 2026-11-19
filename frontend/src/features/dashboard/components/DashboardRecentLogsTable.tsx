@@ -1,7 +1,7 @@
 import React from 'react';
 import { TableSortIndicator } from '../../../components/common/Table';
 import { useTableSort, compareEmployeeNames } from '../../../hooks/useTableSort';
-import { confidenceColor } from '../../../utils/confidence';
+import { confidenceColor } from '@/features/attendances';
 import { Briefcase } from 'lucide-react';
 import { AttendanceEventBadge } from '../../../components/common/AttendanceEventBadge';
 import { formatVNTime } from '../../../utils/dateUtils';

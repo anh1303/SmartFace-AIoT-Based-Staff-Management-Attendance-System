@@ -7,7 +7,7 @@ export { ScheduleLegend } from './components/ScheduleLegend';
 export { ShiftEditModal } from './components/ShiftEditModal';
 export type { EditingShiftTarget } from './components/ShiftEditModal';
 export { BulkShiftModal } from './components/BulkShiftModal';
-export type { ShiftType, WorkShift } from '../../types/shift.types';
+export type * from './types';
 export { useShifts, SHIFTS_QUERY_KEY } from './hooks/useShifts';
 export { ShiftTimeInput } from './components/ShiftTimeInput';
 export * from './api/shiftApi';

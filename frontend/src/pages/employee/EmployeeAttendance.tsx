@@ -6,7 +6,7 @@ import { useEmployeeContext } from '../../context/EmployeeContext';
 import { EmployeeAttendanceTab } from '../components/EmployeeAttendanceTab';
 import { PageHeaderBanner } from '../../components/common';
 import { getTodayVNString } from '../../utils/dateUtils';
-import type { Employee } from '../../types';
+import type { Employee } from '@/features/employees';
 
 export const EmployeeAttendance: React.FC = () => {
   const { currentUser } = useAuth();

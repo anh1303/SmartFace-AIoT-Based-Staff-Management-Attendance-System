@@ -1,7 +1,7 @@
 import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React, { useMemo } from 'react';
 import { Modal } from '../../../components/common/Modal';
-import { Employee } from '../../../types';
+import type { Employee } from '../types';
 import { useAuth } from '../../../context/AuthContext';
 import { formatCurrencyVND, parseCurrencyVND } from '../utils/employeeUtils';
 

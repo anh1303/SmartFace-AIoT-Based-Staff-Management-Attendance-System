@@ -3,9 +3,9 @@ import { usePayrollContext } from '../../context/PayrollContext';
 import { useEmployeeContext } from '../../context/EmployeeContext';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
-import { PayrollRecord } from '../../types';
+import type { PayrollRecord } from '@/features/payrolls';
 import { logger } from '../../utils/logger';
-import { nextPayrollPolicyPeriod } from '../../utils/payrollUtils';
+import { nextPayrollPolicyPeriod } from '@/features/payrolls';
 import { useDepartmentPositions } from '@/features/employees';
 import {
   PayrollHeader,

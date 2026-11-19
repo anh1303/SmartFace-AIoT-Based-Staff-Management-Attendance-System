@@ -11,8 +11,8 @@
   },
   "currentCounts": {
     "pendingMoveContextFiles": 5,
-    "pendingMoveTypeFiles": 7,
-    "pendingMoveUtilFiles": 3,
+    "pendingMoveTypeFiles": 0,
+    "pendingMoveUtilFiles": 0,
     "pendingMoveFeatureEdges": 0,
     "featureCycles": 0,
     "transitionalExceptions": 0
@@ -28,31 +28,31 @@
       "path": "context/AttendanceContext.tsx",
       "owner": "attendances",
       "status": "pending-move",
-      "reason": "Provider state chấm công thuộc feature attendances (chờ di chuyển ở Pha 2)"
+      "reason": "Provider state chấm công thuộc feature attendances (chờ di chuyển ở Batch 5)"
     },
     {
       "path": "context/AuthContext.tsx",
       "owner": "auth",
       "status": "pending-move",
-      "reason": "Provider state phiên đăng nhập thuộc feature auth (chờ di chuyển ở Pha 2)"
+      "reason": "Provider state phiên đăng nhập thuộc feature auth (chờ di chuyển ở Batch 5)"
     },
     {
       "path": "context/EmployeeContext.tsx",
       "owner": "employees",
       "status": "pending-move",
-      "reason": "Provider state danh sách nhân viên thuộc feature employees (chờ di chuyển ở Pha 2)"
+      "reason": "Provider state danh sách nhân viên thuộc feature employees (chờ di chuyển ở Batch 5)"
     },
     {
       "path": "context/PayrollContext.tsx",
       "owner": "payrolls",
       "status": "pending-move",
-      "reason": "Provider state bảng lương thuộc feature payrolls (chờ di chuyển ở Pha 2)"
+      "reason": "Provider state bảng lương thuộc feature payrolls (chờ di chuyển ở Batch 5)"
     },
     {
       "path": "context/ShiftContext.tsx",
       "owner": "schedules",
       "status": "pending-move",
-      "reason": "Provider state lịch phân ca thuộc feature schedules (chờ di chuyển ở Pha 2)"
+      "reason": "Provider state lịch phân ca thuộc feature schedules (chờ di chuyển ở Batch 5)"
     },
     {
       "path": "context/ThemeContext.tsx",
@@ -81,67 +81,19 @@
       "reason": "Kiểu envelope phản hồi API và phân trang dùng chung toàn frontend"
     },
     {
-      "path": "types/attendance.types.ts",
-      "owner": "attendances",
-      "status": "pending-move",
-      "reason": "Kiểu dữ liệu bản ghi chấm công và tổng hợp ngày công thuộc feature attendances (chờ di chuyển ở Pha 2)"
-    },
-    {
-      "path": "types/auth.types.ts",
-      "owner": "auth",
-      "status": "pending-move",
-      "reason": "Kiểu phiên đăng nhập và vai trò thuộc feature auth (chờ di chuyển ở Pha 2)"
-    },
-    {
-      "path": "types/biometric.types.ts",
-      "owner": "biometrics",
-      "status": "pending-move",
-      "reason": "Kiểu dữ liệu sinh trắc học thuộc feature biometrics (chờ di chuyển ở Pha 2)"
-    },
-    {
       "path": "types/common.types.ts",
       "owner": "shared",
       "status": "allowed",
       "reason": "Kiểu giao diện dùng chung (ToastMessage, tùy chọn lọc chung)"
     },
     {
-      "path": "types/department.types.ts",
-      "owner": "employees",
-      "status": "pending-move",
-      "reason": "Kiểu phòng ban và chức vụ thuộc feature employees (chờ di chuyển ở Pha 2)"
-    },
-    {
-      "path": "types/employee.types.ts",
-      "owner": "employees",
-      "status": "pending-move",
-      "reason": "Kiểu hồ sơ nhân viên thuộc feature employees (chờ di chuyển ở Pha 2)"
-    },
-    {
       "path": "types/index.ts",
       "owner": "shared",
       "status": "allowed",
-      "reason": "Barrel tái xuất các kiểu dữ liệu dùng chung và chuyển tiếp"
-    },
-    {
-      "path": "types/payroll.types.ts",
-      "owner": "payrolls",
-      "status": "pending-move",
-      "reason": "Kiểu phiếu lương và chính sách thưởng/phạt thuộc feature payrolls (chờ di chuyển ở Pha 2)"
-    },
-    {
-      "path": "types/shift.types.ts",
-      "owner": "schedules",
-      "status": "pending-move",
-      "reason": "Kiểu ca làm việc thuộc feature schedules (chờ di chuyển ở Pha 2)"
+      "reason": "Barrel tái xuất các kiểu dữ liệu hạ tầng dùng chung"
     }
   ],
   "utilFiles": [
-    {
-      "path": "utils/confidence.ts",
-      "owner": "attendances",
-      "status": "pending-move",
-      "reason": "Hàm định màu độ tin cậy nhận diện chấm công thuộc feature attendances (chờ di chuyển ở Pha 2)"
-    },
     {
       "path": "utils/dateUtils.ts",
       "owner": "shared",
@@ -158,25 +110,13 @@
       "path": "utils/index.ts",
       "owner": "shared",
       "status": "allowed",
-      "reason": "Barrel tái xuất các tiện ích dùng chung và chuyển tiếp"
+      "reason": "Barrel tái xuất các tiện ích hạ tầng dùng chung"
     },
     {
       "path": "utils/logger.ts",
       "owner": "shared",
       "status": "allowed",
       "reason": "Logger phía client dùng chung toàn ứng dụng"
-    },
-    {
-      "path": "utils/payrollUtils.ts",
-      "owner": "payrolls",
-      "status": "pending-move",
-      "reason": "Hàm tính hiển thị hệ số lương và kỳ chính sách thuộc feature payrolls (chờ di chuyển ở Pha 2)"
-    },
-    {
-      "path": "utils/permissionUtils.ts",
-      "owner": "employees",
-      "status": "pending-move",
-      "reason": "Helper kiểm tra phạm vi xem hồ sơ nhân viên thuộc feature employees (chờ di chuyển ở Pha 2)"
     },
     {
       "path": "utils/reportPrint.ts",
@@ -213,6 +153,27 @@
       "reason": "WebRTCPlayer đọc trạng thái/cấu hình thiết bị qua entry công khai của feature devices"
     },
     {
+      "source": "attendances",
+      "target": "employees",
+      "owner": "attendances",
+      "status": "allowed",
+      "reason": "Hợp đồng kiểu một chiều (import type Employee) để đối chiếu nhân viên trong bảng và cặp chấm công"
+    },
+    {
+      "source": "attendances",
+      "target": "schedules",
+      "owner": "attendances",
+      "status": "allowed",
+      "reason": "Hợp đồng kiểu một chiều (import type WorkShift) để ghép ca làm việc với lượt chấm công"
+    },
+    {
+      "source": "biometrics",
+      "target": "employees",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Quản lý sinh trắc học dùng hợp đồng kiểu Employee và kiểm tra phạm vi nhân viên qua entry công khai của feature employees"
+    },
+    {
       "source": "biometrics",
       "target": "operations",
       "owner": "biometrics",
@@ -220,11 +181,46 @@
       "reason": "Luồng đăng ký sinh trắc học theo dõi tác vụ nền qua entry công khai của feature operations"
     },
     {
+      "source": "dashboard",
+      "target": "attendances",
+      "owner": "dashboard",
+      "status": "allowed",
+      "reason": "Bảng log gần nhất trên dashboard dùng helper confidenceColor từ entry công khai của feature attendances"
+    },
+    {
+      "source": "employees",
+      "target": "auth",
+      "owner": "employees",
+      "status": "allowed",
+      "reason": "Hợp đồng kiểu một chiều (import type UserSession) cho permissionUtils trong feature employees"
+    },
+    {
       "source": "employees",
       "target": "operations",
       "owner": "employees",
       "status": "allowed",
       "reason": "Tạo hồ sơ nhân viên và gửi email tài khoản theo dõi tác vụ nền qua entry công khai của feature operations"
+    },
+    {
+      "source": "payrolls",
+      "target": "employees",
+      "owner": "payrolls",
+      "status": "allowed",
+      "reason": "Hợp đồng kiểu một chiều (import type Employee) cho hiển thị thông tin nhân viên trên bảng lương"
+    },
+    {
+      "source": "payrolls",
+      "target": "schedules",
+      "owner": "payrolls",
+      "status": "allowed",
+      "reason": "Hợp đồng kiểu một chiều (import type WorkShift) cho panel duyệt thưởng/phạt theo ca"
+    },
+    {
+      "source": "schedules",
+      "target": "employees",
+      "owner": "schedules",
+      "status": "allowed",
+      "reason": "Hợp đồng kiểu một chiều (import type Employee, DepartmentItem) cho ma trận phân ca"
     },
     {
       "source": "schedules",

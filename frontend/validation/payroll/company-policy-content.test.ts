@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import policy from '../../src/content/company-policy.json'
-import { calcPayrollAmount } from '../../src/utils/payrollUtils'
+import { calcPayrollAmount } from '@/features/payrolls';
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 

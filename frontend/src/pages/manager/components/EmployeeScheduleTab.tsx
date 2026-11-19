@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { CalendarRange } from 'lucide-react';
-import { WorkShift, Employee } from '../../../types';
+import type { WorkShift } from '@/features/schedules';
+import type { Employee } from '@/features/employees';
 import { formatVNDate, getTodayVNString } from '../../../utils/dateUtils';
 import {
   TableContainer,

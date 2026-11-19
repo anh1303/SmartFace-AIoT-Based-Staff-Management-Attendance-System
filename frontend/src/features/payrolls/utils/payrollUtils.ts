@@ -1,4 +1,4 @@
-import { formatVNDateISO } from './dateUtils';
+import { formatVNDateISO } from '../../../utils/dateUtils';
 
 export function wasHiredByPayrollPeriod(createdAt: string | null | undefined, period: string): boolean {
   return !createdAt || formatVNDateISO(createdAt).slice(0, 7) <= period;

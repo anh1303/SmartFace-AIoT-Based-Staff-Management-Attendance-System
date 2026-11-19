@@ -9,7 +9,8 @@ import {
   useAttendanceSummaries,
 } from '@/features/attendances';
 import { AdjustmentReviewPanel } from '@/features/payrolls';
-import { AttendanceRecord, Employee } from '../../types';
+import type { AttendanceRecord } from '@/features/attendances';
+import type { Employee } from '@/features/employees';
 import { useShiftContext } from '../../context/ShiftContext';
 import { useEmployeeContext } from '../../context/EmployeeContext';
 import { FilterSelect } from '../../components/common/FilterSelect';

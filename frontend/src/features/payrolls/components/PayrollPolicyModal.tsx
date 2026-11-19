@@ -1,7 +1,7 @@
 import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../../components/common/Modal';
-import { nextPayrollPolicyPeriod } from '../../../utils/payrollUtils';
+import { nextPayrollPolicyPeriod } from '../utils/payrollUtils';
 import { fetchBonusPenaltyApi } from '../api/payrollApi';
 
 export interface PolicyFormData {

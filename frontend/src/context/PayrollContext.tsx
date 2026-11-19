@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { usePayroll, type PayrollItemUpdates } from '../features/payrolls';
-import { PayrollRecord, BonusPenaltyPolicy } from '../types';
+import type { PayrollRecord, BonusPenaltyPolicy } from '@/features/payrolls';
 import { useAuth } from './AuthContext';
 
 export interface PayrollContextType {

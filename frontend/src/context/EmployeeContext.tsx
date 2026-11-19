@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useEmployees } from '../features/employees';
-import { Employee } from '../types';
+import type { Employee } from '@/features/employees';
 import { useAuth } from './AuthContext';
 
 export interface EmployeeContextType {

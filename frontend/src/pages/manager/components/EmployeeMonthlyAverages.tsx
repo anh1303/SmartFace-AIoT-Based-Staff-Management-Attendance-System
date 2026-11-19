@@ -3,7 +3,7 @@ import { useAttendanceSummaries } from '@/features/attendances';
 import { calculateMonthlyAverages } from '@/features/employees';
 import { useShiftContext } from '../../../context/ShiftContext';
 import { getTodayVNString } from '../../../utils/dateUtils';
-import { Employee } from '../../../types';
+import type { Employee } from '@/features/employees';
 
 export function EmployeeMonthlyAverages({ employee }: { employee: Employee }) {
   const { data: payroll = [], isLoading: isLoadingPayroll, error: payrollError } = usePayrollHistory(employee.employee_id);

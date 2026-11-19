@@ -24,3 +24,5 @@ export * from './api/attendanceApi';
 
 // Utils
 export * from './utils/csvExport';
+export type * from './types';
+export * from './utils/confidence';

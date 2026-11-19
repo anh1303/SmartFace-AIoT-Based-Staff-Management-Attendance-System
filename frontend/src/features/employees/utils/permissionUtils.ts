@@ -1,4 +1,5 @@
-import { Employee, UserSession } from '../types';
+import type { Employee } from '../types';
+import type { UserSession } from '@/features/auth';
 
 /**
  * Kiểm tra xem một nhân viên có phải là "Quản lý khác" đối với người dùng đang đăng nhập hay không.

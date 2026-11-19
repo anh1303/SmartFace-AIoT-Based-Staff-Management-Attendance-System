@@ -2,7 +2,7 @@ import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React, { useEffect, useState } from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { Check } from 'lucide-react';
-import { PayrollRecord } from '../../../types';
+import type { PayrollRecord } from '../types';
 import type { PayrollItemUpdates } from '../api/payrollApi';
 import { previewPayrollItemApi } from '../api/payrollApi';
 

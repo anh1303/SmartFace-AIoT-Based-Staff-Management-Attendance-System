@@ -1,5 +1,5 @@
 import { apiFetch, type ApiResponse } from '../../../api/client';
-import { UserSession, Role } from '../../../types';
+import type { UserSession, Role } from '../types';
 
 export const DEFAULT_USERS: Record<Role, UserSession> = {
   admin: {

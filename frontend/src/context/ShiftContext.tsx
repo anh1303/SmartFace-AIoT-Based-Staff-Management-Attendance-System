@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useShifts } from '../features/schedules';
-import { WorkShift } from '../types';
+import type { WorkShift } from '@/features/schedules';
 import { useAuth } from './AuthContext';
 
 export interface ShiftContextType {

@@ -4,10 +4,10 @@ import { useTableSort, compareEmployeeNames, compareEmployeeCodes } from '../../
 import { useMutationState } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ScanFace, Fingerprint, Lock } from 'lucide-react';
-import { Employee } from '../../../types';
+import type { Employee } from '../types';
 import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext';
-import { isAnotherManager } from '../../../utils/permissionUtils';
+import { isAnotherManager } from '../utils/permissionUtils';
 import {
   TableContainer,
   TableHead,

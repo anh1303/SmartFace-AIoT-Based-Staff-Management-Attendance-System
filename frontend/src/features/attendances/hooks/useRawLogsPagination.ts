@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { AttendanceRecord } from '../../../types';
+import type { AttendanceRecord } from '../types';
 import { fetchAttendanceApi, fetchAttendancePaginatedApi } from '../api/attendanceApi';
 import { compareEmployeeNames } from '../../../hooks/useTableSort';
 

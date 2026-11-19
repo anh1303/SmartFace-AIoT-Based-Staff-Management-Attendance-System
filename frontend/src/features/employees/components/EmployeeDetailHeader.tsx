@@ -13,9 +13,9 @@ import {
   ShieldCheck,
   Lock
 } from 'lucide-react';
-import { Employee } from '../../../types';
+import type { Employee } from '../types';
 import { useAuth } from '../../../context/AuthContext';
-import { isAnotherManager } from '../../../utils/permissionUtils';
+import { isAnotherManager } from '../utils/permissionUtils';
 
 interface EmployeeDetailHeaderProps {
   currentEmp: Employee;

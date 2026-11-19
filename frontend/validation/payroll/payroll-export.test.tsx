@@ -4,9 +4,8 @@ import { createRoot, Root } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Employee, PayrollRecord } from '../../src/types'
-
-;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+import type { Employee } from '@/features/employees';
+import type { PayrollRecord } from '@/features/payrolls';(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
 const toastSpy = vi.fn()
 const state = vi.hoisted(() => ({

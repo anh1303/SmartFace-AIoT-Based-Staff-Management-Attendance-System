@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { usePayrollHistory } from './usePayrollHistory';
-import { Employee } from '../../../types';
+import type { Employee } from '@/features/employees';
 
 export interface UseEmployeePayrollDetailOptions {
   currentEmp: Employee | null;

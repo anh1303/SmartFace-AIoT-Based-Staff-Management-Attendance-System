@@ -6,8 +6,8 @@ import { useToast } from '../../context/ToastContext';
 import { useEmployeeContext } from '../../context/EmployeeContext';
 import { useShiftContext } from '../../context/ShiftContext';
 import { useAuth } from '../../context/AuthContext';
-import { isAnotherManager } from '../../utils/permissionUtils';
-import { WorkShift } from '../../types';
+import { isAnotherManager } from '@/features/employees';
+import type { WorkShift } from '@/features/schedules';
 import {
   ScheduleHeader,
   ScheduleWeekNavigator,

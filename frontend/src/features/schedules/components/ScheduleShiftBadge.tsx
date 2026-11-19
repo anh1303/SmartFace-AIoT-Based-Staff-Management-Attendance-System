@@ -1,5 +1,5 @@
 import { Lock } from 'lucide-react';
-import type { WorkShift } from '../../../types';
+import type { WorkShift } from '../types';
 
 export function ScheduleShiftBadge({ shift, isPast = false }: { shift?: WorkShift; isPast?: boolean }) {
   if (!shift || shift.shift_type === 'OFF') {

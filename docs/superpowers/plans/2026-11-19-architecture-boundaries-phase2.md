@@ -149,9 +149,9 @@ Nguyên tắc xuyên suốt:
    - Kiểm soát ma trận phụ thuộc kiểu (vì `feature-boundary.test.ts` tính cả `import type` vào đồ thị chu trình): mọi kiểu chia sẻ nhiều feature (như `Role`) chốt một hướng duy nhất (ví dụ các feature khác phụ thuộc một chiều vào `auth` hoặc `types/common.types.ts`), tuyệt đối không tạo cạnh hai chiều.
 
 **Kiểm chứng Batch 4:**
-- [ ] Cập nhật `frontend/validation/architecture/boundary-baseline.json` (`currentCounts.pendingMoveUtilFiles: 0`, `currentCounts.pendingMoveTypeFiles: 0`; giữ nguyên `initialCounts`).
-- [ ] Chạy `cd frontend && npm.cmd run build && npx.cmd vitest run validation src/utils/__tests__`.
-- [ ] Chốt commit Batch 4.
+- [x] Cập nhật `frontend/validation/architecture/boundary-baseline.json` (`currentCounts.pendingMoveUtilFiles: 0`, `currentCounts.pendingMoveTypeFiles: 0`; giữ nguyên `initialCounts`).
+- [x] Chạy `cd frontend && npm.cmd run build && npx.cmd vitest run validation src/utils/__tests__`.
+- [x] Chốt commit Batch 4.
 
 ---
 

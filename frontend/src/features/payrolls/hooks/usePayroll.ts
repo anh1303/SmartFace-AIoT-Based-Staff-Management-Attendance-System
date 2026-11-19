@@ -10,7 +10,7 @@ import {
   updateBonusPenaltyApi,
   PayrollItemUpdates,
 } from '../api/payrollApi';
-import { PayrollRecord, BonusPenaltyPolicy } from '../../../types';
+import type { PayrollRecord, BonusPenaltyPolicy } from '../types';
 import { useToast } from '../../../context/ToastContext';
 import { getTodayVNString } from '../../../utils/dateUtils';
 

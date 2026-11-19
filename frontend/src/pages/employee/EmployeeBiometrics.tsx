@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Fingerprint, ScanFace, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/client';
-import type { Employee } from '../../types';
+import type { Employee } from '@/features/employees';
 import { PageHeaderBanner } from '../../components/common';
 
 export const EmployeeBiometrics: React.FC = () => {

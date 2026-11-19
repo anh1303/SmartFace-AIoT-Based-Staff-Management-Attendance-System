@@ -2,7 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PayrollTable } from '../../src/features/payrolls/components/PayrollTable';
-import type { PayrollRecord } from '../../src/types';
+import type { PayrollRecord } from '@/features/payrolls';
 
 vi.mock('../../src/context/AuthContext', () => ({ useAuth: () => ({ role: 'admin', currentUser: null }) }));
 

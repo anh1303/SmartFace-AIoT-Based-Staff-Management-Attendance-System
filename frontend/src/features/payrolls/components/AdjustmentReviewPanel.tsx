@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import { apiFetch } from '../../../api/client';
 import { FilterBar, FilterSelect, SearchInput, TableContainer, TableHead, TableHeadRow, TableHeadCell, TableBody, TableRow, TableCell, TableEmpty } from '../../../components/common';
-import type { WorkShift } from '../../../types';
+import type { WorkShift } from '@/features/schedules';
 
 export interface AttendanceAdjustment {
   id: string;

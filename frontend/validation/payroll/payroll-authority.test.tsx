@@ -1,7 +1,8 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Employee, PayrollRecord } from '../../src/types';
+import type { Employee } from '@/features/employees';
+import type { PayrollRecord } from '@/features/payrolls';
 
 const state = vi.hoisted(() => ({
   payroll: [] as PayrollRecord[],

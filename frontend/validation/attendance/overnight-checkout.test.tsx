@@ -3,7 +3,9 @@ import React, { act } from 'react'
 import { createRoot, Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useAttendancePairs } from '../../src/features/attendances/hooks/useAttendancePairs'
-import type { Employee, WorkShift, AttendanceRecord, DailyAttendanceSummary } from '../../src/types'
+import type { Employee } from '@/features/employees';
+import type { WorkShift } from '@/features/schedules';
+import type { AttendanceRecord, DailyAttendanceSummary } from '@/features/attendances';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 

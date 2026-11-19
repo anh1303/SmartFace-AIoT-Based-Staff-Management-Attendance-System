@@ -19,9 +19,9 @@ import {
   FilterSelectOption,
 } from '../../../components/common';
 import { BiometricStatusBadge } from './BiometricStatusBadge';
-import { Employee } from '../../../types';
+import type { Employee } from '@/features/employees';
 import { useAuth } from '../../../context/AuthContext';
-import { isAnotherManager } from '../../../utils/permissionUtils';
+import { isAnotherManager } from '@/features/employees';
 
 export interface BiometricsEmployeeTableProps {
   employees: Employee[];

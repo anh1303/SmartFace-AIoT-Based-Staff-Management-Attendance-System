@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
-import { Employee, WorkShift, AttendanceRecord } from '../../../types';
+import type { Employee } from '@/features/employees';
+import type { WorkShift } from '@/features/schedules';
+import type { AttendanceRecord } from '../types';
 import { formatVNDateISO, formatVNTime } from '../../../utils/dateUtils';
 import { formatSecondsToHHMMSS } from '../../../utils/timeUtils';
 import { BackendAttendanceSummaryItem } from './useAttendanceSummaries';

@@ -5,7 +5,8 @@ import {
   calculateAutoFitColumnWidths,
   exportScheduleToExcel,
 } from '../scheduleExport';
-import { Employee, WorkShift } from '@/types';
+import type { Employee } from '@/features/employees';
+import type { WorkShift } from '../../types';
 import { DayOfWeekItem } from '../../components/ScheduleMatrixTable';
 
 vi.mock('xlsx', async (importOriginal) => {

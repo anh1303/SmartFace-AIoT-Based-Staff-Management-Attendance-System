@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useEmployeeContext } from '../../context/EmployeeContext';
-import { Employee } from '../../types';
+import type { Employee } from '@/features/employees';
 import {
   getNextEmployeeId,
   EmployeeListHeader,

@@ -11,3 +11,5 @@ export * from './hooks/useEmployeePayrollDetail';
 export * from './hooks/usePayroll';
 export * from './api/payrollApi';
 export * from './hooks/usePayrollHistory';
+export type * from './types';
+export * from './utils/payrollUtils';

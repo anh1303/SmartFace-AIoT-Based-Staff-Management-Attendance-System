@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useAttendanceContext } from '../../../context/AttendanceContext';
-import { Employee } from '../../../types';
+import type { Employee } from '@/features/employees';
 import { formatVNDateISO } from '../../../utils/dateUtils';
 
 export interface UseEmployeeAttendanceDetailOptions {

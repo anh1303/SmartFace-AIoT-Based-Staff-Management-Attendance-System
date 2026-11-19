@@ -4,7 +4,7 @@ import { createRoot, Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PayrollFinalizeModal } from '../../src/features/payrolls/components/PayrollActionModals';
 import { EarlySettlementModal } from '../../src/features/payrolls/components/EarlySettlementModal';
-import type { PayrollRecord } from '../../src/types';
+import type { PayrollRecord } from '@/features/payrolls';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 

@@ -11,7 +11,7 @@ import {
   AlertTriangle,
   Layers,
 } from 'lucide-react';
-import { DepartmentItem } from '../../../types';
+import type { DepartmentItem } from '../types';
 
 export interface DepartmentTabContentProps {
   loading: boolean;

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { fetchEmployeesApi, createEmployeeApi, updateEmployeeApi, deleteEmployeeApi } from '../api/employeeApi';
-import { Employee } from '../../../types';
+import type { Employee } from '../types';
 import { useToast } from '../../../context/ToastContext';
 import { getActiveSessionId } from '../../../context/AuthContext';
 import { ApiError } from '../../../api/client';

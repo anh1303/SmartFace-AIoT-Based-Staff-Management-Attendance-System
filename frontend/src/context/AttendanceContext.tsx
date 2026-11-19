@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useAttendance } from '../features/attendances';
-import { AttendanceRecord } from '../types';
+import type { AttendanceRecord } from '@/features/attendances';
 
 export interface AttendanceContextType {
   attendance: AttendanceRecord[];

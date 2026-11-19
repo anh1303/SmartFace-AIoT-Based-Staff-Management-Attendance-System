@@ -2,7 +2,8 @@ import {Avatar} from '../../../components/common/Avatar';
 import React from 'react';
 import { TableSortIndicator } from '../../../components/common/Table';
 import { useTableSort, compareEmployeeNames } from '../../../hooks/useTableSort';
-import { Employee, WorkShift } from '../../../types';
+import type { Employee } from '@/features/employees';
+import type { WorkShift } from '../types';
 import { getTodayVNString } from '../../../utils/dateUtils';
 import { ScheduleShiftBadge } from './ScheduleShiftBadge';
 

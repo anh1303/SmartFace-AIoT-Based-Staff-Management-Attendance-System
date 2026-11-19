@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcPayrollAmount, formatPayrollRateLabel } from '../../src/utils/payrollUtils';
+import { calcPayrollAmount, formatPayrollRateLabel } from '@/features/payrolls';
 
 describe('Multiplier payroll calculations and formatting', () => {
   it('calculates amount using multiplier formula: hours * multiplier * hourlyRate', () => {

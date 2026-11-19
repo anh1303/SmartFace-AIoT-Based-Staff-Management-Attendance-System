@@ -1,5 +1,5 @@
 import { apiFetch } from '../../../api/client';
-import { PayrollRecord, BonusPenaltyPolicy } from '../../../types';
+import type { PayrollRecord, BonusPenaltyPolicy } from '../types';
 
 export type PayrollItemUpdates = { allowance: number; reason?: string; updated_at?: string };
 

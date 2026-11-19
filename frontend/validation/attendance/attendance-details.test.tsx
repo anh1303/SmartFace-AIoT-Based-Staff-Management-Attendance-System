@@ -8,7 +8,8 @@ import { AttendanceDayDetails } from '../../src/features/attendances/components/
 import { AdjustmentReviewPanel } from '../../src/features/payrolls/components/AdjustmentReviewPanel';
 import { useAttendancePairs } from '../../src/features/attendances/hooks/useAttendancePairs';
 import type { AttendancePairItem } from '../../src/features/attendances/hooks/useAttendancePairs';
-import type { Employee, WorkShift } from '../../src/types';
+import type { Employee } from '@/features/employees';
+import type { WorkShift } from '@/features/schedules';
 vi.mock('../../src/api/client', () => ({ apiFetch: vi.fn() }));
 vi.mock('../../src/context/ToastContext', () => ({ useToast: () => ({showToast:vi.fn()}) }));
 import { apiFetch } from '../../src/api/client';

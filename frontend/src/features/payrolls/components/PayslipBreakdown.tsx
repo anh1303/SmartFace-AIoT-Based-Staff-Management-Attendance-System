@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PayrollRecord } from '../../../types';
+import type { PayrollRecord } from '../types';
 
 const money = (n: number) => `${Number(n).toLocaleString('vi-VN')} ₫`;
 

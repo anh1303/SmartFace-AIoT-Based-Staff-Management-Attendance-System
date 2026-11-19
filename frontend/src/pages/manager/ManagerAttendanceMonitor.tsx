@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { confidenceColor } from '../../utils/confidence';
+import { confidenceColor } from '@/features/attendances';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
@@ -25,7 +25,7 @@ import {
   exportAttendanceToCSV,
   useRawLogsPagination,
 } from '@/features/attendances';
-import { AttendanceRecord } from '../../types';
+import type { AttendanceRecord } from '@/features/attendances';
 import { TableSortIndicator } from '../../components/common/Table';
 import { useTableSort, compareEmployeeNames } from '../../hooks/useTableSort';
 import { ChevronLeft, ChevronRight, RefreshCw, FileText } from 'lucide-react';

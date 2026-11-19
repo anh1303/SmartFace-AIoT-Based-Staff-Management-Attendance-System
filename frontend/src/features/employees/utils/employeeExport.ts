@@ -1,4 +1,4 @@
-import { Employee } from '@/types';
+import type { Employee } from '../types';
 import { exportToExcel } from '@/utils/excelExport';
 
 export const buildEmployeeExportRows = (

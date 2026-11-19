@@ -1,5 +1,5 @@
 import { apiFetch } from '../../../api/client';
-import { WorkShift } from '../../../types';
+import type { WorkShift } from '../types';
 import { submitAndWait } from '../../operations';
 
 export async function submitScheduleBatch(assignments: unknown[]) {

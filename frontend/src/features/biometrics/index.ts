@@ -10,3 +10,4 @@ export * from './components/BiometricStatusBadge';
 export * from './hooks/useBiometricEnrollment';
 
 export * from './api/biometricApi';
+export type { BiometricEnrolledItem } from './types';

@@ -3,7 +3,8 @@ import { useTableSort, compareEmployeeNames } from '../../../hooks/useTableSort'
 import { Lock, Pencil } from 'lucide-react';
 import { SearchInput, FilterSelect, FilterSelectOption, FilterBar, TableContainer, TableHead, TableHeadRow, TableHeadCell, TableBody, TableRow, TableCell, TableEmpty } from '../../../components/common';
 import { Avatar } from '../../../components/common/Avatar';
-import { PayrollRecord, Employee } from '../../../types';
+import type { PayrollRecord } from '../types';
+import type { Employee } from '@/features/employees';
 import { getTodayVNString } from '../../../utils/dateUtils';
 
 interface PayrollTableProps {

@@ -13,7 +13,7 @@ import {
   UserCheck,
   AlertTriangle,
 } from 'lucide-react';
-import { DepartmentItem, PositionItem } from '../../../types';
+import type { DepartmentItem, PositionItem } from '../types';
 
 export interface PositionTabContentProps {
   loading: boolean;

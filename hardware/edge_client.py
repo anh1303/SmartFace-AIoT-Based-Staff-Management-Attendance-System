@@ -144,7 +144,6 @@ if SHOW_GUI and sys.platform.startswith("linux"):
 from detection import create_detector
 from tracking import FaceTracker
 from antispoof import AntiSpoofPredictor
-from alignment import align_face
 from recognition import FaceEmbedder
 from recognition.worker import RecognitionWorker, IdentityCache
 from recognition.remote import RemoteFaceEmbedder, ARCFACE_SHA256

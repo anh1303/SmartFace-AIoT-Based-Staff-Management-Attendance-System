@@ -266,39 +266,7 @@ def orchestrate_track_step(
             if recognition_called:
                 track.recognition_error = True
 
-    attendance_attempted = False
-    attendance_success = None
-    attendance_reason = None
-    last_ts = None
-
-    # Disabled in Embed-only scope: Python không còn ghi attendance_logs trực tiếp.
-    # Backend Prisma là writer duy nhất cho bảng attendance_logs.
-    # if (
-    #     app_mode != "NONE"
-    #     and not is_spoof
-    #     and not is_pad_pending
-    #     and not track.is_pending
-    #     and track.employee_id
-    #     and track.can_log_attendance(attendance_gap_minutes)
-    #     and track.stable_recognitions >= attendance_stable_count
-    # ):
-    #     attendance_attempted = True
-    #     success, reason, last_ts = db.log_attendance(
-    #         employee_id=track.employee_id,
-    #         action=app_mode,
-    #         gap_minutes=attendance_gap_minutes,
-    #         face_similarity=float(track.score) if track.score is not None else None,
-    #         liveness_score=track.last_pad_score,
-    #     )
-    #     attendance_success = success
-    #     attendance_reason = reason
-    #     if success:
-    #         track.last_attendance_time = (
-    #             last_ts.timestamp() if last_ts else time.time()
-    #         )
-    #     elif last_ts is not None:
-    #         track.last_attendance_time = last_ts.timestamp()
-
+    # Keep the legacy result contract; only the backend writes attendance.
     return {
         "should_recognize": should_recognize,
         "is_spoof": is_spoof,
@@ -308,10 +276,10 @@ def orchestrate_track_step(
         ),
         "recognized": recognized,
         "recognition_called": recognition_called,
-        "attendance_attempted": attendance_attempted,
-        "attendance_success": attendance_success,
-        "attendance_reason": attendance_reason,
-        "last_ts": last_ts,
+        "attendance_attempted": False,
+        "attendance_success": None,
+        "attendance_reason": None,
+        "last_ts": None,
     }
 
 

@@ -53,6 +53,30 @@ const io = new Server(httpServer, {
 
 registerServerBootstrap(io)
 
+export function startBackgroundServices(options?: {
+  enableAttendanceCron?: boolean
+  startOperationWorkerFn?: typeof startOperationWorker
+  connectMqttFn?: typeof connectMqtt
+  registerDeviceMqttHandlersFn?: typeof registerDeviceMqttHandlers
+  startAttendanceCronFn?: typeof startAttendanceCron
+}) {
+  const enableAttendanceCron = options?.enableAttendanceCron ?? env.ENABLE_ATTENDANCE_CRON
+  const runWorker = options?.startOperationWorkerFn ?? startOperationWorker
+  const runMqtt = options?.connectMqttFn ?? connectMqtt
+  const runDeviceHandlers = options?.registerDeviceMqttHandlersFn ?? registerDeviceMqttHandlers
+  const runCron = options?.startAttendanceCronFn ?? startAttendanceCron
+
+  runWorker()
+  runMqtt()
+  runDeviceHandlers()
+
+  if (enableAttendanceCron) {
+    runCron()
+  } else {
+    serverLogger.info('Attendance cron disabled (ENABLE_ATTENDANCE_CRON=false)')
+  }
+}
+
 async function start() {
   // 11. Đảm bảo kết nối CSDL Prisma hoàn tất trước khi mở kết nối MQTT và nhận message
   await prisma.$connect()
@@ -61,14 +85,9 @@ async function start() {
   const warmupStarted = performance.now()
   await findBestFaceMatch('[' + ['1', ...Array(511).fill('0')].join(',') + ']')
   serverLogger.info(`Face matcher ready (${Math.round(performance.now() - warmupStarted)} ms warmup)`)
-  startOperationWorker()
   serverLogger.info('Database connected successfully')
 
-  connectMqtt()
-  registerDeviceMqttHandlers()
-
-  // Khởi động dịch vụ tự động tổng hợp chấm công định kỳ
-  startAttendanceCron()
+  startBackgroundServices()
 
   httpServer.listen(env.PORT, () => serverLogger.info(`API listening on http://localhost:${env.PORT}`))
 }

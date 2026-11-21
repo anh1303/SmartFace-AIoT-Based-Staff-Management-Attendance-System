@@ -1,6 +1,5 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '../../config/database.js'
-import { payrollOverrides } from './payroll.overrides.js'
 import { policyForPeriod, nextPayrollPeriod } from './payroll.policy.js'
 import { calculateNetSalary, computePayrollBreakdown, type SalaryCalculationInput, type PayrollBreakdown } from './payroll-rates.js'
 

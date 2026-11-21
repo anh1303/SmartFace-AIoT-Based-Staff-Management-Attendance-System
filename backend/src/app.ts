@@ -9,7 +9,15 @@ import { successResponse } from './common/response.js';
 import { apiRouter } from './routes.js';
 import './composition.js';
 
+export function configureTrustProxy(targetApp: express.Express, hops: number) {
+  if (!Number.isInteger(hops) || hops < 0 || hops > 5) {
+    throw new Error(`Invalid TRUST_PROXY_HOPS: ${hops}`)
+  }
+  targetApp.set('trust proxy', hops > 0 ? hops : false)
+}
+
 export const app = express();
+configureTrustProxy(app, env.TRUST_PROXY_HOPS);
 
 app.use(helmet());
 app.use(

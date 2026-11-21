@@ -139,6 +139,197 @@
       "reason": "Hàm kiểm tra định dạng UUID dùng chung toàn backend"
     }
   ],
+  "moduleDependencyMatrix": [
+    {
+      "source": "attendance",
+      "target": "auth",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Tra cứu danh sách người nhận cảnh báo và quản lý đang hoạt động qua entry công khai của auth"
+    },
+    {
+      "source": "attendance",
+      "target": "biometrics",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Xác thực vân tay và đối khớp khuôn mặt khi ghi nhận chấm công qua public.ts và fingerprint.public.ts"
+    },
+    {
+      "source": "attendance",
+      "target": "devices",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Xác thực chữ ký/secret webhook từ thiết bị chấm công qua entry công khai của devices"
+    },
+    {
+      "source": "attendance",
+      "target": "employees",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Kiểm tra phạm vi quản lý, tra cứu hồ sơ và mức lương giờ nhân viên qua entry công khai của employees"
+    },
+    {
+      "source": "attendance",
+      "target": "shifts",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Đọc lịch phân ca lân cận và ca làm việc để tính công, trễ/sớm và cảnh báo thiếu lượt quét qua entry công khai của shifts"
+    },
+    {
+      "source": "auth",
+      "target": "audit-logs",
+      "owner": "auth",
+      "status": "allowed",
+      "reason": "Ghi nhận nhật ký kiểm toán khi đăng ký và thay đổi thông tin xác thực qua entry công khai của audit-logs"
+    },
+    {
+      "source": "auth",
+      "target": "employees",
+      "owner": "auth",
+      "status": "allowed",
+      "reason": "Tạo và đồng bộ hồ sơ nhân viên, phòng ban và chức vụ trong luồng đăng ký/hồ sơ cá nhân qua entry công khai của employees"
+    },
+    {
+      "source": "biometrics",
+      "target": "audit-logs",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Ghi nhận nhật ký kiểm toán khi đăng ký hoặc xóa mẫu sinh trắc học qua entry công khai của audit-logs"
+    },
+    {
+      "source": "biometrics",
+      "target": "auth",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Áp dụng middleware xác thực lại bằng mật khẩu (requirePasswordAuth) trên các route sinh trắc học nhạy cảm qua entry công khai của auth"
+    },
+    {
+      "source": "biometrics",
+      "target": "devices",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Gửi lệnh đăng ký/đồng bộ vân tay tới thiết bị đầu cuối qua entry công khai của devices"
+    },
+    {
+      "source": "biometrics",
+      "target": "employees",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Kiểm tra tồn tại và quyền quản lý nhân viên khi thao tác dữ liệu sinh trắc học qua entry công khai của employees"
+    },
+    {
+      "source": "biometrics",
+      "target": "operations",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Theo dõi và chạy tác vụ nền đăng ký khuôn mặt qua entry công khai của operations"
+    },
+    {
+      "source": "dashboard",
+      "target": "attendance",
+      "owner": "dashboard",
+      "status": "allowed",
+      "reason": "Tổng hợp số liệu chấm công và nhật ký gần nhất trong ngày qua entry công khai của attendance"
+    },
+    {
+      "source": "dashboard",
+      "target": "employees",
+      "owner": "dashboard",
+      "status": "allowed",
+      "reason": "Đếm nhân sự và phân bổ theo phòng ban trong phạm vi quản lý qua entry công khai của employees"
+    },
+    {
+      "source": "dashboard",
+      "target": "shifts",
+      "owner": "dashboard",
+      "status": "allowed",
+      "reason": "Đọc danh sách ca làm việc hôm nay và định dạng giờ ca qua entry công khai của shifts"
+    },
+    {
+      "source": "devices",
+      "target": "audit-logs",
+      "owner": "devices",
+      "status": "allowed",
+      "reason": "Ghi nhận nhật ký kiểm toán cho các thao tác quản trị và đổi chế độ thiết bị qua entry công khai của audit-logs"
+    },
+    {
+      "source": "employees",
+      "target": "audit-logs",
+      "owner": "employees",
+      "status": "allowed",
+      "reason": "Ghi nhận nhật ký kiểm toán khi cập nhật nhân viên, phòng ban và chức vụ qua entry công khai của audit-logs"
+    },
+    {
+      "source": "employees",
+      "target": "operations",
+      "owner": "employees",
+      "status": "allowed",
+      "reason": "Điều phối tác vụ nền gửi email tài khoản nhân viên qua entry công khai của operations"
+    },
+    {
+      "source": "payroll",
+      "target": "attendance",
+      "owner": "payroll",
+      "status": "allowed",
+      "reason": "Đọc tổng hợp công ngày, khoản điều chỉnh, khóa ngày và kích hoạt tổng hợp/quyết toán qua entry công khai của attendance"
+    },
+    {
+      "source": "payroll",
+      "target": "employees",
+      "owner": "payroll",
+      "status": "allowed",
+      "reason": "Kiểm tra phạm vi quản lý, tính đơn giá lương theo tháng và kết thúc nhân sự khi quyết toán sớm qua entry công khai của employees"
+    },
+    {
+      "source": "payroll",
+      "target": "shifts",
+      "owner": "payroll",
+      "status": "allowed",
+      "reason": "Đọc lịch ca theo kỳ và dọn ca tương lai khi quyết toán sớm qua entry công khai của shifts"
+    },
+    {
+      "source": "reports",
+      "target": "attendance",
+      "owner": "reports",
+      "status": "allowed",
+      "reason": "Đọc tổng hợp chấm công theo tháng phục vụ báo cáo tổng hợp qua entry công khai của attendance"
+    },
+    {
+      "source": "reports",
+      "target": "employees",
+      "owner": "reports",
+      "status": "allowed",
+      "reason": "Đọc danh sách nhân viên và phòng ban trong phạm vi báo cáo qua entry công khai của employees"
+    },
+    {
+      "source": "reports",
+      "target": "payroll",
+      "owner": "reports",
+      "status": "allowed",
+      "reason": "Đọc số liệu quỹ lương theo tháng phục vụ báo cáo tài chính/nhân sự qua entry công khai của payroll"
+    },
+    {
+      "source": "reports",
+      "target": "shifts",
+      "owner": "reports",
+      "status": "allowed",
+      "reason": "Đọc lịch ca theo tháng phục vụ thống kê chuyên cần trong báo cáo qua entry công khai của shifts"
+    },
+    {
+      "source": "shifts",
+      "target": "employees",
+      "owner": "shifts",
+      "status": "allowed",
+      "reason": "Kiểm tra phạm vi quản lý và sự tồn tại của nhân viên khi phân ca qua entry công khai của employees"
+    },
+    {
+      "source": "shifts",
+      "target": "operations",
+      "owner": "shifts",
+      "status": "allowed",
+      "reason": "Điều phối tác vụ nền phân ca hàng loạt qua entry công khai của operations"
+    }
+  ],
   "runtimeModuleCycles": [],
   "exceptions": [
     {

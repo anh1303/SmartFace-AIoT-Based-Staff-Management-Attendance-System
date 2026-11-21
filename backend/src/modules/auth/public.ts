@@ -14,11 +14,17 @@ export {
   getRoleByName,
   deleteAuthUser,
   verifyAndLoadActiveUser,
+  resolveActiveSession,
   assertFaceSession,
   findActiveAdminUserIds,
   findActiveManagerAndAdminUserIds,
   findActiveManagerUserIdsByDepartment,
   findActiveAlertRecipients,
   type ActiveAlertRecipient,
+  type ActiveAuthUser,
+  type ActiveSessionClaims,
+  type ActiveSessionFailureReason,
+  type ActiveSessionResult,
+  type ActiveSessionSocketScope,
 } from './auth.service.js'
 

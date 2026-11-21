@@ -15,7 +15,6 @@ import {
   findDailyAttendanceSummaries,
   findAttendanceAdjustments,
   findAttendanceLocks,
-  countPendingDailySummaries,
   countUnapprovedDailySummaries,
   countPendingAttendanceAdjustments,
   purgeAttendanceForEarlySettlement,
@@ -48,10 +47,8 @@ import {
   getEmployeeShiftsForDateRange,
 } from '../shifts/public.js'
 import { payrollOverrides, requiresHoursReconciliation, workingHoursFingerprint } from './payroll.overrides.js'
-import { logAction } from '../audit-logs/public.js'
 import {
   aggregateDailyAttendance,
-  getAttendanceSummariesByEmployeesAndDateRange,
 } from '../attendance/public.js'
 
 function appliedPolicySnapshot(policy: Awaited<ReturnType<typeof policyForPeriod>>, overtimeRate: number, lateRate: number, adjustments: Array<{ id: bigint; kind: string; status: string; amount: unknown; hours: unknown; work_date: Date; source_details: unknown }>) {
@@ -104,13 +101,10 @@ function assertOvernightSummariesCurrent(
   }
 }
 import {
-  isEmployeeManager,
   assertCanAccessEmployeeDetail,
   assertCannotModifySelfControlData,
   assertCannotModifyOtherManager,
   findEmployeeByIdOrCode,
-  findActiveEmployees,
-  findEmployeeByUserId,
 } from '../employees/public.js'
 
 

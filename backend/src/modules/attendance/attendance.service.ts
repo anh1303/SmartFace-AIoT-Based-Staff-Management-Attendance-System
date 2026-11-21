@@ -35,15 +35,15 @@ import {
 } from '../employees/public.js'
 import { getEmployeeNearShifts, getEmployeeShiftsForRecalculation, getEmployeeShiftsByFilter } from '../shifts/public.js'
 import { AppError } from '../../common/AppError.js'
-import { formatVNDateISO, formatVNTime } from '../../common/utils.js'
-import { buildIdOrCodeWhere } from '../employees/public.js'
+import { formatVNDateISO } from '../../common/utils.js'
 import { attendanceInclude } from './attendance.model.js'
-import { logAction } from '../audit-logs/public.js'
 import { eventBus } from '../../common/event-bus.js'
 import {
-  ATTENDANCE_METHOD,
   type AttendanceMethod,
 } from '../../common/constants.js'
+
+const queryString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value ? value : undefined
 
 const startOfToday = () => {
   const now = new Date()
@@ -62,9 +62,7 @@ export async function list(
     if (!emp) return []
     where.employee_id = emp.id
   } else {
-    const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
-      ? query.employeeId
-      : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
+    const empIdFilter = queryString(query.employeeId) || queryString(query.employee_id)
 
     if (empIdFilter) {
       const emp = await findEmployeeByIdOrCode(empIdFilter)
@@ -72,15 +70,11 @@ export async function list(
     }
   }
 
-  const startDate = (typeof query.startDate === 'string' && query.startDate)
-    ? query.startDate
-    : (typeof query.from === 'string' && query.from ? query.from : undefined)
+  const startDate = queryString(query.startDate) || queryString(query.from)
 
-  const endDate = (typeof query.endDate === 'string' && query.endDate)
-    ? query.endDate
-    : (typeof query.to === 'string' && query.to ? query.to : undefined)
+  const endDate = queryString(query.endDate) || queryString(query.to)
 
-  const singleDate = typeof query.date === 'string' && query.date ? query.date : undefined
+  const singleDate = queryString(query.date)
   const fromDate = singleDate || startDate
   const toDate = singleDate || endDate
 
@@ -131,9 +125,7 @@ export async function getDailySummaries(
 ) {
   const where: Record<string, unknown> = { employees: await getEmployeeScope(requesterUser) }
 
-  let empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
-    ? query.employeeId
-    : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
+  let empIdFilter = queryString(query.employeeId) || queryString(query.employee_id)
 
   if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
     const emp = await findEmployeeByUserId(requesterUser.id)
@@ -146,15 +138,11 @@ export async function getDailySummaries(
     where.employee_id = emp ? emp.id : empIdFilter
   }
 
-  const startDate = (typeof query.startDate === 'string' && query.startDate)
-    ? query.startDate
-    : (typeof query.from === 'string' && query.from ? query.from : undefined)
+  const startDate = queryString(query.startDate) || queryString(query.from)
 
-  const endDate = (typeof query.endDate === 'string' && query.endDate)
-    ? query.endDate
-    : (typeof query.to === 'string' && query.to ? query.to : undefined)
+  const endDate = queryString(query.endDate) || queryString(query.to)
 
-  const singleDate = typeof query.date === 'string' && query.date ? query.date : undefined
+  const singleDate = queryString(query.date)
 
   if (startDate && endDate) {
     where.work_date = {
@@ -818,7 +806,6 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
     }
 
     const days = await tx.daily_attendance_summary.findMany({ where: { work_date }, include: { employees: true } })
-    const empIds = days.map(d => d.employee_id)
     const closedEmpIds = await attendancePayroll().getClosedPayrollEmployeeIds(dateStr.slice(0, 7), tx)
 
     if (is_locked) {

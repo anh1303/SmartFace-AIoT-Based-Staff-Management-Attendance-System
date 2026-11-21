@@ -50,19 +50,22 @@ export async function syncDayAdjustments(tx: Prisma.TransactionClient, day: Adju
     const adjStatus = active ? (isDayApproved ? 'APPROVED' : 'PENDING') : 'VOID'
     const isUuid = (val: unknown): val is string => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
     const reviewerId = isDayApproved && isUuid(day.approved_by) ? day.approved_by : null
-    if (previous?.source_fingerprint === fingerprint && previous.status === adjStatus) continue
+    const approvedReason = isDayApproved ? (day.approval_reason || day.overtime_reason || null) : null
+    const nextNote = approvedReason ?? previous?.note ?? null
+    if (previous?.source_fingerprint === fingerprint && previous.status === adjStatus && (previous.note ?? null) === nextNote) continue
     if (!previous && !active) continue
     const data = { ...item, source_fingerprint: fingerprint,
       source_details: { attendance_fingerprint: details.fingerprint ?? null, policy: details.policy ?? null,
         ...(item.kind === 'ABSENCE' ? { hourly_rate: hourlyRate, scheduled_hours: hours, absence_penalty_rate: effectiveRate } : {}) },
       status: adjStatus,
+      note: nextNote,
       reviewed_by: reviewerId,
       reviewed_at: isDayApproved ? (day.approved_at || null) : null,
     }
-    const write = { ...key, ...data, note: previous?.note ?? (isDayApproved ? (day.approval_reason || day.overtime_reason || null) : null) }
+    const write = { ...key, ...data }
     if (batch) batch.writes.push(write)
     else await tx.attendanceAdjustment.upsert({ where: { employee_id_work_date_kind: key }, create: write, update: { ...data } })
-    if (previous) {
+    if (previous?.status === 'APPROVED' && (adjStatus !== 'APPROVED' || previous.source_fingerprint !== fingerprint)) {
       const audit = { action: 'INVALIDATE_ADJUSTMENT_REVIEW', target_table: 'attendance_adjustments', record_id: String(previous.id),
         old_values: { status: previous.status, note: previous.note, source_fingerprint: previous.source_fingerprint },
         new_values: { status: data.status, source_fingerprint: fingerprint, reason: 'SOURCE_CHANGED' } }
@@ -89,7 +92,7 @@ export async function flushAdjustmentBatch(tx: Prisma.TransactionClient, batch: 
         note text, reviewed_by uuid, reviewed_at timestamptz, source_fingerprint text, source_details jsonb)
       ON CONFLICT (employee_id, work_date, kind) DO UPDATE SET
         hours = EXCLUDED.hours, amount = EXCLUDED.amount, status = EXCLUDED.status,
-        note = EXCLUDED.note, reviewed_by = EXCLUDED.reviewed_by, reviewed_at = EXCLUDED.reviewed_at,
+        note = COALESCE(EXCLUDED.note, attendance_adjustments.note), reviewed_by = EXCLUDED.reviewed_by, reviewed_at = EXCLUDED.reviewed_at,
         source_fingerprint = EXCLUDED.source_fingerprint, source_details = EXCLUDED.source_details,
         updated_at = clock_timestamp()`
   }

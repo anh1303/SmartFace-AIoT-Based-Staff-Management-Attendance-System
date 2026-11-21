@@ -1,7 +1,7 @@
 import { getDashboardShifts } from '../shifts/public.js';
 import { getEmployeeScope, getEmployeesForReporting, type EmployeeActor } from '../employees/public.js';
 import { determinePunctuality, getDashboardAttendanceLogs } from '../attendance/public.js';
-import { formatVNDateISO, formatVNTime, vnDay } from '../../common/utils.js';
+import { formatVNTime, vnDay } from '../../common/utils.js';
 import { formatShiftTime } from '../shifts/public.js';
 import type {
   TodayDashboardResponseDto,

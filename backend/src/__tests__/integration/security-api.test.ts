@@ -8,7 +8,6 @@ import request from 'supertest'
 import jwt from 'jsonwebtoken'
 import { app } from '../../app.js'
 import { env } from '../../config/env.js'
-import { AppError } from '../../common/AppError.js'
 import { errorHandler } from '../../middlewares/errorHandler.js'
 
 vi.mock('../../config/database.js', () => {

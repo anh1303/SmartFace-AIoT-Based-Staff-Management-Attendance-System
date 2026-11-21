@@ -99,25 +99,53 @@ suite('PostgreSQL policy integration (isolated database only)', () => {
     expect(await db.auditLog.count({where:{action:'ADJUST_ATTENDANCE',userId:admin.id,record_id:String(summary.id)}})).toBe(1)
   })
   it('generates zero-safe wages, snapshots rates and blocks stale finalize', async () => {
-    const generated = await payroll.generate(period,emp.id,admin.id,{id:admin.id,role:'ADMIN'})
-    expect(generated[0].total_working_hours).toBe(9.5);expect(generated[0].total_overtime).toBe(2.5)
+    const sameDay = await payroll.generate(period, emp.id, admin.id, { id: admin.id, role: 'ADMIN' })
+    expect(sameDay[0].total_working_hours).toBe(0)
+    expect(sameDay[0].total_overtime).toBe(0)
+    expect(sameDay[0].net_salary).toBe(1500000)
+
+    vi.setSystemTime(new Date('2026-10-03T08:00:00+07:00'))
+    const generated = await payroll.generate(period, emp.id, admin.id, { id: admin.id, role: 'ADMIN' })
+    expect(generated[0].total_working_hours).toBe(9.5)
+    expect(generated[0].total_overtime).toBe(2.5)
     expect(generated[0].net_salary).toBe(2800000)
-    await payroll.updateBonusPenalty({overtime_rate: 2.5, late_early_penalty: 2.0, absence_penalty_rate: 2.0},admin.id)
-    await payroll.generate(period,emp.id,admin.id,{id:admin.id,role:'ADMIN'})
-    const current = await db.payrollRecord.findFirst({where:{employeeId:emp.id}})
+
+    await payroll.updateBonusPenalty({ overtime_rate: 2.5, late_early_penalty: 2.0, absence_penalty_rate: 2.0 }, admin.id)
+    await payroll.generate(period, emp.id, admin.id, { id: admin.id, role: 'ADMIN' })
+    const current = await db.payrollRecord.findFirst({ where: { employeeId: emp.id } })
     expect(Number(current.overtime_rate)).toBe(2.0)
-    await service.adjustAttendance({employeeId:emp.id,date,late_early:1,overtime:1,reason:'Duyệt lại 1 giờ'},admin.id,'ADMIN')
-    await expect(payroll.finalizePeriod(period,admin.id,'ADMIN')).rejects.toThrow(/cần tính lại bảng lương/)
+
+    // Move beyond period end so stale snapshot independently blocks finalize without hitting the period-end guard
+    vi.setSystemTime(new Date('2026-11-01T08:00:00+07:00'))
+    await payroll.generate(period, emp.id, admin.id, { id: admin.id, role: 'ADMIN' })
+    await service.adjustAttendance({ employeeId: emp.id, date, late_early: 1, overtime: 1, reason: 'Duyệt lại 1 giờ' }, admin.id, 'ADMIN')
+    await expect(payroll.finalizePeriod(period, admin.id, 'ADMIN')).rejects.toThrow(/cần tính lại bảng lương/)
+    const unfinalized = await db.payrollRecord.findFirst({ where: { employeeId: emp.id, payroll_period: period } })
+    expect(unfinalized.status).toBe('PENDING')
   })
   it('preserves finalized wages and blocks edits/generation on a closed row', async () => {
-    await payroll.generate(period,emp.id,admin.id,{id:admin.id,role:'ADMIN'})
-    await expect(payroll.finalizePeriod(period,admin.id,'ADMIN')).rejects.toThrow(/chưa kết thúc/)
+    vi.setSystemTime(new Date('2026-10-03T08:00:00+07:00'))
+    await payroll.generate(period, emp.id, admin.id, { id: admin.id, role: 'ADMIN' })
+    await expect(payroll.finalizePeriod(period, admin.id, 'ADMIN')).rejects.toThrow(/chưa kết thúc/)
+
     vi.setSystemTime(new Date('2026-11-01T08:00:00+07:00'))
-    await payroll.finalizePeriod(period,admin.id,'ADMIN')
-    const current = await db.payrollRecord.findFirst({where:{employeeId:emp.id}})
-    await expect(payroll.updateItem(String(current.id),{hourly_rate:1},{id:admin.id,role:'ADMIN'})).rejects.toThrow()
-    await expect(payroll.generate(period,emp.id,admin.id,{id:admin.id,role:'ADMIN'})).rejects.toThrow()
-    expect((await db.payrollRecord.findUnique({where:{id:current.id}})).status).toBe('FINALIZED')
+    await payroll.finalizePeriod(period, admin.id, 'ADMIN')
+    const current = await db.payrollRecord.findFirst({ where: { employeeId: emp.id, payroll_period: period } })
+    expect(current.status).toBe('FINALIZED')
+
+    await expect(
+      payroll.updateItem(String(current.id), { allowance: 2000000, reason: 'Thử sửa phiếu đã chốt' }, { id: admin.id, role: 'ADMIN' }),
+    ).rejects.toThrow(/đã khóa/)
+    await expect(payroll.generate(period, emp.id, admin.id, { id: admin.id, role: 'ADMIN' })).rejects.toThrow(/đã khóa/)
+
+    const stored = await db.payrollRecord.findUnique({ where: { id: current.id } })
+    expect(stored.status).toBe('FINALIZED')
+    expect(Number(stored.net_salary)).toBe(Number(current.net_salary))
+    expect(Number(stored.allowance)).toBe(Number(current.allowance))
+    expect(Number(stored.hourly_rate)).toBe(Number(current.hourly_rate))
+    expect(Number(stored.total_working_hours)).toBe(Number(current.total_working_hours))
+    expect(Number(stored.total_overtime)).toBe(Number(current.total_overtime))
+    expect(Number(stored.total_late_early)).toBe(Number(current.total_late_early))
   })
   it('writes IN and OUT only after three distinct matching face recognitions', async () => {
     const employee = await db.employee.create({data:{employee_code:`FACE-${randomUUID().slice(0,8)}`,full_name:'Face Confirmation Test',hourly_rate:100000}})

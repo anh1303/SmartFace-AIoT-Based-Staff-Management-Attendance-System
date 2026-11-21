@@ -4,14 +4,7 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { formatVNDateISO, getTodayVNString } from '../../common/utils.js'
 import { employeeLockKey, payrollPeriodLockKey } from '../../common/lock-keys.js'
-import { buildIdOrCodeWhere } from '../employees/public.js'
-import { logAction } from '../audit-logs/public.js'
-import {
-  assertCanManageEmployee,
-  getEmployeeScope,
-  findEmployeeByIdOrCode,
-  findEmployeeByUserId,
-} from '../employees/public.js'
+import { assertCanManageEmployee, getEmployeeScope, findEmployeeByIdOrCode, findEmployeeByUserId } from '../employees/public.js'
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 
@@ -21,19 +14,6 @@ const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ 
  */
 import {
   STANDARD_SHIFT_CONFIGS,
-  getDefaultShift,
-  getShiftClient,
-  getEmployeeShiftsByDates,
-  getEmployeeShiftsByFilter,
-  getEmployeeShiftsForDateRange,
-  getEmployeeNearShifts,
-  getEmployeeShiftsForAggregation,
-  getEmployeeShiftsBeforeCutoff,
-  getEmployeeShiftsForEarlySettlement,
-  purgeShiftsForEarlySettlement,
-  deleteShiftsForEmployee,
-  getEmployeeShiftsForRecalculation,
-  getActiveEmployeeShiftsWithDetails,
 } from './shift.queries.js'
 
 function formatTimeHHMM(val: unknown, fallback: string): string {

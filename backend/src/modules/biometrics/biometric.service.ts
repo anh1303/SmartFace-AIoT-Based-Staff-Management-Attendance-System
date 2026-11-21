@@ -6,8 +6,6 @@ import { env } from '../../config/env.js'
 import { assertNoEnrollment } from '../operations/public.js'
 import { findEmployeeByIdOrCode, assertCanManageEmployee, type EmployeeActor } from '../employees/public.js'
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
 async function resolveEmployeeId(idOrCode: string) {
   const emp = await findEmployeeByIdOrCode(idOrCode)
   if (!emp) throw new AppError(404, 'Employee not found')

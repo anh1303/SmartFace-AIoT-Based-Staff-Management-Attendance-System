@@ -23,7 +23,7 @@ export const initializeAttendanceGateway = (server: Server) => {
  * @internal INTERNAL USE ONLY - Do not call from controllers or services.
  * Services must publish domain events via eventBus instead.
  */
-export const emitAttendanceEvent = async (event: string, payload: unknown, room?: string) => {
+export const emitAttendanceEvent = async (event: string, payload: unknown, _room?: string) => {
   if (!io) return
   const nsp = io.of('/attendance')
   try {

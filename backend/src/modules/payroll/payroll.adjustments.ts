@@ -4,11 +4,8 @@ import { AppError } from '../../common/AppError.js'
 import { buildIdOrCodeWhere } from '../employees/public.js'
 import {
   assertCanAccessEmployeeDetail,
-  assertCannotModifyOtherManager,
-  assertCannotModifySelfControlData,
   isEmployeeManager,
   getEmployeeScope,
-  assertCanManageEmployee,
   monthlyHourlyRate,
 } from '../employees/public.js'
 import { payrollOverrides } from './payroll.overrides.js'

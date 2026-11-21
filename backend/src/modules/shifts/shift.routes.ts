@@ -26,7 +26,9 @@ shiftRouter.post('/copy-week', authorize('ADMIN', 'MANAGER'), asyncHandler(async
   successResponse(res, result, 'Đã tiếp nhận sao chép lịch', 202);
 }));
 
-shiftRouter.get('/templates', authorize('ADMIN','MANAGER'), asyncHandler(async(req,res)=>{successResponse(res,await listShiftTemplates());}));
+shiftRouter.get('/templates', authorize('ADMIN','MANAGER'), asyncHandler(async (_req, res) => {
+  successResponse(res, await listShiftTemplates());
+}));
 shiftRouter.post('/templates', authorize('ADMIN'), asyncHandler(async(req,res)=>{const input=shiftTemplateSchema.parse(req.body);successResponse(res,await createShiftTemplate(input,req.user!.id),'Đã tạo ca tùy chỉnh',201);}));
 
 shiftRouter.get('/',  asyncHandler(controller.list));

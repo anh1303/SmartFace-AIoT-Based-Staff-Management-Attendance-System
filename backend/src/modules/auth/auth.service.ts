@@ -334,61 +334,155 @@ export async function updateAuthUser(
   return prisma.$transaction(run)
 }
 
+export type ActiveSessionClaims = {
+  id: string
+  role?: string
+  username?: string
+  tv?: number
+  iat?: number
+  exp?: number
+  amr?: string[]
+  [key: string]: unknown
+}
+
+export type ActiveSessionFailureReason =
+  | 'INVALID_OR_EXPIRED_TOKEN'
+  | 'INVALID_TOKEN_PAYLOAD'
+  | 'USER_LOOKUP_FAILED'
+  | 'ACCOUNT_UNAVAILABLE'
+  | 'EMPLOYEE_INACTIVE'
+  | 'FACE_SESSION_REVOKED'
+  | 'TOKEN_REVOKED'
+  | 'PASSWORD_CHANGED'
+
+export type ActiveAuthUser = Omit<ReturnType<typeof safeUser>, 'avatar'> & {
+  amr?: string[]
+}
+
+export type ActiveSessionSocketScope = {
+  userId: string
+  role: string
+  employeeId?: string
+  departmentId?: number | null
+}
+
+export type ActiveSessionResult =
+  | {
+      ok: true
+      claims: ActiveSessionClaims
+      authUser: ActiveAuthUser
+      socketScope: ActiveSessionSocketScope
+    }
+  | {
+      ok: false
+      reason: ActiveSessionFailureReason
+    }
+
 /**
- * Public Module API: Xác thực token và lấy thông tin phiên đang hoạt động từ CSDL
+ * Public Module API: Nguồn xác thực phiên dùng chung giữa HTTP middleware và Socket.IO.
+ * Xác minh chữ ký/hạn JWT, đọc principal hiện hành theo claims đã xác thực và kiểm tra
+ * toàn bộ chính sách thu hồi (active, nhân viên, phiên khuôn mặt, token_version, password_changed_at).
  */
-export async function verifyAndLoadActiveUser(token: string) {
-  const decoded = jwt.verify(token, env.JWT_SECRET) as {
-    id?: string
-    role?: string
-    tv?: number
-    iat?: number
-    amr?: string[]
+export async function resolveActiveSession(token: string): Promise<ActiveSessionResult> {
+  let decoded: Partial<ActiveSessionClaims>
+  try {
+    decoded = jwt.verify(token, env.JWT_SECRET) as Partial<ActiveSessionClaims>
+  } catch {
+    return { ok: false, reason: 'INVALID_OR_EXPIRED_TOKEN' }
   }
 
   if (!decoded?.id) {
-    throw new AppError(401, 'Invalid token payload')
+    return { ok: false, reason: 'INVALID_TOKEN_PAYLOAD' }
   }
 
-  let user: any = null
+  let user: Awaited<ReturnType<typeof readAuthUser>> = null
   try {
     user = await readAuthUser(decoded.id)
   } catch {
-    throw new AppError(401, 'Invalid user ID in token')
+    return { ok: false, reason: 'USER_LOOKUP_FAILED' }
   }
 
   if (!user || !user.is_active) {
-    throw new AppError(401, 'Tài khoản người dùng đã bị khóa hoặc không tồn tại')
+    return { ok: false, reason: 'ACCOUNT_UNAVAILABLE' }
   }
 
-  if (user.employees) {
-    if (user.employees.status === 'TERMINATED' || user.employees.status === 'INACTIVE') {
-      throw new AppError(401, 'Tài khoản nhân viên không còn hoạt động')
-    }
+  if (user.employees && (user.employees.status === 'TERMINATED' || user.employees.status === 'INACTIVE')) {
+    return { ok: false, reason: 'EMPLOYEE_INACTIVE' }
   }
 
   const profile = (user.profile && typeof user.profile === 'object') ? (user.profile as Record<string, unknown>) : {}
   const currentTv = typeof profile.token_version === 'number' ? profile.token_version : 1
   const tokenTv = typeof decoded.tv === 'number' ? decoded.tv : 1
-  await assertFaceSession(decoded.amr, user.employees?.id, user.roles.role_name)
-  if (decoded.amr?.includes('face') && user.employees?.status !== 'ACTIVE') {
-    throw AppError.unauthorized('Phiên đăng nhập khuôn mặt đã hết hiệu lực. Vui lòng đăng nhập bằng mật khẩu.')
+
+  try {
+    await assertFaceSession(decoded.amr, user.employees?.id, user.roles.role_name)
+  } catch (err) {
+    if (err instanceof AppError && err.statusCode === 401) {
+      return { ok: false, reason: 'FACE_SESSION_REVOKED' }
+    }
+    throw err
   }
+  if (decoded.amr?.includes('face') && user.employees?.status !== 'ACTIVE') {
+    return { ok: false, reason: 'FACE_SESSION_REVOKED' }
+  }
+
   if (tokenTv < currentTv) {
-    throw new AppError(401, 'Phiên đăng nhập đã hết hạn hoặc mật khẩu đã thay đổi. Vui lòng đăng nhập lại.')
+    return { ok: false, reason: 'TOKEN_REVOKED' }
   }
 
   if (profile.password_changed_at && decoded.iat) {
     const pwdTime = new Date(profile.password_changed_at as string).getTime()
     // 1000ms grace window for clock skew between iat (seconds) and Date ISO
     if (decoded.iat * 1000 < pwdTime - 1000) {
-      throw new AppError(401, 'Mật khẩu đã thay đổi. Vui lòng đăng nhập lại.')
+      return { ok: false, reason: 'PASSWORD_CHANGED' }
     }
   }
 
   const safe = safeUser(user)
   const { avatar: _avatar, ...authUser } = safe
-  return { ...authUser, amr: decoded.amr }
+  return {
+    ok: true,
+    claims: decoded as ActiveSessionClaims,
+    authUser: { ...authUser, amr: decoded.amr },
+    socketScope: {
+      userId: user.id,
+      role: safe.role,
+      employeeId: user.employees?.id,
+      departmentId: user.employees?.departmentId ?? null,
+    },
+  }
+}
+
+function httpSessionError(reason: ActiveSessionFailureReason): AppError {
+  switch (reason) {
+    case 'INVALID_OR_EXPIRED_TOKEN':
+      return new AppError(401, 'Invalid or expired token')
+    case 'INVALID_TOKEN_PAYLOAD':
+      return new AppError(401, 'Invalid token payload')
+    case 'USER_LOOKUP_FAILED':
+      return new AppError(401, 'Invalid user ID in token')
+    case 'ACCOUNT_UNAVAILABLE':
+      return new AppError(401, 'Tài khoản người dùng đã bị khóa hoặc không tồn tại')
+    case 'EMPLOYEE_INACTIVE':
+      return new AppError(401, 'Tài khoản nhân viên không còn hoạt động')
+    case 'FACE_SESSION_REVOKED':
+      return AppError.unauthorized('Phiên đăng nhập khuôn mặt đã hết hiệu lực. Vui lòng đăng nhập bằng mật khẩu.')
+    case 'TOKEN_REVOKED':
+      return new AppError(401, 'Phiên đăng nhập đã hết hạn hoặc mật khẩu đã thay đổi. Vui lòng đăng nhập lại.')
+    case 'PASSWORD_CHANGED':
+      return new AppError(401, 'Mật khẩu đã thay đổi. Vui lòng đăng nhập lại.')
+  }
+}
+
+/**
+ * Public Module API: Xác thực token và lấy thông tin phiên đang hoạt động từ CSDL
+ */
+export async function verifyAndLoadActiveUser(token: string) {
+  const session = await resolveActiveSession(token)
+  if (!session.ok) {
+    throw httpSessionError(session.reason)
+  }
+  return session.authUser
 }
 
 /**

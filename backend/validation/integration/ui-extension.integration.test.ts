@@ -67,9 +67,13 @@ suite('UI extensions with real HTTP, cookies and isolated PostgreSQL',()=>{
   const input={name:`${prefix} Evening`,start_time:'18:00',end_time:'22:00',note:'Fixture support'}
   await request(app).get('/api/shifts/templates').expect(401)
   await employeeAgent.get('/api/shifts/templates').expect(401)
-  const employeeToken=jwt.sign({id:employeeUser.id,role:'EMPLOYEE',username:employeeUser.username},process.env.JWT_SECRET!)
-  await request(app).get('/api/shifts/templates').set('Authorization',`Bearer ${employeeToken}`).expect(403)
-  await request(app).post('/api/shifts/templates').set('Authorization',`Bearer ${employeeToken}`).send(input).expect(403)
+  // Stale pre-password-change token (missing bumped token_version) must still be rejected with 401
+  const staleEmployeeToken=jwt.sign({id:employeeUser.id,role:'EMPLOYEE',username:employeeUser.username},process.env.JWT_SECRET!)
+  await request(app).get('/api/shifts/templates').set('Authorization',`Bearer ${staleEmployeeToken}`).expect(401)
+  // Re-authenticate via real login with the new password so RBAC 403 is reached by a valid EMPLOYEE session
+  await employeeAgent.post('/api/auth/login').send({identifier:employeeUser.username,password:newPassword}).expect(200)
+  await employeeAgent.get('/api/shifts/templates').expect(403)
+  await employeeAgent.post('/api/shifts/templates').send(input).expect(403)
   await managerAgent.post('/api/shifts/templates').send(input).expect(403)
   await adminAgent.post('/api/shifts/templates').send({...input,end_time:'18:00'}).expect(422)
   const res=await adminAgent.post('/api/shifts/templates').send(input).expect(201)

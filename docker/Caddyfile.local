@@ -1,0 +1,16 @@
+{
+  auto_https off
+}
+
+https://localhost:8443, https://127.0.0.1:8443 {
+  tls /etc/caddy/certs/localhost.pem /etc/caddy/certs/localhost-key.pem
+
+  reverse_proxy frontend:80 {
+    # Normalize forwarded headers at the edge proxy so downstream Nginx/Node
+    # never trust spoofed client X-Forwarded-* headers.
+    header_up Host {host}
+    header_up X-Real-IP {remote_host}
+    header_up X-Forwarded-For {remote_host}
+    header_up X-Forwarded-Proto https
+  }
+}

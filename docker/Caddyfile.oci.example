@@ -1,0 +1,27 @@
+# Production OCI edge Caddyfile template (fixed 2-hop topology: Caddy -> Frontend Nginx -> Express).
+# Copy to /etc/caddy/Caddyfile (or mount in an OCI compose override) and set APP_DOMAIN.
+# Caddy automatically issues and renews Let's Encrypt TLS certificates over TCP 80/443.
+# Do NOT put Cloudflare orange-cloud CDN in front without updating TRUST_PROXY_HOPS.
+
+{$APP_DOMAIN} {
+  encode zstd gzip
+
+  header {
+    # Do NOT enable long-lived HSTS with includeSubDomains until the entire domain is verified.
+    # For staging, keep HSTS disabled (or optionally test with max-age=300 without includeSubDomains):
+    # Strict-Transport-Security "max-age=300"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+
+  # Optional: If Live Camera Option (b) is enabled (public WHEP with server-side ADMIN auth),
+  # wire a forward_auth check against backend before proxying /camera/* to MediaMTX.
+  # Never expose raw MediaMTX 8889/8554 directly to the public Internet.
+
+  reverse_proxy frontend:80 {
+    header_up Host {host}
+    header_up X-Real-IP {remote_host}
+    header_up X-Forwarded-For {remote_host}
+    header_up X-Forwarded-Proto https
+  }
+}

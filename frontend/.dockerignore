@@ -2,3 +2,13 @@ node_modules
 dist
 .env*
 coverage
+.git
+.local
+.tmp
+.vite
+.vite-cache
+*.log
+validation
+src/**/__tests__
+src/**/*.test.ts
+src/**/*.test.tsx

@@ -7,6 +7,9 @@ face_auth/pad_captures*
 !.env.example
 !.env.compose.example
 !.env.iot.example
+!.env.phase1.local.example
+!.env.phase1.oci.example
+!/scripts/realtime/.env.simulator.example
 *.pem
 *.key
 *.crt
@@ -37,8 +40,8 @@ coverage/
 # Keep test source files visible to Git; ignore only generated test reports.
 playwright-report/
 test-results/
-/.local/face-login-spike/
-/.local/face-login-browser/
+.local/
+.tmp/
 
 # Ngoại lệ: Cho phép lưu trữ kết quả kiểm thử mô hình trong smartface_pad_artifacts
 !**/smartface_pad_artifacts/**/test/
@@ -142,6 +145,3 @@ md/
 # Notebook/editor and development-server caches.
 .ipynb_checkpoints/
 .vite-cache/
-
-# Original employee avatars and rollback data contain personal images.
-/.local/database-backups/

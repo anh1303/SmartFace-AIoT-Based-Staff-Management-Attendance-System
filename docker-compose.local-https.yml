@@ -1,0 +1,32 @@
+# Full-stack (Phase 2) local HTTPS override for docker-compose.cloud.yml.
+# For Phase 1 (FE + BE + Face Login only), use docker-compose.phase1.yml + docker-compose.phase1.local-https.yml instead.
+# Prerequisites:
+#   1. Generate trusted local certs (git-ignored under ./docker/certs):
+#        mkdir -p docker/certs
+#        mkcert -install
+#        mkcert -cert-file docker/certs/localhost.pem -key-file docker/certs/localhost-key.pem localhost 127.0.0.1 ::1
+#   2. Set PBL6_CORS_ORIGIN=https://localhost:8443 and PBL6_NODE_ENV=production in .env.compose (or shell env).
+#   3. Run:
+#        docker compose --env-file .env.compose -f docker-compose.cloud.yml -f docker-compose.local-https.yml up -d --build
+services:
+  backend:
+    environment:
+      NODE_ENV: production
+      TRUST_PROXY_HOPS: 2
+      CORS_ORIGIN: ${PBL6_HTTPS_CORS_ORIGIN:-https://localhost:8443}
+  caddy-local:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:${PBL6_HTTPS_PORT:-8443}:8443
+    volumes:
+      - ./docker/Caddyfile.local:/etc/caddy/Caddyfile:ro
+      - ./docker/certs:/etc/caddy/certs:ro
+    depends_on:
+      frontend:
+        condition: service_started
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

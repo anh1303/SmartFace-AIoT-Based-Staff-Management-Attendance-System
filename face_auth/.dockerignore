@@ -9,4 +9,8 @@ gallery
 md
 tests
 .local
+.tmp
+.git
+*.log
+scripts
 *.zip

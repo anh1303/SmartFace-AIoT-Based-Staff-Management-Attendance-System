@@ -1,15 +1,24 @@
 name: pbl6
 
+x-logging: &iot-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # 1. ThingsBoard IoT Platform (Bản tích hợp sẵn DB Postgres nội bộ)
+  # Pin image version/digest after ARM64 verification (never rely on floating :latest in production).
+  # Bind IOT_BIND_IP to the VPN/Tailscale or LAN IP (defaults to 127.0.0.1, never public 0.0.0.0).
   thingsboard:
-    image: thingsboard/tb-postgres:latest
+    image: ${TB_IMAGE:-thingsboard/tb-postgres:3.8.1}
     container_name: smartface_thingsboard
-    restart: always
+    restart: unless-stopped
+    logging: *iot-logging
     ports:
-      - "${TB_WEB_PORT:-8081}:9090" # 8080 đang dùng cho frontend
-      - "1883:1883"     # Cổng MQTT Broker để Pi 4 kết nối vào
-      - "7070:7070"     # Cổng Edge RPC
+      - "${TB_ADMIN_BIND_IP:-127.0.0.1}:${TB_WEB_PORT:-8081}:9090" # Trang quản trị chỉ bind loopback/VPN
+      - "${IOT_BIND_IP:-127.0.0.1}:1883:1883"                      # MQTT Broker cho Pi qua VPN/LAN riêng
+      - "${IOT_BIND_IP:-127.0.0.1}:7070:7070"                      # Edge RPC nội bộ/VPN
     environment:
       TB_QUEUE_TYPE: in-memory
     volumes:
@@ -20,16 +29,17 @@ services:
 
   # 2. MediaMTX - Máy chủ nhận luồng RTSP từ Pi và phát WebRTC lên Web
   mediamtx:
-    image: bluenviron/mediamtx:latest
+    image: ${MEDIAMTX_IMAGE:-bluenviron/mediamtx:1.9.3}
     container_name: smartface_mediamtx
-    restart: always
+    restart: unless-stopped
+    logging: *iot-logging
     ports:
-      - "8554:8554"     # Cổng nhận luồng RTSP từ Pi 4
-      - "8889:8889"     # Cổng phát WebRTC (WHEP) lên giao diện React
-      - "8189:8189/udp" # Cổng UDP tăng tốc truyền tải WebRTC
+      - "${IOT_BIND_IP:-127.0.0.1}:8554:8554"          # RTSP từ Pi qua VPN/LAN riêng
+      - "${IOT_BIND_IP:-127.0.0.1}:8889:8889"          # WHEP signaling (proxy qua HTTPS/auth, không public thô)
+      - "${MEDIAMTX_MEDIA_BIND_IP:-127.0.0.1}:8189:8189/udp" # Media WebRTC UDP (chỉ mở theo phương án video đã chốt)
     environment:
       MTX_RTSPTRANSPORTS: tcp
-      MTX_WEBRTCADDITIONALHOSTS: "${IOT_SERVER_HOST:?Set IOT_SERVER_HOST in .env.iot}" # IP LAN máy server
+      MTX_WEBRTCADDITIONALHOSTS: "${IOT_SERVER_HOST:?Set IOT_SERVER_HOST in .env.iot}" # IP VPN/LAN máy server
 
 volumes:
   tb-data:

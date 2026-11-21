@@ -1,8 +1,9 @@
 {
-  "extends": "../tsconfig.seed.json",
+  "extends": "../tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "rootDir": ".."
+    "rootDir": "..",
+    "types": ["node"]
   },
-  "include": ["seeds/**/*.ts", "../scripts/maintenance/**/*.ts", "../src/middlewares/auth.middleware.ts"]
+  "include": ["seeds/**/*.ts"]
 }

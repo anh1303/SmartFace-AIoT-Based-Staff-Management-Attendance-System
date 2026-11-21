@@ -4,12 +4,12 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Server, Wifi, WifiOff, Wrench, Info, ArrowLeft, CheckCircle, Clock, RotateCcw, Trash2, Pencil } from 'lucide-react';
 import { useAuth, getActiveSessionId } from '@/features/auth';
+import { config } from '../../config';
 import { useToast } from '../../context/ToastContext';
 import { Modal } from '../../components/common/Modal';
 import { PageHeaderBanner } from '../../components/common/PageHeaderBanner';
 import {
   deviceApi,
-  validDeviceIp,
   confirmsRequestedMode,
   useDeviceRealtime,
   type Device,
@@ -26,6 +26,14 @@ function Status({ status }: {
 }) { const Icon = status === 'ONLINE' ? Wifi : status === 'MAINTENANCE' ? Wrench : WifiOff; return <span className={`sf-badge ${status === 'ONLINE' ? 'success' : status === 'MAINTENANCE' ? 'warning' : ''}`}><Icon size={14}/>{labels[status]}</span>; }
 export const ManagerDevices: React.FC = () => {
     const { role } = useAuth();
+    if (!config.iotHardwareEnabled) {
+        return (
+            <div className="sf-feedback" role="status">
+                <Info size={18} />
+                <span>Quản lý thiết bị phần cứng (Pi, ThingsBoard, camera cổng, vân tay) thuộc phạm vi Đợt 2 và đang tắt trong bản triển khai Đợt 1.</span>
+            </div>
+        );
+    }
     return role === 'admin' ? <DeviceManagement/> : <p className="sf-feedback warning">Chỉ Admin được quản lý và điều khiển thiết bị dùng chung.</p>;
 };
 

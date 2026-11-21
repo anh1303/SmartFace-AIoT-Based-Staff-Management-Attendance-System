@@ -475,7 +475,7 @@ export function useAttendancePairs(
       const isNoShift = isOffDay || isUnassigned;
 
       // Danh sách tất cả raw events (bao gồm cả sự kiện lẻ)
-      const rawEvents: AttendanceEventItem[] = empLogs.map((log, idx) => {
+      const rawEvents: AttendanceEventItem[] = empLogs.map(log => {
         const isFace = log.method === 'FACE';
         const methodLabel = isFace
           ? 'Face-id'

@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import {
   Unlock,
   Lock,
-  Download,
   Clock,
 } from 'lucide-react';
 import { getTodayVNString } from '../../../utils/dateUtils';

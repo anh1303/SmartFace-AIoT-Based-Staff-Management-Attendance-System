@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScanFace, Fingerprint } from 'lucide-react';
+import { config } from '../../../config';
 import { DeviceInfo } from '../hooks/useDevices';
 
 interface DeviceStatusCardsProps {
@@ -8,6 +9,17 @@ interface DeviceStatusCardsProps {
 }
 
 export const DeviceStatusCards: React.FC<DeviceStatusCardsProps> = ({ devices, isError }) => {
+  if (!config.iotHardwareEnabled) {
+    return (
+      <div
+        role="status"
+        className="p-4 rounded-xl bg-slate-50 dark:bg-[#13162b]/50 border border-slate-200/80 dark:border-[#21264b] text-center text-xs text-slate-500 dark:text-slate-400"
+      >
+        Trạng thái thiết bị phần cứng AIoT (Pi/cảm biến vân tay) thuộc phạm vi Đợt 2 và đang tắt trong bản Đợt 1.
+      </div>
+    );
+  }
+
   if (isError) {
     return (
       <div className="p-4 rounded-xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/80 dark:border-rose-900/40 text-center text-xs text-rose-600 dark:text-rose-400">

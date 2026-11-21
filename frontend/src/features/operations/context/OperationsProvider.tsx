@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
-import { apiFetch } from '../../api/client';
+import { apiFetch } from '../../../api/client';
 import { useAuth } from '@/features/auth';
-import { useToast } from '../../context/ToastContext';
+import { useToast } from '../../../context/ToastContext';
 
 export interface Operation {
   jobId: string; type: string; label: string; status: 'queued' | 'running' | 'succeeded' | 'partially_succeeded' | 'failed'; revision: number;

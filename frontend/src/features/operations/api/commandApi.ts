@@ -1,5 +1,5 @@
-import { ApiError, apiFetch } from '../../api/client';
-import type { Operation } from './OperationsProvider';
+import { ApiError, apiFetch } from '../../../api/client';
+import type { Operation } from '../context/OperationsProvider';
 import { getActiveSessionId, getActiveUsername } from '@/features/auth';
 export class UncertainWriteError extends Error {}
 function assertSession(session: number) {

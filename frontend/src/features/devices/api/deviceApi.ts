@@ -1,4 +1,4 @@
-import { api } from '../../api/client';
+import { api } from '../../../api/client';
 export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
 export type AttendanceMode = 'CHECK_IN' | 'CHECK_OUT' | 'OFF' | 'AUTO';
 export interface Device {

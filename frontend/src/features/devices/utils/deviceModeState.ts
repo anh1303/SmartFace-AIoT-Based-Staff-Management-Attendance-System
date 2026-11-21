@@ -1,4 +1,4 @@
-import type { AttendanceMode, DeviceMode } from './deviceApi';
+import type { AttendanceMode, DeviceMode } from '../api/deviceApi';
 /** A cached observation predating the request cannot confirm the new command. */
 export function confirmsRequestedMode(observed: DeviceMode | undefined, requested: {
     mode: AttendanceMode;

@@ -176,7 +176,7 @@
       "target": "attendances",
       "owner": "dashboard",
       "status": "allowed",
-      "reason": "Bảng log gần nhất trên dashboard dùng helper confidenceColor từ entry công khai của feature attendances"
+      "reason": "Bảng log gần nhất trên dashboard dùng helper confidenceColor và AttendanceEventBadge từ entry công khai của feature attendances"
     },
     {
       "source": "devices",

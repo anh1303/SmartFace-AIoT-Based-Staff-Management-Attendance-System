@@ -27,7 +27,7 @@ export function useEmployees(enabled = true) {
     mutationKey: ['employee-write', 'create'],
     mutationFn: (newEmp: Omit<Employee, 'created_at' | 'updated_at'>) => createEmployeeApi(newEmp),
     onMutate: () => ({ sessionId: getActiveSessionId() }),
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, _variables, context) => {
       if (context?.sessionId !== getActiveSessionId()) return;
       queryClient.setQueryData<Employee[]>(EMPLOYEES_QUERY_KEY, rows => [data.employee, ...(rows || []).filter(e => e.id !== data.employee.id)]);
       showToast(`Đã tạo hồ sơ ${data.employee.full_name} (${data.employee.employee_id}). ${data.emailStatus === 'queued' ? 'Email tài khoản đang được gửi nền.' : 'Chưa gửi email tài khoản.'}`, 'success', "Thêm nhân viên thành công");

@@ -1,5 +1,5 @@
+import { useState, useRef } from 'react';
 import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
-import React,{useState,useRef} from 'react';
 import {useMutation} from '@tanstack/react-query';
 import {ArrowRight,Check,CheckCircle2,Send,Building2} from 'lucide-react';
 import {api} from '../../api/client';

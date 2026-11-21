@@ -199,7 +199,6 @@ export const FingerprintConfirmModal: React.FC<FingerprintConfirmModalProps> = (
   isOpen,
   onClose,
   currentEmp,
-  selectedFinger,
   selectedDevice,
   onConfirm,
 }) => {

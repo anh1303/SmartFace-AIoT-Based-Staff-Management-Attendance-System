@@ -11,7 +11,6 @@ import { logger } from '../../../utils/logger';
 import { enrollFaceJobApi, deleteEmployeeBiometricsApi, EnrollFaceResult } from '../api/biometricApi';
 import type { Employee } from '@/features/employees';
 import { FacePhotoItem } from '../components/FaceEnrollmentSection';
-import { FingerprintStep } from '../components/FingerprintEnrollmentSection';
 import { CapturedFaceSample } from '../components/CameraEkycModal';
 
 const biometricLogger = logger.child('useBiometricEnrollment');
@@ -87,7 +86,7 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
   const [analyzingFace, setAnalyzingFace] = useState<boolean>(false);
   const [faceConfirmModal, setFaceConfirmModal] = useState<boolean>(false);
   const [isEkycModalOpen, setIsEkycModalOpen] = useState<boolean>(false);
-  const [enrollResult, setEnrollResult] = useState<EnrollFaceResult | null>(null);
+  const [enrollResult] = useState<EnrollFaceResult | null>(null);
   const [resultModalOpen, setResultModalOpen] = useState<boolean>(false);
 
   // Fingerprint Device Trigger State

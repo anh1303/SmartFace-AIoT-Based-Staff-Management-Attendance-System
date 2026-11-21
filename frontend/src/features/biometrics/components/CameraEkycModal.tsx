@@ -6,11 +6,8 @@ import {
   RefreshCw,
   AlertTriangle,
   RotateCcw,
-  ShieldCheck,
   Check,
-  Info,
   Plus,
-  Trash2
 } from 'lucide-react';
 import { logger } from '../../../utils/logger';
 
@@ -273,17 +270,6 @@ export const CameraEkycModal: React.FC<CameraEkycModalProps> = ({
       }
     }, 350);
   }, [currentStepIndex, steps, streamReady]);
-
-  const handleRetakeStep = (index: number) => {
-    setCurrentStepIndex(index);
-    const stepId = steps[index]?.id;
-    if (stepId) {
-      setSamples(prev => ({
-        ...prev,
-        [stepId]: null
-      }));
-    }
-  };
 
   const capturedCount = Object.values(samples).filter(Boolean).length;
 

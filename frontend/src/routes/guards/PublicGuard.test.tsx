@@ -1,9 +1,8 @@
-﻿import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { PublicGuard } from './PublicGuard';
 
-vi.mock('../../context/AuthContext', () => ({
+vi.mock('@/features/auth', () => ({
   useAuth: () => ({ currentUser: { role: 'manager' }, isInitializing: false }),
 }));
 vi.mock('react-router-dom', () => ({

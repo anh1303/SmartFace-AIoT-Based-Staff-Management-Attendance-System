@@ -1,10 +1,7 @@
+import { WifiSignalIcon } from '@/components/common/WifiSignalIcon';
 import { ActionError, ActionButton } from '@/components/common/ActionFeedback';
 import React, { useState } from 'react';
 import {
-  Wifi,
-  WifiHigh,
-  WifiLow,
-  WifiZero,
   WifiOff,
   Volume2,
   Volume1,
@@ -28,19 +25,12 @@ import {
 import {
   useDeviceSettings,
   BluetoothDevice,
-} from '../useDeviceSettings';
+} from '../hooks/useDeviceSettings';
 
 interface DeviceKioskSettingsPanelProps {
   deviceId: string;
   deviceName?: string;
 }
-
-const renderWifiSignalIcon = (signal: number, className = 'w-4 h-4 shrink-0') => {
-  if (signal >= 75) return <Wifi className={`${className} text-emerald-500`} />;
-  if (signal >= 50) return <WifiHigh className={`${className} text-emerald-500 dark:text-emerald-400`} />;
-  if (signal >= 25) return <WifiLow className={`${className} text-amber-500`} />;
-  return <WifiZero className={`${className} text-rose-500`} />;
-};
 
 export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> = ({
   deviceId,
@@ -215,7 +205,7 @@ export const DeviceKioskSettingsPanel: React.FC<DeviceKioskSettingsPanelProps> =
                 }`}
               >
                 {settings.online && settings.wifi.connected ? (
-                  renderWifiSignalIcon(settings.wifi.signalStrength, 'w-5 h-5')
+                  <WifiSignalIcon signal={settings.wifi.signalStrength} className='w-5 h-5' />
                 ) : (
                   <WifiOff className="w-5 h-5" />
                 )}

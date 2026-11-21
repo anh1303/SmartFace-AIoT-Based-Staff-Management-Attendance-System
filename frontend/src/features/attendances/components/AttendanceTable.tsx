@@ -3,7 +3,7 @@ import { AttendanceDayDetails } from './AttendanceDayDetails';
 import { confidenceColor } from '../utils/confidence';
 import React, { useState } from 'react';
 import { useTableSort, compareEmployeeNames } from '../../../hooks/useTableSort';
-import { ScanFace, Fingerprint, Edit, Clock, ChevronDown, ChevronUp, Unlock } from 'lucide-react';
+import { ScanFace, Fingerprint, Edit, ChevronDown, ChevronUp, Unlock } from 'lucide-react';
 import { AttendancePairItem, AttendanceEventItem } from '../hooks/useAttendancePairs';
 import {
   TableContainer,

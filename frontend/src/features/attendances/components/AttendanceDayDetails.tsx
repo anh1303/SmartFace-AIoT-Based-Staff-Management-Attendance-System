@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   TableContainer,
   TableHead,
@@ -10,7 +10,7 @@ import {
   TableEmpty,
   FilterSelect,
 } from '../../../components/common';
-import { AttendanceEventBadge } from '../../../components/common/AttendanceEventBadge';
+import { AttendanceEventBadge } from './AttendanceEventBadge';
 import { AttendancePairItem } from '../hooks/useAttendancePairs';
 import { formatVNDateISO } from '../../../utils/dateUtils';
 import { formatSecondsToHHMMSS, parseTimeToSeconds } from '../../../utils/timeUtils';

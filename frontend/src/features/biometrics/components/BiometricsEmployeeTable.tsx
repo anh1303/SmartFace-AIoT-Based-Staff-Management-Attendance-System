@@ -40,7 +40,6 @@ export interface BiometricsEmployeeTableProps {
 export type BiometricsStaffTableProps = BiometricsEmployeeTableProps;
 
 export const BiometricsEmployeeTable: React.FC<BiometricsEmployeeTableProps> = ({
-  employees,
   filteredEmployees,
   searchTerm,
   onSearchChange,

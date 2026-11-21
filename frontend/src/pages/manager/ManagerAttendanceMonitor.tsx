@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth';
 import { useShiftContext } from '@/features/schedules';
 import { useEmployeeContext } from '@/features/employees';
 import { getTodayVNString } from '../../utils/dateUtils';
+import { config } from '../../config';
 import { useDepartmentPositions } from '@/features/employees';
 import {
   AttendanceHeader,
@@ -108,7 +109,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     departmentFilter,
   });
 
-  const { devices, isError: isDevicesError } = useDevices(role === 'admin');
+  const { devices, isError: isDevicesError } = useDevices(role === 'admin' && config.iotHardwareEnabled);
   const { isDateLocked, toggleLockAsync, isLoading: locksLoading, isError: locksError, refetch: refetchLocks } = useAttendanceLocks();
   // useAttendanceSummaries lấy đúng khoảng ngày đang xem [startDate, endDate]
   const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap, adjustAttendance, unlockEmployeeAttendance, refetch: refetchSummaries, isLoading: summariesLoading, isError: summariesError } = useAttendanceSummaries(startDate, endDate);
@@ -293,7 +294,6 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     showRawLogs,
     setShowRawLogs,
     rawLogPage,
-    rawLogPageSize,
     rawLogsData,
     hasMoreRawLogs,
     isLoadingRawLogs,

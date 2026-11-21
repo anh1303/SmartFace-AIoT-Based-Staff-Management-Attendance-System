@@ -1,4 +1,3 @@
-import React from 'react';
 import { AppProviders } from './providers';
 import { AppRoutes } from './routes';
 import { ToastContainer } from './components/common/Toast';

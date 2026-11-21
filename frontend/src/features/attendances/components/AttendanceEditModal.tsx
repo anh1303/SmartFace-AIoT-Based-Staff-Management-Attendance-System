@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { AttendancePairItem } from '../hooks/useAttendancePairs';
-import { formatSecondsToHHMMSS, roundPayableHours, roundToHalfHour } from '../../../utils/timeUtils';
+import { formatSecondsToHHMMSS, roundPayableHours } from '../../../utils/timeUtils';
 
 export interface EditingItemState {
   employee: AttendancePairItem['employee'];
@@ -83,7 +83,6 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
     currentReason: string
   ) => {
     const totalLE = (leH || 0) * 3600 + (leM || 0) * 60 + (leS || 0);
-    const totalOT = (_otH || 0) * 3600 + (_otM || 0) * 60 + (_otS || 0);
 
     if (![leH, leM, leS, _otH, _otM, _otS].every(Number.isFinite) || totalLE < 0 || leH < 0 || _otH < 0 || leM < 0 || leM > 59 || _otM < 0 || _otM > 59 || leS < 0 || leS > 59 || _otS < 0 || _otS > 59) {
       setModalError('Nhập thời gian hợp lệ, không âm; phút/giây từ 0–59.');

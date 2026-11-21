@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { apiFetch } from '../../../api/client';
+import { config } from '../../../config';
 import { useAuth } from '@/features/auth';
 import { useDeviceSettings } from '../../devices';
 
@@ -21,13 +22,42 @@ interface WebRTCPlayerProps {
   showToast?: (msg: string, type?: 'success' | 'error' | 'info' | 'warning', title?: string) => void;
 }
 
+export function resolveDefaultWhepUrl(params?: {
+  configuredUrl?: string;
+  protocol?: string;
+  hostname?: string;
+}): string {
+  const configured = (params?.configuredUrl ?? import.meta.env.VITE_MEDIAMTX_WHEP_URL ?? '').trim();
+  if (configured) return configured;
+
+  const protocol = params?.protocol ?? (typeof window !== 'undefined' ? window.location.protocol : 'http:');
+  if (protocol === 'https:') {
+    // Never fall back to insecure http://:8889 on HTTPS pages (blocked by browser Mixed Content).
+    return '/camera/pi4_cam/whep';
+  }
+
+  const hostname = params?.hostname ?? (typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '192.168.1.170');
+  return `http://${hostname}:8889/pi4_cam/whep`;
+}
+
 export const WebRTCPlayer: React.FC<WebRTCPlayerProps> = (props) => {
   const { role } = useAuth();
-  return role === 'admin' ? <AdminWebRTCPlayer {...props}/> : null;
+  if (role !== 'admin') return null;
+  if (!config.iotHardwareEnabled) {
+    return (
+      <div
+        role="status"
+        className="p-4 rounded-xl bg-slate-50 dark:bg-[#13162b]/60 border border-slate-200/80 dark:border-[#21264b] text-xs text-slate-600 dark:text-slate-300"
+      >
+        Luồng camera cổng trực tiếp (Pi/MediaMTX) thuộc phạm vi Đợt 2 và đang tắt ở Đợt 1. Camera đăng nhập khuôn mặt trên trình duyệt vẫn hoạt động bình thường.
+      </div>
+    );
+  }
+  return <AdminWebRTCPlayer {...props}/>;
 };
 
 const AdminWebRTCPlayer: React.FC<WebRTCPlayerProps> = ({
-  streamUrl = (import.meta.env.VITE_MEDIAMTX_WHEP_URL || `http://${typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '192.168.1.170'}:8889/pi4_cam/whep`),
+  streamUrl = resolveDefaultWhepUrl(),
   deviceId = 'PI4_FRONT_GATE',
   deviceName = 'Cổng Chính — Raspberry Pi 4 Edge',
   currentMode = null,

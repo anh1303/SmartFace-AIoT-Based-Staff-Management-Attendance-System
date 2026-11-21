@@ -1,7 +1,7 @@
 import { useOperations, OperationFailedError, UncertainWriteError, submitAndWait, type Operation } from '../../features/operations';
 import { ActionButton } from '../../components/common/ActionFeedback';
 import { submitScheduleBatch, submitScheduleCopy } from '../../features/schedules';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { useEmployeeContext } from '@/features/employees';
 import { useShiftContext } from '@/features/schedules';

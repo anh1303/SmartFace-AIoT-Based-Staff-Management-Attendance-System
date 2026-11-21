@@ -2,7 +2,6 @@ import { ActionButton } from '@/components/common/ActionFeedback';
 import React from 'react';
 import {
   Briefcase,
-  Building2,
   Edit2,
   Trash2,
   Check,

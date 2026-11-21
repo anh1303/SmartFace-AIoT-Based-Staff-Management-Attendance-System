@@ -1,4 +1,5 @@
 // Components
+export * from './components/AttendanceEventBadge';
 export * from './components/AttendanceHeader';
 export * from './components/AttendanceFilters';
 export * from './components/DeviceStatusCards';

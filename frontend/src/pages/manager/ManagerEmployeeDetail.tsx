@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { useEmployeeContext } from '@/features/employees';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '@/features/auth';
-import { Users, ShieldAlert, Lock } from 'lucide-react';
+import { Users, ShieldAlert } from 'lucide-react';
 import type { Employee } from '@/features/employees';
 import type { PayrollRecord } from '@/features/payrolls';
 import { isAnotherManager, isDifferentDepartment } from '@/features/employees';

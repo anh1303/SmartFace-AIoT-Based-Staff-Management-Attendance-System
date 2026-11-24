@@ -1,8 +1,9 @@
 import { ActionButton } from '@/components/common/ActionFeedback';
 import { AttendanceDayDetails } from './AttendanceDayDetails';
-import { confidenceColor } from '../../../utils/confidence';
+import { confidenceColor } from '../utils/confidence';
 import React, { useState } from 'react';
-import { ScanFace, Fingerprint, Edit, Clock, ChevronDown, ChevronUp, Unlock } from 'lucide-react';
+import { useTableSort, compareEmployeeNames } from '../../../hooks/useTableSort';
+import { ScanFace, Fingerprint, Edit, ChevronDown, ChevronUp, Unlock } from 'lucide-react';
 import { AttendancePairItem, AttendanceEventItem } from '../hooks/useAttendancePairs';
 import {
   TableContainer,
@@ -29,6 +30,9 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
   onUnlockEmployee,
 }) => {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const { sortedRows, sortProps } = useTableSort(employeePairs, {
+    name: (a, b) => compareEmployeeNames(a.employee.full_name, b.employee.full_name),
+  });
 
   const toggleExpand = (rowKey: string) => {
     setExpandedRows(prev => ({ ...prev, [rowKey]: !prev[rowKey] }));
@@ -117,7 +121,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
     <TableContainer minWidth="100%">
       <TableHead>
         <TableHeadRow>
-          <TableHeadCell width="18%" align="center" className="!py-2.5 !px-2">NHÂN VIÊN</TableHeadCell>
+          <TableHeadCell width="18%" align="center" className="!py-2.5 !px-2" {...sortProps('name')}>NHÂN VIÊN</TableHeadCell>
           <TableHeadCell width="11%" align="center" className="!py-2.5 !px-1.5">CA LÀM VIỆC</TableHeadCell>
           <TableHeadCell width="8%" align="center" className="!py-2.5 !px-1">SỰ KIỆN</TableHeadCell>
           <TableHeadCell width="9%" align="center" className="!py-2.5 !px-1">THỜI GIAN</TableHeadCell>
@@ -138,7 +142,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
             }`}
           />
         ) : (
-          employeePairs.map((item) => {
+          sortedRows.map((item) => {
             const { employee, shift, events, lateEarlyStr, overtimeStr } = item;
             const checkInEv = events[0] || {
               type: 'CHECK_IN',

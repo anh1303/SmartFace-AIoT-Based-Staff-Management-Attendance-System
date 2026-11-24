@@ -1,4 +1,4 @@
-export { enqueueOperation, findOperationByKey, safeError, stagedInput, assertNoEnrollment, type OperationItem } from './operation.service.js'
+export { enqueueOperation, findOperationByKey, safeError, stagedInput, acquireBiometricLock, hasActiveEnrollment, assertNoEnrollment, ENROLLMENT_CONFLICT_MESSAGE, type OperationItem } from './operation.service.js'
 export { wakeOperationWorker } from './operation.worker.js'
 export { type OperationRow, summarizeItems, publicOperation } from './operation.contract.js'
 export { currentActor } from './operation.worker.js'

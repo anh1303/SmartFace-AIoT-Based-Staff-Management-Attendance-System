@@ -1,1 +1,1 @@
-export { encryptPayload, decryptPayload } from '../../common/biometric-crypto.js'
+export { encryptPayload, decryptPayload } from '../../common/payload-crypto.js'

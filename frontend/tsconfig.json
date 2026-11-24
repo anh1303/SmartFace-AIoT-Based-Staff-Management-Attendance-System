@@ -8,10 +8,10 @@
       "DOM.Iterable"
     ],
     "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
-    "allowJs": true,
     "jsx": "react-jsx",
     "strict": true,
     "paths": {

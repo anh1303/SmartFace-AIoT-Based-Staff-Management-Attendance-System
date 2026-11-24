@@ -16,3 +16,4 @@ export {
 } from './shift.queries.js'
 
 export { getDashboardShifts, getReportShifts } from './shifts.report-queries.js'
+export { formatShiftTime } from './shift.format.js'

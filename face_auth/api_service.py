@@ -45,11 +45,21 @@ db: Optional[VectorDB] = None
 remote_extractor: Optional[AlignedFaceExtractor] = None
 remote_slot = BoundedSemaphore(1)
 login_pad = None
+pad_state: str = "disabled"  # disabled | loading | ready | failed
+
+
+def _face_login_enabled() -> bool:
+    return os.getenv("FACE_LOGIN_ENABLED", "false").lower() == "true"
+
+
+def _load_pad_predictor():
+    from antispoof.predictor import AntiSpoofPredictor
+    return AntiSpoofPredictor()
 
 
 @app.on_event("startup")
 def startup_event():
-    global detector, embedder, db, remote_extractor
+    global detector, embedder, db, remote_extractor, login_pad, pad_state
     print("[api_service] Loading models...")
     detector = FaceDetector(
         model_name=config.MODEL_PACK_NAME,
@@ -71,15 +81,32 @@ def startup_event():
         conninfo=config.DB_CONN_INFO,
         min_size=config.DB_POOL_MIN_SIZE,
         max_size=config.DB_POOL_MAX_SIZE,
+        pool_timeout=config.DB_POOL_TIMEOUT_SECONDS,
+        query_timeout_ms=config.DB_QUERY_TIMEOUT_MS,
     )
-    print(f"[api_service] VectorDB pool ready: min={config.DB_POOL_MIN_SIZE}, max={config.DB_POOL_MAX_SIZE}")
+    print(
+        f"[api_service] VectorDB pool ready: min={config.DB_POOL_MIN_SIZE}, "
+        f"max={config.DB_POOL_MAX_SIZE}, pool_timeout={config.DB_POOL_TIMEOUT_SECONDS}s, "
+        f"query_timeout={config.DB_QUERY_TIMEOUT_MS}ms"
+    )
     # Preload PAD so the first streaming frame is not delayed by ONNX session creation.
+    if not _face_login_enabled():
+        login_pad = None
+        pad_state = "disabled"
+        print("[api_service] Ready on :5000 (face_login=disabled)")
+        return
+
+    pad_state = "loading"
     try:
-        if get_face_login_models() is not None:
-            print("[api_service] Face login PAD preloaded")
+        login_pad = _load_pad_predictor()
+        pad_state = "ready"
+        print("[api_service] Face login PAD preloaded")
+        print("[api_service] Ready on :5000 (face_login=ready)")
     except Exception as exc:
+        login_pad = None
+        pad_state = "failed"
         print(f"[api_service] Face login PAD preload failed: {type(exc).__name__}")
-    print("[api_service] Ready on :5000")
+        print("[api_service] Started in DEGRADED state on :5000 (face_login=failed)")
 
 
 @app.on_event("shutdown")
@@ -96,11 +123,25 @@ class EnrollRequest(BaseModel):
     operation_id: Optional[UUID] = None
 
 
-@app.get("/health")
-def health_check():
-    """Health check endpoint để Backend kiểm tra trạng thái hoạt động."""
+@app.get("/health/live")
+def health_live():
+    """Liveness probe for Docker/orchestrator: never queries the database."""
     if detector is None or embedder is None or db is None:
-        raise HTTPException(status_code=503, detail="Face Auth chưa sẵn sàng")
+        raise HTTPException(status_code=503, detail="Face Auth is starting")
+    return {
+        "status": "alive",
+        "model_version": config.EMBEDDING_MODEL_VERSION,
+        "pad_state": pad_state,
+    }
+
+
+@app.get("/health/ready")
+def health_ready():
+    """Readiness probe: checks core models, required PAD state, and DB connectivity with timeout."""
+    if detector is None or embedder is None or db is None:
+        raise HTTPException(status_code=503, detail="Face Auth is not ready")
+    if _face_login_enabled() and (pad_state != "ready" or login_pad is None):
+        raise HTTPException(status_code=503, detail="Face Auth PAD model is not ready")
     try:
         db.check_connection()
     except Exception as exc:
@@ -111,7 +152,14 @@ def health_check():
     return {
         "status": "ready",
         "model_version": config.EMBEDDING_MODEL_VERSION,
+        "pad_state": pad_state,
     }
+
+
+@app.get("/health")
+def health_check():
+    """Backward-compatible readiness endpoint."""
+    return health_ready()
 
 
 def require_internal_key(x_face_auth_key: str = Header(default="")):
@@ -215,8 +263,9 @@ def enroll_faces(req: EnrollRequest):
         "warnings": warnings,
     }
 
+    is_ignored = False
     try:
-        db.upsert(
+        _, _, is_ignored = db.upsert(
             employee_code=req.employee_code,
             individual_embeddings=valid_embeddings,
             mean_embedding=centroid,
@@ -230,9 +279,14 @@ def enroll_faces(req: EnrollRequest):
     except ValueError as ve:
         raise HTTPException(status_code=404, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu embeddings: {e}")
+        print(f"[api_service] Enrollment DB write failed: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lưu embeddings ({type(e).__name__})")
 
-    return db.enrollment_receipt(str(req.operation_id)) if req.operation_id else result
+    if req.operation_id:
+        if is_ignored:
+            return db.enrollment_receipt(str(req.operation_id)) or {**result, "operation_id": str(req.operation_id)}
+        return {**result, "operation_id": str(req.operation_id)}
+    return result
 
 
 
@@ -247,6 +301,7 @@ def delete_employee_faces(employee_code: str):
 
     with db.pool.connection() as conn:
         with conn.transaction():
+            db.apply_query_timeout(conn)
             row = conn.execute(
                 "SELECT id FROM employees WHERE employee_code = %s;",
                 (employee_code,)
@@ -296,12 +351,10 @@ def extract_aligned_embedding(req: AlignedEmbeddingRequest):
 
 
 def get_face_login_models():
-    global login_pad
-    if os.getenv('FACE_LOGIN_ENABLED', 'false').lower() != 'true' or detector is None or embedder is None:
+    if not _face_login_enabled() or detector is None or embedder is None:
         return None
-    if login_pad is None:
-        from antispoof.predictor import AntiSpoofPredictor
-        login_pad = AntiSpoofPredictor()
+    if pad_state != "ready" or login_pad is None:
+        return None
     return SimpleNamespace(detector=detector, embedder=embedder, predictor=login_pad)
 
 

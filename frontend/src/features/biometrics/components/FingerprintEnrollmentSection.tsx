@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Fingerprint, Trash2 } from 'lucide-react';
 import type { FingerprintDevice } from '../hooks/useFingerprintEnrollment';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { apiFetch } from '../../../api/client';
+import { config } from '../../../config';
 
 export type FingerprintStep = 'IDLE' | 'SENDING' | 'QUEUED' | 'WAITING_TOUCH_1' | 'LIFT_FINGER' | 'WAITING_TOUCH_2' | 'VERIFIED' | 'SYNCING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'EXPIRED';
 const labels: Record<FingerprintStep,string> = {
@@ -24,6 +25,20 @@ interface Props {
   onSendIoTTrigger: () => void; onOpenConfirmModal: () => void; onCancel: () => void;
 }
 export const FingerprintEnrollmentSection: React.FC<Props> = props => {
+  if (!config.iotHardwareEnabled) {
+    return (
+      <div
+        role="status"
+        className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-5 text-sm text-slate-600 dark:text-slate-300"
+      >
+        Đăng ký và chấm công bằng cảm biến vân tay trên Raspberry Pi thuộc phạm vi Đợt 2 và đang tắt trong bản triển khai Đợt 1. Vui lòng sử dụng tab Khuôn mặt.
+      </div>
+    );
+  }
+  return <FingerprintEnrollmentContent {...props} />;
+};
+
+const FingerprintEnrollmentContent: React.FC<Props> = props => {
   const { role, currentUser } = useAuth();
   const queryClient = useQueryClient();
   const [acceptanceDevice, setAcceptanceDevice] = useState<string | null>(null);

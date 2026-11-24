@@ -1,0 +1,28 @@
+# Phase 1 OCI HTTPS override (Task 6 & Task 7).
+# Only Caddy publishes public ports 80/443; frontend, backend, and face-auth remain internal-only.
+# Persistent ACME state is stored in named volumes caddy_data and caddy_config.
+services:
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.phase1.oci}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${PHASE1_CADDYFILE:-./docker/Caddyfile.oci.example}:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_started
+
+volumes:
+  caddy_data:
+  caddy_config:

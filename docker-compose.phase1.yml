@@ -1,0 +1,91 @@
+# SmartFace Phase 1 (FE, BE, Neon, Face Login) — standalone base Compose manifest.
+# Do NOT merge with docker-compose.yml, docker-compose.cloud.yml, or docker-compose.iot.yml.
+# Hardware services (Pi, ThingsBoard, Mosquitto/MQTT, MediaMTX) are intentionally excluded in Phase 1.
+# Use with an explicit override:
+#   Local HTTPS: -f docker-compose.phase1.yml -f docker-compose.phase1.local-https.yml
+#   OCI HTTPS:   -f docker-compose.phase1.yml -f docker-compose.phase1.oci.yml
+x-logging: &phase1-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  face-auth:
+    build: ./face_auth
+    restart: unless-stopped
+    logging: *phase1-logging
+    env_file:
+      - ${PHASE1_FACE_AUTH_ENV_FILE:-./face_auth/.env}
+    environment:
+      MODEL_PACK_NAME: ${PHASE1_FACE_MODEL_PACK:-buffalo_s}
+      EMBEDDING_MODEL_VERSION: ${PHASE1_FACE_MODEL_PACK:-buffalo_s}
+      MODEL_CTX_ID: -1
+      PAD_RUNTIME_CONFIG_PATH: ${PHASE1_PAD_RUNTIME_CONFIG_PATH:-}
+      PAD_ADAPTIVE_ENABLED: ${PHASE1_PAD_ADAPTIVE_ENABLED:-true}
+      PAD_ADAPTIVE_CONFIG_PATH: ${PHASE1_PAD_ADAPTIVE_CONFIG_PATH:-/app/login-models/R7_SC_FULL_pi_final_conservative_runtime.json}
+      DB_POOL_TIMEOUT_SECONDS: ${PHASE1_FACE_DB_POOL_TIMEOUT_SECONDS:-5}
+      DB_QUERY_TIMEOUT_MS: ${PHASE1_FACE_DB_QUERY_TIMEOUT_MS:-5000}
+    volumes:
+      - ${PHASE1_INSIGHTFACE_CACHE:-insightface_models}:/root/.insightface
+      - ./face_auth/gallery:/app/gallery:ro
+      - ./hardware/models:/app/login-models:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health/live', timeout=5)
+      interval: 15s
+      timeout: 8s
+      retries: 12
+      start_period: 120s
+
+  backend:
+    image: ${PHASE1_BACKEND_IMAGE:-smartface-phase1-backend:local}
+    build: ./backend
+    restart: unless-stopped
+    logging: *phase1-logging
+    env_file:
+      - ${PHASE1_BACKEND_ENV_FILE:-./backend/.env}
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      TRUST_PROXY_HOPS: ${PHASE1_TRUST_PROXY_HOPS:-2}
+      ENABLE_MQTT: 'false'
+      ENABLE_ATTENDANCE_CRON: ${PHASE1_ENABLE_ATTENDANCE_CRON:-false}
+      REMOTE_RECOGNITION_ENABLED: 'false'
+      TB_HOST: ''
+      TB_WEBHOOK_SECRET: ''
+      OPERATION_RECOVERY_INTERVAL_MS: ${PHASE1_OPERATION_RECOVERY_INTERVAL_MS:-900000}
+      ATTENDANCE_ALERTS_INTERVAL_MS: ${PHASE1_ATTENDANCE_ALERTS_INTERVAL_MS:-900000}
+      FACE_AUTH_URL: http://face-auth:5000
+      FACE_AUTH_MODEL_VERSION: ${PHASE1_FACE_MODEL_PACK:-buffalo_s}
+      CORS_ORIGIN: ${PHASE1_CORS_ORIGIN:?Set PHASE1_CORS_ORIGIN in .env.phase1.local or .env.phase1.oci}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 12
+    depends_on:
+      face-auth:
+        condition: service_healthy
+
+  frontend:
+    image: ${PHASE1_FRONTEND_IMAGE:-smartface-phase1-frontend:local}
+    build:
+      context: ./frontend
+      args:
+        VITE_IOT_HARDWARE_ENABLED: ${PHASE1_IOT_HARDWARE_ENABLED:-false}
+    restart: unless-stopped
+    logging: *phase1-logging
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  insightface_models:

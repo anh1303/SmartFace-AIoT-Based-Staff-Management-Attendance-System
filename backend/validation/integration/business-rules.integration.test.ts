@@ -61,14 +61,18 @@ suite('Business payroll rules in isolated PostgreSQL', () => {
     expect(await db.employee_shifts.count({ where: { employee_id: emp.id } })).toBe(1)
   })
 
-  it('retains October wages after a November profile update and uses the old baseline for ungenerated September', async () => {
+  it('applies profile hourly_rate updates from the next month while preserving prior and current months', async () => {
     const emp = await employee('wages')
+    // Updated on 2026-10-29 -> effective from 2026-11; 2026-09 and 2026-10 keep baseline 50000
     await employees.updateWithManagerCheck(emp.id, { hourly_rate: 60000 }, admin)
     vi.setSystemTime(new Date('2026-11-10T20:00:00+07:00'))
+    // Updated on 2026-11-10 -> effective from 2026-12; 2026-11 keeps 60000
     await employees.updateWithManagerCheck(emp.id, { hourly_rate: 70000 }, admin)
-    expect((await payroll.generate('2026-10', emp.id, admin.id, admin))[0].hourly_rate).toBe(60000)
     expect((await payroll.generate('2026-09', emp.id, admin.id, admin))[0].hourly_rate).toBe(50000)
-    expect((await payroll.generate('2026-11', emp.id, admin.id, admin))[0].hourly_rate).toBe(70000)
+    expect((await payroll.generate('2026-10', emp.id, admin.id, admin))[0].hourly_rate).toBe(50000)
+    expect((await payroll.generate('2026-11', emp.id, admin.id, admin))[0].hourly_rate).toBe(60000)
+    vi.setSystemTime(new Date('2026-12-10T20:00:00+07:00'))
+    expect((await payroll.generate('2026-12', emp.id, admin.id, admin))[0].hourly_rate).toBe(70000)
   })
 
   it('stores a 20:00–04:00 shift and both scans under its starting work date', async () => {

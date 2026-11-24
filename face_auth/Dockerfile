@@ -12,7 +12,6 @@ COPY recognition ./recognition
 COPY tracking ./tracking
 COPY face_login ./face_login
 COPY antispoof ./antispoof
-COPY scripts ./scripts
 ENV PYTHONUNBUFFERED=1
 EXPOSE 5000
 CMD ["python", "-m", "uvicorn", "api_service:app", "--host", "0.0.0.0", "--port", "5000"]

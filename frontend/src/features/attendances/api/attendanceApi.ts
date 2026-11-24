@@ -1,5 +1,5 @@
 import { apiFetch } from '../../../api/client';
-import { AttendanceRecord } from '../../../types';
+import type { AttendanceRecord } from '../types';
 
 export interface FetchAttendanceParams {
   startDate?: string;
@@ -24,6 +24,18 @@ export interface PaginatedAttendanceResponse {
   limit: number;
   hasMore: boolean;
   totalLoaded: number;
+}
+
+export function normalizeAttendanceRecord(record: AttendanceRecord): AttendanceRecord {
+  const rawWorkDate = record?.work_date;
+  const work_date =
+    typeof rawWorkDate === 'string' && rawWorkDate.trim()
+      ? rawWorkDate.trim().slice(0, 10)
+      : null;
+  return {
+    ...record,
+    work_date,
+  };
 }
 
 /**
@@ -54,7 +66,7 @@ export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promis
   if (!params?.fetchAllPages) {
     const res = await apiFetch(buildUrl(currentPage, pageSize));
     if (res.success && Array.isArray(res.data)) {
-      const records: AttendanceRecordList = res.data;
+      const records: AttendanceRecordList = res.data.map(normalizeAttendanceRecord);
       records.totalLoaded = records.length;
       records.isTruncated = records.length === pageSize;
       if (records.isTruncated) params?.onTruncated?.(records.length);
@@ -71,7 +83,7 @@ export async function fetchAttendanceApi(params?: FetchAttendanceParams): Promis
     if (res.data.length === 0) {
       break;
     }
-    allRecords.push(...res.data);
+    allRecords.push(...res.data.map(normalizeAttendanceRecord));
     if (res.data.length < pageSize) break;
     currentPage++;
   }
@@ -101,7 +113,7 @@ export async function fetchAttendancePaginatedApi(
 
   const res = await apiFetch(`/api/attendance?${searchParams.toString()}`);
   if (!res.success || !Array.isArray(res.data)) throw new Error(res.message || 'Unable to load attendance page');
-  const records: AttendanceRecord[] = res.data;
+  const records: AttendanceRecord[] = res.data.map(normalizeAttendanceRecord);
 
   return {
     data: records,

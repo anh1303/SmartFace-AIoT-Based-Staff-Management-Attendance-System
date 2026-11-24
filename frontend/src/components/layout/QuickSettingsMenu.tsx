@@ -1,9 +1,6 @@
+import { WifiSignalIcon } from '@/components/common/WifiSignalIcon';
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Wifi,
-  WifiHigh,
-  WifiLow,
-  WifiZero,
   WifiOff,
   Volume2,
   Volume1,
@@ -21,36 +18,28 @@ import {
   Unlink,
   Search,
   X,
-  Filter,
-  Users
+  Users,
 } from 'lucide-react';
-import { useDeviceSettings, BluetoothDevice } from '../../features/attendances/hooks/useDeviceSettings';
-
-// Icon sóng Wi-Fi động theo cường độ tín hiệu (%)
-const renderWifiSignalIcon = (signal: number, className = 'w-4 h-4 shrink-0') => {
-  if (signal >= 75) {
-    return <Wifi className={`${className} text-emerald-500`} />;
-  }
-  if (signal >= 50) {
-    return <WifiHigh className={`${className} text-emerald-500 dark:text-emerald-400`} />;
-  }
-  if (signal >= 25) {
-    return <WifiLow className={`${className} text-amber-500`} />;
-  }
-  return <WifiZero className={`${className} text-rose-500`} />;
-};
+import { useDeviceSettings, BluetoothDevice } from '../../features/devices';
+import { config } from '../../config';
 
 interface QuickSettingsMenuProps {
   deviceId?: string;
 }
 
-export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
+export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = (props) => {
+  if (!config.iotHardwareEnabled) {
+    return null;
+  }
+  return <QuickSettingsMenuContent {...props} />;
+};
+
+const QuickSettingsMenuContent: React.FC<QuickSettingsMenuProps> = ({
   deviceId = 'PI4_FRONT_GATE',
 }) => {
   const {
     canManage,
     settings,
-    isLoading,
     isUpdating,
     setVolume,
     toggleMute,
@@ -236,7 +225,7 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
       >
         {/* Biểu tượng Wi-Fi động theo mức sóng & trạng thái Online của Pi */}
         {settings.online && settings.wifi.connected ? (
-          renderWifiSignalIcon(settings.wifi.signalStrength, 'w-3.5 h-3.5')
+          <WifiSignalIcon signal={settings.wifi.signalStrength} className='w-3.5 h-3.5' />
         ) : (
           <WifiOff className="w-3.5 h-3.5 text-rose-500" />
         )}
@@ -305,10 +294,10 @@ export const QuickSettingsMenu: React.FC<QuickSettingsMenuProps> = ({
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
                   }`}
                 >
-                  {renderWifiSignalIcon(
-                    settings.online && settings.wifi.connected && settings.wifi.ssid ? settings.wifi.signalStrength : 0,
-                    'w-4 h-4'
-                  )}
+                  <WifiSignalIcon
+                    signal={settings.online && settings.wifi.connected && settings.wifi.ssid ? settings.wifi.signalStrength : 0}
+                    className="w-4 h-4"
+                  />
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">

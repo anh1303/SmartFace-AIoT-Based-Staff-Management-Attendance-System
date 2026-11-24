@@ -1,23 +1,26 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
-import { useEmployeeContext } from '../../context/EmployeeContext';
+import { useEmployeeContext } from '@/features/employees';
 import { useToast } from '../../context/ToastContext';
-import { useAuth } from '../../context/AuthContext';
-import { Users, ShieldAlert, Lock } from 'lucide-react';
-import { Employee, PayrollRecord } from '../../types';
-import { isAnotherManager, isDifferentDepartment } from '../../utils/permissionUtils';
+import { useAuth } from '@/features/auth';
+import { Users, ShieldAlert } from 'lucide-react';
+import type { Employee } from '@/features/employees';
+import type { PayrollRecord } from '@/features/payrolls';
+import { isAnotherManager, isDifferentDepartment } from '@/features/employees';
 import { getTodayVNString } from '@/utils/dateUtils';
 import {
   EmployeeDetailHeader,
   EmployeeOverviewTab,
-  EmployeeAttendanceTab,
-  EmployeePayrollTab,
-  EmployeeScheduleTab,
   EmployeeAccountTab,
-  EmployeePayslipModal,
   EditEmployeeModal,
   useDepartmentPositions,
 } from '@/features/employees';
+import { BiometricStatusBadge } from '@/features/biometrics';
+import { EmployeeAttendanceTab } from '../components/EmployeeAttendanceTab';
+import { EmployeeMonthlyAverages } from './components/EmployeeMonthlyAverages';
+import { EmployeePayslipModal } from './components/EmployeePayslipModal';
+import { EmployeePayrollTab } from './components/EmployeePayrollTab';
+import { EmployeeScheduleTab } from './components/EmployeeScheduleTab';
 import { useEmployeeDetailData } from './hooks/useEmployeeDetailData';
 
 export const ManagerEmployeeDetail: React.FC = () => {
@@ -345,6 +348,8 @@ export const ManagerEmployeeDetail: React.FC = () => {
           currentEmp={currentEmp}
           hourlyRate={hourlyRate}
           onOpenEditModal={handleOpenEditModal}
+          renderBiometricStatus={enrolled => <BiometricStatusBadge enrolled={Boolean(enrolled)} />}
+          monthlyAveragesSlot={<EmployeeMonthlyAverages employee={currentEmp} />}
         />
       )}
 

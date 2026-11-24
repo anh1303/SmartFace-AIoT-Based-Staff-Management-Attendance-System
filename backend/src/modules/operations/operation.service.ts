@@ -72,8 +72,18 @@ export async function stagedInput(id: string) {
   if (!rows[0]) throw AppError.conflict('Dữ liệu tải lên đã hết hạn. Vui lòng gửi lại thao tác.')
   return decryptPayload(rows[0].ciphertext, env.BIOMETRIC_ENCRYPTION_KEY)
 }
-export async function assertNoEnrollment(tx: OperationTx, employeeId: string) {
+export const ENROLLMENT_CONFLICT_MESSAGE = 'Nhân viên đang được cập nhật khuôn mặt. Vui lòng chờ tác vụ hoàn tất.'
+
+export async function acquireBiometricLock(tx: OperationTx, employeeId: string) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`biometric:${employeeId}`}))`
+}
+
+export async function hasActiveEnrollment(tx: OperationTx, employeeId: string): Promise<boolean> {
   const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM background_operations WHERE type = 'biometric.enroll' AND status IN ('queued', 'running') AND payload->>'employeeId' = ${employeeId} LIMIT 1`
-  if (rows.length) throw AppError.conflict('Nhân viên đang được cập nhật khuôn mặt. Vui lòng chờ tác vụ hoàn tất.')
+  return rows.length > 0
+}
+
+export async function assertNoEnrollment(tx: OperationTx, employeeId: string) {
+  await acquireBiometricLock(tx, employeeId)
+  if (await hasActiveEnrollment(tx, employeeId)) throw AppError.conflict(ENROLLMENT_CONFLICT_MESSAGE)
 }

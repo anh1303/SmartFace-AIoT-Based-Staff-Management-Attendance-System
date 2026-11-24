@@ -1,8 +1,8 @@
 import { Avatar } from '../../../components/common/Avatar';
 import React, { useState, useRef, useEffect } from 'react';
 import { ScanFace, Fingerprint, ChevronDown, Search } from 'lucide-react';
-import { Employee } from '../../../types';
-import { useAuth } from '../../../context/AuthContext';
+import type { Employee } from '@/features/employees';
+import { useAuth } from '@/features/auth';
 import { BiometricStatusBadge } from './BiometricStatusBadge';
 
 interface EmployeeBiometricsCardProps {

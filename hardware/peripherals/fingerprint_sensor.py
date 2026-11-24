@@ -11,11 +11,9 @@ Hỗ trợ:
 """
 
 import time
-import base64
 import fcntl
 import hashlib
 import os
-import struct
 import termios
 from typing import Optional, Tuple, Dict, Any
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { Role } from '../../types';
+import { useAuth } from '@/features/auth';
+import type { Role } from '@/features/auth';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 
 interface AuthGuardProps {

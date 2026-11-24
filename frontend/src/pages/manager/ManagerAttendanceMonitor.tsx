@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { confidenceColor } from '../../utils/confidence';
+import { confidenceColor } from '@/features/attendances';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
-import { useAuth } from '../../context/AuthContext';
-import { useShiftContext } from '../../context/ShiftContext';
-import { useEmployeeContext } from '../../context/EmployeeContext';
+import { useAuth } from '@/features/auth';
+import { useShifts } from '@/features/schedules';
+import { useEmployeeContext } from '@/features/employees';
 import { getTodayVNString } from '../../utils/dateUtils';
+import { config } from '../../config';
 import { useDepartmentPositions } from '@/features/employees';
 import {
   AttendanceHeader,
@@ -25,7 +26,9 @@ import {
   exportAttendanceToCSV,
   useRawLogsPagination,
 } from '@/features/attendances';
-import { AttendanceRecord } from '../../types';
+import type { AttendanceRecord } from '@/features/attendances';
+import { TableSortIndicator } from '../../components/common/Table';
+import { useTableSort, compareEmployeeNames } from '../../hooks/useTableSort';
 import { ChevronLeft, ChevronRight, RefreshCw, FileText } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAttendanceApi } from '@/features/attendances';
@@ -41,20 +44,16 @@ const useSafeSearchParams = () => {
 };
 
 export const ManagerAttendanceMonitor: React.FC = () => {
-  const shiftState = useShiftContext();
   const employeeState = useEmployeeContext();
   const { employees } = employeeState;
-  const { workShifts } = shiftState;
   const { showToast } = useToast();
-  const { role, currentUser } = useAuth();
+  const { role, currentUser, isInitializing } = useAuth();
   const isManager = role === 'manager';
   const managerDept = currentUser?.department;
 
   const [searchParams] = useSafeSearchParams();
   const paramDate = searchParams.get('date');
   const paramSearch = searchParams.get('search') || searchParams.get('employeeId');
-
-  const { liveEvents, isSocketConnected, clearEvents } = useAttendanceSocket({ showToast });
 
   const [startDate, setStartDate] = useState<string>(() => paramDate || getTodayVNString());
   const [endDate, setEndDate] = useState<string>(() => paramDate || getTodayVNString());
@@ -78,12 +77,29 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     value.setUTCDate(value.getUTCDate() + days);
     return value.toISOString().slice(0, 10);
   };
+  const validRange = Boolean(startDate && endDate) && startDate <= endDate;
+  const rangeStart = validRange ? adjacentDate(startDate, -1) : undefined;
+  const rangeEnd = validRange ? adjacentDate(endDate, 1) : undefined;
+
+  const shiftState = useShifts(
+    Boolean(currentUser) && !isInitializing && validRange,
+    rangeStart && rangeEnd ? { startDate: rangeStart, endDate: rangeEnd } : undefined,
+  );
+  const { workShifts } = shiftState;
+
   const attendanceQuery = useQuery({
     queryKey: ['attendance', { startDate, endDate, fetchAllPages: true }],
-    queryFn: () => fetchAttendanceApi({ startDate: adjacentDate(startDate, -1), endDate: adjacentDate(endDate, 1), fetchAllPages: true }),
-    enabled: Boolean(currentUser) && Boolean(startDate && endDate) && startDate <= endDate,
+    queryFn: () => fetchAttendanceApi({ startDate: rangeStart, endDate: rangeEnd, fetchAllPages: true }),
+    enabled: Boolean(currentUser) && validRange,
   });
   const attendance = attendanceQuery.data || [];
+
+  const todayStr = getTodayVNString();
+  const includesToday = validRange && startDate <= todayStr && todayStr <= endDate;
+  const { liveEvents, isLoadingEvents, eventsError, refetchEvents } = useAttendanceSocket({
+    showToast,
+    externalTodayLogs: includesToday ? attendanceQuery : undefined,
+  });
   const [departmentFilter, setDepartmentFilter] = useState(() => {
     if (role === 'manager' && currentUser?.department) {
       return currentUser.department;
@@ -106,7 +122,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     departmentFilter,
   });
 
-  const { devices, isError: isDevicesError } = useDevices(role === 'admin');
+  const { devices, isError: isDevicesError } = useDevices(role === 'admin' && config.iotHardwareEnabled);
   const { isDateLocked, toggleLockAsync, isLoading: locksLoading, isError: locksError, refetch: refetchLocks } = useAttendanceLocks();
   // useAttendanceSummaries lấy đúng khoảng ngày đang xem [startDate, endDate]
   const { customOvertimeMap, customLateEarlyMap, workingHoursMap, summaryMap, adjustAttendance, unlockEmployeeAttendance, refetch: refetchSummaries, isLoading: summariesLoading, isError: summariesError } = useAttendanceSummaries(startDate, endDate);
@@ -284,11 +300,13 @@ export const ManagerAttendanceMonitor: React.FC = () => {
   };
 
   // PHÂN TRANG RAW LOGS: Xem lịch sử quẹt thẻ toàn hệ thống không bị giới hạn ở 5000 bản ghi
+  const { sortProps: rawLogSortProps } = useTableSort<AttendanceRecord, 'name'>([], {
+    name: (a, b) => compareEmployeeNames(a.employee_name || a.employee_id, b.employee_name || b.employee_id),
+  });
   const {
     showRawLogs,
     setShowRawLogs,
     rawLogPage,
-    rawLogPageSize,
     rawLogsData,
     hasMoreRawLogs,
     isLoadingRawLogs,
@@ -297,6 +315,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     startDate,
     endDate,
     pageSize: 50,
+    employeeNameSort: rawLogSortProps('name')['aria-sort'],
     showToast,
   });
 
@@ -358,11 +377,12 @@ export const ManagerAttendanceMonitor: React.FC = () => {
             showToast={showToast}
           />
         </div>}
-        <div className="lg:col-span-1 h-full min-h-[360px]">
+        <div className="lg:col-span-1 min-w-0">
           <LiveEventFeed
             events={liveEvents}
-            onClear={clearEvents}
-            isSocketConnected={isSocketConnected}
+            isLoading={isLoadingEvents}
+            isError={eventsError}
+            onRetry={refetchEvents}
           />
         </div>
       </div>
@@ -411,7 +431,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => loadRawLogsPage(rawLogPage)}
+                onClick={() => loadRawLogsPage(rawLogPage, true)}
                 disabled={isLoadingRawLogs}
                 className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-[#0f1224] transition-colors cursor-pointer disabled:opacity-50"
                 title="Làm mới"
@@ -449,7 +469,7 @@ export const ManagerAttendanceMonitor: React.FC = () => {
               <thead className="bg-slate-50 dark:bg-[#0f1224] text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-[#21264b]">
                 <tr>
                   <th className="py-2.5 px-3">Thời gian ghi nhận</th>
-                  <th className="py-2.5 px-3">Nhân viên</th>
+                  <th aria-sort={rawLogSortProps('name')['aria-sort']} className="relative py-2.5 px-3"><button type="button" onClick={rawLogSortProps('name').onSort} className="inline-flex w-full items-center justify-center px-3 text-center cursor-pointer focus-visible:outline-blue-500">Nhân viên<TableSortIndicator direction={rawLogSortProps('name')['aria-sort']} /></button></th>
                   <th className="py-2.5 px-3">Loại sự kiện</th>
                   <th className="py-2.5 px-3">Phương thức</th>
                   <th className="py-2.5 px-3">Thiết bị</th>

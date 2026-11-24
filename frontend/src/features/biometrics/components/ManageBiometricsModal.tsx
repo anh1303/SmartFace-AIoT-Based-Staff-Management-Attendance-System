@@ -4,7 +4,7 @@ import React from 'react';
 import { ScanFace, Fingerprint, Upload, Camera, Trash2, Radio } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
 import { BiometricStatusBadge } from './BiometricStatusBadge';
-import { Employee } from '../../../types';
+import type { Employee } from '@/features/employees';
 
 interface ManageBiometricsModalProps {
   employee: Employee | null;

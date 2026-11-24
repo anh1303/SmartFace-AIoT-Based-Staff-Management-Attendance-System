@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PositionItem, fetchPositionsApi } from '../api/positionApi';
 import { DepartmentItem, fetchDepartmentsApi } from '../api/departmentApi';
-import { Employee } from '../../../types';
+import type { Employee } from '../types';
 import { FilterSelectOption } from '../../../components/common';
 
 export interface UseDepartmentPositionsOptions {

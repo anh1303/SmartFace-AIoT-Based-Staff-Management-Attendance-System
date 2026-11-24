@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../common/AppError.js';
-import { buildIdOrCodeWhere } from '../../common/utils.js';
+import { buildIdOrCodeWhere } from './employee.model.js';
 
 /**
  * Kiểm tra xem một nhân viên có vai trò hoặc chức vụ là Quản lý/Admin không
@@ -57,6 +57,23 @@ export async function getEmployeeScope(
   return { id: { in: ids } };
 }
 
+export async function getManagedEmployeeIds(
+  actor: EmployeeActor | undefined,
+  employeeIds: readonly string[],
+  tx?: Prisma.TransactionClient
+): Promise<Set<string>> {
+  const uniqueIds = [...new Set(employeeIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return new Set<string>();
+  const scope = await getEmployeeScope(actor, 'manage', tx);
+  const rows = await (tx ?? prisma).employee.findMany({
+    where: {
+      AND: [scope, { id: { in: uniqueIds } }],
+    },
+    select: { id: true },
+  });
+  return new Set<string>(rows.map(row => row.id));
+}
+
 export async function assertCanAccessEmployeeDetail(
   actor: EmployeeActor | undefined,
   targetIdOrCode: string,
@@ -66,6 +83,38 @@ export async function assertCanAccessEmployeeDetail(
   if (actor?.role?.toUpperCase() === 'ADMIN') return;
   const target = await prisma.employee.findFirst({ where: { AND: [scope, buildIdOrCodeWhere(targetIdOrCode)] }, select: { id: true } });
   if (!target) throw AppError.forbidden(forbiddenMessage);
+}
+
+export type ManagedEmployeeTarget = {
+  id: string;
+  employee_code: string;
+  status: string;
+  user_id: string | null;
+  departmentId: number | null;
+};
+
+/**
+ * Kiểm tra quyền quản lý và trả về bản ghi nhân viên gọn trong 1 lần đọc DB.
+ * Giữ nguyên API contract mã lỗi:
+ * - ADMIN: ném 404 nếu không tìm thấy nhân viên.
+ * - MANAGER/EMPLOYEE: ném 403 nếu ngoài phạm vi quản lý hoặc không tồn tại.
+ */
+export async function resolveManagedEmployee(
+  actor: EmployeeActor | undefined,
+  targetIdOrCode: string,
+  tx?: Prisma.TransactionClient,
+): Promise<ManagedEmployeeTarget> {
+  const scope = await getEmployeeScope(actor, 'manage', tx);
+  const client = tx ?? prisma;
+  const select = { id: true, employee_code: true, status: true, user_id: true, departmentId: true } as const;
+  if (actor?.role?.toUpperCase() === 'ADMIN') {
+    const target = await client.employee.findFirst({ where: buildIdOrCodeWhere(targetIdOrCode), select });
+    if (!target) throw new AppError(404, 'Employee not found');
+    return target;
+  }
+  const target = await client.employee.findFirst({ where: { AND: [scope, buildIdOrCodeWhere(targetIdOrCode)] }, select });
+  if (!target) throw AppError.forbidden('Employee management denied');
+  return target;
 }
 
 export async function assertCanManageEmployee(actor: EmployeeActor | undefined, targetIdOrCode: string, tx?: Prisma.TransactionClient) {

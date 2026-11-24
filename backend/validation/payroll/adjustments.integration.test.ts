@@ -96,13 +96,31 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
     const date='2025-03-03',emp=await fixture(date)
     await aggregate(emp,date)
     await attendance.adjustAttendance({ employeeId: emp.id, date, late_early: 0, overtime: 0, reason: 'Vắng' }, admin.id, 'ADMIN')
-    expect((await rows(emp))[0].status).toBe('APPROVED')
+    const [approved]=await rows(emp)
+    expect(approved.status).toBe('APPROVED')
+    expect(approved.note).toBe('Vắng')
+    expect(approved.reviewed_by).toBe(admin.id)
+    expect(approved.reviewed_at).not.toBeNull()
+    expect(await db.auditLog.count({where:{record_id:String(approved.id),action:'INVALIDATE_ADJUSTMENT_REVIEW'}})).toBe(0)
 
     await raw(emp,'CHECK_IN',date,'08:00:00');await raw(emp,'CHECK_OUT',date,'16:00:00')
     await attendance.unlockEmployeeAttendance({ employeeId: emp.id, date, reason: 'Bổ sung lượt quét' }, actor())
     await aggregate(emp,date)
-    const [changed]=await rows(emp);expect(changed.status).toBe('VOID');expect(changed.note).toBe('Vắng')
-    expect(await db.auditLog.count({where:{record_id:String(changed.id),action:'INVALIDATE_ADJUSTMENT_REVIEW'}})).toBeGreaterThan(0)
+    const [changed]=await rows(emp)
+    expect(changed.status).toBe('VOID')
+    expect(changed.note).toBe('Vắng')
+    expect(changed.reviewed_by).toBeNull()
+    expect(changed.reviewed_at).toBeNull()
+    const invalidationLogs = await db.auditLog.findMany({where:{record_id:String(changed.id),action:'INVALIDATE_ADJUSTMENT_REVIEW'}})
+    expect(invalidationLogs.length).toBeGreaterThan(0)
+    expect(invalidationLogs.some((log: any) => log.old_values?.status === 'APPROVED' && log.old_values?.note === 'Vắng')).toBe(true)
+
+    // Idempotent reaggregation preserves note and revoked absence is not deducted from payroll
+    await aggregate(emp,date)
+    const [reaggregated]=await rows(emp)
+    expect(reaggregated.status).toBe('VOID');expect(reaggregated.note).toBe('Vắng')
+    const [pay]=await payroll.generate('2025-03',emp.id,admin.id,actor())
+    expect(pay.total_absence_penalty).toBe(0)
   })
 
   it('joins split overnight attendance across month end and keeps OT on the shift date', async () => {
@@ -189,13 +207,39 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
     await raw(emp,'CHECK_IN',date,'08:00:00');await raw(emp,'CHECK_OUT',date,'17:00:00');await aggregate(emp,date)
     const [ot]=await rows(emp)
     await attendance.adjustAttendance({ employeeId: emp.id, date, late_early: 0, overtime: 1, reason: 'Đã xác nhận' }, admin.id, 'ADMIN')
-    expect((await rows(emp))[0].status).toBe('APPROVED')
+    const [approved]=await rows(emp)
+    expect(approved.status).toBe('APPROVED')
+    expect(approved.note).toBe('Đã xác nhận')
+    expect(approved.reviewed_by).toBe(admin.id)
+    expect(approved.reviewed_at).not.toBeNull()
+    expect(await db.auditLog.count({where:{record_id:String(ot.id),action:'INVALIDATE_ADJUSTMENT_REVIEW'}})).toBe(0)
+
+    // Reapproving with a different reason but identical hours/fingerprint updates note without emitting invalidation audit
+    await attendance.adjustAttendance({ employeeId: emp.id, date, late_early: 0, overtime: 1, reason: 'Đã xác nhận cập nhật' }, admin.id, 'ADMIN')
+    const [reapproved]=await rows(emp)
+    expect(reapproved.status).toBe('APPROVED')
+    expect(reapproved.note).toBe('Đã xác nhận cập nhật')
+    expect(await db.auditLog.count({where:{record_id:String(ot.id),action:'INVALIDATE_ADJUSTMENT_REVIEW'}})).toBe(0)
 
     await attendance.unlockEmployeeAttendance({ employeeId: emp.id, date, reason: 'Điều chỉnh ca' }, actor())
     await db.employee_shifts.update({where:{employee_id_work_date:{employee_id:emp.id,work_date:new Date(`${date}T00:00:00Z`)}},data:{end_time:new Date('1970-01-01T15:00:00Z')}})
     await aggregate(emp,date)
-    const [updated]=await rows(emp);expect(updated.status).toBe('PENDING');expect(Number(updated.hours)).toBe(2);expect(updated.note).toBe('Đã xác nhận')
-    expect(await db.auditLog.count({where:{record_id:String(ot.id),action:'INVALIDATE_ADJUSTMENT_REVIEW'}})).toBeGreaterThan(0)
+    const [updated]=await rows(emp)
+    expect(updated.status).toBe('PENDING')
+    expect(Number(updated.hours)).toBe(2)
+    expect(updated.note).toBe('Đã xác nhận cập nhật')
+    expect(updated.reviewed_by).toBeNull()
+    expect(updated.reviewed_at).toBeNull()
+    const invalidationLogs = await db.auditLog.findMany({where:{record_id:String(ot.id),action:'INVALIDATE_ADJUSTMENT_REVIEW'}})
+    expect(invalidationLogs.length).toBe(1)
+    expect(invalidationLogs[0].old_values).toMatchObject({ status: 'APPROVED', note: 'Đã xác nhận cập nhật' })
+
+    // Idempotent reaggregation preserves note and revoked OT is not counted as approved payroll
+    await aggregate(emp,date)
+    const [reaggregated]=await rows(emp)
+    expect(reaggregated.status).toBe('PENDING');expect(reaggregated.note).toBe('Đã xác nhận cập nhật')
+    const [pay]=await payroll.generate('2025-09',emp.id,admin.id,actor())
+    expect(pay.total_overtime).toBe(0)
   })
 
   it('reads per-checkout credits from legacy daily summaries without rewriting their data', async () => {
@@ -211,6 +255,28 @@ suite('Daily OT and penalty ledger on isolated PostgreSQL', () => {
     expect(response.calculation_details.pairs[0]).toMatchObject({counted:true,regular_seconds:35256,credited_regular_seconds:36000})
     const unchanged=await db.daily_attendance_summary.findUnique({where:{id:summary.id}})
     expect(unchanged.policy_version).toBe('2026-10-25-v4');expect(unchanged.calculation_details.pairs[0]).not.toHaveProperty('credited_regular_seconds')
+  })
+
+  it('applies historical policy multiplier inside a transaction and rolls back uncommitted policy writes', async () => {
+    const date = '2024-11-04'
+    const emp = await fixture(date)
+    await expect(
+      db.$transaction(async (tx: any) => {
+        await tx.bonusPenalty.upsert({
+          where: { effective_period: '2024-11' },
+          create: { effective_period: '2024-11', overtime_rate: 2.5, late_early_penalty: 1.5, absence_penalty_rate: 3.0, description: 'Historical tx test' },
+          update: { absence_penalty_rate: 3.0 },
+        })
+        const { getAdjustmentPolicy } = await import('../../src/modules/payroll/public.js')
+        const txPolicy = await getAdjustmentPolicy('2024-11', tx)
+        expect(txPolicy?.absence_penalty_rate).toBe(3.0)
+        throw new Error('rollback-historical-policy-tx')
+      })
+    ).rejects.toThrow('rollback-historical-policy-tx')
+
+    const rolledBack = await db.bonusPenalty.findUnique({ where: { effective_period: '2024-11' } })
+    expect(rolledBack).toBeNull()
+    expect(emp.id).toBeDefined()
   })
 
 })

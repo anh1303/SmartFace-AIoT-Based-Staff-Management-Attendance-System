@@ -1,0 +1,38 @@
+# Phase 1 Local HTTPS override (Task 5: mkcert CA + Caddy on https://localhost:8443).
+# Run with an isolated project name:
+#   docker compose -p smartface-phase1-local --env-file .env.phase1.local \
+#     -f docker-compose.phase1.yml -f docker-compose.phase1.local-https.yml config --quiet
+#   docker compose -p smartface-phase1-local --env-file .env.phase1.local \
+#     -f docker-compose.phase1.yml -f docker-compose.phase1.local-https.yml build
+#   docker compose -p smartface-phase1-local --env-file .env.phase1.local \
+#     -f docker-compose.phase1.yml -f docker-compose.phase1.local-https.yml up -d
+services:
+  face-auth:
+    ports:
+      - 127.0.0.1:${PHASE1_FACE_API_PORT:-5000}:5000
+
+  backend:
+    ports:
+      - 127.0.0.1:${PHASE1_BACKEND_PORT:-3000}:3000
+
+  frontend:
+    # HTTP 8080 is strictly for UI-01 smoke; all production-cookie UAT runs on https://localhost:8443.
+    ports:
+      - 127.0.0.1:${PHASE1_HTTP_SMOKE_PORT:-8080}:80
+
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - 127.0.0.1:${PHASE1_HTTPS_PORT:-8443}:8443
+    volumes:
+      - ./docker/Caddyfile.local:/etc/caddy/Caddyfile:ro
+      - ./docker/certs:/etc/caddy/certs:ro
+    depends_on:
+      frontend:
+        condition: service_started

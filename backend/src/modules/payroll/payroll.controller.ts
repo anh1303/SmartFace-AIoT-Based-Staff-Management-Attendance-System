@@ -2,14 +2,18 @@ import * as adjustments from './payroll.adjustments.js';
 import { reviewAdjustmentSchema } from './payroll.dto.js';
 import { z } from 'zod';
 import { Request, Response } from 'express';
+import { AppError } from '../../common/AppError.js';
 import { successResponse } from '../../common/response.js';
 import * as service from './payroll.service.js';
+import { buildPayrollExport } from './payroll.export.js';
 import {
   updateBonusPenaltySchema,
   generatePayrollSchema,
   updatePayrollSchema,
   earlySettlementSchema,
   previewPayrollSchema,
+  payrollPeriodParamSchema,
+  exportPayrollSchema,
 } from './payroll.dto.js';
 
 export const getBonusPenalty = async (req: Request, res: Response) => {
@@ -66,7 +70,7 @@ export const finalizeEarlySettlement = async (req: Request, res: Response) => {
 
 export const unlockPeriod = async (req: Request, res: Response) => {
   const period = req.params.period as string;
-  successResponse(res, await service.unlockPeriod(period, req.user?.id), 'Payroll period unlocked');
+  successResponse(res, await service.unlockPeriod(period, req.user?.id, req.user), 'Payroll period unlocked');
 };
 
 export const previewEarlySettlement = async (req: Request, res: Response) => {
@@ -81,4 +85,14 @@ export const listAdjustments = async (req: Request, res: Response) => {
 export const reviewAdjustment = async (req: Request, res: Response) => {
   const id = z.string().regex(/^\d+$/).parse(req.params.id);
   successResponse(res, await adjustments.reviewAdjustment(id, reviewAdjustmentSchema.parse(req.body), req.user!));
+};
+
+export const exportPeriod = async (req: Request, res: Response) => {
+  const parsedPeriod = payrollPeriodParamSchema.safeParse(req.params.period);
+  const parsedBody = exportPayrollSchema.safeParse(req.body);
+  if (!parsedPeriod.success || !parsedBody.success) {
+    throw AppError.badRequest('Tham số kỳ lương hoặc danh sách ID phiếu lương xuất báo cáo không hợp lệ');
+  }
+  const exported = await buildPayrollExport(parsedPeriod.data, req.user, parsedBody.data.recordIds);
+  successResponse(res, exported, 'Payroll export generated');
 };

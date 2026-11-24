@@ -3,7 +3,6 @@ Module Phát hiện khuôn mặt SCRFD (InsightFace)
 Sử dụng mô hình det_500m.onnx (~2.5 MB).
 """
 
-import os
 from pathlib import Path
 import numpy as np
 try:

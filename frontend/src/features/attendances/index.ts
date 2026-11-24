@@ -1,4 +1,5 @@
 // Components
+export * from './components/AttendanceEventBadge';
 export * from './components/AttendanceHeader';
 export * from './components/AttendanceFilters';
 export * from './components/DeviceStatusCards';
@@ -18,10 +19,12 @@ export * from './hooks/useAttendancePairs';
 export * from './hooks/useEmployeeAttendanceDetail';
 export * from './hooks/useRawLogsPagination';
 export * from './hooks/useEmployeeOverview';
-export * from './hooks/useDeviceSettings';
 
 // Api
 export * from './api/attendanceApi';
 
 // Utils
 export * from './utils/csvExport';
+export type * from './types';
+export * from './utils/confidence';
+export * from './context/AttendanceContext';

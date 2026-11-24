@@ -3,7 +3,7 @@ import { logger } from '../../../utils/logger';
 
 const positionLogger = logger.child('PositionApi');
 
-import { PositionItem } from '../../../types';
+import type { PositionItem } from '../types';
 
 export type { PositionItem };
 

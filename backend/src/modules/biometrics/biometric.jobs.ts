@@ -1,18 +1,16 @@
 import { prisma } from '../../config/database.js'
 import { env } from '../../config/env.js'
 import { AppError } from '../../common/AppError.js'
-import { assertCanManageEmployee, findEmployeeByIdOrCode } from '../employees/public.js'
+import { assertCanManageEmployee, resolveManagedEmployee } from '../employees/public.js'
 import { enqueueOperation, assertNoEnrollment, stagedInput } from '../operations/public.js'
 import type { OperationRow } from '../operations/public.js'
 import { currentActor } from '../operations/public.js'
-import { announceDataChange } from '../operations/public.js'
 import { logger } from '../../common/logger.js'
 
 export async function submitEnrollment(code: string, images: string[], actor: { id: string; role: string }, key: string) {
   if (env.FACE_AUTH_INTERNAL_KEY.length < 32) throw AppError.conflict('Máy chủ chưa cấu hình FACE_AUTH_INTERNAL_KEY để xử lý khuôn mặt nền.')
-  await assertCanManageEmployee(actor, code)
-  const emp = await findEmployeeByIdOrCode(code)
-  if (!emp || emp.status !== 'ACTIVE') throw AppError.conflict('Chỉ cập nhật khuôn mặt cho nhân viên đang hoạt động.')
+  const emp = await resolveManagedEmployee(actor, code)
+  if (emp.status !== 'ACTIVE') throw AppError.conflict('Chỉ cập nhật khuôn mặt cho nhân viên đang hoạt động.')
   return prisma.$transaction(async tx => {
     const previous = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM background_operations WHERE owner_id = ${actor.id}::uuid AND idempotency_key = ${key}::uuid`
     if (!previous.length) await assertNoEnrollment(tx, emp.id)
@@ -44,7 +42,12 @@ export async function executeEnrollment(job: OperationRow) {
     throw AppError.conflict(`Dịch vụ nhận diện gặp lỗi khi xử lý/lưu Face ID (HTTP ${response.status}). Cần kiểm tra log face_auth; giữ lại ảnh để thử lại sau khi khắc phục.`)
   }
   // Python commits the receipt, avatar, audit and job completion together with the vectors.
-  const confirmed = await prisma.$queryRaw<{ result: any }[]>`SELECT result FROM face_enrollment_receipts WHERE operation_id = ${job.id}::uuid`
-  if (!confirmed.length) throw AppError.conflict('Dịch vụ nhận diện chưa hỗ trợ xác nhận tác vụ nền. Vui lòng cập nhật face_auth.')
-  await announceDataChange('biometrics', [job.payload.employeeId], job.owner_id)
+  // Accept confirmed HTTP 200 JSON containing operation_id directly to avoid a redundant DB round-trip;
+  // fall back to checking face_enrollment_receipts only when operation_id confirmation is absent.
+  const okBody = await response.json().catch(() => null) as { status?: string; operation_id?: string } | null
+  if (okBody?.status !== 'ok' || okBody?.operation_id !== job.id) {
+    const confirmed = await prisma.$queryRaw<{ result: any }[]>`SELECT result FROM face_enrollment_receipts WHERE operation_id = ${job.id}::uuid`
+    if (!confirmed.length) throw AppError.conflict('Dịch vụ nhận diện chưa hỗ trợ xác nhận tác vụ nền. Vui lòng cập nhật face_auth.')
+  }
+  return { dataChange: { domain: 'biometrics' as const, employeeIds: [job.payload.employeeId] } }
 }

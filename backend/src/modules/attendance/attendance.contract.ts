@@ -40,6 +40,89 @@ export async function findDailyAttendanceSummaries(
   })
 }
 
+export interface PayrollDailySummaryRow {
+  id: bigint
+  employee_id: string
+  work_date: Date
+  total_working_hours: Prisma.Decimal
+  overtime: Prisma.Decimal
+  late_early: Prisma.Decimal
+  overtime_status: string
+  review_status: string
+  policy_version: string | null
+  requires_review: boolean
+  calculation_details: { scheduledEnd?: string; fingerprint?: string } | null
+}
+
+/**
+ * Projected read of daily_attendance_summary specifically for payroll.list().
+ * Avoids transferring large full calculation_details / pre_approval_snapshot JSON blobs over WAN
+ * while preserving the exact scalar columns and JSON fields (scheduledEnd, fingerprint) required
+ * by elapsedPayrollSources, workingHoursFingerprint, and summaryFingerprint.
+ */
+export async function findDailyAttendanceSummariesForPayroll(
+  filter: {
+    employeeIds?: string[]
+    employeeId?: string
+    workDate?: { gte?: Date; lt?: Date; lte?: Date }
+    status?: string
+  },
+  tx?: Prisma.TransactionClient
+): Promise<PayrollDailySummaryRow[]> {
+  const client = tx || prisma
+  const conditions: Prisma.Sql[] = []
+
+  if (filter.employeeId) {
+    conditions.push(Prisma.sql`employee_id = ${filter.employeeId}::uuid`)
+  } else if (filter.employeeIds) {
+    if (filter.employeeIds.length === 0) return []
+    conditions.push(Prisma.sql`employee_id = ANY(${filter.employeeIds}::uuid[])`)
+  }
+
+  if (filter.workDate?.gte) {
+    conditions.push(Prisma.sql`work_date >= ${filter.workDate.gte}::date`)
+  }
+  if (filter.workDate?.lt) {
+    conditions.push(Prisma.sql`work_date < ${filter.workDate.lt}::date`)
+  }
+  if (filter.workDate?.lte) {
+    conditions.push(Prisma.sql`work_date <= ${filter.workDate.lte}::date`)
+  }
+  if (filter.status) {
+    conditions.push(Prisma.sql`review_status = ${filter.status}`)
+  }
+
+  const whereSql = conditions.length > 0
+    ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`
+    : Prisma.empty
+
+  return client.$queryRaw<PayrollDailySummaryRow[]>(Prisma.sql`
+    SELECT
+      id,
+      employee_id,
+      work_date,
+      total_working_hours,
+      overtime,
+      late_early,
+      overtime_status,
+      review_status,
+      policy_version,
+      requires_review,
+      CASE
+        WHEN calculation_details IS NULL THEN NULL
+        ELSE jsonb_strip_nulls(
+          jsonb_build_object(
+            'scheduledEnd', calculation_details->'scheduledEnd',
+            'fingerprint', calculation_details->'fingerprint'
+          )
+        )
+      END AS calculation_details
+    FROM daily_attendance_summary
+    ${whereSql}
+    ORDER BY work_date ASC
+  `)
+}
+
 export async function findAttendanceAdjustments(
   filter: {
     employeeIds?: string[]

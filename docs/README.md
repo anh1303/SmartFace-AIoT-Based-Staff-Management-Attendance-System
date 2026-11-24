@@ -1,51 +1,40 @@
 # Tài liệu SmartFace
 
-## Quy tắc công ty và dự án — `rule/`
+Bắt đầu từ [README dự án](../README.md) để chọn thành phần cần cài. Tài liệu có ngày là hồ sơ tại thời điểm ghi nhận, không xác nhận trạng thái triển khai hiện tại.
 
-- [Chính sách điểm danh, tăng ca, tính lương, phân quyền và dữ liệu](rule/COMPANY_POLICY.md) — nguồn quy định nghiệp vụ; có đơn giá, công thức và tình huống minh họa.
+## Nghiệp vụ và kiến trúc
 
-## Kiến trúc — `architecture/`
+- [Chính sách công ty](rule/COMPANY_POLICY.md): căn cứ chấm công, tăng ca, lương và phân quyền.
+- [Tổng quan hệ thống](architecture/PROJECT_OVERVIEW.md).
+- [Kiến trúc/luồng dữ liệu](architecture/DATA_FLOWS.md).
 
-- [Tổng quan dự án](architecture/PROJECT_OVERVIEW.md).
-- [Kiến trúc và luồng dữ liệu](architecture/DATA_FLOWS.md).
-- Tài liệu module: [Backend](../backend/README.md), [Database/Prisma](../backend/prisma/README.md), [Frontend](../frontend/README.md), [Face Auth](../face_auth/README.md), [Hardware](../hardware/README.md).
+## Hướng dẫn theo thành phần
 
-## Hướng dẫn — `tutorial/`
+| Thành phần | Tài liệu |
+| --- | --- |
+| API | [Backend](../backend/README.md) |
+| Database | [Prisma](../backend/prisma/README.md), [seed](../backend/prisma/seeds/README-SEED.md) |
+| Giao diện | [Frontend](../frontend/README.md) |
+| Sinh trắc học | [Face Auth](../face_auth/README.md), [nghiên cứu/runtime](../face_auth/md/README.md) |
+| Thiết bị | [Hardware](../hardware/README.md), [Pi](../hardware/RUN_ON_PI.md) |
+| Giả lập | [Simulator](../scripts/realtime/README.md) |
 
-### Triển khai và vận hành
+## Triển khai
 
-- [Hướng dẫn triển khai tổng thể](tutorial/deployment/DEPLOYMENT_GUIDE.md).
-- [Chạy stack dùng DB cloud](tutorial/deployment/run_cloud_stack.md).
-- [Chạy stack local](tutorial/deployment/run_full_stack.md).
-- [Đưa bản sửa công/lương vào vận hành và chạy regression test](tutorial/deployment/ATTENDANCE_PAYROLL_RELEASE.md).
+- [Triển khai tổng thể](tutorial/deployment/DEPLOYMENT_GUIDE.md).
+- [Stack local](tutorial/deployment/run_full_stack.md).
+- [Stack database cloud](tutorial/deployment/run_cloud_stack.md).
+- [ThingsBoard/Pi](tutorial/thingsboard/THINGSBOARD_PI_SETUP.md).
+- [Rule Chain và widget](tutorial/thingsboard/THINGSBOARD_GUIDE.md).
+- [Dashboard exports](tutorial/thingsboard/DASHBOARD_EXPORTS.md).
 
-### ThingsBoard và Pi
+Đối chiếu file Compose và `.env.example` tương ứng trước khi chạy lệnh cũ. Stack Phase 1 có base/override riêng, không ghép với stack IoT/local/cloud khác.
 
-- [Tổng hợp thiết lập ThingsBoard, dashboard và Pi](tutorial/thingsboard/THINGSBOARD_PI_SETUP.md).
-- [Tạo Rule Chain và widget](tutorial/thingsboard/THINGSBOARD_GUIDE.md).
-- [Dashboard exports và bản sao cấu hình](tutorial/thingsboard/DASHBOARD_EXPORTS.md).
-- [Chạy phần cứng trên Pi](../hardware/RUN_ON_PI.md), [kế hoạch HC-SR04](../hardware/ULTRASONIC_EDGE_PLAN.md).
+## Hồ sơ và tài nguyên
 
-## Lịch sử thay đổi — `changes/`
+- [Lịch sử ngày 19/10/2026](changes/2026-10-19/README.md).
+- [Tài nguyên ThingsBoard](assets/thingsboard/).
+- `superpowers/`: kế hoạch/đánh giá/báo cáo có ngày; đọc trạng thái từng tài liệu riêng.
+- `reports/`: báo cáo cục bộ, có thể không phân phối qua Git.
 
-- [Đợt 19/10/2026](changes/2026-10-19/README.md): backend, frontend, hardware, kiểm thử và sắp xếp tài liệu.
-
-## Báo cáo và tài nguyên
-
-- [Đánh giá báo cáo PBL6 ngày 15/10/2026](reports/danh_gia_bao_cao_smartface_2026-10-15.md).
-- [Tài nguyên/export ThingsBoard](assets/thingsboard/).
-
-```text
-docs/
-├── README.md
-├── rule/                 # Quy định công ty và quy tắc nghiệp vụ
-├── architecture/         # Tổng quan, kiến trúc, luồng dữ liệu
-├── tutorial/
-│   ├── deployment/       # Cài đặt, chạy hệ thống, triển khai và kiểm thử
-│   └── thingsboard/      # ThingsBoard, dashboard, Rule Chain, kết nối Pi
-├── changes/2026-10-19/    # Báo cáo thay đổi của từng phân hệ
-├── reports/              # Đánh giá, báo cáo dự án
-└── assets/thingsboard/   # JSON export và bản sao cấu hình
-```
-
-Các lệnh trong hướng dẫn được chạy từ thư mục gốc repository, trừ khi tài liệu ghi rõ thư mục khác. Chính sách tại `rule/` là căn cứ cho công/lương; báo cáo thay đổi tại `changes/` ghi trạng thái và bằng chứng của từng đợt triển khai.
+Không lấy số lượng test, IP máy thử hoặc câu “đã triển khai” trong hồ sơ cũ làm bằng chứng cho môi trường hiện tại. Đối chiếu lệnh với README thành phần, scripts và mã nguồn đang có.

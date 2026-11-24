@@ -4,7 +4,7 @@ import {
   buildEmployeeExportRows,
   exportEmployeesToExcel,
 } from '../employeeExport';
-import { Employee } from '@/types';
+import type { Employee } from '../../types';
 
 vi.mock('xlsx', async (importOriginal) => {
   const actual = await importOriginal<typeof import('xlsx')>();

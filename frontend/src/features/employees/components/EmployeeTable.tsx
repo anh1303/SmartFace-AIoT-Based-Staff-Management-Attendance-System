@@ -1,12 +1,13 @@
 import { Avatar } from '../../../components/common/Avatar';
 import React from 'react';
+import { useTableSort, compareEmployeeNames, compareEmployeeCodes } from '../../../hooks/useTableSort';
 import { useMutationState } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ScanFace, Fingerprint, Lock } from 'lucide-react';
-import { Employee } from '../../../types';
-import { useAuth } from '../../../context/AuthContext';
+import type { Employee } from '../types';
+import { useAuth } from '@/features/auth';
 import { useToast } from '../../../context/ToastContext';
-import { isAnotherManager } from '../../../utils/permissionUtils';
+import { isAnotherManager } from '../utils/permissionUtils';
 import {
   TableContainer,
   TableHead,
@@ -33,6 +34,11 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
   onOpenStatusToggle,
 }) => {
   const navigate = useNavigate();
+  const { sortedRows, sortProps } = useTableSort(filteredEmployees, {
+    name: (a, b) => compareEmployeeNames(a.full_name, b.full_name),
+    code: (a, b) => compareEmployeeCodes(a.employee_id, b.employee_id),
+    rate: (a, b) => (a.hourly_rate ?? 0) - (b.hourly_rate ?? 0),
+  });
   const { currentUser } = useAuth();
   const { showToast } = useToast();
   const creating = useMutationState({ filters: { mutationKey: ['employee-write', 'create'], status: 'pending' }, select: mutation => ({ id: mutation.mutationId, draft: mutation.state.variables as Employee }) });
@@ -53,12 +59,12 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
     <TableContainer minWidth="1000px">
       <TableHead>
         <TableHeadRow>
-          <TableHeadCell width="230px" align="left">Nhân viên</TableHeadCell>
-          <TableHeadCell width="110px">Mã NV</TableHeadCell>
+          <TableHeadCell width="230px" align="center" {...sortProps('name')}>Nhân viên</TableHeadCell>
+          <TableHeadCell width="110px" {...sortProps('code')}>Mã NV</TableHeadCell>
           <TableHeadCell width="180px">Phòng ban & Chức vụ</TableHeadCell>
           <TableHeadCell width="210px">Liên hệ</TableHeadCell>
           <TableHeadCell width="120px">Sinh trắc AI</TableHeadCell>
-          <TableHeadCell width="140px">Lương theo giờ</TableHeadCell>
+          <TableHeadCell width="140px" {...sortProps('rate')}>Lương theo giờ</TableHeadCell>
           <TableHeadCell width="120px">Trạng thái</TableHeadCell>
           <TableHeadCell width="100px" isLast>Thao tác</TableHeadCell>
         </TableHeadRow>
@@ -68,7 +74,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
         {filteredEmployees.length === 0 ? (
           <TableEmpty colSpan={8} message="Không tìm thấy nhân viên nào phù hợp." />
         ) : (
-          filteredEmployees.map((emp) => {
+          sortedRows.map((emp) => {
             const restricted = isAnotherManager(emp, currentUser);
 
             return (

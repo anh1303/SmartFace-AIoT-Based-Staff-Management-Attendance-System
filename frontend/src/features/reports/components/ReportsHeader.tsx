@@ -1,6 +1,6 @@
 import { ReportExportButton, type ReportFormat } from '@/components/common/ReportExportButton';
 import React from 'react';
-import { Download, Calendar, BarChart3 } from 'lucide-react';
+import { Calendar, BarChart3 } from 'lucide-react';
 import { PageHeaderBanner } from '../../../components/common';
 
 interface ReportsHeaderProps {

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { User, Camera, Check } from 'lucide-react';
 import { profileApi, meApi, PasswordReauthentication, type AccountProfile, type ProfileInput } from '@/features/auth';
-import { useAuth, getActiveSessionId, getActiveUsername } from '../../../context/AuthContext';
+import { useAuth, getActiveSessionId, getActiveUsername } from '@/features/auth';
 import { PageHeaderBanner } from '../../../components/common/PageHeaderBanner';
 import { PasswordForm } from './PasswordForm';
 

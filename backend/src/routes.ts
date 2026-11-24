@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { operationRouter } from './modules/operations/operation.routes.js';
+import { operationRouter } from './modules/operations/index.js';
 import { authRouter } from './modules/auth/index.js';
 import { employeeRouter, departmentRouter, positionRouter } from './modules/employees/index.js';
 import { attendanceRouter, notificationRouter, deviceAttendanceRouter } from './modules/attendance/index.js';

@@ -8,6 +8,7 @@ interface ToastContextType {
   removeToast: (id: string) => void;
   reportError: (message: string, title?: string, checkpoint?: number) => void;
   getCheckpoint: () => number;
+  openNotifications?: () => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -21,6 +22,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const generations = useRef(new Map<string, number>());
   const getCheckpoint = useCallback(() => sequence.current, []);
   const addNotification = notifications?.addNotification;
+  const setNotificationsOpen = notifications?.setIsOpen;
+  const openNotifications = useCallback(() => {
+    setNotificationsOpen?.(true);
+  }, [setNotificationsOpen]);
   const removeToast = useCallback((id: string) => {
     clearTimeout(timers.current.get(id));
     timers.current.delete(id);
@@ -52,7 +57,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [showToast]);
 
   return (
-    <ToastContext.Provider value={{ toasts, showToast, removeToast, reportError, getCheckpoint }}>
+    <ToastContext.Provider value={{ toasts, showToast, removeToast, reportError, getCheckpoint, openNotifications }}>
       {children}
     </ToastContext.Provider>
   );

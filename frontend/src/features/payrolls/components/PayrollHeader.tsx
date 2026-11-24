@@ -1,8 +1,8 @@
 import { ActionButton } from '@/components/common/ActionFeedback';
 import { ReportExportButton, type ReportFormat } from '@/components/common/ReportExportButton';
 import React from 'react';
-import { Calendar, Sparkles, Lock, Unlock, Download, Banknote } from 'lucide-react';
-import { useAuth } from '../../../context/AuthContext';
+import { Calendar, Sparkles, Lock, Unlock, Banknote } from 'lucide-react';
+import { useAuth } from '@/features/auth';
 import { PageHeaderBanner } from '../../../components/common';
 
 interface PayrollHeaderProps {

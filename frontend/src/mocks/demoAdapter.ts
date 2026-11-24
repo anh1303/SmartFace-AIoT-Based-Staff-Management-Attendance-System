@@ -1,10 +1,13 @@
 /** Explicit, development-only preview adapter. Never a fallback for a failed real API. */
 import type { ApiResponse } from '../types/api.types';
-import type { Employee, WorkShift, AttendanceRecord, PayrollRecord } from '../types';
+import type { Employee } from '@/features/employees';
+import type { WorkShift } from '@/features/schedules';
+import type { AttendanceRecord } from '@/features/attendances';
+import type { PayrollRecord } from '@/features/payrolls';
 import type { AttendanceAdjustment } from '@/features/payrolls';
 import type { Device, DeviceMode } from '@/features/devices';
-import { calcPayrollAmount } from '../utils/payrollUtils';
-import { nextPayrollPolicyPeriod } from '../utils/payrollUtils';
+import { calcPayrollAmount } from '@/features/payrolls';
+import { nextPayrollPolicyPeriod } from '@/features/payrolls';
 const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
 const period = today.slice(0, 7);
 const now = () => new Date().toISOString();

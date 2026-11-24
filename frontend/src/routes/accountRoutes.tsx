@@ -1,4 +1,4 @@
-import React,{lazy} from 'react';
+import { lazy } from 'react';
 import {Navigate,type RouteObject} from 'react-router-dom';
 import {AuthGuard} from './guards/AuthGuard';
 import {AppLayout} from '../components/layout/AppLayout';

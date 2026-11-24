@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { usePayrollContext } from '../../../context/PayrollContext';
-import { Employee } from '../../../types';
+import { usePayrollHistory } from './usePayrollHistory';
+import type { Employee } from '@/features/employees';
 
 export interface UseEmployeePayrollDetailOptions {
   currentEmp: Employee | null;
@@ -9,7 +9,7 @@ export interface UseEmployeePayrollDetailOptions {
 }
 
 export function useEmployeePayrollDetail({ currentEmp }: UseEmployeePayrollDetailOptions) {
-  const { payroll } = usePayrollContext();
+  const { data: payroll = [] } = usePayrollHistory(currentEmp?.employee_id);
   const employeePayrolls = useMemo(() => {
     if (!currentEmp) return [];
     return payroll

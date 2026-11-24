@@ -45,6 +45,15 @@ class VectorDB:
         values /= norm
         return "[" + ",".join(f"{x:.8f}" for x in values) + "]"
 
+    def apply_query_timeout(self, conn) -> None:
+        """Apply transaction-local statement_timeout compatible with pooled Neon endpoints."""
+        query_timeout_ms = getattr(self, "query_timeout_ms", None)
+        if query_timeout_ms is not None:
+            conn.execute(
+                "SELECT set_config('statement_timeout', %s, true)",
+                (str(query_timeout_ms),),
+            )
+
     def validate_schema(self) -> None:
         """Fail at startup when this service is connected to the legacy/wrong DB."""
         expected = {
@@ -59,16 +68,18 @@ class VectorDB:
             ("face_embeddings", "embedding_type"): "character varying(20)",
         }
         with self.pool.connection() as conn:
-            rows = conn.execute("""
-                SELECT c.relname, a.attname,
-                       format_type(a.atttypid, a.atttypmod)
-                FROM pg_class c
-                JOIN pg_namespace n ON n.oid = c.relnamespace
-                JOIN pg_attribute a ON a.attrelid = c.oid
-                WHERE n.nspname = 'public'
-                  AND c.relname IN ('employees', 'face_embeddings')
-                  AND a.attnum > 0 AND NOT a.attisdropped;
-            """).fetchall()
+            with conn.transaction():
+                self.apply_query_timeout(conn)
+                rows = conn.execute("""
+                    SELECT c.relname, a.attname,
+                           format_type(a.atttypid, a.atttypmod)
+                    FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    JOIN pg_attribute a ON a.attrelid = c.oid
+                    WHERE n.nspname = 'public'
+                      AND c.relname IN ('employees', 'face_embeddings')
+                      AND a.attnum > 0 AND NOT a.attisdropped;
+                """).fetchall()
         actual = {(table, column): data_type for table, column, data_type in rows}
         problems = [
             f"{table}.{column} expected {data_type}, got {actual.get((table, column), 'missing')}"
@@ -83,7 +94,9 @@ class VectorDB:
 
     def check_connection(self) -> None:
         with self.pool.connection() as conn:
-            conn.execute("SELECT 1")
+            with conn.transaction():
+                self.apply_query_timeout(conn)
+                conn.execute("SELECT 1")
 
     def search(
         self,
@@ -108,30 +121,28 @@ class VectorDB:
             model_version = config.EMBEDDING_MODEL_VERSION
         vec = self._to_vector_literal(embedding)
         with self.pool.connection() as conn:
-            if self.query_timeout_ms is not None:
-                # Transaction-local setting works with pooled cloud connections.
-                conn.execute("SELECT set_config('statement_timeout', %s, true)",
-                             (str(self.query_timeout_ms),))
-            query = """
-                SELECT
-                    e.employee_code,
-                    e.full_name,
-                    1 - (f.embedding <=> %s::vector) AS similarity
-                FROM face_embeddings f
-                JOIN employees e ON e.id = f.employee_id
-                WHERE f.embedding_type = 'CENTROID'
-                  AND f.model_version = %s
-                  AND f.is_active = true
-                  AND e.status = 'ACTIVE'
-                  AND f.embedding IS NOT NULL
-                ORDER BY f.embedding <=> %s::vector
-                LIMIT %s;
-            """
-            if include_vectors:
-                query = query.replace(
-                    "AS similarity", "AS similarity, f.embedding::text AS centroid"
-                )
-            rows = conn.execute(query, (vec, model_version, vec, top_k)).fetchall()
+            with conn.transaction():
+                self.apply_query_timeout(conn)
+                query = """
+                    SELECT
+                        e.employee_code,
+                        e.full_name,
+                        1 - (f.embedding <=> %s::vector) AS similarity
+                    FROM face_embeddings f
+                    JOIN employees e ON e.id = f.employee_id
+                    WHERE f.embedding_type = 'CENTROID'
+                      AND f.model_version = %s
+                      AND f.is_active = true
+                      AND e.status = 'ACTIVE'
+                      AND f.embedding IS NOT NULL
+                    ORDER BY f.embedding <=> %s::vector
+                    LIMIT %s;
+                """
+                if include_vectors:
+                    query = query.replace(
+                        "AS similarity", "AS similarity, f.embedding::text AS centroid"
+                    )
+                rows = conn.execute(query, (vec, model_version, vec, top_k)).fetchall()
         return rows
 
     def upsert(
@@ -170,6 +181,7 @@ class VectorDB:
 
         with self.pool.connection() as conn:
             with conn.transaction():
+                self.apply_query_timeout(conn)
                 # 1. Lookup UUID từ employee_code
                 row = conn.execute("""
                     SELECT id FROM employees WHERE employee_code = %s FOR UPDATE;
@@ -194,50 +206,42 @@ class VectorDB:
                     if active:
                         raise ValueError("Nhân viên đang được cập nhật khuôn mặt nền.")
 
-                # 2. Kiểm tra nhân viên đã có embedding cùng model_version chưa
-                existing = conn.execute("""
-                    SELECT 1 FROM face_embeddings
-                    WHERE employee_id = %s AND model_version = %s
-                    LIMIT 1;
-                """, (emp_uuid, model_version)).fetchone()
-                is_new = not bool(existing)
+                # 2-3. Xoá embeddings cũ hoặc kiểm tra tồn tại khi overwrite=False
+                if overwrite:
+                    deleted = conn.execute("""
+                        DELETE FROM face_embeddings
+                        WHERE employee_id = %s AND model_version = %s;
+                    """, (emp_uuid, model_version))
+                    is_new = (deleted.rowcount == 0)
+                else:
+                    existing = conn.execute("""
+                        SELECT 1 FROM face_embeddings
+                        WHERE employee_id = %s AND model_version = %s
+                        LIMIT 1;
+                    """, (emp_uuid, model_version)).fetchone()
+                    is_new = not bool(existing)
+                    if existing:
+                        return employee_code, is_new, True
 
-                if existing and not overwrite:
-                    return employee_code, is_new, True
-
-                # 3. Xoá embeddings cũ của nhân viên với cùng model_version
-                conn.execute("""
-                    DELETE FROM face_embeddings
-                    WHERE employee_id = %s AND model_version = %s;
-                """, (emp_uuid, model_version))
-
-                # 4. Insert các individual sample embeddings
+                # 4-5. Batch multi-row INSERT toàn bộ SAMPLE + CENTROID trong 1 SQL round-trip duy nhất
+                rows_to_insert = []
                 if save_individuals and individual_embeddings:
                     for emb in individual_embeddings:
-                        vec = self._to_vector_literal(emb)
-                        conn.execute("""
-                            INSERT INTO face_embeddings (
-                                id, employee_id, embedding, embedding_type,
-                                model_version, is_active, created_at
-                            )
-                            VALUES (
-                                gen_random_uuid(), %s, %s::vector, 'SAMPLE',
-                                %s, true, CURRENT_TIMESTAMP
-                            );
-                        """, (emp_uuid, vec, model_version))
+                        rows_to_insert.append((emp_uuid, self._to_vector_literal(emb), 'SAMPLE', model_version))
+                rows_to_insert.append((emp_uuid, self._to_vector_literal(mean_embedding), 'CENTROID', model_version))
 
-                # 5. Insert mean centroid embedding
-                mean_vec = self._to_vector_literal(mean_embedding)
-                conn.execute("""
+                placeholders = ", ".join(
+                    "(gen_random_uuid(), %s, %s::vector, %s, %s, true, CURRENT_TIMESTAMP)"
+                    for _ in rows_to_insert
+                )
+                flat_params = [item for row_tuple in rows_to_insert for item in row_tuple]
+                conn.execute(f"""
                     INSERT INTO face_embeddings (
                         id, employee_id, embedding, embedding_type,
                         model_version, is_active, created_at
                     )
-                    VALUES (
-                        gen_random_uuid(), %s, %s::vector, 'CENTROID',
-                        %s, true, CURRENT_TIMESTAMP
-                    );
-                """, (emp_uuid, mean_vec, model_version))
+                    VALUES {placeholders};
+                """, tuple(flat_params))
 
                 if operation_id:
                     from enrollment.operation import finish_enrollment
@@ -247,8 +251,10 @@ class VectorDB:
 
     def enrollment_receipt(self, operation_id):
         with self.pool.connection() as conn:
-            row = conn.execute("SELECT result FROM face_enrollment_receipts WHERE operation_id = %s", (operation_id,)).fetchone()
-            return row[0] if row else None
+            with conn.transaction():
+                self.apply_query_timeout(conn)
+                row = conn.execute("SELECT result FROM face_enrollment_receipts WHERE operation_id = %s", (operation_id,)).fetchone()
+                return row[0] if row else None
 
     def close(self):
         self.pool.close()

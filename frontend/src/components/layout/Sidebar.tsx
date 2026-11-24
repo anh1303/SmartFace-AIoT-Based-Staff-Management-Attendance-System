@@ -1,10 +1,11 @@
 import { ActionButton } from '@/components/common/ActionFeedback';
 import React, { useRef, useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { ScanFace, LayoutDashboard, CalendarDays, Clock, User, FileText, Users, Banknote, Fingerprint, LogOut, ExternalLink, Server, X, BarChart3 } from 'lucide-react';
 import { useDialogFocus } from '../common/useDialogFocus';
 import { Avatar } from '../common/Avatar';
+import { config } from '../../config';
 export const Sidebar: React.FC<{
     isOpen: boolean;
     onClose: () => void;
@@ -18,7 +19,7 @@ export const Sidebar: React.FC<{
     const groups = role === 'admin' || role === 'manager' ? [
         { label: 'Dashboard', items: [['Tổng quan', 'dashboard', LayoutDashboard]] },
         { label: 'Nhân viên', items: [['Nhân viên', 'employees', Users], ['Sinh trắc học', 'biometrics', Fingerprint], ['Lịch làm việc', 'schedule', CalendarDays]] },
-        { label: 'Vận hành', items: [['Theo dõi chấm công', 'attendance', Clock], ['Thiết bị', 'devices', Server]] },
+        { label: 'Vận hành', items: config.iotHardwareEnabled ? [['Theo dõi chấm công', 'attendance', Clock], ['Thiết bị', 'devices', Server]] : [['Theo dõi chấm công', 'attendance', Clock]] },
         { label: 'Tài chính', items: [['Bảng lương', 'payroll', Banknote], ['Báo cáo & thống kê', 'reports', BarChart3]] }
     ] : [{ label: 'Công việc', items: [['Tổng quan', 'dashboard', LayoutDashboard], ['Lịch làm việc', 'schedule', CalendarDays], ['Theo dõi chấm công', 'attendance', Clock]] }, { label: 'Cá nhân', items: [['Sinh trắc học', 'biometrics', ScanFace], ['Bảng lương', 'payroll', Banknote], ['Hồ sơ', '/app/account/profile', User]] }];
     const base = role === 'admin' || role === 'manager' ? '/app/manager/' : '/app/employee/';

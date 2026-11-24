@@ -1,0 +1,44 @@
+model PayrollRecord {
+  id                  BigInt   @id @default(autoincrement())
+  employeeId          String   @map("employee_id") @db.Uuid
+  payroll_period      String   @db.VarChar(7)
+  hourly_rate         Decimal  @default(0) @db.Decimal(15, 2)
+  total_working_hours Decimal  @default(0) @db.Decimal(6, 2)
+  total_overtime      Decimal  @default(0) @db.Decimal(10, 2)
+  total_late_early    Decimal  @default(0) @db.Decimal(10, 2)
+  total_absence_penalty Decimal @default(0) @db.Decimal(15, 2)
+  allowance           Decimal  @default(0) @db.Decimal(15, 2)
+  net_salary          Decimal  @default(0) @db.Decimal(15, 2)
+  status              String   @default("PENDING") @db.VarChar(20)
+  overtime_rate       Decimal? @db.Decimal(15, 4)
+  late_penalty_rate   Decimal? @db.Decimal(15, 4)
+  calculation_details Json?
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  employee            Employee @relation(fields: [employeeId], references: [id], onUpdate: NoAction)
+
+  @@unique([employeeId, payroll_period], map: "uq_emp_payroll_period")
+  @@index([payroll_period], map: "idx_payroll_period")
+  @@map("payroll_records")
+}
+
+model BonusPenalty {
+  id                 Int      @id @default(autoincrement())
+  overtime_rate      Decimal  @default(2.0) @db.Decimal(15, 4)
+  late_early_penalty Decimal  @default(1.5) @db.Decimal(15, 4)
+  absence_penalty_rate Decimal @default(2.0) @db.Decimal(15, 4)
+  effective_period   String?  @unique @db.VarChar(7)
+  description        String?  @db.VarChar(255)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@map("bonus_penalty")
+}
+
+model PayrollRateRepairArchive {
+  payroll_id      BigInt   @id
+  original_record Json
+  archived_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("payroll_rate_repair_archive")
+}

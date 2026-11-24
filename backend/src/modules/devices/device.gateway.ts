@@ -21,7 +21,7 @@ export const initializeDeviceGateway = (server: Server) => {
  * @internal INTERNAL USE ONLY - Do not call from controllers or services.
  * Services must publish domain events via eventBus instead.
  */
-export const emitDeviceEvent = async (event: string, payload: unknown, room?: string) => {
+export const emitDeviceEvent = async (event: string, payload: unknown, _room?: string) => {
   if (!io) return
   const nsp = io.of('/devices')
   await Promise.all([...nsp.sockets.values()].map(async socket => {

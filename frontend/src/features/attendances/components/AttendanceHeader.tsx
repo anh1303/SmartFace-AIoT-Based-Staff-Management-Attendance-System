@@ -4,11 +4,10 @@ import React, { useState } from 'react';
 import {
   Unlock,
   Lock,
-  Download,
   Clock,
 } from 'lucide-react';
 import { getTodayVNString } from '../../../utils/dateUtils';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import { PageHeaderBanner } from '../../../components/common';
 
 interface AttendanceHeaderProps {

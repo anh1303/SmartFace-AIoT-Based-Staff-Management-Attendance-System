@@ -1,6 +1,6 @@
-import { hasMultiplierSnapshot } from '../../common/payroll-policy.js'
-import { historicalBreakdown } from '../../common/payroll-history.js'
-import { computePayrollBreakdown } from '../../common/utils.js'
+import { hasMultiplierSnapshot } from './payroll.policy.js'
+import { historicalBreakdown } from './payroll-history.js'
+import { computePayrollBreakdown } from './payroll-rates.js'
 import type { PayrollStatus } from '../../common/constants.js'
 
 export interface RawPayrollRecord {
@@ -21,6 +21,7 @@ export interface RawPayrollRecord {
   updated_at?: Date
   late_early_penalty?: number | null
   calculation_details?: unknown
+  can_edit?: boolean
   employee?: { employee_code?: string; full_name?: string; department?: { name?: string } | null } | null
 }
 
@@ -73,6 +74,7 @@ export function formatPayrollRecord(record: RawPayrollRecord) {
     needs_recalculation: Boolean(details.needs_recalculation || !hasRateSnapshot && !verifiedHistory),
     calculation_details: record.calculation_details,
     status,
+    can_edit: Boolean(record.can_edit),
     reason: record.reason || undefined,
   }
 }

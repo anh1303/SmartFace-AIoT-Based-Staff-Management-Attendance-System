@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
-import { usePayrollContext } from '../../context/PayrollContext';
+import { usePayrollContext } from '@/features/payrolls';
 import { useToast } from '../../context/ToastContext';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/features/auth';
 import {
   ReportsHeader,
   ReportsSummaryKpis,
@@ -13,7 +13,7 @@ import {
 import { exportMonthlyExcel, printMonthlyReport } from '@/features/reports';
 
 export const ManagerReports: React.FC = () => {
-  const { selectedPeriod, setSelectedPeriod } = usePayrollContext();
+  const { selectedPeriod, setSelectedPeriod } = usePayrollContext({ loadData: false });
   const { showToast } = useToast();
   const { role } = useAuth();
   const isManager = role === 'manager';

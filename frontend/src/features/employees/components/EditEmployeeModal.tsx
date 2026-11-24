@@ -1,8 +1,8 @@
 import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React, { useMemo } from 'react';
 import { Modal } from '../../../components/common/Modal';
-import { Employee } from '../../../types';
-import { useAuth } from '../../../context/AuthContext';
+import type { Employee } from '../types';
+import { useAuth } from '@/features/auth';
 import { formatCurrencyVND, parseCurrencyVND } from '../utils/employeeUtils';
 
 interface EditEmployeeModalProps {

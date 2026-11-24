@@ -2,7 +2,7 @@ import { ActionButton } from '@/components/common/ActionFeedback';
 import React from 'react';
 import { Modal } from '../../../components/common/Modal';
 import { RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { Employee } from '../../../types';
+import type { Employee } from '@/features/employees';
 import { EnrollFaceResult } from '../api/biometricApi';
 
 interface FaceConfirmModalProps {
@@ -199,7 +199,6 @@ export const FingerprintConfirmModal: React.FC<FingerprintConfirmModalProps> = (
   isOpen,
   onClose,
   currentEmp,
-  selectedFinger,
   selectedDevice,
   onConfirm,
 }) => {

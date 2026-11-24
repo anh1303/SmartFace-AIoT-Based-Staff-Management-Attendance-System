@@ -1,5 +1,12 @@
 import { EventEmitter } from 'node:events'
 
+export interface AttendanceRecipientMeta {
+  id: string
+  departmentId: number | null
+  user_id: string | null
+  isManager: boolean
+}
+
 export interface DomainEvents {
   'fingerprint:progress': { owner_id: string; id: string; employee_id: string; device_id: string; finger_name: string; status: string; match_score: number | null; error: string | null; expires_at: Date }
 
@@ -11,6 +18,7 @@ export interface DomainEvents {
     method: string
     deviceInfo?: string | null
     payload?: any
+    recipientMeta?: AttendanceRecipientMeta | null
   }
   'attendance:checked-out': {
     employeeId: string
@@ -20,12 +28,14 @@ export interface DomainEvents {
     method: string
     deviceInfo?: string | null
     payload?: any
+    recipientMeta?: AttendanceRecipientMeta | null
   }
   'attendance:summary-updated': {
     employeeId?: string
     workDate?: string
     period?: string
     summary: any
+    recipientMeta?: AttendanceRecipientMeta | null
   }
   'attendance:spoof-blocked': {
     employeeId?: string

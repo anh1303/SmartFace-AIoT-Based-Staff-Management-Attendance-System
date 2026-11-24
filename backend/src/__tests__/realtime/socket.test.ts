@@ -2,6 +2,14 @@
 import { prisma } from '../../config/database.js'
 vi.mock('../../modules/auth/auth.read.js', () => ({
   readAuthUser: async (id: string) => prisma.user.findUnique({ where: { id } }),
+  readAuthUsers: async (ids: readonly string[]) => {
+    const map = new Map<string, any>()
+    for (const id of new Set(ids)) {
+      const user = await prisma.user.findUnique({ where: { id } })
+      if (user) map.set(id, user)
+    }
+    return map
+  },
 }))
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { createServer, type Server as HttpServer } from 'node:http'

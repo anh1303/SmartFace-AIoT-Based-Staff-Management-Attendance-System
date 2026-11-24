@@ -1,7 +1,8 @@
 /**
  * Biometrics Module Public Contract
  */
-export { hasFaceLoginTemplate } from './face-login.repository.js'
+export { faceEnrollmentSummarySelect, hasActiveFaceEnrollment } from './face-enrollment-status.js'
+export { hasFaceLoginTemplate, findActiveFaceLoginTemplateEmployeeIds } from './face-login.repository.js'
 export {
   deleteBiometricsForEmployee,
   findBestFaceMatch,

@@ -56,11 +56,11 @@ class ExtractionTests(unittest.TestCase):
             with self.assertRaises(RuntimeError): self.extract()
 
     def test_api_auth_busy_and_valid_request_without_startup_or_db(self):
-        from fastapi.testclient import TestClient
+        from tests.test_face_login_http import Client
         import api_service as api
         body = dict(request_id='a'*32, image_png_b64=self.png, model_sha256=self.extractor.model_sha256, model_version='buffalo_s')
         with patch.object(api, 'remote_extractor', self.extractor), patch.dict(os.environ, {'FACE_AUTH_INTERNAL_KEY':'k'*32}):
-            client = TestClient(api.app)  # No lifespan/startup: no DB or model discovery.
+            client = Client(api.app)  # Direct ASGI call without lifespan/startup: no DB, model discovery, or extra httpx package.
             self.assertEqual(client.post('/internal/face-embedding', json=body).status_code, 401)
             headers = {'X-Face-Auth-Key':'k'*32}
             result = client.post('/internal/face-embedding', json=body, headers=headers)

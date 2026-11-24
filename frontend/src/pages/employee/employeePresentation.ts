@@ -1,4 +1,4 @@
-import type { WorkShift } from '../../types';
+import type { WorkShift } from '@/features/schedules';
 
 export const shiftNames: Record<WorkShift['shift_type'], string> = {
   MORNING: 'Ca sáng', AFTERNOON: 'Ca chiều', OFFICE_HOURS: 'Ca hành chính', OTHER: 'Ca khác', OFF: 'Nghỉ ca',

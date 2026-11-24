@@ -58,13 +58,28 @@ export function calcShiftWorkingHours(startTimeVal?: string | Date | null, endTi
   return Math.round((diffMins / 60) * 100) / 100
 }
 
+export function normalizeWorkDate(val?: Date | string | null): string | null {
+  if (!val) return null
+  if (typeof val === 'string') {
+    const trimmed = val.trim()
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10)
+    const d = new Date(trimmed)
+    return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
+  }
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? null : val.toISOString().slice(0, 10)
+  }
+  return null
+}
+
 export function determinePunctuality(
   type: string,
   eventTime: Date | string,
-  employeeShifts?: Array<{ work_date: Date | string; start_time?: string | Date | null; end_time?: string | Date | null; shift_type?: string | null }> | null
+  employeeShifts?: Array<{ work_date: Date | string; start_time?: string | Date | null; end_time?: string | Date | null; shift_type?: string | null }> | null,
+  workDateOverride?: string
 ): AttendancePunctuality {
   const eventDate = new Date(eventTime)
-  const workDate = attendanceWorkDate(eventDate, employeeShifts || [])
+  const workDate = workDateOverride || attendanceWorkDate(eventDate, employeeShifts || [])
   const shift = employeeShifts?.find(s => formatVNDateISO(s.work_date) === workDate)
   if (!shift || shift.shift_type === 'OFF' || !shift.start_time || !shift.end_time) {
     return ATTENDANCE_PUNCTUALITY.UNRECORDED
@@ -91,6 +106,7 @@ export function determinePunctuality(
 export interface RawAttendanceLogDb {
   id: string | bigint
   event_time: Date | string
+  work_date?: Date | string | null
   type: string
   employee_id: string
   method?: string | null
@@ -110,10 +126,12 @@ export interface RawAttendanceLogDb {
 
 export function formatAttendanceRecord(log: RawAttendanceLogDb, shifts = log.employees?.employee_shifts) {
   const eventDate = new Date(log.event_time)
+  const work_date = normalizeWorkDate(log.work_date)
   const punctuality = determinePunctuality(
     log.type,
     eventDate,
     shifts,
+    work_date ?? undefined,
   )
 
   return {
@@ -127,6 +145,7 @@ export function formatAttendanceRecord(log: RawAttendanceLogDb, shifts = log.emp
     type: log.type as 'CHECK_IN' | 'CHECK_OUT',
     timestamp: eventDate.toISOString(),
     event_time: eventDate.toISOString(),
+    work_date,
     method: (log.method || ATTENDANCE_METHOD.MANUAL) as AttendanceMethod,
     device_id: log.device_info || '--',
     verification_score: log.verification_score !== undefined && log.verification_score !== null ? Number(log.verification_score) : null,
@@ -138,7 +157,11 @@ export function formatAttendanceRecord(log: RawAttendanceLogDb, shifts = log.emp
 
 export async function formatAttendanceRecords(logs: RawAttendanceLogDb[], preloadedShifts?: Array<Omit<Awaited<ReturnType<typeof getEmployeeShiftsForDateRange>>[number], 'employees'>>) {
   if (!logs.length) return []
-  const dates = logs.map(log => formatVNDateISO(log.event_time)).sort()
+  const dates = logs.flatMap(log => {
+    const eventDay = formatVNDateISO(log.event_time)
+    const workDay = normalizeWorkDate(log.work_date)
+    return workDay ? [workDay, eventDay] : [eventDay]
+  }).sort()
   const employeeIds = [...new Set(logs.map(log => log.employee_id))]
   const range = { gte: new Date(+new Date(`${dates[0]}T00:00:00Z`) - 86400000), lte: new Date(`${dates[dates.length - 1]}T00:00:00Z`) }
   const shifts = preloadedShifts === undefined

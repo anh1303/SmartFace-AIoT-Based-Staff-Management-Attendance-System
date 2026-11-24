@@ -1,0 +1,368 @@
+{
+  "phase": 2,
+  "baselineSnapshot": "e395c9b8",
+  "initialCounts": {
+    "pendingMoveCommonFiles": 3,
+    "pendingMoveCommonUtilsExports": 6,
+    "runtimeModuleCycles": 0,
+    "transitionalExceptions": 7,
+    "allowedCompositionPortExceptions": 4
+  },
+  "currentCounts": {
+    "pendingMoveCommonFiles": 0,
+    "pendingMoveCommonUtilsExports": 0,
+    "runtimeModuleCycles": 0,
+    "transitionalExceptions": 0,
+    "allowedCompositionPortExceptions": 4
+  },
+  "commonFiles": [
+    {
+      "path": "common/AppError.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Lớp chuẩn hóa lỗi HTTP/application dùng chung toàn backend",
+      "representativeCallers": ["middlewares/errorHandler.ts", "modules/attendance/attendance.service.ts", "modules/payroll/payroll.service.ts"]
+    },
+    {
+      "path": "common/constants.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Hằng số hệ thống và ngưỡng cấu hình dùng chung nhiều module",
+      "representativeCallers": ["modules/attendance/attendance.service.ts", "modules/biometrics/biometric.service.ts"]
+    },
+    {
+      "path": "common/date.schema.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Schema Zod kiểm tra định dạng ngày/tháng dùng chung cho DTO các module",
+      "representativeCallers": ["modules/attendance/attendance.dto.ts", "modules/payroll/payroll.dto.ts", "modules/shifts/shift.dto.ts"]
+    },
+    {
+      "path": "common/email.service.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Adapter hạ tầng gửi email SMTP dùng chung",
+      "representativeCallers": ["modules/employees/employee.jobs.ts", "modules/auth/auth.service.ts"]
+    },
+    {
+      "path": "common/event-bus.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "In-process event bus hạ tầng dùng chung",
+      "representativeCallers": ["common/index.ts"]
+    },
+    {
+      "path": "common/index.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Barrel công khai cho các tiện ích hạ tầng trong src/common",
+      "representativeCallers": ["modules/employees/employee.service.ts", "modules/shifts/shift.service.ts"]
+    },
+    {
+      "path": "common/lock-keys.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Quy ước chuỗi khóa PostgreSQL advisory lock dùng chung giữa employees, shifts và payroll (khóa hợp đồng byte-for-byte qua lock-keys.test.ts)",
+      "representativeCallers": ["modules/employees/employee.service.ts", "modules/payroll/payroll.service.ts", "modules/shifts/shift.service.ts"]
+    },
+    {
+      "path": "common/logger.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Logger hạ tầng dùng chung toàn backend",
+      "representativeCallers": ["server.ts", "config/mqtt.ts", "modules/attendance/attendance.service.ts"]
+    },
+    {
+      "path": "common/payload-crypto.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích mã hóa/giải mã AES-256-GCM dùng chung giữa biometrics và operations (tránh chu trình operations <-> biometrics)",
+      "representativeCallers": ["modules/biometrics/fingerprint.service.ts", "modules/operations/operation.crypto.ts"]
+    },
+    {
+      "path": "common/perf-trace.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích đo hiệu năng truy vấn/giai đoạn dùng AsyncLocalStorage, được config/database.ts và attendance sử dụng",
+      "representativeCallers": ["config/database.ts", "modules/attendance/attendance.controller.ts", "modules/attendance/attendance.service.ts"]
+    },
+    {
+      "path": "common/response.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Helper chuẩn hóa HTTP response envelope dùng chung cho các controller",
+      "representativeCallers": ["modules/attendance/attendance.controller.ts", "modules/payroll/payroll.controller.ts"]
+    },
+    {
+      "path": "common/utils.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Chỉ còn các tiện ích định dạng ngày giờ múi giờ Việt Nam và UUID dùng chung toàn backend",
+      "representativeCallers": ["modules/attendance/attendance.service.ts", "modules/payroll/payroll.service.ts", "modules/employees/employee.service.ts"]
+    }
+  ],
+  "commonUtilsExports": [
+    {
+      "exportName": "formatVNDateISO",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Định dạng ngày YYYY-MM-DD theo múi giờ Việt Nam dùng chung toàn backend"
+    },
+    {
+      "exportName": "vnDay",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Chuẩn hóa ngày YYYY-MM-DD theo múi giờ Việt Nam dùng chung toàn backend"
+    },
+    {
+      "exportName": "formatVNTime",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Định dạng giờ HH:mm:ss theo múi giờ Việt Nam dùng chung toàn backend"
+    },
+    {
+      "exportName": "getTodayVNString",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Lấy chuỗi ngày hiện tại theo múi giờ Việt Nam dùng chung toàn backend"
+    },
+    {
+      "exportName": "UUID_REGEX",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Biểu thức chính quy kiểm tra UUID dùng chung toàn backend"
+    },
+    {
+      "exportName": "isValidUuid",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Hàm kiểm tra định dạng UUID dùng chung toàn backend"
+    }
+  ],
+  "moduleDependencyMatrix": [
+    {
+      "source": "attendance",
+      "target": "auth",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Tra cứu danh sách người nhận cảnh báo và quản lý đang hoạt động qua entry công khai của auth"
+    },
+    {
+      "source": "attendance",
+      "target": "biometrics",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Xác thực vân tay và đối khớp khuôn mặt khi ghi nhận chấm công qua public.ts và fingerprint.public.ts"
+    },
+    {
+      "source": "attendance",
+      "target": "devices",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Xác thực chữ ký/secret webhook từ thiết bị chấm công qua entry công khai của devices"
+    },
+    {
+      "source": "attendance",
+      "target": "employees",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Kiểm tra phạm vi quản lý, tra cứu hồ sơ và mức lương giờ nhân viên qua entry công khai của employees"
+    },
+    {
+      "source": "attendance",
+      "target": "shifts",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Đọc lịch phân ca lân cận và ca làm việc để tính công, trễ/sớm và cảnh báo thiếu lượt quét qua entry công khai của shifts"
+    },
+    {
+      "source": "auth",
+      "target": "audit-logs",
+      "owner": "auth",
+      "status": "allowed",
+      "reason": "Ghi nhận nhật ký kiểm toán khi đăng ký và thay đổi thông tin xác thực qua entry công khai của audit-logs"
+    },
+    {
+      "source": "auth",
+      "target": "employees",
+      "owner": "auth",
+      "status": "allowed",
+      "reason": "Tạo và đồng bộ hồ sơ nhân viên, phòng ban và chức vụ trong luồng đăng ký/hồ sơ cá nhân qua entry công khai của employees"
+    },
+    {
+      "source": "biometrics",
+      "target": "audit-logs",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Ghi nhận nhật ký kiểm toán khi đăng ký hoặc xóa mẫu sinh trắc học qua entry công khai của audit-logs"
+    },
+    {
+      "source": "biometrics",
+      "target": "auth",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Áp dụng middleware xác thực lại bằng mật khẩu (requirePasswordAuth) trên các route sinh trắc học nhạy cảm qua entry công khai của auth"
+    },
+    {
+      "source": "biometrics",
+      "target": "devices",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Gửi lệnh đăng ký/đồng bộ vân tay tới thiết bị đầu cuối qua entry công khai của devices"
+    },
+    {
+      "source": "biometrics",
+      "target": "employees",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Kiểm tra tồn tại và quyền quản lý nhân viên khi thao tác dữ liệu sinh trắc học qua entry công khai của employees"
+    },
+    {
+      "source": "biometrics",
+      "target": "operations",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Theo dõi và chạy tác vụ nền đăng ký khuôn mặt qua entry công khai của operations"
+    },
+    {
+      "source": "dashboard",
+      "target": "attendance",
+      "owner": "dashboard",
+      "status": "allowed",
+      "reason": "Tổng hợp số liệu chấm công và nhật ký gần nhất trong ngày qua entry công khai của attendance"
+    },
+    {
+      "source": "dashboard",
+      "target": "employees",
+      "owner": "dashboard",
+      "status": "allowed",
+      "reason": "Đếm nhân sự và phân bổ theo phòng ban trong phạm vi quản lý qua entry công khai của employees"
+    },
+    {
+      "source": "dashboard",
+      "target": "shifts",
+      "owner": "dashboard",
+      "status": "allowed",
+      "reason": "Đọc danh sách ca làm việc hôm nay và định dạng giờ ca qua entry công khai của shifts"
+    },
+    {
+      "source": "devices",
+      "target": "audit-logs",
+      "owner": "devices",
+      "status": "allowed",
+      "reason": "Ghi nhận nhật ký kiểm toán cho các thao tác quản trị và đổi chế độ thiết bị qua entry công khai của audit-logs"
+    },
+    {
+      "source": "employees",
+      "target": "audit-logs",
+      "owner": "employees",
+      "status": "allowed",
+      "reason": "Ghi nhận nhật ký kiểm toán khi cập nhật nhân viên, phòng ban và chức vụ qua entry công khai của audit-logs"
+    },
+    {
+      "source": "employees",
+      "target": "operations",
+      "owner": "employees",
+      "status": "allowed",
+      "reason": "Điều phối tác vụ nền gửi email tài khoản nhân viên qua entry công khai của operations"
+    },
+    {
+      "source": "payroll",
+      "target": "attendance",
+      "owner": "payroll",
+      "status": "allowed",
+      "reason": "Đọc tổng hợp công ngày, khoản điều chỉnh, khóa ngày và kích hoạt tổng hợp/quyết toán qua entry công khai của attendance"
+    },
+    {
+      "source": "payroll",
+      "target": "employees",
+      "owner": "payroll",
+      "status": "allowed",
+      "reason": "Kiểm tra phạm vi quản lý, tính đơn giá lương theo tháng và kết thúc nhân sự khi quyết toán sớm qua entry công khai của employees"
+    },
+    {
+      "source": "payroll",
+      "target": "shifts",
+      "owner": "payroll",
+      "status": "allowed",
+      "reason": "Đọc lịch ca theo kỳ và dọn ca tương lai khi quyết toán sớm qua entry công khai của shifts"
+    },
+    {
+      "source": "reports",
+      "target": "attendance",
+      "owner": "reports",
+      "status": "allowed",
+      "reason": "Đọc tổng hợp chấm công theo tháng phục vụ báo cáo tổng hợp qua entry công khai của attendance"
+    },
+    {
+      "source": "reports",
+      "target": "employees",
+      "owner": "reports",
+      "status": "allowed",
+      "reason": "Đọc danh sách nhân viên và phòng ban trong phạm vi báo cáo qua entry công khai của employees"
+    },
+    {
+      "source": "reports",
+      "target": "payroll",
+      "owner": "reports",
+      "status": "allowed",
+      "reason": "Đọc số liệu quỹ lương theo tháng phục vụ báo cáo tài chính/nhân sự qua entry công khai của payroll"
+    },
+    {
+      "source": "reports",
+      "target": "shifts",
+      "owner": "reports",
+      "status": "allowed",
+      "reason": "Đọc lịch ca theo tháng phục vụ thống kê chuyên cần trong báo cáo qua entry công khai của shifts"
+    },
+    {
+      "source": "shifts",
+      "target": "employees",
+      "owner": "shifts",
+      "status": "allowed",
+      "reason": "Kiểm tra phạm vi quản lý và sự tồn tại của nhân viên khi phân ca qua entry công khai của employees"
+    },
+    {
+      "source": "shifts",
+      "target": "operations",
+      "owner": "shifts",
+      "status": "allowed",
+      "reason": "Điều phối tác vụ nền phân ca hàng loạt qua entry công khai của operations"
+    }
+  ],
+  "runtimeModuleCycles": [],
+  "exceptions": [
+    {
+      "source": "composition.ts",
+      "target": "modules/shifts/shift.attendance-port.ts",
+      "kind": "composition-port-wiring",
+      "owner": "shifts",
+      "status": "allowed",
+      "reason": "Điểm lắp ráp composition.ts nối port attendance cho module shifts"
+    },
+    {
+      "source": "composition.ts",
+      "target": "modules/employees/employee.integration-port.ts",
+      "kind": "composition-port-wiring",
+      "owner": "employees",
+      "status": "allowed",
+      "reason": "Điểm lắp ráp composition.ts nối port tích hợp liên module cho module employees"
+    },
+    {
+      "source": "composition.ts",
+      "target": "modules/auth/auth.biometrics-port.ts",
+      "kind": "composition-port-wiring",
+      "owner": "auth",
+      "status": "allowed",
+      "reason": "Điểm lắp ráp composition.ts nối port biometrics cho module auth"
+    },
+    {
+      "source": "composition.ts",
+      "target": "modules/attendance/attendance.payroll-port.ts",
+      "kind": "composition-port-wiring",
+      "owner": "attendance",
+      "status": "allowed",
+      "reason": "Điểm lắp ráp composition.ts nối port payroll cho module attendance"
+    }
+  ]
+}

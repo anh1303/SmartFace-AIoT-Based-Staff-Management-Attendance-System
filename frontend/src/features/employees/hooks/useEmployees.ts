@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { fetchEmployeesApi, createEmployeeApi, updateEmployeeApi, deleteEmployeeApi } from '../api/employeeApi';
-import { Employee } from '../../../types';
+import type { Employee } from '../types';
 import { useToast } from '../../../context/ToastContext';
-import { getActiveSessionId } from '../../../context/AuthContext';
+import { getActiveSessionId } from '@/features/auth';
 import { ApiError } from '../../../api/client';
 import { UncertainWriteError } from '../../operations';
 
@@ -27,7 +27,7 @@ export function useEmployees(enabled = true) {
     mutationKey: ['employee-write', 'create'],
     mutationFn: (newEmp: Omit<Employee, 'created_at' | 'updated_at'>) => createEmployeeApi(newEmp),
     onMutate: () => ({ sessionId: getActiveSessionId() }),
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, _variables, context) => {
       if (context?.sessionId !== getActiveSessionId()) return;
       queryClient.setQueryData<Employee[]>(EMPLOYEES_QUERY_KEY, rows => [data.employee, ...(rows || []).filter(e => e.id !== data.employee.id)]);
       showToast(`Đã tạo hồ sơ ${data.employee.full_name} (${data.employee.employee_id}). ${data.emailStatus === 'queued' ? 'Email tài khoản đang được gửi nền.' : 'Chưa gửi email tài khoản.'}`, 'success', "Thêm nhân viên thành công");
@@ -71,10 +71,13 @@ export function useEmployees(enabled = true) {
     mutationKey: ['employee-write', 'delete'],
     onMutate: (id: string) => ({ sessionId: getActiveSessionId(), employee: queryClient.getQueryData<Employee[]>(EMPLOYEES_QUERY_KEY)?.find(e => matches(e, id)) }),
     mutationFn: (id: string) => deleteEmployeeApi(id),
-    onSuccess: (_data, _id, context) => {
+    onSuccess: (_data, id, context) => {
       if (context?.sessionId !== getActiveSessionId()) return;
-      showToast(`Đã xóa hồ sơ ${context.employee?.full_name || _id} (${context.employee?.employee_id || _id}) và tài khoản liên kết.`, 'success', 'Xóa nhân viên thành công');
-      queryClient.invalidateQueries({ queryKey: EMPLOYEES_QUERY_KEY });
+      queryClient.setQueryData<Employee[]>(EMPLOYEES_QUERY_KEY, (rows) =>
+        rows?.filter((e) => !matches(e, id)),
+      );
+      showToast(`Đã xóa hồ sơ ${context.employee?.full_name || id} (${context.employee?.employee_id || id}) và tài khoản liên kết.`, 'success', 'Xóa nhân viên thành công');
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (error: Error, _id, context) => {
       if (context?.sessionId !== getActiveSessionId()) return;

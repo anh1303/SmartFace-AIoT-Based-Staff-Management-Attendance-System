@@ -1,16 +1,27 @@
-# Standalone cloud stack. Use this file alone, not merged with docker-compose.yml.
-# Database URLs come from backend/.env and face_auth/.env. No automatic migrations.
+# Full-stack (Phase 2 / AIoT) standalone cloud stack.
+# For Phase 1 (FE + BE + Neon + Face Login only, no MQTT/IoT), use docker-compose.phase1.yml instead.
+# Do NOT merge this file with docker-compose.yml or docker-compose.phase1.yml.
+# Database URLs and FACE_LOGIN_* secrets come from backend/.env and face_auth/.env (single source of truth).
+# No automatic migrations or seeds.
 name: pbl6
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 services:
   face-auth:
     build: ./face_auth
     restart: unless-stopped
+    logging: *default-logging
     environment:
       MODEL_PACK_NAME: ${PBL6_FACE_MODEL_PACK:-buffalo_s}
       EMBEDDING_MODEL_VERSION: ${PBL6_FACE_MODEL_PACK:-buffalo_s}
       MODEL_CTX_ID: -1
       PAD_RUNTIME_CONFIG_PATH: ${FACE_LOGIN_PAD_RUNTIME_CONFIG_PATH:-}
       PAD_ADAPTIVE_ENABLED: 'false'
+      DB_POOL_TIMEOUT_SECONDS: ${PBL6_FACE_DB_POOL_TIMEOUT_SECONDS:-5}
+      DB_QUERY_TIMEOUT_MS: ${PBL6_FACE_DB_QUERY_TIMEOUT_MS:-5000}
     ports:
     - 127.0.0.1:${PBL6_FACE_API_PORT:-5000}:5000
     volumes:
@@ -22,9 +33,9 @@ services:
       - CMD
       - python
       - -c
-      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health',
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health/live',
         timeout=5)
-      interval: 10s
+      interval: 15s
       timeout: 8s
       retries: 12
       start_period: 120s
@@ -32,16 +43,21 @@ services:
   mqtt:
     image: eclipse-mosquitto:2
     restart: unless-stopped
+    logging: *default-logging
     volumes:
     - ./docker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
   backend:
     image: pbl6-backend:local
     build: ./backend
     restart: unless-stopped
+    logging: *default-logging
     env_file: ./backend/.env
     environment:
       NODE_ENV: ${PBL6_NODE_ENV:-development}
       PORT: 3000
+      TRUST_PROXY_HOPS: ${PBL6_TRUST_PROXY_HOPS:-1}
+      OPERATION_RECOVERY_INTERVAL_MS: ${PBL6_OPERATION_RECOVERY_INTERVAL_MS:-900000}
+      ATTENDANCE_ALERTS_INTERVAL_MS: ${PBL6_ATTENDANCE_ALERTS_INTERVAL_MS:-900000}
       FACE_AUTH_URL: http://face-auth:5000
       FACE_AUTH_MODEL_VERSION: ${PBL6_FACE_MODEL_PACK:-buffalo_s}
       MQTT_URL: mqtt://mqtt:1883
@@ -56,7 +72,7 @@ services:
       - node
       - -e
       - fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
-      interval: 10s
+      interval: 15s
       timeout: 5s
       retries: 12
     depends_on:
@@ -67,6 +83,7 @@ services:
   frontend:
     build: ./frontend
     restart: unless-stopped
+    logging: *default-logging
     ports:
     - ${PBL6_WEB_BIND_IP:-127.0.0.1}:${PBL6_WEB_PORT:-8080}:80
     depends_on:

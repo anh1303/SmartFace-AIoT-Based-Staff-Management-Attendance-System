@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Wallet } from 'lucide-react';
 import { FilterSelect, PageHeaderBanner } from '../../components/common';
-import { useAuth } from '../../context/AuthContext';
-import { useEmployeeContext } from '../../context/EmployeeContext';
-import { usePayrollContext } from '../../context/PayrollContext';
+import { useAuth } from '@/features/auth';
+import { useEmployeeContext } from '@/features/employees';
+import { usePayrollHistory } from '../../features/payrolls';
 import { PayslipBreakdown } from '../../features/payrolls';
 import { getTodayVNString } from '../../utils/dateUtils';
 import { money, quantity } from './employeePresentation';
@@ -11,8 +11,8 @@ import { money, quantity } from './employeePresentation';
 export const EmployeeSalaryEstimate: React.FC = () => {
   const { currentUser } = useAuth();
   const { employees } = useEmployeeContext();
-  const { payroll, isLoadingPayroll, payrollError } = usePayrollContext();
   const employeeId = currentUser?.employee_id;
+  const { data: payroll = [], isLoading: isLoadingPayroll, error: payrollError } = usePayrollHistory(employeeId || undefined);
   const employee = employeeId ? employees.find(e => e.employee_id === employeeId || e.id === employeeId) : undefined;
   const myPayrolls = employeeId ? payroll.filter(p => p.employee_id === employeeId || p.employee_id === employee?.id) : [];
   const currentPeriod = getTodayVNString().slice(0, 7);

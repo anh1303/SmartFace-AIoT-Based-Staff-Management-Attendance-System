@@ -1,6 +1,7 @@
 import { aggregateDailyAttendance, autoCloseDueAttendance, autoLockCompletedAttendanceDates } from './attendance.service.js'
 import { getTodayVNString } from '../../common/utils.js'
 import { logger } from '../../common/logger.js'
+import { env } from '../../config/env.js'
 import { prisma } from '../../config/database.js'
 import { randomUUID } from 'node:crypto'
 import { runMissingScanAlerts } from './attendance.missing-alerts.js'
@@ -127,7 +128,10 @@ function scheduleNext0005Job() {
  * - Lên lịch cố định chính xác 00:05 mỗi ngày theo giờ VN.
  * - Chạy tổng hợp chấm công định kỳ mỗi 30 phút.
  */
-export function startAttendanceCron(intervalMs: number = 30 * 60 * 1000) {
+export function startAttendanceCron(
+  intervalMs: number = 30 * 60 * 1000,
+  alertsIntervalMs: number = env.ATTENDANCE_ALERTS_INTERVAL_MS
+) {
   if (cronInterval) return
 
   // 1. Chạy bù ngay lần đầu tiên khi khởi động sau 10 giây
@@ -147,9 +151,9 @@ export function startAttendanceCron(intervalMs: number = 30 * 60 * 1000) {
   }, intervalMs)
   alertsInterval = setInterval(() => {
     runMissingScanAlerts().catch(error => cronLogger.error('Không thể kiểm tra cảnh báo thiếu lượt chấm công:', error))
-  }, 60_000)
+  }, alertsIntervalMs)
 
-  cronLogger.info(`Dịch vụ tổng hợp chấm công tự động đã được kích hoạt (00:05 VN, chạy bù khởi động & chu kỳ ${Math.round(intervalMs / 60000)} phút).`)
+  cronLogger.info(`Dịch vụ tổng hợp chấm công tự động đã được kích hoạt (00:05 VN, chạy bù khởi động, chu kỳ tổng hợp ${Math.round(intervalMs / 60000)} phút, cảnh báo thiếu lượt ${Math.round(alertsIntervalMs / 60000)} phút).`)
 }
 
 export function stopAttendanceCron() {

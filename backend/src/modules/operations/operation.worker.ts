@@ -1,15 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { prisma } from '../../config/database.js'
+import { env } from '../../config/env.js'
 import { logger } from '../../common/logger.js'
 import type { OperationRow } from './operation.contract.js'
 import { safeError } from './operation.service.js'
 import { announceOperation } from './operation.gateway.js'
 import { AppError } from '../../common/AppError.js'
 
-type Handler = (job: OperationRow) => Promise<void>
+export type OperationDataChange = { domain: 'employees' | 'shifts' | 'biometrics'; employeeIds: string[] }
+type Handler = (job: OperationRow) => Promise<void | { dataChange?: OperationDataChange }>
 const handlers = new Map<string, Handler>()
 export const registerOperationHandler = (type: string, handler: Handler) => { handlers.set(type, handler) }
+export const listRegisteredOperationHandlers = () => [...handlers.keys()].sort()
 let timer: ReturnType<typeof setInterval> | undefined
+let startupTimer: ReturnType<typeof setTimeout> | undefined
 let busy = false
 let stopping = false
 let wakePending = false
@@ -21,24 +25,30 @@ export async function claimOperation(): Promise<OperationRow | undefined> {
   const jobs = await prisma.$queryRaw<OperationRow[]>`UPDATE background_operations SET status = 'running', attempts = attempts + 1,
     lease_token = ${token}::uuid, lease_until = now() + interval '120 seconds', updated_at = now(), revision = revision + 1
     WHERE id = (SELECT id FROM background_operations WHERE status = 'queued' OR (status = 'running' AND lease_until < now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`
-  return jobs[0]
+  return jobs?.[0]
 }
 export async function runOperationTick() {
   if (busy || stopping) return
   busy = true
+  let claimed = false
   let heartbeat: ReturnType<typeof setInterval> | undefined
   try {
     await prisma.$executeRaw`DELETE FROM background_operation_inputs WHERE expires_at < now()`
     const job = await claimOperation()
     if (!job) return
+    claimed = true
     heartbeat = setInterval(() => {
       void prisma.$executeRaw`UPDATE background_operations SET lease_until = now() + interval '120 seconds' WHERE id = ${job.id}::uuid AND lease_token = ${job.lease_token}::uuid AND status = 'running'`.catch(() => { logger.warn('Operation lease heartbeat failed') })
     }, 20000)
     heartbeat.unref()
+    let dataChange: OperationDataChange | undefined
     try {
       const handler = handlers.get(job.type)
       if (!handler) throw AppError.conflict('Loại tác vụ chưa được hỗ trợ trên phiên bản máy chủ này.')
-      await handler(job)
+      const result = await handler(job)
+      if (result && typeof result === 'object' && 'dataChange' in result) {
+        dataChange = result.dataChange
+      }
     } catch (error) {
       await prisma.$executeRaw`UPDATE background_operations SET status = 'failed', error = ${safeError(error)}, revision = revision + 1, updated_at = now(), lease_until = NULL
         , completed = CASE WHEN type = 'biometric.enroll' THEN total ELSE completed END
@@ -47,13 +57,13 @@ export async function runOperationTick() {
       logger.error(`Background operation failed: ${job.type} ${job.id}`)
     }
     const states = await prisma.$queryRaw<{ status: string }[]>`SELECT status FROM background_operations WHERE id = ${job.id}::uuid`
-    if (states[0]?.status !== 'running') await prisma.$executeRaw`DELETE FROM background_operation_inputs WHERE operation_id = ${job.id}::uuid`
-    await announceOperation(job.owner_id, job.id)
+    if (states?.[0]?.status !== 'running') await prisma.$executeRaw`DELETE FROM background_operation_inputs WHERE operation_id = ${job.id}::uuid`
+    await announceOperation(job.owner_id, job.id, dataChange)
   } catch { logger.error('Unable to poll background operations') }
   finally {
     if (heartbeat) clearInterval(heartbeat)
     busy = false
-    if (wakePending && !stopping) { wakePending = false; void runOperationTick() }
+    if ((wakePending || (claimed && Boolean(timer))) && !stopping) { wakePending = false; void runOperationTick() }
   }
 }
 export function wakeOperationWorker() {
@@ -68,13 +78,22 @@ export async function currentActor(ownerId: string) {
   if (!['ADMIN', 'MANAGER'].includes(user.roles.role_name.toUpperCase())) throw AppError.forbidden('Quyền quản lý đã thay đổi. Tác vụ không được thực hiện.')
   return { id: user.id, role: user.roles.role_name.toUpperCase() }
 }
-export function startOperationWorker() {
+export function startOperationWorker(recoveryIntervalMs = env.OPERATION_RECOVERY_INTERVAL_MS) {
   stopping = false
-  timer = setInterval(() => { void runOperationTick() }, 1000)
+  if (startupTimer) clearTimeout(startupTimer)
+  if (timer) clearInterval(timer)
+  // Run one bounded startup recovery pass shortly after boot, then rely on
+  // wakeOperationWorker() + queue draining and infrequent lease/TTL recovery
+  // so idle cloud databases (Neon) can scale to zero.
+  startupTimer = setTimeout(() => { startupTimer = undefined; void runOperationTick() }, 1000)
+  startupTimer.unref()
+  timer = setInterval(() => { void runOperationTick() }, recoveryIntervalMs)
   timer.unref()
 }
 export async function stopOperationWorker() {
   stopping = true
+  if (startupTimer) clearTimeout(startupTimer)
+  startupTimer = undefined
   if (timer) clearInterval(timer)
   timer = undefined
   wakePending = false

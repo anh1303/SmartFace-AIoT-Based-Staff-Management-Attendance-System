@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { useShiftContext } from '@/context/ShiftContext';
-import { Employee } from '@/types';
+import { useShiftContext } from '@/features/schedules';
+import type { Employee } from '@/features/employees';
 import { useEmployeeAttendanceDetail, type AttendanceStats } from '@/features/attendances';
 import { useEmployeePayrollDetail } from '@/features/payrolls';
 

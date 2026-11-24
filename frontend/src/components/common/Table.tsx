@@ -1,5 +1,12 @@
 import React from 'react';
-import { Edit } from 'lucide-react';
+import { ChevronUp, ChevronDown, Edit } from 'lucide-react';
+
+export const TableSortIndicator = ({ direction }: { direction?: React.AriaAttributes['aria-sort'] }) => (
+  <span aria-hidden="true" className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex shrink-0 flex-col text-slate-500 dark:text-slate-400">
+    <ChevronUp className={`h-2.5 w-3 ${direction === 'ascending' ? 'text-blue-600 dark:text-blue-400' : direction === 'descending' ? 'opacity-40' : ''}`} />
+    <ChevronDown className={`h-2.5 w-3 ${direction === 'descending' ? 'text-blue-600 dark:text-blue-400' : direction === 'ascending' ? 'opacity-40' : ''}`} />
+  </span>
+);
 
 /**
  * Container bao bọc bảng theo chuẩn Bento Design System:
@@ -82,6 +89,7 @@ export const TableHeadRow: React.FC<React.HTMLAttributes<HTMLTableRowElement>> =
  * Ô tiêu đề cột th chuẩn: có vạch kẻ dọc phân chia cột border-r, padding py-4 px-4, căn giữa/trái/phải
  */
 export interface TableHeadCellProps extends React.ThHTMLAttributes<HTMLTableCellElement> {
+  onSort?: () => void;
   children?: React.ReactNode;
   isLast?: boolean;
   align?: 'left' | 'center' | 'right';
@@ -89,6 +97,7 @@ export interface TableHeadCellProps extends React.ThHTMLAttributes<HTMLTableCell
 }
 
 export const TableHeadCell: React.FC<TableHeadCellProps> = ({
+  onSort,
   children,
   className = '',
   isLast = false,
@@ -110,7 +119,7 @@ export const TableHeadCell: React.FC<TableHeadCellProps> = ({
       className={`sticky top-0 z-10 bg-slate-50 dark:bg-[#0c0f1f] border-b border-slate-200 dark:border-[#28305c] py-4 px-4 font-bold ${alignClass} ${borderClass} ${className}`}
       {...props}
     >
-      {children}
+      {onSort ? <button type="button" onClick={onSort} className={`inline-flex w-full items-center px-2 cursor-pointer text-inherit [text-align:inherit] focus-visible:outline-blue-500 ${finalAlign === 'left' ? 'justify-start' : finalAlign === 'right' ? 'justify-end' : 'justify-center'}`}><span>{children}</span><TableSortIndicator direction={props['aria-sort']} /></button> : children}
     </th>
   );
 };

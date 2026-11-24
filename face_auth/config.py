@@ -176,6 +176,8 @@ else:
 # Connection pool (tránh mở connection mới mỗi lần search/upsert)
 DB_POOL_MIN_SIZE = _get_env_int("DB_POOL_MIN_SIZE", 1)
 DB_POOL_MAX_SIZE = _get_env_int("DB_POOL_MAX_SIZE", 4)
+DB_POOL_TIMEOUT_SECONDS = max(0.1, _get_env_float("DB_POOL_TIMEOUT_SECONDS", 5.0))
+DB_QUERY_TIMEOUT_MS = max(100, _get_env_int("DB_QUERY_TIMEOUT_MS", 5000))
 
 # Model Config — Recognition (ArcFace)
 # ArcFace lấy từ insightface model pack buffalo_s.

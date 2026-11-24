@@ -1,10 +1,10 @@
+import { useRef, useState } from 'react';
 import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
-import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 import { profileApi } from '@/features/auth';
-import { useAuth, getActiveSessionId, getActiveUsername } from '../../../context/AuthContext';
+import { useAuth, getActiveSessionId, getActiveUsername } from '@/features/auth';
 
 export function PasswordForm() {
   const [current, setCurrent] = useState('');

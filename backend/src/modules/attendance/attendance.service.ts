@@ -1,4 +1,4 @@
-import { timeAttendanceStage } from '../../common/attendance-timing.js'
+import { timeAttendanceStage } from '../../common/perf-trace.js'
 import { requireFingerprintBinding, assertNoFingerprintMaintenance, type FingerprintScan } from '../biometrics/fingerprint.public.js'
 import { aggregateDailyAttendance } from './attendance.aggregation.js'
 import { attendanceIntervalRemaining, attendanceIntervalMessage } from './attendance.interval.js'
@@ -29,21 +29,24 @@ import {
   findEmployeeByUserId,
   countScopedEmployees,
   findEmployeeWageProfile,
+  isEmployeeManager,
   assertCannotModifyOtherManager,
   assertCannotModifySelfControlData,
   type EmployeeActor,
 } from '../employees/public.js'
 import { getEmployeeNearShifts, getEmployeeShiftsForRecalculation, getEmployeeShiftsByFilter } from '../shifts/public.js'
 import { AppError } from '../../common/AppError.js'
-import { policyForPeriod } from '../../common/payroll-policy.js'
-import { buildIdOrCodeWhere, formatVNDateISO, formatVNTime } from '../../common/utils.js'
+import { formatVNDateISO, UUID_REGEX } from '../../common/utils.js'
+import { acquireAdvisoryLocks } from '../../common/advisory-lock.js'
 import { attendanceInclude } from './attendance.model.js'
-import { logAction } from '../audit-logs/public.js'
-import { eventBus } from '../../common/event-bus.js'
+import { resolveCurrentRecipientMeta } from './attendance.recipients.js'
+import { eventBus, type AttendanceRecipientMeta } from '../../common/event-bus.js'
 import {
-  ATTENDANCE_METHOD,
   type AttendanceMethod,
 } from '../../common/constants.js'
+
+const queryString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value ? value : undefined
 
 const startOfToday = () => {
   const now = new Date()
@@ -62,9 +65,7 @@ export async function list(
     if (!emp) return []
     where.employee_id = emp.id
   } else {
-    const empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
-      ? query.employeeId
-      : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
+    const empIdFilter = queryString(query.employeeId) || queryString(query.employee_id)
 
     if (empIdFilter) {
       const emp = await findEmployeeByIdOrCode(empIdFilter)
@@ -72,34 +73,29 @@ export async function list(
     }
   }
 
-  const startDate = (typeof query.startDate === 'string' && query.startDate)
-    ? query.startDate
-    : (typeof query.from === 'string' && query.from ? query.from : undefined)
+  const startDate = queryString(query.startDate) || queryString(query.from)
 
-  const endDate = (typeof query.endDate === 'string' && query.endDate)
-    ? query.endDate
-    : (typeof query.to === 'string' && query.to ? query.to : undefined)
+  const endDate = queryString(query.endDate) || queryString(query.to)
 
-  const singleDate = typeof query.date === 'string' && query.date ? query.date : undefined
+  const singleDate = queryString(query.date)
+  const fromDate = singleDate || startDate
+  const toDate = singleDate || endDate
 
-  if (startDate && endDate) {
-    where.event_time = {
-      gte: new Date(`${startDate}T00:00:00+07:00`),
-      lt: new Date(`${endDate}T23:59:59.999+07:00`),
+  if (fromDate || toDate) {
+    const workDateFilter: Record<string, Date> = {}
+    const eventTimeFilter: Record<string, Date> = {}
+    if (fromDate) {
+      workDateFilter.gte = new Date(`${fromDate}T00:00:00.000Z`)
+      eventTimeFilter.gte = new Date(`${fromDate}T00:00:00+07:00`)
     }
-  } else if (startDate) {
-    where.event_time = {
-      gte: new Date(`${startDate}T00:00:00+07:00`),
+    if (toDate) {
+      workDateFilter.lte = new Date(`${toDate}T00:00:00.000Z`)
+      eventTimeFilter.lt = new Date(`${toDate}T23:59:59.999+07:00`)
     }
-  } else if (endDate) {
-    where.event_time = {
-      lt: new Date(`${endDate}T23:59:59.999+07:00`),
-    }
-  } else if (singleDate) {
-    where.event_time = {
-      gte: new Date(`${singleDate}T00:00:00+07:00`),
-      lt: new Date(`${singleDate}T23:59:59.999+07:00`),
-    }
+    where.OR = [
+      { work_date: workDateFilter },
+      { work_date: null, event_time: eventTimeFilter },
+    ]
   }
 
   if (typeof query.type === 'string') {
@@ -132,9 +128,7 @@ export async function getDailySummaries(
 ) {
   const where: Record<string, unknown> = { employees: await getEmployeeScope(requesterUser) }
 
-  let empIdFilter = (typeof query.employeeId === 'string' && query.employeeId)
-    ? query.employeeId
-    : (typeof query.employee_id === 'string' && query.employee_id ? query.employee_id : undefined)
+  let empIdFilter = queryString(query.employeeId) || queryString(query.employee_id)
 
   if (requesterUser?.role === 'EMPLOYEE' && requesterUser.id) {
     const emp = await findEmployeeByUserId(requesterUser.id)
@@ -147,15 +141,11 @@ export async function getDailySummaries(
     where.employee_id = emp ? emp.id : empIdFilter
   }
 
-  const startDate = (typeof query.startDate === 'string' && query.startDate)
-    ? query.startDate
-    : (typeof query.from === 'string' && query.from ? query.from : undefined)
+  const startDate = queryString(query.startDate) || queryString(query.from)
 
-  const endDate = (typeof query.endDate === 'string' && query.endDate)
-    ? query.endDate
-    : (typeof query.to === 'string' && query.to ? query.to : undefined)
+  const endDate = queryString(query.endDate) || queryString(query.to)
 
-  const singleDate = typeof query.date === 'string' && query.date ? query.date : undefined
+  const singleDate = queryString(query.date)
 
   if (startDate && endDate) {
     where.work_date = {
@@ -350,7 +340,7 @@ export async function adjustAttendance(
         reopened_by: null,
       },
     })
-    const adjustmentPolicy = await policyForPeriod(data.date.slice(0, 7), tx)
+    const adjustmentPolicy = await attendancePayroll().getAdjustmentPolicy(data.date.slice(0, 7), tx)
     const wageSnapshot = await attendancePayroll().getPayrollWageSnapshot(emp.id, data.date.slice(0, 7), tx)
     await syncDayAdjustments(tx, updated, sourceHourlyRate(emp, data.date.slice(0, 7), wageSnapshot?.hourly_rate, Boolean(attendancePayroll().payrollOverrides(wageSnapshot).fields.hourly_rate)), adjustmentPolicy?.absence_penalty_rate ?? null)
 
@@ -398,6 +388,37 @@ export async function adjustAttendance(
   return summaryResult
 }
 
+
+const pendingBackgroundAggregations = new Set<Promise<void>>()
+let backgroundErrorListener: ((err: unknown) => void) | undefined
+
+export function setBackgroundAggregationErrorListener(fn?: (err: unknown) => void) {
+  backgroundErrorListener = fn
+}
+
+export async function flushBackgroundAggregations(): Promise<void> {
+  while (pendingBackgroundAggregations.size > 0) {
+    await Promise.allSettled([...pendingBackgroundAggregations])
+  }
+}
+
+function trackBackgroundAggregation(fn: () => Promise<void>) {
+  let tracked!: Promise<void>
+  tracked = new Promise<void>((resolve) => {
+    setImmediate(() => {
+      fn()
+        .catch((err) => {
+          console.error('[Attendance] Background aggregation error:', err)
+          backgroundErrorListener?.(err)
+        })
+        .finally(() => {
+          pendingBackgroundAggregations.delete(tracked)
+          resolve()
+        })
+    })
+  })
+  pendingBackgroundAggregations.add(tracked)
+}
 type CaptureOptions = {
   fingerprint?: FingerprintScan
   eventId?: string
@@ -420,40 +441,69 @@ async function recordAttendance(
   capture: CaptureOptions = {}
 ) {
   const edgeRequest = !requester && Boolean(capture.deviceId) && capture.syncSummary === false
-  const employee = requester?.role === 'EMPLOYEE' && requester.id
-    ? await findEmployeeByUserId(requester.id, undefined, 'identity')
-    : await findEmployeeByIdOrCode(employeeId, undefined, 'identity')
-  if (!employee) throw AppError.notFound('Employee not found')
-  if (requester?.role?.toUpperCase() === 'MANAGER') {
-    if (employee.user_id && requester.id && employee.user_id === requester.id) {
-      throw AppError.forbidden('Quản lý không được tự thực hiện điểm danh thủ công cho chính mình')
+  const skipPreTxLookup = edgeRequest && UUID_REGEX.test(employeeId)
+  const preloadedEmployee = skipPreTxLookup
+    ? null
+    : requester?.role === 'EMPLOYEE' && requester.id
+      ? await findEmployeeByUserId(requester.id, undefined, 'identity')
+      : await findEmployeeByIdOrCode(employeeId, undefined, 'identity')
+  if (!skipPreTxLookup && !preloadedEmployee) throw AppError.notFound('Employee not found')
+  const targetEmployeeId = skipPreTxLookup ? employeeId : preloadedEmployee!.id
+  if (preloadedEmployee) {
+    if (requester?.role?.toUpperCase() === 'MANAGER') {
+      if (preloadedEmployee.user_id && requester.id && preloadedEmployee.user_id === requester.id) {
+        throw AppError.forbidden('Quản lý không được tự thực hiện điểm danh thủ công cho chính mình')
+      }
+      await assertCanManageEmployee(requester, preloadedEmployee.id)
+    } else if (requester && requester.role?.toUpperCase() !== 'EMPLOYEE') {
+      await assertCanManageEmployee(requester, preloadedEmployee.id)
     }
-    await assertCanManageEmployee(requester, employee.id)
-  } else if (requester && requester.role?.toUpperCase() !== 'EMPLOYEE') {
-    await assertCanManageEmployee(requester, employee.id)
+    if (preloadedEmployee.status !== 'ACTIVE') throw AppError.forbidden('Nhân viên không ở trạng thái ACTIVE')
   }
-  if (employee.status !== 'ACTIVE') throw AppError.forbidden('Nhân viên không ở trạng thái ACTIVE')
   const eventTime = new Date(capture.capturedAt ?? Date.now())
   if (!Number.isFinite(+eventTime)) throw AppError.badRequest('Thời điểm ghi nhận không hợp lệ')
   const flagged = +eventTime > Date.now() + 120000 || +eventTime < Date.now() - MAX_PAIR_MS
   const eventKey = capture.eventId ? createHash('sha256').update(`${capture.deviceId || device || 'web'}:${capture.eventId}`).digest('hex') : undefined
   const outcome = await timeAttendanceStage('record_transaction', () => prisma.$transaction(async tx => {
     // Lock adjacent periods in chronological order for cross-midnight/month pairs.
-    const periods = [-1, 0, 1].map(offset => { const d = new Date(eventTime); d.setUTCMonth(d.getUTCMonth() + offset, 1); return vnDay(d).slice(0, 7) }).sort()
-    for (const period of periods) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${period}`}))`
-    if (requester?.role?.toUpperCase() === 'MANAGER') {
-      if (employee.user_id && requester.id && employee.user_id === requester.id) {
-        throw AppError.forbidden('Quản lý không được tự thực hiện điểm danh thủ công cho chính mình')
+    const periods = Array.from(new Set([-1, 0, 1].map(offset => { const d = new Date(eventTime); d.setUTCMonth(d.getUTCMonth() + offset, 1); return vnDay(d).slice(0, 7) }))).sort()
+    const periodKeys = periods.map(period => `payroll:${period}`)
+    const needsManagerScopeCheck = Boolean(requester && requester.role?.toUpperCase() !== 'EMPLOYEE')
+    if (needsManagerScopeCheck) {
+      await acquireAdvisoryLocks(tx, periodKeys)
+      if (requester?.role?.toUpperCase() === 'MANAGER') {
+        if (preloadedEmployee?.user_id && requester.id && preloadedEmployee.user_id === requester.id) {
+          throw AppError.forbidden('Quản lý không được tự thực hiện điểm danh thủ công cho chính mình')
+        }
+        await assertCanManageEmployee(requester, targetEmployeeId, tx)
+      } else {
+        await assertCanManageEmployee(requester, targetEmployeeId, tx)
       }
-      await assertCanManageEmployee(requester, employee.id, tx)
-    } else if (requester && requester.role?.toUpperCase() !== 'EMPLOYEE') {
-      await assertCanManageEmployee(requester, employee.id, tx)
+      await acquireAdvisoryLocks(tx, [`employee:${targetEmployeeId}`])
+    } else {
+      await acquireAdvisoryLocks(tx, [...periodKeys, `employee:${targetEmployeeId}`])
     }
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`employee:${employee.id}`}))`
     if (capture.deviceId) await assertNoFingerprintMaintenance(tx, capture.deviceId)
-    if (capture.fingerprint) await requireFingerprintBinding(tx, capture.fingerprint, employee.id)
-    const currentEmployee = await findEmployeeWageProfile(employee.id, tx, edgeRequest)
-    if (!currentEmployee || currentEmployee.status !== 'ACTIVE') throw AppError.forbidden('Nhân viên không ở trạng thái ACTIVE')
+    if (capture.fingerprint) await requireFingerprintBinding(tx, capture.fingerprint, targetEmployeeId)
+    const currentEmployee = await findEmployeeWageProfile(targetEmployeeId, tx, edgeRequest ? 'edge' : 'routing')
+    if (!currentEmployee) throw AppError.notFound('Employee not found')
+    if (currentEmployee.status !== 'ACTIVE') throw AppError.forbidden('Nhân viên không ở trạng thái ACTIVE')
+    const authEmp = currentEmployee as any
+    const employee = {
+      id: currentEmployee.id,
+      employee_code: authEmp.employee_code ?? preloadedEmployee?.employee_code ?? currentEmployee.id,
+      user_id: authEmp.user_id !== undefined ? authEmp.user_id : (preloadedEmployee?.user_id ?? null),
+      departmentId: authEmp.departmentId !== undefined ? authEmp.departmentId : ((preloadedEmployee as any)?.departmentId ?? null),
+      department: authEmp.department !== undefined ? authEmp.department : ((preloadedEmployee as any)?.department ?? null),
+      position: authEmp.position !== undefined ? authEmp.position : ((preloadedEmployee as any)?.position ?? null),
+      users: authEmp.users !== undefined ? authEmp.users : ((preloadedEmployee as any)?.users ?? null),
+    }
+    const recipientMeta: AttendanceRecipientMeta = {
+      id: employee.id,
+      departmentId: (employee as any).departmentId ?? null,
+      user_id: employee.user_id ?? null,
+      isManager: isEmployeeManager(employee as any),
+    }
     if (eventKey) {
       const existing = await tx.attendance_logs.findUnique({ where: { event_key: eventKey }, include: attendanceInclude })
       if (existing) {
@@ -465,7 +515,7 @@ async function recordAttendance(
         const reopened = Boolean(summary?.reopened_at)
         const closed = await attendancePayroll().isPayrollPeriodClosed(date.slice(0, 7), employee.id, tx)
         const accessDenied = flagged || existing.status === 'FLAGGED' || closed || Boolean(!reopened && (lock?.is_locked || summary?.review_status === 'APPROVED'))
-        return { created: existing, affected: lock?.is_locked ? [] : [...new Set([date, vnDay(existing.event_time)])], duplicate: true, accessDenied, ignored: false as const }
+        return { created: existing, affected: lock?.is_locked ? [] : [...new Set([date, vnDay(existing.event_time)])], duplicate: true, accessDenied, ignored: false as const, employee, recipientMeta }
       }
     }
     const latestAccepted = await tx.attendance_logs.findFirst({
@@ -475,7 +525,7 @@ async function recordAttendance(
     // Use server receipt time inside the employee lock; device timestamps cannot shorten the interval.
     const remaining = attendanceIntervalRemaining(latestAccepted?.created_at)
     if (!flagged && latestAccepted && remaining > 0) {
-      return { ignored: true as const, remaining, latestAccepted }
+      return { ignored: true as const, remaining, latestAccepted, employee, recipientMeta }
     }
     const previous = await tx.attendance_logs.findFirst({
       where: { employee_id: employee.id, status: 'VALID', event_time: { lte: eventTime } },
@@ -600,8 +650,10 @@ async function recordAttendance(
         })
       }
     }
-    return { created, affected, nearShifts, duplicate: false, accessDenied: false, ignored: false as const }
+    return { created, affected, nearShifts, duplicate: false, accessDenied: false, ignored: false as const, employee, recipientMeta }
   }, { timeout: 15000, maxWait: 10000 }))
+  const employee = outcome.employee
+  const recipientMeta = outcome.recipientMeta
   if (outcome.ignored) {
     return {
       id: String(outcome.latestAccepted.id), employee_id: employee.id,
@@ -623,19 +675,19 @@ async function recordAttendance(
     }
   } else if (affected.length > 0) {
     // Non-blocking background aggregation for edge/IoT webhooks to return sub-second response
-    setImmediate(async () => {
-      try {
-        for (const date of affected) {
-          await aggregateDailyAttendance(Number(date.slice(5, 7)), Number(date.slice(0, 4)), employee.id, date)
-        }
-        eventBus.publish('attendance:summary-updated', {
-          employeeId: employee.id,
-          workDate: vnDay(created.work_date || created.event_time),
-          summary: { employee_id: employee.employee_code, employee_user_id: employee.user_id, dates: affected },
-        })
-      } catch (err) {
-        console.error('[Attendance] Background aggregation error:', err)
+    trackBackgroundAggregation(async () => {
+      const allDetails: Array<Record<string, unknown>> = []
+      for (const date of affected) {
+        const calculated = await aggregateDailyAttendance(Number(date.slice(5, 7)), Number(date.slice(0, 4)), employee.id, date)
+        if (Array.isArray(calculated?.details)) allDetails.push(...calculated.details)
       }
+      const freshMeta = await resolveCurrentRecipientMeta(employee.id, employee.user_id)
+      eventBus.publish('attendance:summary-updated', {
+        employeeId: employee.id,
+        workDate: vnDay(created.work_date || created.event_time),
+        summary: { employee_id: employee.employee_code, employee_uuid: employee.id, employee_user_id: employee.user_id, dates: affected, details: allDetails },
+        recipientMeta: freshMeta,
+      })
     })
   }
 
@@ -646,6 +698,7 @@ async function recordAttendance(
       employeeId: employee.id,
       workDate: vnDay(created.work_date || created.event_time),
       summary: { employee_id: employee.employee_code, employee_user_id: employee.user_id, dates: affected },
+      recipientMeta,
     })
   }
   if (!duplicate) eventBus.publish(type === 'CHECK_IN' ? 'attendance:checked-in' : 'attendance:checked-out', {
@@ -656,6 +709,7 @@ async function recordAttendance(
     method: created.method,
     deviceInfo: created.device_info,
     payload: result,
+    recipientMeta,
   })
   return result
 }
@@ -819,7 +873,6 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
     }
 
     const days = await tx.daily_attendance_summary.findMany({ where: { work_date }, include: { employees: true } })
-    const empIds = days.map(d => d.employee_id)
     const closedEmpIds = await attendancePayroll().getClosedPayrollEmployeeIds(dateStr.slice(0, 7), tx)
 
     if (is_locked) {
@@ -855,7 +908,7 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
       })) {
         throw AppError.conflict('Ca chưa kết thúc, bao gồm ca qua đêm; chưa thể khóa ngày')
       }
-      const adjustmentPolicy = await policyForPeriod(dateStr.slice(0, 7), tx)
+      const adjustmentPolicy = await attendancePayroll().getAdjustmentPolicy(dateStr.slice(0, 7), tx)
       for (const day of activeDays) {
         // VẤN ĐỀ 6: Nếu ngày công đã APPROVED và KHÔNG bị mở khóa (reopened_at === null),
         // giữ nguyên quyết định đã duyệt riêng trước đó, không ghi đè người duyệt hay phân loại lại!
@@ -1016,7 +1069,7 @@ export async function toggleLock(dateStr: string, is_locked: boolean, actorUserI
       }
     } else {
       const activeDays = days.filter(d => !closedEmpIds.has(d.employee_id))
-      const adjustmentPolicy = await policyForPeriod(dateStr.slice(0, 7), tx)
+      const adjustmentPolicy = await attendancePayroll().getAdjustmentPolicy(dateStr.slice(0, 7), tx)
       for (const day of activeDays) {
         const snapshot = (day as any).pre_approval_snapshot as Record<string, any> | null
         let restoredRecord: any
@@ -1157,7 +1210,7 @@ export async function unlockEmployeeAttendance(
 
     const snapshot = (summary as any).pre_approval_snapshot as Record<string, any> | null
     const period = dateStr.slice(0, 7)
-    const adjustmentPolicy = await policyForPeriod(period, tx)
+    const adjustmentPolicy = await attendancePayroll().getAdjustmentPolicy(period, tx)
 
     let updated: any
     if (snapshot && !snapshot.reconstructed) {
@@ -1424,7 +1477,7 @@ export async function autoCloseDueAttendance(asOf = new Date()) {
         // 1. Khóa kỳ lương đồng bộ với các thao tác tính lương và tổng hợp
         const [lock] = await tx.$queryRaw<Array<{ locked: boolean }>>`SELECT pg_try_advisory_xact_lock(hashtext(${`payroll:${period}`})) AS locked`
         if (!lock?.locked) return false
-        const adjustmentPolicy = await policyForPeriod(period, tx)
+        const adjustmentPolicy = await attendancePayroll().getAdjustmentPolicy(period, tx)
 
         // 2. Giới hạn truy vấn vào đúng kỳ đang xử lý (tránh áp dụng sai chính sách tháng)
         const unapproved = await tx.daily_attendance_summary.findMany({

@@ -1,4 +1,4 @@
-type PayrollPort = Pick<typeof import('../payroll/public.js'), 'isPayrollPeriodClosed' | 'getClosedPayrollEmployeeIds' | 'getPayrollWageSnapshot' | 'touchPendingPayrollForAttendance' | 'markPendingPayrollsRecompute' | 'findPeriodPayrolls' | 'payrollOverrides'>
+type PayrollPort = Pick<typeof import('../payroll/public.js'), 'isPayrollPeriodClosed' | 'getClosedPayrollEmployeeIds' | 'getPayrollWageSnapshot' | 'touchPendingPayrollForAttendance' | 'markPendingPayrollsRecompute' | 'findPeriodPayrolls' | 'payrollOverrides' | 'getAdjustmentPolicy'>
 let payroll: PayrollPort | undefined
 export function configureAttendancePayroll(port: PayrollPort) { payroll = port }
 export function attendancePayroll(): PayrollPort {

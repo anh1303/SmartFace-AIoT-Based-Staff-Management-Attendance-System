@@ -1,4 +1,5 @@
 import { formatPayrollRecord } from './payroll.format.js'
+import { writePayrollBatch, type PayrollBatchRow } from './payroll.batch.js'
 import { approvedAbsenceCount } from './payroll.absence-count.js'
 export { formatPayrollRecord, type RawPayrollRecord } from './payroll.format.js'
 import type { PayrollStatus } from '../../common/constants.js'
@@ -12,9 +13,9 @@ import {
   hasLegacyOvernightBounds,
   prepareAttendance,
   findDailyAttendanceSummaries,
+  findDailyAttendanceSummariesForPayroll,
   findAttendanceAdjustments,
   findAttendanceLocks,
-  countPendingDailySummaries,
   countUnapprovedDailySummaries,
   countPendingAttendanceAdjustments,
   purgeAttendanceForEarlySettlement,
@@ -25,11 +26,15 @@ import { createHash } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
-import { DEFAULT_PAYROLL_POLICY, assertResolvedPayroll, currentPayrollPeriod, hasMultiplierSnapshot, nextPayrollPeriod, policyForPeriod } from '../../common/payroll-policy.js'
+import { DEFAULT_PAYROLL_POLICY, assertResolvedPayroll, currentPayrollPeriod, hasMultiplierSnapshot, nextPayrollPeriod, policyForPeriod } from './payroll.policy.js'
+import { calculateNetSalary } from './payroll-rates.js'
 import { updateBonusPenaltySchema } from './payroll.dto.js'
-import { buildIdOrCodeWhere, calculateNetSalary, vnDay, employeeLockKey, payrollPeriodLockKey } from '../../common/utils.js'
+import { vnDay } from '../../common/utils.js'
+import { employeeLockKey, payrollPeriodLockKey } from '../../common/lock-keys.js'
+import { buildIdOrCodeWhere } from '../employees/public.js'
 import {
   getEmployeeScope,
+  getManagedEmployeeIds,
   assertCanManageEmployee,
   monthlyHourlyRate,
   sourceHourlyRate,
@@ -43,10 +48,8 @@ import {
   getEmployeeShiftsForDateRange,
 } from '../shifts/public.js'
 import { payrollOverrides, requiresHoursReconciliation, workingHoursFingerprint } from './payroll.overrides.js'
-import { logAction } from '../audit-logs/public.js'
 import {
   aggregateDailyAttendance,
-  getAttendanceSummariesByEmployeesAndDateRange,
 } from '../attendance/public.js'
 
 function appliedPolicySnapshot(policy: Awaited<ReturnType<typeof policyForPeriod>>, overtimeRate: number, lateRate: number, adjustments: Array<{ id: bigint; kind: string; status: string; amount: unknown; hours: unknown; work_date: Date; source_details: unknown }>) {
@@ -61,13 +64,15 @@ function appliedPolicySnapshot(policy: Awaited<ReturnType<typeof policyForPeriod
   }
 }
 
-function elapsedPayrollSources(
-  summaries: Awaited<ReturnType<typeof findDailyAttendanceSummaries>>,
+function elapsedPayrollSources<
+  T extends { employee_id: string; work_date: Date; calculation_details: unknown }
+>(
+  summaries: T[],
   shifts: Awaited<ReturnType<typeof getEmployeeShiftsForDateRange>>,
   start: Date, end: Date, asOf = new Date(),
 ) {
   const today = vnDay(asOf)
-  const cutoff = new Date(Math.min(+end, +new Date(`${today}T00:00:00Z`) + 86400000))
+  const cutoff = new Date(Math.min(+end, +new Date(`${today}T00:00:00Z`)))
   const inRange = (date: Date) => date >= start && date < cutoff
   const dayKey = (row: { employee_id: string; work_date: Date }) => `${row.employee_id}:${vnDay(row.work_date)}`
   const shiftsByDay = new Map(shifts.map(shift => [dayKey(shift), shift]))
@@ -99,13 +104,10 @@ function assertOvernightSummariesCurrent(
   }
 }
 import {
-  isEmployeeManager,
   assertCanAccessEmployeeDetail,
   assertCannotModifySelfControlData,
   assertCannotModifyOtherManager,
   findEmployeeByIdOrCode,
-  findActiveEmployees,
-  findEmployeeByUserId,
 } from '../employees/public.js'
 
 
@@ -187,23 +189,50 @@ export async function updateBonusPenalty(data: {
 export async function list(payroll_period?: string, employeeIdOrCode?: string, requester?: { id?: string; role?: string }) {
   const scope = requester ? await getEmployeeScope(requester, 'read') : {}
   if (requester && employeeIdOrCode) await assertCanAccessEmployeeDetail(requester, employeeIdOrCode)
-  const records = await prisma.payrollRecord.findMany({ where: {
-    ...(payroll_period ? { payroll_period } : {}),
-    employee: { AND: [scope, employeeIdOrCode ? buildIdOrCodeWhere(employeeIdOrCode) : {}] },
-  }, include: { employee: { include: { department: true, position: true, users: { include: { roles: true } } } } }, orderBy: { payroll_period: 'desc' } })
+  const rawRecords = await prisma.payrollRecord.findMany({
+    where: {
+      ...(payroll_period ? { payroll_period } : {}),
+      employee: { AND: [scope, employeeIdOrCode ? buildIdOrCodeWhere(employeeIdOrCode) : {}] },
+    },
+    include: {
+      employee: {
+        select: {
+          employee_code: true,
+          full_name: true,
+          createdAt: true,
+          hourly_rate: true,
+          hourly_rate_history: true,
+          department: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { payroll_period: 'desc' },
+  })
+  const records = rawRecords.filter(row => {
+    if (row.status !== 'PENDING') return true
+    const createdAt = (row.employee as { createdAt?: Date | string | null } | null)?.createdAt
+    return !createdAt || vnDay(createdAt).slice(0, 7) <= row.payroll_period
+  })
   const pending = records.filter(row => row.status === 'PENDING')
-  if (!pending.length) return records.map(formatPayrollRecord)
+  const pendingEmployeeIds = [...new Set(pending.map(row => row.employeeId))]
+  const managedIds = requester
+    ? requester.role?.toUpperCase() === 'ADMIN'
+      ? new Set<string>(pendingEmployeeIds)
+      : await getManagedEmployeeIds(requester, pendingEmployeeIds)
+    : new Set<string>()
+  if (!pending.length) return records.map(row => formatPayrollRecord({ ...row, can_edit: false }))
   const periods = pending.map(row => row.payroll_period).sort()
-  const ids = [...new Set(pending.map(row => row.employeeId))]
+  const ids = pendingEmployeeIds
   const dateRange = { gte: validatePeriod(periods[0]).start, lt: validatePeriod(periods.at(-1)!).end }
   const [allSummaries, adjustments, shifts] = await Promise.all([
-    findDailyAttendanceSummaries({ employeeIds: ids, workDate: dateRange }),
+    findDailyAttendanceSummariesForPayroll({ employeeIds: ids, workDate: dateRange }),
     findAttendanceAdjustments({ employeeIds: ids, workDate: dateRange }),
     getEmployeeShiftsForDateRange(ids, dateRange.gte, dateRange.lt),
   ])
   const { summaries } = elapsedPayrollSources(allSummaries, shifts, dateRange.gte, dateRange.lt)
   return records.map(row => {
-    if (row.status !== 'PENDING') return formatPayrollRecord(row)
+    if (row.status !== 'PENDING') return formatPayrollRecord({ ...row, can_edit: false })
+    const can_edit = managedIds.has(row.employeeId)
     const source = summaries.filter(s => s.employee_id === row.employeeId && s.work_date.toISOString().slice(0, 7) === row.payroll_period)
     const approvedDates = new Set(source.filter(s => (s as any).review_status === 'APPROVED').map(s => vnDay(s.work_date)))
     const eligibleAdjustments = adjustments.filter(a => a.employee_id === row.employeeId && a.work_date.toISOString().slice(0, 7) === row.payroll_period && a.status === 'APPROVED' && approvedDates.has(vnDay(a.work_date)))
@@ -212,7 +241,7 @@ export async function list(payroll_period?: string, employeeIdOrCode?: string, r
     const requires_reconciliation = requiresHoursReconciliation(overrides.fields, overrides.legacy, workingHoursFingerprint(source))
     const needs_recalculation = details.source_fingerprint !== summaryFingerprint(source) || details.adjustment_fingerprint !== adjustmentFingerprint(eligibleAdjustments)
       || !overrides.fields.hourly_rate && Number(row.hourly_rate) !== monthlyHourlyRate(row.employee, row.payroll_period, row.hourly_rate)
-    return formatPayrollRecord({ ...row, calculation_details: { ...details, requires_reconciliation, needs_recalculation } })
+    return formatPayrollRecord({ ...row, can_edit, calculation_details: { ...details, requires_reconciliation, needs_recalculation } })
   })
 }
 
@@ -693,7 +722,7 @@ export async function finalizeEarlySettlement(
   })
 }
 
-export async function unlockPeriod(period: string, actorUserId?: string) {
+export async function unlockPeriod(period: string, actorUserId?: string, actorUser?: { id?: string; role?: string }) {
   validatePeriod(period)
   await prisma.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`payroll:${period}`}))`
@@ -704,20 +733,21 @@ export async function unlockPeriod(period: string, actorUserId?: string) {
     await tx.payrollRecord.updateMany({ where: { id: { in: eligible.map(row => row.id) } }, data: { status: 'PENDING' } })
     await tx.auditLog.create({ data: { userId: actorUserId, action: 'UNLOCK_PAYROLL_PERIOD', target_table: 'payroll_records', record_id: period, new_values: { period } } })
   })
-  return list(period)
+  return list(period, undefined, actorUser ?? (actorUserId ? { id: actorUserId, role: 'ADMIN' } : undefined))
 }
 
 export async function generate(payroll_period: string, employeeId?: string, actorUserId?: string, actorUser?: { id?: string; role?: string }) {
   const { year, month, start, end } = validatePeriod(payroll_period)
   const calculatedAt = new Date()
   const today = vnDay(calculatedAt)
-  const calculationEnd = new Date(Math.min(+end, +new Date(`${today}T00:00:00Z`) + 86400000))
-  const calculationRange = {
+  // Current-day attendance is not eligible until the following Vietnamese day.
+  const calculationEnd = new Date(Math.min(+end, +new Date(`${today}T00:00:00Z`)))
+  const calculationRange = calculationEnd > start ? {
     start_date: start.toISOString().slice(0, 10),
     end_date: new Date(+calculationEnd - 86400000).toISOString().slice(0, 10),
     as_of: calculatedAt.toISOString(),
     is_partial: payroll_period === today.slice(0, 7),
-  }
+  } : null
   if (payroll_period > today.slice(0, 7)) throw AppError.badRequest('Không tính lương cho kỳ tương lai')
   if (!actorUser || !['ADMIN', 'MANAGER'].includes(actorUser.role || '')) throw AppError.forbidden()
   const employeeScope = await getEmployeeScope(actorUser, 'manage')
@@ -750,7 +780,8 @@ export async function generate(payroll_period: string, employeeId?: string, acto
     ]) : [[], [], [], []]
     const { summaries: elapsedSummaries, shifts: elapsedShifts } = elapsedPayrollSources(allSummaries, allShifts, start, calculationEnd, calculatedAt)
     assertOvernightSummariesCurrent(elapsedSummaries.filter(summary => summary.review_status === 'APPROVED'), elapsedShifts)
-    const results = []
+    const writes: PayrollBatchRow[] = []
+    const employeesById = new Map(employees.map(emp => [emp.id, emp]))
     for (const emp of employees) {
       const empCreatedDay = emp.createdAt ? vnDay(emp.createdAt) : null
       const periodEndDay = vnDay(end)
@@ -785,7 +816,7 @@ export async function generate(payroll_period: string, employeeId?: string, acto
       const net_salary = calculateNetSalary({ hourly_rate, total_working_hours, total_overtime, total_late_early, allowance,
         overtime_rate, late_early_penalty: late_penalty_rate, total_absence_penalty })
       const data = { hourly_rate, total_working_hours, total_overtime, total_late_early, total_absence_penalty, allowance, net_salary,
-        overtime_rate, late_penalty_rate, status: 'PENDING', calculation_details: {
+        overtime_rate, late_penalty_rate, status: 'PENDING' as const, calculation_details: {
           manual: false, field_overrides: {}, legacy_manual_unresolved: false, requires_reconciliation,
           previous_manual_overrides: overrides.legacy || overrides.fields.working_hours || overrides.fields.hourly_rate ? { fields: overrides.fields, legacy: overrides.legacy, hourly_rate: Number(existing?.hourly_rate), total_working_hours: Number(existing?.total_working_hours) } : (existing?.calculation_details as Record<string, any> | null)?.previous_manual_overrides ?? null,
           rate_snapshot_status: 'MULTIPLIER',
@@ -799,11 +830,11 @@ export async function generate(payroll_period: string, employeeId?: string, acto
           applied_policy_snapshot: appliedPolicySnapshot(policy, overtime_rate, late_penalty_rate, approved),
           pending_review_days: summaries.filter(s => (s as any).review_status !== 'APPROVED').map(s => s.work_date.toISOString().slice(0, 10)),
         } }
-      results.push(await tx.payrollRecord.upsert({ where: { employeeId_payroll_period: { employeeId: emp.id, payroll_period } },
-        update: data, create: { employeeId: emp.id, payroll_period, ...data }, include: { employee: { include: { department: true } } } }))
+      writes.push({ employeeId: emp.id, payroll_period, ...data })
     }
+    const results = await writePayrollBatch(tx, writes)
     await tx.auditLog.create({ data: { userId: actorUserId, action: 'GENERATE_PAYROLL', target_table: 'payroll_records', record_id: payroll_period,
       new_values: { employee_count: results.length, employeeId: employeeId || 'ALL', calculation_range: calculationRange } } })
-    return results.map(formatPayrollRecord)
+    return results.map(record => formatPayrollRecord({ ...record, can_edit: true, employee: employeesById.get(record.employeeId) }))
   }, { timeout: 60000, maxWait: 20000 })
 }

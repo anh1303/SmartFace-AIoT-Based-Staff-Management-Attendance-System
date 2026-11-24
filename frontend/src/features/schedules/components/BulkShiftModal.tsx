@@ -2,7 +2,8 @@ import { ActionError, ActionButton, ActionForm } from '@/components/common/Actio
 import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { Modal } from '../../../components/common/Modal';
-import { WorkShift, Employee, DepartmentItem } from '../../../types';
+import type { WorkShift } from '../types';
+import type { Employee, DepartmentItem } from '@/features/employees';
 import { ShiftTimeInput } from './ShiftTimeInput';
 import { calculateShiftWorkingHours } from '../../../utils/timeUtils';
 

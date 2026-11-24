@@ -1,0 +1,254 @@
+{
+  "phase": 2,
+  "baselineSnapshot": "e395c9b8",
+  "initialCounts": {
+    "pendingMoveContextFiles": 5,
+    "pendingMoveTypeFiles": 7,
+    "pendingMoveUtilFiles": 3,
+    "pendingMoveFeatureEdges": 3,
+    "featureCycles": 0,
+    "transitionalExceptions": 0
+  },
+  "currentCounts": {
+    "pendingMoveContextFiles": 0,
+    "pendingMoveTypeFiles": 0,
+    "pendingMoveUtilFiles": 0,
+    "pendingMoveFeatureEdges": 0,
+    "featureCycles": 0,
+    "transitionalExceptions": 0
+  },
+  "contextFiles": [
+    {
+      "path": "context/AppContext.tsx",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Provider lắp ráp ứng dụng ở tầng root"
+    },
+    {
+      "path": "context/ThemeContext.tsx",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Provider quản lý giao diện sáng/tối dùng chung toàn ứng dụng"
+    },
+    {
+      "path": "context/ToastContext.tsx",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Provider hiển thị toast thông báo dùng chung toàn ứng dụng"
+    },
+    {
+      "path": "context/index.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Barrel tái xuất các context dùng chung ở tầng ứng dụng"
+    }
+  ],
+  "typeFiles": [
+    {
+      "path": "types/api.types.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Kiểu envelope phản hồi API và phân trang dùng chung toàn frontend"
+    },
+    {
+      "path": "types/common.types.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Kiểu giao diện dùng chung (ToastMessage, tùy chọn lọc chung)"
+    },
+    {
+      "path": "types/index.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Barrel tái xuất các kiểu dữ liệu hạ tầng dùng chung"
+    }
+  ],
+  "utilFiles": [
+    {
+      "path": "utils/dateUtils.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích định dạng ngày tháng theo múi giờ Việt Nam dùng chung toàn ứng dụng"
+    },
+    {
+      "path": "utils/excelExport.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích xuất bảng Excel dùng chung cho nhiều trang báo cáo"
+    },
+    {
+      "path": "utils/index.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Barrel tái xuất các tiện ích hạ tầng dùng chung"
+    },
+    {
+      "path": "utils/logger.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Logger phía client dùng chung toàn ứng dụng"
+    },
+    {
+      "path": "utils/reportPrint.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích dựng HTML và in báo cáo dùng chung"
+    },
+    {
+      "path": "utils/saveWorkbook.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Adapter lưu workbook Excel xuống trình duyệt dùng chung"
+    },
+    {
+      "path": "utils/timeUtils.ts",
+      "owner": "shared",
+      "status": "allowed",
+      "reason": "Tiện ích định dạng và phân tích chuỗi giờ HH:mm dùng chung"
+    }
+  ],
+  "featureDependencyMatrix": [
+    {
+      "source": "account",
+      "target": "auth",
+      "owner": "account",
+      "status": "allowed",
+      "reason": "Trang tài khoản cá nhân sử dụng API hồ sơ và xác thực lại mật khẩu từ entry công khai của feature auth"
+    },
+    {
+      "source": "attendances",
+      "target": "auth",
+      "owner": "attendances",
+      "status": "allowed",
+      "reason": "Hook chấm công đọc trạng thái phiên người dùng hiện tại qua useAuth từ entry công khai của feature auth"
+    },
+    {
+      "source": "attendances",
+      "target": "devices",
+      "owner": "attendances",
+      "status": "allowed",
+      "reason": "WebRTCPlayer đọc trạng thái/cấu hình thiết bị qua entry công khai của feature devices"
+    },
+    {
+      "source": "attendances",
+      "target": "employees",
+      "owner": "attendances",
+      "status": "allowed",
+      "reason": "Hợp đồng kiểu một chiều (import type Employee) để đối chiếu nhân viên trong bảng và cặp chấm công"
+    },
+    {
+      "source": "attendances",
+      "target": "schedules",
+      "owner": "attendances",
+      "status": "allowed",
+      "reason": "Hợp đồng kiểu một chiều (import type WorkShift) để ghép ca làm việc với lượt chấm công"
+    },
+    {
+      "source": "auth",
+      "target": "notifications",
+      "owner": "auth",
+      "status": "allowed",
+      "reason": "AuthProvider dọn lịch sử thông báo cục bộ khi đổi phiên hoặc đăng xuất qua useOptionalNotifications"
+    },
+    {
+      "source": "biometrics",
+      "target": "auth",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Luồng sinh trắc học đọc phiên hiện tại và vai trò qua useAuth từ entry công khai của feature auth"
+    },
+    {
+      "source": "biometrics",
+      "target": "employees",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Quản lý sinh trắc học dùng hợp đồng kiểu Employee và kiểm tra phạm vi nhân viên qua entry công khai của feature employees"
+    },
+    {
+      "source": "biometrics",
+      "target": "operations",
+      "owner": "biometrics",
+      "status": "allowed",
+      "reason": "Luồng đăng ký sinh trắc học theo dõi tác vụ nền qua entry công khai của feature operations"
+    },
+    {
+      "source": "dashboard",
+      "target": "attendances",
+      "owner": "dashboard",
+      "status": "allowed",
+      "reason": "Bảng log gần nhất trên dashboard dùng helper confidenceColor và AttendanceEventBadge từ entry công khai của feature attendances"
+    },
+    {
+      "source": "devices",
+      "target": "auth",
+      "owner": "devices",
+      "status": "allowed",
+      "reason": "Quản lý thiết bị đọc trạng thái xác thực và vai trò qua useAuth từ entry công khai của feature auth"
+    },
+    {
+      "source": "employees",
+      "target": "auth",
+      "owner": "employees",
+      "status": "allowed",
+      "reason": "EmployeeProvider và permissionUtils đọc phiên hiện tại và kiểu UserSession từ entry công khai của feature auth"
+    },
+    {
+      "source": "employees",
+      "target": "operations",
+      "owner": "employees",
+      "status": "allowed",
+      "reason": "Tạo hồ sơ nhân viên và gửi email tài khoản theo dõi tác vụ nền qua entry công khai của feature operations"
+    },
+    {
+      "source": "operations",
+      "target": "auth",
+      "owner": "operations",
+      "status": "allowed",
+      "reason": "OperationsProvider và commandApi gắn định danh phiên người dùng hiện tại từ entry công khai của feature auth"
+    },
+    {
+      "source": "payrolls",
+      "target": "auth",
+      "owner": "payrolls",
+      "status": "allowed",
+      "reason": "PayrollProvider và hook lương đọc trạng thái phiên hiện tại qua useAuth từ entry công khai của feature auth"
+    },
+    {
+      "source": "payrolls",
+      "target": "employees",
+      "owner": "payrolls",
+      "status": "allowed",
+      "reason": "Hợp đồng kiểu một chiều (import type Employee) cho hiển thị thông tin nhân viên trên bảng lương"
+    },
+    {
+      "source": "payrolls",
+      "target": "schedules",
+      "owner": "payrolls",
+      "status": "allowed",
+      "reason": "Hợp đồng kiểu một chiều (import type WorkShift) cho panel duyệt thưởng/phạt theo ca"
+    },
+    {
+      "source": "schedules",
+      "target": "auth",
+      "owner": "schedules",
+      "status": "allowed",
+      "reason": "ShiftProvider đọc trạng thái phiên hiện tại qua useAuth từ entry công khai của feature auth"
+    },
+    {
+      "source": "schedules",
+      "target": "employees",
+      "owner": "schedules",
+      "status": "allowed",
+      "reason": "Hợp đồng kiểu một chiều (import type Employee, DepartmentItem) cho ma trận phân ca"
+    },
+    {
+      "source": "schedules",
+      "target": "operations",
+      "owner": "schedules",
+      "status": "allowed",
+      "reason": "Phân ca hàng loạt theo dõi tiến trình xử lý qua entry công khai của feature operations"
+    }
+  ],
+  "featureCycles": [],
+  "exceptions": []
+}

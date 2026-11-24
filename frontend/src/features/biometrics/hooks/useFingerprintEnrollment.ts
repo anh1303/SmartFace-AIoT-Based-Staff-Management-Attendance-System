@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { apiFetch } from '../../../api/client';
-import type { Employee } from '../../../types';
-import { useAuth, getActiveSessionId } from '../../../context/AuthContext';
+import { config } from '../../../config';
+import type { Employee } from '@/features/employees';
+import { useAuth, getActiveSessionId } from '@/features/auth';
 import type { FingerprintStep } from '../components/FingerprintEnrollmentSection';
 
 export interface FingerprintSession {
@@ -17,6 +18,7 @@ export interface FingerprintDevice {
 }
 const terminal = ['COMPLETED','CANCELLED','EXPIRED','FAILED'];
 export function useFingerprintEnrollment(employeeId: string | undefined, blocked: boolean, toast: (message: string, type: any, title?: string) => void) {
+  const hardwareEnabled = config.iotHardwareEnabled;
   const { currentUser } = useAuth();
   const client = useQueryClient();
   const storageKey = `fingerprint-session:${currentUser?.username}:${employeeId}`;
@@ -27,6 +29,10 @@ export function useFingerprintEnrollment(employeeId: string | undefined, blocked
   const latest = useRef(storageKey); latest.current = storageKey;
   useEffect(() => {
     requestKey.current = null;
+    if (!hardwareEnabled) {
+      setSessionId(null);
+      return;
+    }
     const stored = sessionStorage.getItem(storageKey);
     // Don't auto-restore terminal sessions from storage
     if (stored) {
@@ -34,12 +40,13 @@ export function useFingerprintEnrollment(employeeId: string | undefined, blocked
     } else {
       setSessionId(null);
     }
-  }, [storageKey]);
-  const devices = useQuery({ queryKey: ['fingerprint-devices',currentUser?.username], enabled: Boolean(currentUser),
-    queryFn: async () => (await apiFetch<FingerprintDevice[]>('/api/biometrics/fingerprint-devices')).data || [], refetchInterval: 15000, staleTime: 10000 });
-  const recover = useQuery({ queryKey: ['fingerprint-current', currentUser?.username, employeeId], enabled: Boolean(employeeId && !blocked),
+  }, [storageKey, hardwareEnabled]);
+  const devices = useQuery({ queryKey: ['fingerprint-devices',currentUser?.username], enabled: Boolean(currentUser && hardwareEnabled),
+    queryFn: async () => (await apiFetch<FingerprintDevice[]>('/api/biometrics/fingerprint-devices')).data || [], refetchInterval: hardwareEnabled ? 15000 : false, staleTime: 10000 });
+  const recover = useQuery({ queryKey: ['fingerprint-current', currentUser?.username, employeeId], enabled: Boolean(hardwareEnabled && employeeId && !blocked),
     queryFn: async () => (await apiFetch<FingerprintSession | null>(`/api/biometrics/${employeeId}/fingerprint/sessions/current`)).data });
   useEffect(() => {
+    if (!hardwareEnabled) return;
     if (recover.isSuccess) {
       if (recover.data && !terminal.includes(recover.data.status)) {
         sessionStorage.setItem(storageKey, recover.data.id);
@@ -49,32 +56,34 @@ export function useFingerprintEnrollment(employeeId: string | undefined, blocked
         setSessionId(null);
       }
     }
-  }, [recover.isSuccess, recover.data, storageKey]);
-  const session = useQuery({ queryKey: key, enabled: Boolean(employeeId && sessionId), retry: 1,
+  }, [hardwareEnabled, recover.isSuccess, recover.data, storageKey]);
+  const session = useQuery({ queryKey: key, enabled: Boolean(hardwareEnabled && employeeId && sessionId), retry: 1,
     queryFn: async ({ signal }) => (await apiFetch<FingerprintSession>(`/api/biometrics/${employeeId}/fingerprint/sessions/${sessionId}`, { signal })).data,
-    refetchInterval: query => terminal.includes(query.state.data?.status || '') ? false : 2000 });
+    refetchInterval: query => !hardwareEnabled || terminal.includes(query.state.data?.status || '') ? false : 2000 });
   useEffect(() => {
+    if (!hardwareEnabled) return;
     if (session.data?.status && terminal.includes(session.data.status)) {
       sessionStorage.removeItem(storageKey);
       void client.invalidateQueries({ queryKey: ['fingerprint-devices', currentUser?.username] });
     }
-  }, [session.data?.status, storageKey]);
+  }, [hardwareEnabled, session.data?.status, storageKey]);
   useEffect(() => {
-    if (!sessionId) return;
+    if (!hardwareEnabled || !sessionId) return;
     const socket = io(`${import.meta.env.VITE_SOCKET_URL || window.location.origin}/fingerprint`, { withCredentials: true });
     const refresh = () => { void client.invalidateQueries({ queryKey: key }); };
     socket.on('connect', refresh);
     socket.on('progress', (progress: FingerprintSession) => { if (progress.id === sessionId) refresh(); });
     return () => { socket.disconnect(); };
-  }, [employeeId, sessionId, currentUser?.username]);
+  }, [hardwareEnabled, employeeId, sessionId, currentUser?.username]);
   useEffect(() => {
+    if (!hardwareEnabled) return;
     if (session.data?.status === 'COMPLETED') {
       void client.invalidateQueries({ queryKey: ['employees'] });
       void client.invalidateQueries({ queryKey: ['biometrics'] });
     }
-  }, [session.data?.status]);
+  }, [hardwareEnabled, session.data?.status]);
   async function start(device_id: string, finger_name: string) {
-    if (blocked || !employeeId || sending) return;
+    if (!hardwareEnabled || blocked || !employeeId || sending) return;
     const forEmployee = storageKey;
     setSending(true);
     requestKey.current ||= crypto.randomUUID();

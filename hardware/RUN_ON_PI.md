@@ -87,8 +87,11 @@ REST API Call: POST, JSON, URL
 `http://backend:3000/api/attendance/tb-webhook` nếu backend chạy trong Docker cùng
 project. Nếu chạy `npm run dev` trên host, dùng
 `http://host.docker.internal:3000/api/attendance/tb-webhook` và backend phải nghe
-trên địa chỉ Docker truy cập được. Giữ payload `{method, params}` và metadata
-`requestId` qua REST node để RPC Call Reply trả về đúng yêu cầu. Save rule chain.
+trên địa chỉ Docker truy cập được. Thêm header bắt buộc
+`X-TB-Webhook-Secret: <TB_WEBHOOK_SECRET>` khớp với `TB_WEBHOOK_SECRET` (≥ 24 ký tự)
+trong `backend/.env` — bí mật này chỉ nằm giữa ThingsBoard và backend, không lưu trên Pi.
+Giữ payload `{method, params}` và metadata `requestId` qua REST node để RPC Call Reply
+trả về đúng yêu cầu. Save rule chain.
 
 Đây là **client-side two-way RPC**, không nối vector vào nhánh lưu telemetry.
 Lệnh `check_connection.py` chỉ xác minh MQTT/attributes, chưa kiểm tra rule chain,

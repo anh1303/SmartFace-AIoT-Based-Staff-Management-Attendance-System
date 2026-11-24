@@ -1,10 +1,8 @@
 import { Device } from '@prisma/client'
 import { prisma } from '../../config/database.js'
-import { env } from '../../config/env.js'
 import { isValidUuid } from '../../common/utils.js'
 import { AppError } from '../../common/AppError.js'
 import { logAction } from '../audit-logs/public.js'
-import { eventBus } from '../../common/event-bus.js'
 
 export function formatDevice(d: Device) {
   return {

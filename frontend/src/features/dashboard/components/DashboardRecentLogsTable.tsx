@@ -1,7 +1,8 @@
 import React from 'react';
-import { confidenceColor } from '../../../utils/confidence';
+import { TableSortIndicator } from '../../../components/common/Table';
+import { useTableSort, compareEmployeeNames } from '../../../hooks/useTableSort';
+import { AttendanceEventBadge, confidenceColor } from '@/features/attendances';
 import { Briefcase } from 'lucide-react';
-import { AttendanceEventBadge } from '../../../components/common/AttendanceEventBadge';
 import { formatVNTime } from '../../../utils/dateUtils';
 import type { DashboardRecentLog } from '../api/dashboardApi';
 
@@ -10,6 +11,9 @@ interface DashboardRecentLogsTableProps {
 }
 
 export const DashboardRecentLogsTable: React.FC<DashboardRecentLogsTableProps> = ({ logs }) => {
+  const { sortedRows, sortProps } = useTableSort(logs, {
+    name: (a, b) => compareEmployeeNames(a.employee_name || a.employee_id, b.employee_name || b.employee_id),
+  });
   return (
     <div className="bg-white dark:bg-[#13162b] border border-slate-200/80 dark:border-[#21264b] rounded-2xl p-5 shadow-xs transition-colors h-full">
       <div className="flex items-center gap-2 mb-4">
@@ -23,7 +27,7 @@ export const DashboardRecentLogsTable: React.FC<DashboardRecentLogsTableProps> =
         <table className="w-full text-left text-xs border-collapse">
           <thead className="bg-slate-50 dark:bg-[#181c38] text-slate-500 dark:text-slate-400 font-semibold sticky top-0 z-10">
             <tr>
-              <th className="py-2.5 px-3">Nhân viên</th>
+              <th aria-sort={sortProps('name')['aria-sort']} className="relative py-2.5 px-3"><button type="button" onClick={sortProps('name').onSort} className="inline-flex w-full items-center justify-center px-3 text-center cursor-pointer focus-visible:outline-blue-500">Nhân viên<TableSortIndicator direction={sortProps('name')['aria-sort']} /></button></th>
               <th className="py-2.5 px-3 text-center">Sự kiện</th>
               <th className="py-2.5 px-3 text-center">Thời điểm</th>
               <th className="py-2.5 px-3 text-center">Thiết bị</th>
@@ -39,7 +43,7 @@ export const DashboardRecentLogsTable: React.FC<DashboardRecentLogsTableProps> =
                 </td>
               </tr>
             ) : (
-              logs.map((att) => {
+              sortedRows.map((att) => {
                 const initials = (att.employee_name || att.employee_id)
                   .split(' ')
                   .map((w: string) => w[0])

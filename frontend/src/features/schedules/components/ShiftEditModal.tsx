@@ -2,7 +2,7 @@ import { ActionError, ActionButton, ActionForm } from '@/components/common/Actio
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '../../../components/common/Modal';
-import { WorkShift } from '../../../types';
+import type { WorkShift } from '../types';
 import { ShiftTimeInput } from './ShiftTimeInput';
 import { calculateShiftWorkingHours } from '../../../utils/timeUtils';
 

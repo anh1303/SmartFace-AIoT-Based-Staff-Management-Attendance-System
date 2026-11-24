@@ -1,6 +1,4 @@
 import type { NextFunction, Request, Response } from 'express'
-import jwt from 'jsonwebtoken'
-import { env } from '../config/env.js'
 import { AppError } from '../common/AppError.js'
 
 import { verifyAndLoadActiveUser } from '../modules/auth/public.js'

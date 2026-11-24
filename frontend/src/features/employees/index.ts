@@ -1,6 +1,7 @@
 // Utilities
 export * from './utils/employeeUtils';
 export * from './utils/employeeExport';
+export * from './utils/monthlyAverages';
 
 // Management & List Components
 export * from './components/EmployeeListHeader';
@@ -16,11 +17,7 @@ export * from './components/PositionTabContent';
 // Detail & Tab Components
 export * from './components/EmployeeDetailHeader';
 export * from './components/EmployeeOverviewTab';
-export * from './components/EmployeeAttendanceTab';
-export * from './components/EmployeePayrollTab';
-export * from './components/EmployeeScheduleTab';
 export * from './components/EmployeeAccountTab';
-export * from './components/EmployeePayslipModal';
 
 // Hooks
 export * from './hooks/useDepartmentPositionManager';
@@ -32,4 +29,6 @@ export * from './hooks/useEmployees';
 export * from './api/employeeApi';
 export * from './api/departmentApi';
 export * from './api/positionApi';
-
+export type * from './types';
+export * from './utils/permissionUtils';
+export * from './context/EmployeeContext';

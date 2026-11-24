@@ -1,11 +1,15 @@
-# Thay đổi ngày 19/10/2026
+# Hồ sơ thay đổi ngày 19/10/2026
 
-- [Backend](BACKEND_CHANGES.md): ghép công, quy tắc làm tròn phần lẻ, duyệt OT, tính lương, phân quyền, đồng bộ và migration.
-- [Frontend](FRONTEND_CHANGES.md): số liệu công theo backend, duyệt OT, trạng thái thiết bị/mode, phiếu lương và realtime.
-- [Hardware](HARDWARE_CHANGES.md): event ID, retry, timeout, tương quan phản hồi, latch/mode, camera và RTSP.
-- [Face Auth](FACE_AUTH_CHANGES.md): recognition 1,0 giây, detection/PAD 0,2 giây, cập nhật cả môi trường và giá trị dự phòng.
-- [Sắp xếp tài liệu](DOCUMENTATION_CHANGES.md): bảng đường dẫn trước/sau.
+Chỉ mục hồ sơ tại thời điểm 19/10/2026. Nội dung có thể dùng đường dẫn, bộ test hoặc trạng thái triển khai cũ; không dùng thay hướng dẫn cài/chạy hiện tại.
 
-Quy định nghiệp vụ nằm tại [Chính sách công ty và dự án](../../rule/COMPANY_POLICY.md). Lệnh kiểm tra và triển khai nằm tại [hướng dẫn đưa bản sửa công/lương vào vận hành](../../tutorial/deployment/ATTENDANCE_PAYROLL_RELEASE.md).
+| Hồ sơ | Nội dung |
+| --- | --- |
+| [Backend](BACKEND_CHANGES.md) | Công, OT, lương, phân quyền, đồng bộ và migrations |
+| [Frontend](FRONTEND_CHANGES.md) | Hiển thị công, thiết bị, lương và realtime |
+| [Hardware](HARDWARE_CHANGES.md) | Retry, sự kiện, phản hồi, camera và stream |
+| [Face Auth](FACE_AUTH_CHANGES.md) | Pipeline/config tại thời điểm ghi nhận |
+| [Tổ chức tài liệu](DOCUMENTATION_CHANGES.md) | Đường dẫn trước/sau đợt sắp xếp |
 
-Migration thêm cột/chỉ mục đã áp dụng trên Neon; không cập nhật/xóa dữ liệu nghiệp vụ. Code mới chưa thay tiến trình backend/frontend đang chạy hoặc triển khai lên Pi.
+Quy định nghiệp vụ: [chính sách công ty](../../rule/COMPANY_POLICY.md). Cách chạy/cấu hình: [README dự án](../../../README.md) và [chỉ mục tài liệu](../../README.md).
+
+Ghi nhận migration/triển khai trong hồ sơ là kết quả của đợt cũ; kiểm tra lại môi trường thực tế trước khi vận hành.

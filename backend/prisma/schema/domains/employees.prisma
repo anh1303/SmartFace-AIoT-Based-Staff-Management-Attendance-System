@@ -1,0 +1,71 @@
+model Employee {
+  fingerprint_templates FingerprintTemplate[]
+  fingerprint_sessions FingerprintSession[]
+  enrollment_receipts FaceEnrollmentReceipt[]
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employee_code            String                     @unique @db.VarChar(50)
+  user_id                  String?                    @unique @db.Uuid
+  departmentId             Int?                       @map("department_id")
+  positionId               Int?                       @map("position_id")
+  full_name                String                     @db.VarChar(100)
+  phone                    String?                    @db.VarChar(20)
+  email                    String?                    @unique @db.VarChar(100)
+  avatar_url               String?                    @db.Text
+  hourly_rate              Decimal?                   @default(0) @db.Decimal(15, 2)
+  hourly_rate_history      Json                       @default("[]")
+  status                   String                     @default("ACTIVE") @db.VarChar(20)
+  fingerprint_enrolled     Boolean                    @default(false)
+  createdAt                DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  attendance_logs          attendance_logs[]
+  daily_attendance_summary daily_attendance_summary[]
+  employee_shifts          employee_shifts[]
+  department               Department?                @relation(fields: [departmentId], references: [id], onUpdate: NoAction)
+  position                 Position?                  @relation(fields: [positionId], references: [id], onUpdate: NoAction)
+  users                    User?                      @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  face_embeddings          face_embeddings[]
+  payrollRecords           PayrollRecord[]
+  attendanceAdjustments    AttendanceAdjustment[]
+  systemNotifications      SystemNotification[]
+
+  @@index([employee_code], map: "idx_employees_code")
+  @@index([departmentId], map: "idx_employees_dept")
+  @@index([positionId])
+  @@index([status], map: "idx_employees_status")
+  @@map("employees")
+}
+
+model Department {
+  id              Int        @id @default(autoincrement())
+  department_code String     @unique @db.VarChar(50)
+  name            String     @db.VarChar(100)
+  description     String?    @db.VarChar(255)
+  is_active       Boolean    @default(true)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  positions       Position[]
+  employees       Employee[]
+
+  @@map("departments")
+}
+
+model Position {
+  id            Int           @id @default(autoincrement())
+  position_code String        @unique @db.VarChar(50)
+  name          String        @db.VarChar(100)
+  level         PositionLevel @default(EMPLOYEE)
+  departmentId  Int           @map("department_id")
+  is_active     Boolean       @default(true)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  department    Department    @relation(fields: [departmentId], references: [id], onUpdate: NoAction)
+  employees     Employee[]
+
+  @@index([departmentId], map: "idx_positions_dept")
+  @@map("positions")
+}
+
+enum PositionLevel {
+  MANAGER
+  EMPLOYEE
+}

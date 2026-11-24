@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
+ARG VITE_IOT_HARDWARE_ENABLED=true
+ENV VITE_IOT_HARDWARE_ENABLED=$VITE_IOT_HARDWARE_ENABLED
 RUN npm run build
 
 FROM nginx:1.28-alpine

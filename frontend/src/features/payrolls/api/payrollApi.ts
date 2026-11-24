@@ -1,5 +1,5 @@
 import { apiFetch } from '../../../api/client';
-import { PayrollRecord, BonusPenaltyPolicy } from '../../../types';
+import type { PayrollRecord, BonusPenaltyPolicy } from '../types';
 
 export type PayrollItemUpdates = { allowance: number; reason?: string; updated_at?: string };
 
@@ -11,8 +11,11 @@ export async function previewPayrollItemApi(id: string, allowance: number, updat
   return res.data;
 }
 
-export async function fetchPayrollApi(): Promise<PayrollRecord[]> {
-  const res = await apiFetch('/api/payroll');
+export async function fetchPayrollApi(period?: string, employeeId?: string): Promise<PayrollRecord[]> {
+  const params = new URLSearchParams();
+  if (period) params.set('payroll_period', period);
+  if (employeeId) params.set('employeeId', employeeId);
+  const res = await apiFetch(`/api/payroll${params.size ? `?${params}` : ''}`);
   if (res.success && Array.isArray(res.data)) {
     return res.data;
   }
@@ -109,4 +112,15 @@ export async function updateBonusPenaltyApi(data: Partial<Omit<BonusPenaltyPolic
     return res.data;
   }
   throw new Error(res.message || 'Lỗi cập nhật thưởng/phạt');
+}
+
+export async function fetchPayrollExportApi(period: string, recordIds: string[]): Promise<PayrollRecord[]> {
+  const res = await apiFetch(`/api/payroll/period/${encodeURIComponent(period)}/export`, {
+    method: 'POST',
+    body: JSON.stringify({ recordIds }),
+  });
+  if (res.success && Array.isArray(res.data)) {
+    return res.data;
+  }
+  throw new Error(res.message || 'Không thể xuất báo cáo bảng lương');
 }

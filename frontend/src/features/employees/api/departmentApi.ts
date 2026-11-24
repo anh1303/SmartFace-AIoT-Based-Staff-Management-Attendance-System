@@ -3,7 +3,7 @@ import { logger } from '../../../utils/logger';
 
 const departmentLogger = logger.child('DepartmentApi');
 
-import { DepartmentItem } from '../../../types';
+import type { DepartmentItem } from '../types';
 
 export type { DepartmentItem };
 

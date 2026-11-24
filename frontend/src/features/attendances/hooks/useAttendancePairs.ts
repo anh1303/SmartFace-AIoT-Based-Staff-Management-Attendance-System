@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
-import { Employee, WorkShift, AttendanceRecord } from '../../../types';
+import type { Employee } from '@/features/employees';
+import type { WorkShift } from '@/features/schedules';
+import type { AttendanceRecord } from '../types';
 import { formatVNDateISO, formatVNTime } from '../../../utils/dateUtils';
 import { formatSecondsToHHMMSS } from '../../../utils/timeUtils';
 import { BackendAttendanceSummaryItem } from './useAttendanceSummaries';
@@ -135,6 +137,7 @@ export function useAttendancePairs(
       shift_type: string;
       start_time: string;
       end_time: string;
+      isNullWorkDate?: boolean;
     }> = [];
 
     if (summaryMap) {
@@ -185,79 +188,80 @@ export function useAttendancePairs(
       });
     }
 
-    const isPlausibleOvernightCheckout = (empId: string, empUuid: string | undefined, log: AttendanceRecord, dateStr: string) => {
-      const prevD = new Date(`${dateStr}T00:00:00Z`);
-      prevD.setUTCDate(prevD.getUTCDate() - 1);
-      const prevDateStr = prevD.toISOString().slice(0, 10);
-      const prevShift = workShifts.find(s => 
-        (s.employee_id === empId || (empUuid && s.employee_id === empUuid)) &&
-        s.date === prevDateStr &&
-        s.end_time < s.start_time
-      );
-      if (!prevShift) return false;
+    const logsByEmpWorkDate = new Map<string, AttendanceRecord[]>();
+    const nullLogsByEmpEventDate = new Map<string, AttendanceRecord[]>();
+    const seenIdsByBucket = new Map<string, Set<string>>();
 
-      // Check if yesterday's shift already has a claimed or paired checkout
-      const prevSummary = summaryMap?.[`${empId}_${prevDateStr}`] || (empUuid ? summaryMap?.[`${empUuid}_${prevDateStr}`] : undefined);
-      if (prevSummary) {
-        const hasClaimedCheckout = (prevSummary.calculation_details?.pairs || []).some((p: any) => Boolean(p.outId)) || Boolean(prevSummary.last_check_out);
-        if (hasClaimedCheckout) {
-          // Yesterday's overnight shift already has a paired checkout.
-          // This checkout cannot be the overnight shift checkout.
-          return false;
-        }
+    const pushToBucket = (map: Map<string, AttendanceRecord[]>, bucketKey: string, log: AttendanceRecord) => {
+      const logId = String(log.id || log.attendance_id || '');
+      let seen = seenIdsByBucket.get(bucketKey);
+      if (!seen) {
+        seen = new Set<string>();
+        seenIdsByBucket.set(bucketKey, seen);
       }
-
-      const logTime = (log as any).time || (log.timestamp ? formatVNTime(log.timestamp) : '');
-      if (!logTime || logTime === '--:--:--') return false;
-      const [logH, logM] = logTime.split(':').map(Number);
-      const logMinutes = (isNaN(logH) ? 0 : logH) * 60 + (isNaN(logM) ? 0 : logM);
-
-      const [endH, endM] = prevShift.end_time.split(':').map(Number);
-      const shiftEndMinutes = (isNaN(endH) ? 6 : endH) * 60 + (isNaN(endM) ? 0 : endM);
-
-      const isMorningWindow = logMinutes <= 14 * 60;
-      const isWithinShiftEndWindow = logMinutes <= shiftEndMinutes + 6 * 60;
-
-      const hasYesterdayCheckIn = attendance.some(a =>
-        (a.employee_id === empId || (empUuid && a.employee_id === empUuid)) &&
-        a.type === 'CHECK_IN' &&
-        formatVNDateISO(a.timestamp) === prevDateStr
-      );
-
-      if (!isMorningWindow || !isWithinShiftEndWindow || !hasYesterdayCheckIn) {
-        return false;
-      }
-
-      // If there are multiple morning checkouts without a summary, only the earliest one
-      // is the plausible overnight checkout candidate; later checkouts must not be swallowed.
-      const earlierMorningCheckout = attendance.find(a => {
-        if ((a.employee_id !== empId && (!empUuid || a.employee_id !== empUuid))) return false;
-        if (a.type !== 'CHECK_OUT' && a.type !== 'TAN_CA') return false;
-        if (formatVNDateISO(a.timestamp) !== dateStr) return false;
-        const aId = String(a.id || a.attendance_id || '');
-        const logId = String(log.id || log.attendance_id || '');
-        if (aId && logId && aId === logId) return false;
-        return +new Date(a.timestamp) < +new Date(log.timestamp);
-      });
-
-      if (earlierMorningCheckout) {
-        return false;
-      }
-
-      return true;
+      if (logId && seen.has(logId)) return;
+      if (logId) seen.add(logId);
+      const list = map.get(bucketKey) || [];
+      list.push(log);
+      map.set(bucketKey, list);
     };
 
     for (const log of attendance) {
       const logId = String(log.id || log.attendance_id || '');
-      if (logId && allClaimedEventIds.has(logId)) continue;
       const emp = employees.find(e => e.employee_id === log.employee_id || e.id === log.employee_id);
       if (!emp) continue;
-      const date = formatVNDateISO(log.timestamp);
-      if (startDate && date < startDate || endDate && date > endDate) continue;
-      if (log.type === 'CHECK_OUT' && isPlausibleOvernightCheckout(emp.employee_id, emp.id, log, date)) continue;
-      if (scheduledShiftKeys.has(`${emp.employee_id}_${date}`) || emp.id && scheduledShiftKeys.has(`${emp.id}_${date}`)) continue;
-      scheduledShiftKeys.add(`${emp.employee_id}_${date}`);
-      unassignedEntries.push({employee_id:emp.employee_id,date,shift_type:'UNASSIGNED',start_time:'--:--',end_time:'--:--'});
+
+      const hasExplicitWorkDateProp = Object.prototype.hasOwnProperty.call(log, 'work_date');
+      const explicitWorkDate =
+        typeof log.work_date === 'string' && log.work_date.trim()
+          ? log.work_date.trim().slice(0, 10)
+          : null;
+
+      // In transition or legacy in-memory fixtures without work_date property,
+      // treat missing/null work_date as undetermined (null), except when a legacy fixture
+      // without `work_date` key directly targets an already-scheduled non-overnight shift day.
+      const fallbackShiftDay = !hasExplicitWorkDateProp ? formatVNDateISO(log.timestamp) : null;
+      const hasSameDayAssignedShift = Boolean(
+        fallbackShiftDay &&
+          targetShifts.some(
+            s =>
+              (s.employee_id === emp.employee_id || (emp.id && s.employee_id === emp.id)) &&
+              s.date === fallbackShiftDay
+          )
+      );
+      const workDate = explicitWorkDate ?? (hasSameDayAssignedShift ? fallbackShiftDay : null);
+
+      if (workDate) {
+        pushToBucket(logsByEmpWorkDate, `${emp.employee_id}_${workDate}`, log);
+        if ((startDate && workDate < startDate) || (endDate && workDate > endDate)) continue;
+        if (logId && allClaimedEventIds.has(logId)) continue;
+        if (scheduledShiftKeys.has(`${emp.employee_id}_${workDate}`) || (emp.id && scheduledShiftKeys.has(`${emp.id}_${workDate}`))) continue;
+        scheduledShiftKeys.add(`${emp.employee_id}_${workDate}`);
+        unassignedEntries.push({
+          employee_id: emp.employee_id,
+          date: workDate,
+          shift_type: 'UNASSIGNED',
+          start_time: '--:--',
+          end_time: '--:--',
+        });
+      } else {
+        if (logId && allClaimedEventIds.has(logId)) continue;
+        const eventDate = formatVNDateISO(log.timestamp);
+        if ((startDate && eventDate < startDate) || (endDate && eventDate > endDate)) continue;
+        const nullKey = `${emp.employee_id}_${eventDate}`;
+        const isFirstNullForDay = !nullLogsByEmpEventDate.has(nullKey);
+        pushToBucket(nullLogsByEmpEventDate, nullKey, log);
+        if (isFirstNullForDay) {
+          unassignedEntries.push({
+            employee_id: emp.employee_id,
+            date: eventDate,
+            shift_type: 'UNASSIGNED',
+            start_time: '--:--',
+            end_time: '--:--',
+            isNullWorkDate: true,
+          });
+        }
+      }
     }
 
     const allShiftEntries = [
@@ -267,6 +271,7 @@ export function useAttendancePairs(
         shift_type: s.shift_type,
         start_time: s.start_time,
         end_time: s.end_time,
+        isNullWorkDate: false,
       })),
       ...unassignedEntries,
     ];
@@ -295,9 +300,12 @@ export function useAttendancePairs(
       }
 
       const shiftDate = empShift.date;
+      const isNullWorkDateGroup = Boolean(empShift.isNullWorkDate);
       const summaryKey = `${emp.employee_id}_${shiftDate}`;
       const fallbackKey = emp.id ? `${emp.id}_${shiftDate}` : '';
-      const summary = summaryMap?.[summaryKey] || (fallbackKey ? summaryMap?.[fallbackKey] : undefined);
+      const summary = isNullWorkDateGroup
+        ? undefined
+        : (summaryMap?.[summaryKey] || (fallbackKey ? summaryMap?.[fallbackKey] : undefined));
 
       const details = summary?.calculation_details;
       const hasScheduledFromSummary = details && Number(details.scheduledShiftSeconds || 0) > 0 && details.scheduledStart && details.scheduledEnd && !details.off;
@@ -340,26 +348,27 @@ export function useAttendancePairs(
         : `${effectiveStartTime} – ${effectiveEndTime}`;
 
       // 3. Số giờ làm việc lấy trực tiếp từ summary backend (không tự tạo công 9h khi có sự kiện lẻ)
-      const regularHours = isOffDay
+      const regularHours = isOffDay || isNullWorkDateGroup
         ? 0
         : (summary?.total_working_hours !== undefined
             ? Number(summary.total_working_hours)
             : (summary?.regular_hours !== undefined
                 ? Number(summary.regular_hours)
                 : (workingHoursMap?.[summaryKey] ?? (fallbackKey ? workingHoursMap?.[fallbackKey] ?? 0 : 0))));
-      const workingHours = isOffDay ? 0 : Number(summary?.total_working_hours ?? regularHours);
+      const workingHours = isOffDay || isNullWorkDateGroup ? 0 : Number(summary?.total_working_hours ?? regularHours);
 
       // Giây làm việc gốc (raw_work_seconds)
       const rawWorkSeconds = summary?.raw_work_seconds ?? 0;
       const rawWorkSecondsStr = formatSecondsToHHMMSS(rawWorkSeconds);
 
       // Đi trễ / về sớm từ backend
-      const currentLateEarlySec =
-        customLateEarlyMap[summaryKey] !== undefined
-          ? customLateEarlyMap[summaryKey]
-          : (fallbackKey && customLateEarlyMap[fallbackKey] !== undefined
-            ? customLateEarlyMap[fallbackKey]
-            : Math.round((Number(summary?.late_early) || 0) * 3600));
+      const currentLateEarlySec = isNullWorkDateGroup
+        ? 0
+        : (customLateEarlyMap[summaryKey] !== undefined
+            ? customLateEarlyMap[summaryKey]
+            : (fallbackKey && customLateEarlyMap[fallbackKey] !== undefined
+              ? customLateEarlyMap[fallbackKey]
+              : Math.round((Number(summary?.late_early) || 0) * 3600)));
       const lateEarlyStr = formatSecondsToHHMMSS(currentLateEarlySec);
       const initialLateEarlySec = summary?.late_early_seconds != null ? Number(summary.late_early_seconds) : null;
 
@@ -368,12 +377,13 @@ export function useAttendancePairs(
       const proposedOtHours = summary?.proposed_overtime_hours ?? approvedOtHours;
       const pendingOtHours = summary?.pending_overtime_hours ?? Math.max(0, proposedOtHours - approvedOtHours);
 
-      const currentOTSec =
-        customOvertimeMap[summaryKey] !== undefined
-          ? customOvertimeMap[summaryKey]
-          : (fallbackKey && customOvertimeMap[fallbackKey] !== undefined
-            ? customOvertimeMap[fallbackKey]
-            : Math.round(approvedOtHours * 3600));
+      const currentOTSec = isNullWorkDateGroup
+        ? 0
+        : (customOvertimeMap[summaryKey] !== undefined
+            ? customOvertimeMap[summaryKey]
+            : (fallbackKey && customOvertimeMap[fallbackKey] !== undefined
+              ? customOvertimeMap[fallbackKey]
+              : Math.round(approvedOtHours * 3600)));
       const overtimeStr = formatSecondsToHHMMSS(currentOTSec);
       const initialOTSec = summary?.overtime_seconds != null ? Number(summary.overtime_seconds) : null;
 
@@ -392,27 +402,80 @@ export function useAttendancePairs(
       const policyVersion = summary?.policy_version ?? null;
       const isLegacyNoPolicy = summary ? summary.is_legacy_no_policy : false;
 
-      // 4. Lấy danh sách log thực tế của nhân viên trong ngày (sắp xếp tăng dần theo thời gian)
-      const sourceEvents = summary?.calculation_details?.events;
-      const savedLogs: AttendanceRecord[] = Array.isArray(sourceEvents) ? sourceEvents.map((ev: any) => {
-        const raw = attendance.find(log => (log.id || log.attendance_id) === ev.id);
-        return { ...raw, id: ev.id, attendance_id: ev.id, employee_id: emp.employee_id, type: ev.type,
-          timestamp: ev.time, status: ev.status, method: ev.method || raw?.method || 'MANUAL',
-          device_id: ev.device_info || raw?.device_id || '--', verification_score: ev.verification_score ?? raw?.verification_score ?? null };
-      }) : attendance.filter(log => (log.employee_id === emp.employee_id || (emp.id && log.employee_id === emp.id)) && formatVNDateISO(log.timestamp) === shiftDate)
-        .sort((a,b) => +new Date(a.timestamp) - +new Date(b.timestamp));
-      const foreignIds = new Set(Object.values(summaryMap).filter((s: any) => s && s.date !== shiftDate && (s.employee_id === emp.employee_id || s.employee_uuid === emp.id))
-        .flatMap((s: any) => (s.calculation_details?.pairs || []).flatMap((p: any) => [p.inId, p.outId])));
-      const savedIds = new Set(savedLogs.map(l => l.id || l.attendance_id));
-      const empLogs = [...savedLogs, ...attendance.filter(l => (l.employee_id === emp.employee_id || l.employee_id === emp.id)
-        && formatVNDateISO(l.timestamp) === shiftDate && !savedIds.has(l.id || l.attendance_id) && !foreignIds.has(l.id || l.attendance_id))]
-        .filter(l => !foreignIds.has(l.id || l.attendance_id))
-        .sort((a,b) => +new Date(a.timestamp) - +new Date(b.timestamp));
+      // 4. Lấy danh sách log thực tế của nhân viên theo ngày công (hoặc nhóm log null tách biệt)
+      let empLogs: AttendanceRecord[];
+      if (isNullWorkDateGroup) {
+        empLogs = (nullLogsByEmpEventDate.get(`${emp.employee_id}_${shiftDate}`) || [])
+          .slice()
+          .sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp));
+      } else {
+        const sourceEvents = summary?.calculation_details?.events;
+        const indexedForWorkDate = logsByEmpWorkDate.get(`${emp.employee_id}_${shiftDate}`) || [];
+        const savedLogs: AttendanceRecord[] = Array.isArray(sourceEvents)
+          ? sourceEvents.map((ev: any) => {
+              const raw = attendance.find(log => (log.id || log.attendance_id) === ev.id);
+              return {
+                ...raw,
+                id: ev.id,
+                attendance_id: ev.id,
+                employee_id: emp.employee_id,
+                type: ev.type,
+                timestamp: ev.time,
+                work_date: shiftDate,
+                status: ev.status,
+                method: ev.method || raw?.method || 'MANUAL',
+                device_id: ev.device_info || raw?.device_id || '--',
+                verification_score: ev.verification_score ?? raw?.verification_score ?? null,
+              };
+            })
+          : indexedForWorkDate
+              .slice()
+              .sort((a, b) => +new Date(a.timestamp) - +new Date(b.timestamp));
+
+        const summaryPairIds = new Set<string>(
+          (summary?.calculation_details?.pairs || [])
+            .flatMap((p: any) => [p.inId, p.outId])
+            .filter(Boolean)
+            .map(String)
+        );
+        const claimedPairLogs = attendance.filter(log => {
+          const id = String(log.id || log.attendance_id || '');
+          return id && summaryPairIds.has(id);
+        });
+
+        const foreignIds = new Set(
+          Object.values(summaryMap)
+            .filter((s: any) => s && s.date !== shiftDate && (s.employee_id === emp.employee_id || s.employee_uuid === emp.id))
+            .flatMap((s: any) => [
+              ...((s.calculation_details?.pairs || []).flatMap((p: any) => [p.inId, p.outId])),
+              ...((s.calculation_details?.events || []).map((ev: any) => ev.id)),
+            ])
+            .filter(Boolean)
+            .map(String)
+        );
+
+        const mergedById = new Map<string, AttendanceRecord>();
+        const unkeyedLogs: AttendanceRecord[] = [];
+        for (const candidate of [...savedLogs, ...claimedPairLogs, ...indexedForWorkDate]) {
+          const id = String(candidate.id || candidate.attendance_id || '');
+          if (id && foreignIds.has(id)) continue;
+          if (!id) {
+            unkeyedLogs.push(candidate);
+            continue;
+          }
+          if (!mergedById.has(id)) {
+            mergedById.set(id, candidate);
+          }
+        }
+        empLogs = [...mergedById.values(), ...unkeyedLogs].sort(
+          (a, b) => +new Date(a.timestamp) - +new Date(b.timestamp)
+        );
+      }
 
       const isNoShift = isOffDay || isUnassigned;
 
       // Danh sách tất cả raw events (bao gồm cả sự kiện lẻ)
-      const rawEvents: AttendanceEventItem[] = empLogs.map((log, idx) => {
+      const rawEvents: AttendanceEventItem[] = empLogs.map(log => {
         const isFace = log.method === 'FACE';
         const methodLabel = isFace
           ? 'Face-id'

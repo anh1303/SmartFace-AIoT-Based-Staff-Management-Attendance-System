@@ -1,7 +1,7 @@
 import { ActionButton, ActionForm } from '@/components/common/ActionFeedback';
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal } from '../../../components/common/Modal';
-import { nextPayrollPolicyPeriod } from '../../../utils/payrollUtils';
+import { nextPayrollPolicyPeriod } from '../utils/payrollUtils';
 import { fetchBonusPenaltyApi } from '../api/payrollApi';
 
 export interface PolicyFormData {
@@ -36,9 +36,13 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       baseline.current = policyData;
-      setLoading(false); setError(''); setProposal(null);
+      setLoading(false);
+      setError('');
+      setProposal(null);
     }
-    return () => { requestId.current += 1; };
+    return () => {
+      requestId.current += 1;
+    };
     // The starting baseline must not change when the user edits the form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -48,20 +52,42 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
     const dirty = (['overtime_rate', 'late_early_penalty', 'absence_penalty_rate', 'description'] as const)
       .some(key => policyData[key] !== baseline.current[key]);
     onChangePolicyData(current => ({ ...current, effective_period: period }));
-    setProposal(null); setError('');
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) { setLoading(false); setError('Vui lòng chọn kỳ hiệu lực hợp lệ.'); return; }
+    setProposal(null);
+    setError('');
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+      setLoading(false);
+      setError('Vui lòng chọn kỳ hiệu lực hợp lệ.');
+      return;
+    }
     setLoading(true);
     try {
       const policy = await fetchBonusPenaltyApi(period);
       if (id !== requestId.current) return;
-      if (!policy || policy.absence_penalty_rate == null) throw new Error('Không có chính sách được xác minh cho kỳ này.');
-      const next: PolicyFormData = { effective_period: period, overtime_rate: Number(policy.overtime_rate), late_early_penalty: Number(policy.late_early_penalty), absence_penalty_rate: Number(policy.absence_penalty_rate), description: policy.description || '' };
-      if (![next.overtime_rate, next.late_early_penalty, next.absence_penalty_rate].every(rate => Number.isFinite(rate) && rate >= 0 && rate <= 50)) throw new Error('Hệ số không hợp lệ');
-      if (dirty) setProposal(next);
-      else { baseline.current = next; onChangePolicyData(next); }
+      if (!policy || policy.absence_penalty_rate == null) {
+        throw new Error('Không có chính sách được xác minh cho kỳ này.');
+      }
+      const next: PolicyFormData = {
+        effective_period: period,
+        overtime_rate: Number(policy.overtime_rate),
+        late_early_penalty: Number(policy.late_early_penalty),
+        absence_penalty_rate: Number(policy.absence_penalty_rate),
+        description: policy.description || '',
+      };
+      const rates = [next.overtime_rate, next.late_early_penalty, next.absence_penalty_rate];
+      if (!rates.every(rate => Number.isFinite(rate) && rate >= 0 && rate <= 50)) {
+        throw new Error('Hệ số không hợp lệ');
+      }
+      if (dirty) {
+        setProposal(next);
+      } else {
+        baseline.current = next;
+        onChangePolicyData(next);
+      }
     } catch {
       if (id === requestId.current) setError('Không tải được chính sách của kỳ đã chọn. Vui lòng thử lại.');
-    } finally { if (id === requestId.current) setLoading(false); }
+    } finally {
+      if (id === requestId.current) setLoading(false);
+    }
   };
 
   const choosePolicy = (useNew: boolean) => {
@@ -77,7 +103,16 @@ export const PayrollPolicyModal: React.FC<PayrollPolicyModalProps> = ({
       onClose={onClose}
       title="Thay đổi quy định Thưởng / Phạt"
     >
-      <ActionForm onSubmit={e => { if (blocked) { e.preventDefault(); return; } return onSavePolicy(e); }} className="space-y-4">
+      <ActionForm
+        onSubmit={e => {
+          if (blocked) {
+            e.preventDefault();
+            return;
+          }
+          return onSavePolicy(e);
+        }}
+        className="space-y-4"
+      >
         <label className="sf-field">Áp dụng từ kỳ lương
           <input className="sf-input" type="month" min={nextPayrollPolicyPeriod()} required value={policyData.effective_period}
             onChange={e => void loadPeriod(e.target.value)}/>

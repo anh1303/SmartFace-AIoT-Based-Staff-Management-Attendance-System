@@ -4,7 +4,7 @@ import { submitScheduleBatch, submitScheduleCopy } from '../../features/schedule
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { useEmployeeContext } from '@/features/employees';
-import { useShiftContext } from '@/features/schedules';
+import { useShifts } from '@/features/schedules';
 import { useAuth } from '@/features/auth';
 import { isAnotherManager } from '@/features/employees';
 import type { WorkShift } from '@/features/schedules';
@@ -28,13 +28,24 @@ export const ManagerSchedule: React.FC = () => {
   const [failedJob, setFailedJob] = useState<Operation | null>(null);
   const scheduleBusy = jobs.some(job => job.type === 'shifts.batch' && ['queued', 'running'].includes(job.status));
   const employeeState = useEmployeeContext();
-  const shiftState = useShiftContext();
   const { employees } = employeeState;
-  const { workShifts, assignOrUpdateShift } = shiftState;
   const { showToast } = useToast();
-  const { currentUser, role } = useAuth();
+  const { currentUser, role, isInitializing } = useAuth();
   const isManager = role === 'manager';
   const managerDept = currentUser?.department;
+
+  // Solar Calendar Week State (Default Monday of current week)
+  const [currentMonday, setCurrentMonday] = useState<Date>(() => getMonday(new Date()));
+  const startDateObj = currentMonday;
+  const endDateObj = new Date(currentMonday);
+  endDateObj.setDate(currentMonday.getDate() + 6);
+  const weekStartDate = formatDateToYYYYMMDD(startDateObj);
+  const weekEndDate = formatDateToYYYYMMDD(endDateObj);
+  const shiftState = useShifts(Boolean(currentUser) && !isInitializing, {
+    startDate: weekStartDate,
+    endDate: weekEndDate,
+  });
+  const { workShifts, assignOrUpdateShift } = shiftState;
 
   const [departmentFilter, setDepartmentFilter] = useState(() => {
     if (role === 'manager' && currentUser?.department) {
@@ -60,9 +71,6 @@ export const ManagerSchedule: React.FC = () => {
     managerDept,
     departmentFilter,
   });
-
-  // Solar Calendar Week State (Default Monday of current week)
-  const [currentMonday, setCurrentMonday] = useState<Date>(() => getMonday(new Date()));
 
   // Bulk Shift Assignment Modal State
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
@@ -96,9 +104,6 @@ export const ManagerSchedule: React.FC = () => {
   });
 
   const weekNumber = getISOWeekNumber(currentMonday);
-  const startDateObj = currentMonday;
-  const endDateObj = new Date(currentMonday);
-  endDateObj.setDate(currentMonday.getDate() + 6);
 
   const startLabel = `${String(startDateObj.getDate()).padStart(2, '0')}/${String(startDateObj.getMonth() + 1).padStart(2, '0')}`;
   const endLabel = `${String(endDateObj.getDate()).padStart(2, '0')}/${String(endDateObj.getMonth() + 1).padStart(2, '0')}`;

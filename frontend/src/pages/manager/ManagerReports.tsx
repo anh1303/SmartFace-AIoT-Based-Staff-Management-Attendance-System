@@ -13,7 +13,7 @@ import {
 import { exportMonthlyExcel, printMonthlyReport } from '@/features/reports';
 
 export const ManagerReports: React.FC = () => {
-  const { selectedPeriod, setSelectedPeriod } = usePayrollContext();
+  const { selectedPeriod, setSelectedPeriod } = usePayrollContext({ loadData: false });
   const { showToast } = useToast();
   const { role } = useAuth();
   const isManager = role === 'manager';

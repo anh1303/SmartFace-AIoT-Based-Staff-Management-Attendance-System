@@ -3,7 +3,7 @@ import { confidenceColor } from '@/features/attendances';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '@/features/auth';
-import { useShiftContext } from '@/features/schedules';
+import { useShifts } from '@/features/schedules';
 import { useEmployeeContext } from '@/features/employees';
 import { getTodayVNString } from '../../utils/dateUtils';
 import { config } from '../../config';
@@ -44,20 +44,16 @@ const useSafeSearchParams = () => {
 };
 
 export const ManagerAttendanceMonitor: React.FC = () => {
-  const shiftState = useShiftContext();
   const employeeState = useEmployeeContext();
   const { employees } = employeeState;
-  const { workShifts } = shiftState;
   const { showToast } = useToast();
-  const { role, currentUser } = useAuth();
+  const { role, currentUser, isInitializing } = useAuth();
   const isManager = role === 'manager';
   const managerDept = currentUser?.department;
 
   const [searchParams] = useSafeSearchParams();
   const paramDate = searchParams.get('date');
   const paramSearch = searchParams.get('search') || searchParams.get('employeeId');
-
-  const { liveEvents, isLoadingEvents, eventsError, refetchEvents } = useAttendanceSocket({ showToast });
 
   const [startDate, setStartDate] = useState<string>(() => paramDate || getTodayVNString());
   const [endDate, setEndDate] = useState<string>(() => paramDate || getTodayVNString());
@@ -81,12 +77,29 @@ export const ManagerAttendanceMonitor: React.FC = () => {
     value.setUTCDate(value.getUTCDate() + days);
     return value.toISOString().slice(0, 10);
   };
+  const validRange = Boolean(startDate && endDate) && startDate <= endDate;
+  const rangeStart = validRange ? adjacentDate(startDate, -1) : undefined;
+  const rangeEnd = validRange ? adjacentDate(endDate, 1) : undefined;
+
+  const shiftState = useShifts(
+    Boolean(currentUser) && !isInitializing && validRange,
+    rangeStart && rangeEnd ? { startDate: rangeStart, endDate: rangeEnd } : undefined,
+  );
+  const { workShifts } = shiftState;
+
   const attendanceQuery = useQuery({
     queryKey: ['attendance', { startDate, endDate, fetchAllPages: true }],
-    queryFn: () => fetchAttendanceApi({ startDate: adjacentDate(startDate, -1), endDate: adjacentDate(endDate, 1), fetchAllPages: true }),
-    enabled: Boolean(currentUser) && Boolean(startDate && endDate) && startDate <= endDate,
+    queryFn: () => fetchAttendanceApi({ startDate: rangeStart, endDate: rangeEnd, fetchAllPages: true }),
+    enabled: Boolean(currentUser) && validRange,
   });
   const attendance = attendanceQuery.data || [];
+
+  const todayStr = getTodayVNString();
+  const includesToday = validRange && startDate <= todayStr && todayStr <= endDate;
+  const { liveEvents, isLoadingEvents, eventsError, refetchEvents } = useAttendanceSocket({
+    showToast,
+    externalTodayLogs: includesToday ? attendanceQuery : undefined,
+  });
   const [departmentFilter, setDepartmentFilter] = useState(() => {
     if (role === 'manager' && currentUser?.department) {
       return currentUser.department;

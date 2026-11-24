@@ -63,7 +63,7 @@ export async function submitAndWait(endpoint: string, body: unknown): Promise<Op
   const previous = sessionStorage.getItem(pendingKey);
   const job = previous
     ? (await apiFetch<Operation>(`/api/operations/${previous}`)).data!
-    : await submitBackgroundCommand(endpoint, body);
+    : await submitBackgroundCommand(endpoint, body, request);
   assertSession(session);
   sessionStorage.setItem(pendingKey, job.jobId);
   try {
@@ -93,9 +93,13 @@ export async function commandKey(endpoint: string, body: unknown) {
 }
 export const definitiveFailure = (error: unknown) => error instanceof ApiError && error.statusCode >= 400 && error.statusCode < 500;
 
-export async function submitBackgroundCommand(endpoint: string, body: unknown): Promise<Operation> {
+export async function submitBackgroundCommand(
+  endpoint: string,
+  body: unknown,
+  precomputedKey?: { key: string; storageKey: string },
+): Promise<Operation> {
   const session = getActiveSessionId();
-  const request = await commandKey(endpoint, body);
+  const request = precomputedKey ?? await commandKey(endpoint, body);
   assertSession(session);
   try {
     const response = await apiFetch<Operation>(endpoint, { method: 'POST', headers: { 'Idempotency-Key': request.key }, body: JSON.stringify(body) });

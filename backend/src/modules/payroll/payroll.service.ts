@@ -13,6 +13,7 @@ import {
   hasLegacyOvernightBounds,
   prepareAttendance,
   findDailyAttendanceSummaries,
+  findDailyAttendanceSummariesForPayroll,
   findAttendanceAdjustments,
   findAttendanceLocks,
   countUnapprovedDailySummaries,
@@ -63,8 +64,10 @@ function appliedPolicySnapshot(policy: Awaited<ReturnType<typeof policyForPeriod
   }
 }
 
-function elapsedPayrollSources(
-  summaries: Awaited<ReturnType<typeof findDailyAttendanceSummaries>>,
+function elapsedPayrollSources<
+  T extends { employee_id: string; work_date: Date; calculation_details: unknown }
+>(
+  summaries: T[],
   shifts: Awaited<ReturnType<typeof getEmployeeShiftsForDateRange>>,
   start: Date, end: Date, asOf = new Date(),
 ) {
@@ -186,10 +189,25 @@ export async function updateBonusPenalty(data: {
 export async function list(payroll_period?: string, employeeIdOrCode?: string, requester?: { id?: string; role?: string }) {
   const scope = requester ? await getEmployeeScope(requester, 'read') : {}
   if (requester && employeeIdOrCode) await assertCanAccessEmployeeDetail(requester, employeeIdOrCode)
-  const rawRecords = await prisma.payrollRecord.findMany({ where: {
-    ...(payroll_period ? { payroll_period } : {}),
-    employee: { AND: [scope, employeeIdOrCode ? buildIdOrCodeWhere(employeeIdOrCode) : {}] },
-  }, include: { employee: { include: { department: true, position: true, users: { include: { roles: true } } } } }, orderBy: { payroll_period: 'desc' } })
+  const rawRecords = await prisma.payrollRecord.findMany({
+    where: {
+      ...(payroll_period ? { payroll_period } : {}),
+      employee: { AND: [scope, employeeIdOrCode ? buildIdOrCodeWhere(employeeIdOrCode) : {}] },
+    },
+    include: {
+      employee: {
+        select: {
+          employee_code: true,
+          full_name: true,
+          createdAt: true,
+          hourly_rate: true,
+          hourly_rate_history: true,
+          department: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { payroll_period: 'desc' },
+  })
   const records = rawRecords.filter(row => {
     if (row.status !== 'PENDING') return true
     const createdAt = (row.employee as { createdAt?: Date | string | null } | null)?.createdAt
@@ -198,14 +216,16 @@ export async function list(payroll_period?: string, employeeIdOrCode?: string, r
   const pending = records.filter(row => row.status === 'PENDING')
   const pendingEmployeeIds = [...new Set(pending.map(row => row.employeeId))]
   const managedIds = requester
-    ? await getManagedEmployeeIds(requester, pendingEmployeeIds)
+    ? requester.role?.toUpperCase() === 'ADMIN'
+      ? new Set<string>(pendingEmployeeIds)
+      : await getManagedEmployeeIds(requester, pendingEmployeeIds)
     : new Set<string>()
   if (!pending.length) return records.map(row => formatPayrollRecord({ ...row, can_edit: false }))
   const periods = pending.map(row => row.payroll_period).sort()
   const ids = pendingEmployeeIds
   const dateRange = { gte: validatePeriod(periods[0]).start, lt: validatePeriod(periods.at(-1)!).end }
   const [allSummaries, adjustments, shifts] = await Promise.all([
-    findDailyAttendanceSummaries({ employeeIds: ids, workDate: dateRange }),
+    findDailyAttendanceSummariesForPayroll({ employeeIds: ids, workDate: dateRange }),
     findAttendanceAdjustments({ employeeIds: ids, workDate: dateRange }),
     getEmployeeShiftsForDateRange(ids, dateRange.gte, dateRange.lt),
   ])

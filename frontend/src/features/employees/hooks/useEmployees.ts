@@ -71,10 +71,13 @@ export function useEmployees(enabled = true) {
     mutationKey: ['employee-write', 'delete'],
     onMutate: (id: string) => ({ sessionId: getActiveSessionId(), employee: queryClient.getQueryData<Employee[]>(EMPLOYEES_QUERY_KEY)?.find(e => matches(e, id)) }),
     mutationFn: (id: string) => deleteEmployeeApi(id),
-    onSuccess: (_data, _id, context) => {
+    onSuccess: (_data, id, context) => {
       if (context?.sessionId !== getActiveSessionId()) return;
-      showToast(`Đã xóa hồ sơ ${context.employee?.full_name || _id} (${context.employee?.employee_id || _id}) và tài khoản liên kết.`, 'success', 'Xóa nhân viên thành công');
-      queryClient.invalidateQueries({ queryKey: EMPLOYEES_QUERY_KEY });
+      queryClient.setQueryData<Employee[]>(EMPLOYEES_QUERY_KEY, (rows) =>
+        rows?.filter((e) => !matches(e, id)),
+      );
+      showToast(`Đã xóa hồ sơ ${context.employee?.full_name || id} (${context.employee?.employee_id || id}) và tài khoản liên kết.`, 'success', 'Xóa nhân viên thành công');
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (error: Error, _id, context) => {
       if (context?.sessionId !== getActiveSessionId()) return;

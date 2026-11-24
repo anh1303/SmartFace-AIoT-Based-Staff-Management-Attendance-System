@@ -244,8 +244,17 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
     setAnalyzingFace(true);
     try {
       await enrollFaceJobApi(currentEmp.employee_id, uploadedPhotos.map(photo => photo.url));
-      await queryClient.invalidateQueries({ queryKey: ['employees'] });
-      await queryClient.invalidateQueries({ queryKey: ['biometrics'] });
+      queryClient.setQueryData<Employee[]>(['employees'], (rows) =>
+        rows?.map((e) =>
+          e.employee_id === currentEmp.employee_id || e.id === currentEmp.id
+            ? { ...e, face_enrolled: true }
+            : e,
+        ),
+      );
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['employees'] }),
+        queryClient.invalidateQueries({ queryKey: ['biometrics'] }),
+      ]);
       showToast(`Đã lưu mẫu khuôn mặt cho ${currentEmp.full_name} (${currentEmp.employee_id}) từ ${uploadedPhotos.length} ảnh mẫu.`, 'success', 'Lưu Face ID thành công');
       setFaceConfirmModal(false);
       setUploadedPhotos([]);
@@ -292,8 +301,17 @@ export function useBiometricEnrollment(options: UseBiometricEnrollmentOptions = 
 
     try {
       await deleteEmployeeBiometricsApi(emp.employee_id);
-      await queryClient.invalidateQueries({ queryKey: ['employees'] });
-      await queryClient.invalidateQueries({ queryKey: ['biometrics'] });
+      queryClient.setQueryData<Employee[]>(['employees'], (rows) =>
+        rows?.map((e) =>
+          e.employee_id === emp.employee_id || e.id === emp.id
+            ? { ...e, face_enrolled: false }
+            : e,
+        ),
+      );
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['employees'] }),
+        queryClient.invalidateQueries({ queryKey: ['biometrics'] }),
+      ]);
       showToast(
         `Đã xóa dữ liệu Face ID của nhân viên ${emp.full_name} (${emp.employee_id}) thành công!`,
         'success',

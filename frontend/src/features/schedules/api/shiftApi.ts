@@ -9,8 +9,19 @@ export async function submitScheduleCopy(command: unknown) {
   return submitAndWait('/api/shifts/copy-week', command);
 }
 
-export async function fetchShiftsApi(): Promise<WorkShift[]> {
-  const res = await apiFetch('/api/shifts');
+export interface FetchShiftsParams {
+  startDate?: string;
+  endDate?: string;
+  employeeId?: string;
+}
+
+export async function fetchShiftsApi(params?: FetchShiftsParams): Promise<WorkShift[]> {
+  const query = new URLSearchParams();
+  if (params?.startDate) query.set('startDate', params.startDate);
+  if (params?.endDate) query.set('endDate', params.endDate);
+  if (params?.employeeId) query.set('employeeId', params.employeeId);
+  const qs = query.toString();
+  const res = await apiFetch(qs ? `/api/shifts?${qs}` : '/api/shifts');
   if (!res.success || !Array.isArray(res.data)) throw new Error(res.message || 'Không tải được lịch làm việc');
   return res.data as WorkShift[];
 }

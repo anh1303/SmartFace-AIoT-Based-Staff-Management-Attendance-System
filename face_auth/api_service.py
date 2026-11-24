@@ -263,8 +263,9 @@ def enroll_faces(req: EnrollRequest):
         "warnings": warnings,
     }
 
+    is_ignored = False
     try:
-        db.upsert(
+        _, _, is_ignored = db.upsert(
             employee_code=req.employee_code,
             individual_embeddings=valid_embeddings,
             mean_embedding=centroid,
@@ -281,7 +282,11 @@ def enroll_faces(req: EnrollRequest):
         print(f"[api_service] Enrollment DB write failed: {type(e).__name__}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lưu embeddings ({type(e).__name__})")
 
-    return db.enrollment_receipt(str(req.operation_id)) if req.operation_id else result
+    if req.operation_id:
+        if is_ignored:
+            return db.enrollment_receipt(str(req.operation_id)) or {**result, "operation_id": str(req.operation_id)}
+        return {**result, "operation_id": str(req.operation_id)}
+    return result
 
 
 

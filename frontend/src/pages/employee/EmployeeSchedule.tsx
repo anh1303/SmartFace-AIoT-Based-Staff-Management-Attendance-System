@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, CalendarDays, Clock } from 'lucide-react';
 import { useAuth } from '@/features/auth';
 import { useEmployeeContext } from '@/features/employees';
-import { useShiftContext } from '@/features/schedules';
+import { useShifts } from '@/features/schedules';
 import { PageHeaderBanner } from '../../components/common';
 import { getTodayVNString } from '../../utils/dateUtils';
 import { shiftNames, shortDate } from './employeePresentation';
@@ -13,12 +13,17 @@ function moveDate(date: string, days: number) { const d = new Date(`${date}T00:0
 function monday(date: string) { return moveDate(date, -((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7)); }
 
 export const EmployeeSchedule: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, isInitializing } = useAuth();
   const { employees } = useEmployeeContext();
-  const { workShifts, isLoading, isError, refetchShifts } = useShiftContext();
   const today = getTodayVNString();
   const [selected, setSelected] = useState(today);
   const [view, setView] = useState<'week' | 'month'>('week');
+  const start = view === 'week' ? monday(selected) : monday(`${selected.slice(0, 7)}-01`);
+  const days = Array.from({ length: view === 'week' ? 7 : 42 }, (_, i) => moveDate(start, i));
+  const { workShifts, isLoading, isError, refetchShifts } = useShifts(
+    Boolean(currentUser) && !isInitializing,
+    { startDate: days[0], endDate: days[days.length - 1] },
+  );
   const calendarRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const container = calendarRef.current;
@@ -28,8 +33,6 @@ export const EmployeeSchedule: React.FC = () => {
   const employeeId = currentUser?.employee_id;
   const employee = employeeId ? employees.find(e => e.employee_id === employeeId || e.id === employeeId) : undefined;
   const ownShifts = workShifts.filter(s => !!employeeId && (s.employee_id === employeeId || s.employee_id === employee?.id));
-  const start = view === 'week' ? monday(selected) : monday(`${selected.slice(0, 7)}-01`);
-  const days = Array.from({ length: view === 'week' ? 7 : 42 }, (_, i) => moveDate(start, i));
   const inPeriod = ownShifts.filter(s => view === 'week' ? s.date >= days[0] && s.date <= days[6] : s.date.slice(0, 7) === selected.slice(0, 7));
   const selectedShifts = ownShifts.filter(s => s.date === selected);
   const navigate = (direction: number) => {
@@ -44,7 +47,7 @@ export const EmployeeSchedule: React.FC = () => {
         <button className="sf-button" onClick={() => setSelected(today)}>Hôm nay</button>
       </div>
     }/>
-    {isLoading ? <p role="status">Đang tải lịch làm việc…</p> : isError ? <p className="sf-feedback error" role="alert">Không tải được lịch làm việc. <button className="underline" onClick={refetchShifts}>Thử lại</button></p> : <>
+    {isLoading ? <p role="status">Đang tải lịch làm việc…</p> : isError ? <p className="sf-feedback error" role="alert">Không tải được lịch làm việc. <button className="underline" onClick={() => refetchShifts()}>Thử lại</button></p> : <>
       <p className="sf-secondary">Số ca được phân: <strong>{inPeriod.filter(s => s.shift_type !== 'OFF').length} ca</strong></p>
       <div ref={calendarRef} className="sf-employee-calendar-scroll" tabIndex={0} role="region" aria-label="Lịch phân ca, cuộn ngang để xem đủ các ngày"><div className={`sf-employee-calendar ${view === 'month' ? 'is-month' : ''}`}>{days.map((date, index) => {
         const shifts = ownShifts.filter(s => s.date === date);

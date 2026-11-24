@@ -206,50 +206,42 @@ class VectorDB:
                     if active:
                         raise ValueError("Nhân viên đang được cập nhật khuôn mặt nền.")
 
-                # 2. Kiểm tra nhân viên đã có embedding cùng model_version chưa
-                existing = conn.execute("""
-                    SELECT 1 FROM face_embeddings
-                    WHERE employee_id = %s AND model_version = %s
-                    LIMIT 1;
-                """, (emp_uuid, model_version)).fetchone()
-                is_new = not bool(existing)
+                # 2-3. Xoá embeddings cũ hoặc kiểm tra tồn tại khi overwrite=False
+                if overwrite:
+                    deleted = conn.execute("""
+                        DELETE FROM face_embeddings
+                        WHERE employee_id = %s AND model_version = %s;
+                    """, (emp_uuid, model_version))
+                    is_new = (deleted.rowcount == 0)
+                else:
+                    existing = conn.execute("""
+                        SELECT 1 FROM face_embeddings
+                        WHERE employee_id = %s AND model_version = %s
+                        LIMIT 1;
+                    """, (emp_uuid, model_version)).fetchone()
+                    is_new = not bool(existing)
+                    if existing:
+                        return employee_code, is_new, True
 
-                if existing and not overwrite:
-                    return employee_code, is_new, True
-
-                # 3. Xoá embeddings cũ của nhân viên với cùng model_version
-                conn.execute("""
-                    DELETE FROM face_embeddings
-                    WHERE employee_id = %s AND model_version = %s;
-                """, (emp_uuid, model_version))
-
-                # 4. Insert các individual sample embeddings
+                # 4-5. Batch multi-row INSERT toàn bộ SAMPLE + CENTROID trong 1 SQL round-trip duy nhất
+                rows_to_insert = []
                 if save_individuals and individual_embeddings:
                     for emb in individual_embeddings:
-                        vec = self._to_vector_literal(emb)
-                        conn.execute("""
-                            INSERT INTO face_embeddings (
-                                id, employee_id, embedding, embedding_type,
-                                model_version, is_active, created_at
-                            )
-                            VALUES (
-                                gen_random_uuid(), %s, %s::vector, 'SAMPLE',
-                                %s, true, CURRENT_TIMESTAMP
-                            );
-                        """, (emp_uuid, vec, model_version))
+                        rows_to_insert.append((emp_uuid, self._to_vector_literal(emb), 'SAMPLE', model_version))
+                rows_to_insert.append((emp_uuid, self._to_vector_literal(mean_embedding), 'CENTROID', model_version))
 
-                # 5. Insert mean centroid embedding
-                mean_vec = self._to_vector_literal(mean_embedding)
-                conn.execute("""
+                placeholders = ", ".join(
+                    "(gen_random_uuid(), %s, %s::vector, %s, %s, true, CURRENT_TIMESTAMP)"
+                    for _ in rows_to_insert
+                )
+                flat_params = [item for row_tuple in rows_to_insert for item in row_tuple]
+                conn.execute(f"""
                     INSERT INTO face_embeddings (
                         id, employee_id, embedding, embedding_type,
                         model_version, is_active, created_at
                     )
-                    VALUES (
-                        gen_random_uuid(), %s, %s::vector, 'CENTROID',
-                        %s, true, CURRENT_TIMESTAMP
-                    );
-                """, (emp_uuid, mean_vec, model_version))
+                    VALUES {placeholders};
+                """, tuple(flat_params))
 
                 if operation_id:
                     from enrollment.operation import finish_enrollment

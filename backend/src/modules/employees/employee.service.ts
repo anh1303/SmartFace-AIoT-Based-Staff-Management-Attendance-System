@@ -11,11 +11,11 @@ import { generateUniqueEmployeeCode } from './employee.code.js'
 import { sendAccountCredentialsEmail, type EmailSendResult } from '../../common/email.service.js'
 import { logAction } from '../audit-logs/public.js'
 import { employeeIntegration } from './employee.integration-port.js'
-import { employeeInclude } from './employee.model.js'
+import { employeeInclude, employeeListInclude } from './employee.model.js'
 import { recordHourlyRateChange, nextPayrollPeriod } from './employee.wage.js'
 import { vnDay } from '../../common/utils.js'
 import { payrollPeriodLockKey } from '../../common/lock-keys.js'
-import { assertCanAccessEmployeeDetail, assertCanManageEmployee, getEmployeeScope, isEmployeeManager, type EmployeeActor } from './employee.permission.js'
+import { assertCanAccessEmployeeDetail, assertCanManageEmployee, resolveManagedEmployee, getEmployeeScope, isEmployeeManager, type EmployeeActor } from './employee.permission.js'
 
 export async function list(query: Record<string, unknown>, actor?: EmployeeActor) {
   const scope = await getEmployeeScope(actor)
@@ -46,7 +46,7 @@ export async function list(query: Record<string, unknown>, actor?: EmployeeActor
   const [items, total] = await prisma.$transaction([
     prisma.employee.findMany({
       where,
-      include: employeeInclude,
+      include: employeeListInclude,
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { createdAt: 'desc' },
@@ -274,7 +274,20 @@ export async function update(
   }
   const existing = await client.employee.findFirst({
     where: buildIdOrCodeWhere(idOrCode),
-    include: employeeInclude,
+    select: {
+      id: true,
+      employee_code: true,
+      full_name: true,
+      email: true,
+      positionId: true,
+      departmentId: true,
+      status: true,
+      hourly_rate: true,
+      hourly_rate_history: true,
+      user_id: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   })
   if (!existing) throw new AppError(404, 'Employee not found')
   if (data.expectedVersion && existing.updatedAt.toISOString() !== data.expectedVersion) throw AppError.conflict('Nhân viên đã được cập nhật bởi thao tác khác. Vui lòng tải lại thông tin trước khi sửa.')
@@ -348,33 +361,35 @@ export async function update(
       ...(rateVal !== undefined && rateVal !== Number(existing.hourly_rate ?? 0) ? { hourly_rate_history: recordHourlyRateChange(existing, rateVal, ratePeriod) } : {}),
 
     },
-    include: employeeInclude,
+    include: employeeListInclude,
   })
 
   if (existing.user_id && data.status !== undefined) {
     await employeeIntegration().updateAuthUser(existing.user_id, { is_active: data.status === 'ACTIVE' }, client)
   }
 
-  await logAction({
-    userId: actorUserId,
-    action: 'UPDATE_EMPLOYEE',
-    target_table: 'employees',
-    record_id: existing.id,
-    old_values: {
-      full_name: existing.full_name,
-      email: existing.email,
-      positionId: existing.positionId,
-      departmentId: existing.departmentId,
-      status: existing.status,
-      hourly_rate: existing.hourly_rate ? Number(existing.hourly_rate) : 0,
-    },
-    new_values: {
-      full_name: updated.full_name,
-      email: updated.email,
-      positionId: updated.positionId,
-      departmentId: updated.departmentId,
-      status: updated.status,
-      hourly_rate: updated.hourly_rate ? Number(updated.hourly_rate) : 0,
+  await client.auditLog.create({
+    data: {
+      userId: actorUserId ?? null,
+      action: 'UPDATE_EMPLOYEE',
+      target_table: 'employees',
+      record_id: existing.id,
+      old_values: {
+        full_name: existing.full_name,
+        email: existing.email,
+        positionId: existing.positionId,
+        departmentId: existing.departmentId,
+        status: existing.status,
+        hourly_rate: existing.hourly_rate ? Number(existing.hourly_rate) : 0,
+      },
+      new_values: {
+        full_name: updated.full_name,
+        email: updated.email,
+        positionId: updated.positionId,
+        departmentId: updated.departmentId,
+        status: updated.status,
+        hourly_rate: updated.hourly_rate ? Number(updated.hourly_rate) : 0,
+      },
     },
   })
 
@@ -598,7 +613,6 @@ export async function updateWithManagerCheck(
   updates: any,
   actorUser?: { id?: string; role?: string }
 ) {
-  await assertCanManageEmployee(actorUser, id);
   updates = await scopeEmployeeChanges(updates, actorUser);
 
   if (actorUser?.role === 'MANAGER') {

@@ -3,8 +3,8 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { logAction } from '../audit-logs/public.js'
 import { env } from '../../config/env.js'
-import { assertNoEnrollment } from '../operations/public.js'
-import { findEmployeeByIdOrCode, assertCanManageEmployee, type EmployeeActor } from '../employees/public.js'
+import { acquireBiometricLock, hasActiveEnrollment, ENROLLMENT_CONFLICT_MESSAGE } from '../operations/public.js'
+import { findEmployeeByIdOrCode, assertCanManageEmployee, resolveManagedEmployee, type EmployeeActor } from '../employees/public.js'
 
 async function resolveEmployeeId(idOrCode: string) {
   const emp = await findEmployeeByIdOrCode(idOrCode)
@@ -37,40 +37,62 @@ export async function getByEmployee(idOrCode: string) {
 }
 
 export async function deactivate(idOrCode: string, actor?: EmployeeActor) {
-  await assertCanManageEmployee(actor, idOrCode)
-  const employeeId = await resolveEmployeeId(idOrCode)
-  const count = await prisma.face_embeddings.count({
-    where: { employee_id: employeeId, is_active: true },
-  })
-  if (count === 0) throw new AppError(404, 'No active biometric data found for this employee')
+  const employeeId = actor
+    ? (await resolveManagedEmployee(actor, idOrCode)).id
+    : await resolveEmployeeId(idOrCode)
 
   await prisma.$transaction(async tx => {
-    await assertNoEnrollment(tx, employeeId)
-    await tx.face_embeddings.updateMany({
-    where: { employee_id: employeeId },
-    data: { is_active: false },
+    await acquireBiometricLock(tx, employeeId)
+    if (await hasActiveEnrollment(tx, employeeId)) {
+      const existingActive = await tx.face_embeddings.findFirst({
+        where: { employee_id: employeeId, is_active: true },
+        select: { id: true },
+      })
+      if (!existingActive) {
+        throw new AppError(404, 'No active biometric data found for this employee')
+      }
+      throw AppError.conflict(ENROLLMENT_CONFLICT_MESSAGE)
+    }
+    const updated = await tx.face_embeddings.updateMany({
+      where: { employee_id: employeeId, is_active: true },
+      data: { is_active: false },
     })
+    if (updated.count === 0) {
+      throw new AppError(404, 'No active biometric data found for this employee')
+    }
   })
 }
 
-export async function removeAll(idOrCode: string, actorUserId?: string) {
-  const employeeId = await resolveEmployeeId(idOrCode)
-  const count = await prisma.face_embeddings.count({ where: { employee_id: employeeId } })
-  if (count === 0) throw new AppError(404, 'No biometric data found for this employee')
+export async function removeAll(idOrCode: string, actorUserId?: string, resolvedEmployeeId?: string) {
+  const employeeId = resolvedEmployeeId ?? await resolveEmployeeId(idOrCode)
   await prisma.$transaction(async tx => {
-    await assertNoEnrollment(tx, employeeId)
-    await tx.face_embeddings.deleteMany({ where: { employee_id: employeeId } })
-  })
-
-  await logAction({
-    userId: actorUserId,
-    action: 'DELETE_BIOMETRIC',
-    target_table: 'face_embeddings',
-    record_id: employeeId,
-    old_values: {
-      employee_id: employeeId,
-      deleted_samples_count: count,
-    },
+    await acquireBiometricLock(tx, employeeId)
+    if (await hasActiveEnrollment(tx, employeeId)) {
+      const existingAny = await tx.face_embeddings.findFirst({
+        where: { employee_id: employeeId },
+        select: { id: true },
+      })
+      if (!existingAny) {
+        throw new AppError(404, 'No biometric data found for this employee')
+      }
+      throw AppError.conflict(ENROLLMENT_CONFLICT_MESSAGE)
+    }
+    const deleted = await tx.face_embeddings.deleteMany({ where: { employee_id: employeeId } })
+    if (deleted.count === 0) {
+      throw new AppError(404, 'No biometric data found for this employee')
+    }
+    await tx.auditLog.create({
+      data: {
+        userId: actorUserId ?? null,
+        action: 'DELETE_BIOMETRIC',
+        target_table: 'face_embeddings',
+        record_id: employeeId,
+        old_values: {
+          employee_id: employeeId,
+          deleted_samples_count: deleted.count,
+        },
+      },
+    })
   })
 }
 
@@ -166,9 +188,9 @@ export async function removeAllWithPermissionCheck(
   employeeId: string,
   actorUser?: { id?: string; role?: string }
 ) {
-  await assertCanManageEmployee(actorUser, employeeId)
+  const emp = await resolveManagedEmployee(actorUser, employeeId)
 
-  return removeAll(employeeId, actorUser?.id);
+  return removeAll(emp.id, actorUser?.id, emp.id);
 }
 
 export type FaceMatchCandidate = {

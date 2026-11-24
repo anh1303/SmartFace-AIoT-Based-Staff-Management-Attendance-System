@@ -74,6 +74,28 @@ export async function findEmployeesByIds(ids: string[], tx?: Prisma.TransactionC
 }
 
 /**
+ * Public Module API: Lấy projection siêu nhẹ (id, departmentId) theo danh sách ID hoặc mã nhân viên
+ * để định tuyến room cho Socket.IO /operations mà không kéo nguyên hồ sơ nhân viên.
+ */
+export async function findEmployeesRoomMetadata(
+  idsOrCodes: readonly string[],
+  tx?: Prisma.TransactionClient,
+): Promise<Array<{ id: string; departmentId: number | null }>> {
+  const unique = [...new Set(idsOrCodes.filter(Boolean))]
+  if (unique.length === 0) return []
+  const uuids = unique.filter((v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v))
+  const codes = unique.filter((v) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v))
+  const orClauses: Prisma.EmployeeWhereInput[] = []
+  if (uuids.length > 0) orClauses.push({ id: { in: uuids } })
+  if (codes.length > 0) orClauses.push({ employee_code: { in: codes } })
+  const client = getEmployeeClient(tx)
+  return client.employee.findMany({
+    where: orClauses.length === 1 ? orClauses[0] : { OR: orClauses },
+    select: { id: true, departmentId: true },
+  })
+}
+
+/**
  * Public Module API: Lấy tất cả nhân viên đang hoạt động (ACTIVE, hỗ trợ transaction)
  */
 export async function findActiveEmployees(tx?: Prisma.TransactionClient) {
@@ -231,13 +253,31 @@ export async function findEmployeesWithFilter(
 export async function findEmployeeWageProfile(
   id: string,
   tx?: Prisma.TransactionClient,
-  includeAttendanceIdentity = false
+  mode: boolean | 'edge' | 'routing' = false
 ) {
   const client = getEmployeeClient(tx)
+  const includeRouting = mode === true || mode === 'edge' || mode === 'routing'
+  const includeAvatar = mode === true || mode === 'edge'
   return client.employee.findFirst({
     where: { id },
-    select: { id: true, status: true, hourly_rate: true, hourly_rate_history: true,
-      ...(includeAttendanceIdentity ? { user_id: true, avatar_url: true, full_name: true, employee_code: true } as const : {}) },
+    select: {
+      id: true,
+      status: true,
+      hourly_rate: true,
+      hourly_rate_history: true,
+      ...(includeRouting
+        ? {
+            user_id: true,
+            ...(includeAvatar ? { avatar_url: true } : {}),
+            full_name: true,
+            employee_code: true,
+            departmentId: true,
+            department: { select: { name: true } },
+            position: { select: { name: true, level: true } },
+            users: { select: { roles: { select: { role_name: true } } } },
+          }
+        : {}),
+    },
   })
 }
 

@@ -20,7 +20,7 @@ export function buildIdOrCodeWhere(idOrCode: string): { id: string } | { employe
 // - employee_shifts (relation nhiều-nhiều với work_shifts)
 // - face_embeddings (biometric data read projection owned by biometrics)
 // KHÔNG có: shift, biometricData (tên này không tồn tại trong schema)
-export const employeeInclude = {
+export const employeeListInclude = {
   department: true,
   position: true,
   users: {
@@ -37,12 +37,16 @@ export const employeeInclude = {
       },
     },
   },
+  get face_embeddings() {
+    return faceEnrollmentSummarySelect()
+  },
+} as const
+
+export const employeeInclude = {
+  ...employeeListInclude,
   employee_shifts: {
     include: { work_shifts: true },
     orderBy: { work_date: 'desc' as const },
     take: 1,
-  },
-  get face_embeddings() {
-    return faceEnrollmentSummarySelect()
   },
 } as const

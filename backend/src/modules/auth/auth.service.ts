@@ -1,5 +1,5 @@
 import { storedProfile } from './profile.dto.js';
-import { readAuthUser } from './auth.read.js'
+import { readAuthUser, readAuthUsers, type AuthScopeUser } from './auth.read.js'
 import type { Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
@@ -379,27 +379,17 @@ export type ActiveSessionResult =
     }
 
 /**
- * Public Module API: Nguồn xác thực phiên dùng chung giữa HTTP middleware và Socket.IO.
- * Xác minh chữ ký/hạn JWT, đọc principal hiện hành theo claims đã xác thực và kiểm tra
- * toàn bộ chính sách thu hồi (active, nhân viên, phiên khuôn mặt, token_version, password_changed_at).
+ * Đánh giá toàn bộ chính sách phiên (active, nhân viên, phiên khuôn mặt, token_version, password_changed_at)
+ * cho MỘT token cụ thể dựa trên principal đã đọc từ DB.
+ * Dùng chung cho cả HTTP (resolveActiveSession) và Socket.IO batch refresh (resolveActiveSessionsBatch).
  */
-export async function resolveActiveSession(token: string): Promise<ActiveSessionResult> {
-  let decoded: Partial<ActiveSessionClaims>
-  try {
-    decoded = jwt.verify(token, env.JWT_SECRET) as Partial<ActiveSessionClaims>
-  } catch {
-    return { ok: false, reason: 'INVALID_OR_EXPIRED_TOKEN' }
-  }
-
+export function evaluateActiveSession(
+  decoded: Partial<ActiveSessionClaims>,
+  user: AuthScopeUser | null,
+  hasFaceTemplate: boolean,
+): ActiveSessionResult {
   if (!decoded?.id) {
     return { ok: false, reason: 'INVALID_TOKEN_PAYLOAD' }
-  }
-
-  let user: Awaited<ReturnType<typeof readAuthUser>> = null
-  try {
-    user = await readAuthUser(decoded.id)
-  } catch {
-    return { ok: false, reason: 'USER_LOOKUP_FAILED' }
   }
 
   if (!user || !user.is_active) {
@@ -414,15 +404,11 @@ export async function resolveActiveSession(token: string): Promise<ActiveSession
   const currentTv = typeof profile.token_version === 'number' ? profile.token_version : 1
   const tokenTv = typeof decoded.tv === 'number' ? decoded.tv : 1
 
-  try {
-    await assertFaceSession(decoded.amr, user.employees?.id, user.roles.role_name)
-  } catch (err) {
-    if (err instanceof AppError && err.statusCode === 401) {
-      return { ok: false, reason: 'FACE_SESSION_REVOKED' }
-    }
-    throw err
+  const isFaceSession = Array.isArray(decoded.amr) && decoded.amr.includes('face')
+  if (!faceSessionAllowed(decoded.amr, user.roles.role_name, env.FACE_LOGIN_ENABLED)) {
+    return { ok: false, reason: 'FACE_SESSION_REVOKED' }
   }
-  if (decoded.amr?.includes('face') && user.employees?.status !== 'ACTIVE') {
+  if (isFaceSession && (!user.employees?.id || user.employees.status !== 'ACTIVE' || !hasFaceTemplate)) {
     return { ok: false, reason: 'FACE_SESSION_REVOKED' }
   }
 
@@ -451,6 +437,114 @@ export async function resolveActiveSession(token: string): Promise<ActiveSession
       departmentId: user.employees?.departmentId ?? null,
     },
   }
+}
+
+/**
+ * Public Module API: Nguồn xác thực phiên dùng chung giữa HTTP middleware và Socket.IO.
+ * Xác minh chữ ký/hạn JWT, đọc principal hiện hành theo claims đã xác thực và kiểm tra
+ * toàn bộ chính sách thu hồi (active, nhân viên, phiên khuôn mặt, token_version, password_changed_at).
+ */
+export async function resolveActiveSession(token: string): Promise<ActiveSessionResult> {
+  let decoded: Partial<ActiveSessionClaims>
+  try {
+    decoded = jwt.verify(token, env.JWT_SECRET) as Partial<ActiveSessionClaims>
+  } catch {
+    return { ok: false, reason: 'INVALID_OR_EXPIRED_TOKEN' }
+  }
+
+  if (!decoded?.id) {
+    return { ok: false, reason: 'INVALID_TOKEN_PAYLOAD' }
+  }
+
+  let user: AuthScopeUser | null = null
+  try {
+    user = await readAuthUser(decoded.id)
+  } catch {
+    return { ok: false, reason: 'USER_LOOKUP_FAILED' }
+  }
+
+  let hasFaceTemplate = true
+  const isFaceSession = Array.isArray(decoded.amr) && decoded.amr.includes('face')
+  if (
+    isFaceSession &&
+    user?.is_active &&
+    user.employees?.id &&
+    user.employees.status === 'ACTIVE' &&
+    faceSessionAllowed(decoded.amr, user.roles.role_name, env.FACE_LOGIN_ENABLED)
+  ) {
+    hasFaceTemplate = await authBiometrics().hasFaceLoginTemplate(user.employees.id)
+  }
+
+  return evaluateActiveSession(decoded, user, hasFaceTemplate)
+}
+
+/**
+ * Public Module API: Batch dữ liệu DB dùng chung (readAuthUsers + batch face template khi cần),
+ * nhưng xác minh chữ ký/hạn JWT và toàn bộ chính sách phiên ĐỘC LẬP cho từng token.
+ */
+export async function resolveActiveSessionsBatch(
+  tokens: readonly (string | undefined)[],
+): Promise<ActiveSessionResult[]> {
+  if (tokens.length === 0) return []
+
+  const results = new Array<ActiveSessionResult | null>(tokens.length).fill(null)
+  const verified: Array<{ index: number; decoded: Partial<ActiveSessionClaims>; userId: string }> = []
+
+  // Step 1: Verify JWT signature & expiration individually per token
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]
+    if (!token) {
+      results[i] = { ok: false, reason: 'INVALID_TOKEN_PAYLOAD' }
+      continue
+    }
+    try {
+      const decoded = jwt.verify(token, env.JWT_SECRET) as Partial<ActiveSessionClaims>
+      if (!decoded?.id) {
+        results[i] = { ok: false, reason: 'INVALID_TOKEN_PAYLOAD' }
+      } else {
+        verified.push({ index: i, decoded, userId: decoded.id })
+      }
+    } catch {
+      results[i] = { ok: false, reason: 'INVALID_OR_EXPIRED_TOKEN' }
+    }
+  }
+
+  if (verified.length === 0) {
+    return results as ActiveSessionResult[]
+  }
+
+  // Step 2: Single batched DB read for all unique userIds (transient DB errors propagate so gateways abort emitting stale scopes without dropping live sockets)
+  const usersById = await readAuthUsers(verified.map(item => item.userId))
+
+  // Step 3: Optional single batched DB read for active face templates ONLY if any socket carries amr: ['face']
+  const faceEmployeeIds: string[] = []
+  for (const item of verified) {
+    const user = usersById.get(item.userId) ?? null
+    const isFaceSession = Array.isArray(item.decoded.amr) && item.decoded.amr.includes('face')
+    if (
+      isFaceSession &&
+      user?.is_active &&
+      user.employees?.id &&
+      user.employees.status === 'ACTIVE' &&
+      faceSessionAllowed(item.decoded.amr, user.roles.role_name, env.FACE_LOGIN_ENABLED)
+    ) {
+      faceEmployeeIds.push(user.employees.id)
+    }
+  }
+
+  const activeFaceEmployeeIds = faceEmployeeIds.length > 0
+    ? await authBiometrics().findActiveFaceLoginTemplateEmployeeIds(faceEmployeeIds)
+    : new Set<string>()
+
+  // Step 4: Evaluate full session policies independently for EVERY token
+  for (const item of verified) {
+    const user = usersById.get(item.userId) ?? null
+    const empId = user?.employees?.id
+    const hasFaceTemplate = empId ? activeFaceEmployeeIds.has(empId) : false
+    results[item.index] = evaluateActiveSession(item.decoded, user, hasFaceTemplate)
+  }
+
+  return results as ActiveSessionResult[]
 }
 
 function httpSessionError(reason: ActiveSessionFailureReason): AppError {

@@ -7,7 +7,7 @@ import { app } from './app.js'
 import { env } from './config/env.js'
 import { prisma } from './config/database.js'
 import { connectMqtt, disconnectMqtt } from './config/mqtt.js'
-import { socketAuthMiddleware, refreshSocketScope } from './sockets/socket.auth.js'
+import { socketAuthMiddleware, refreshNamespaceScopes } from './sockets/socket.auth.js'
 import { initializeAttendanceGateway, startAttendanceCron, stopAttendanceCron } from './modules/attendance/index.js'
 import { initializeDeviceGateway, registerDeviceMqttHandlers } from './modules/devices/index.js'
 import { logger } from './common/logger.js'
@@ -20,7 +20,7 @@ import {
 } from './modules/operations/index.js'
 import { executeShiftBatch } from './modules/shifts/index.js'
 import { executeAccountEmail } from './modules/employees/index.js'
-import { findEmployeeByIdOrCode } from './modules/employees/public.js'
+import { findEmployeesRoomMetadata } from './modules/employees/public.js'
 import { findAuthUserById } from './modules/auth/public.js'
 
 const serverLogger = logger.child('Server')
@@ -33,9 +33,9 @@ export function registerServerBootstrap(socketServer: Server) {
   initializeAttendanceGateway(socketServer)
   initializeDeviceGateway(socketServer)
   initializeFingerprintGateway(socketServer)
-  initializeOperationGateway(socketServer, findEmployeeByIdOrCode, {
+  initializeOperationGateway(socketServer, findEmployeesRoomMetadata, {
     authenticate: socketAuthMiddleware,
-    refresh: refreshSocketScope,
+    refreshNamespace: refreshNamespaceScopes,
   })
   setOperationActorLookup(id => findAuthUserById(id, { includeRoles: true }))
   registerOperationHandler('shifts.batch', executeShiftBatch)

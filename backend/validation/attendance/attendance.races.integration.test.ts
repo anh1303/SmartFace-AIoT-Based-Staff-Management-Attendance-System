@@ -100,4 +100,72 @@ if (enabled) assertIsolatedNeonTestDatabase(process.env.DATABASE_URL, process.en
     } else expect(record.status).toBe('PENDING')
     expect(outcomes.some(result => result.status === 'fulfilled')).toBe(true)
   })
+
+  it('serializes overlapping acquireAdvisoryLocks batches on PostgreSQL without deadlock', async () => {
+    const { acquireAdvisoryLocks } = await import('../../src/common/advisory-lock.js')
+    const suffix = randomUUID().slice(0, 8)
+    const keys = [`payroll:2026-06-${suffix}`, `payroll:2026-07-${suffix}`, `employee:${suffix}`, `attendance:2026-07-01-${suffix}`]
+    const timeline: string[] = []
+    let releaseFirst!: () => void
+    let firstLocked!: () => void
+    const firstReady = new Promise<void>(resolve => { firstLocked = resolve })
+    const allowCommit = new Promise<void>(resolve => { releaseFirst = resolve })
+
+    const tx1 = db.$transaction(async (tx: any) => {
+      await tx.$executeRaw`SET LOCAL lock_timeout = '10s'`
+      await acquireAdvisoryLocks(tx, keys)
+      timeline.push('tx1:acquired')
+      firstLocked()
+      await allowCommit
+      timeline.push('tx1:releasing')
+    }, { timeout: 20000 })
+
+    await firstReady
+    const tx2 = db.$transaction(async (tx: any) => {
+      await tx.$executeRaw`SET LOCAL lock_timeout = '10s'`
+      await acquireAdvisoryLocks(tx, [keys[0], keys[2], keys[3]])
+      timeline.push('tx2:acquired')
+    }, { timeout: 20000 })
+
+    await new Promise(resolve => setTimeout(resolve, 250))
+    expect(timeline).toEqual(['tx1:acquired'])
+    releaseFirst()
+    await Promise.all([tx1, tx2])
+    expect(timeline).toEqual(['tx1:acquired', 'tx1:releasing', 'tx2:acquired'])
+  })
+
+  it('serializes concurrent checkIn (edgeRequest) and shift assignOrUpdate without deadlock and preserves consistent state', async () => {
+    const date = '2026-12-02'
+    vi.setSystemTime(new Date(`${date}T12:00:00+07:00`))
+    const employee = await db.employee.create({
+      data: {
+        employee_code: `RACE-EDGE-${randomUUID().slice(0, 8)}`,
+        full_name: 'Race Edge Checkin',
+        hourly_rate: 100000,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      },
+    })
+    await shifts.assignOrUpdate({ employee_id: employee.id, date, shift_type: 'OFFICE_HOURS' }, admin.id, 'ADMIN')
+
+    const scan = () => attendance.checkIn(
+      { employeeId: employee.id, device_info: 'device:PI4_RACE', method: 'FACE' },
+      undefined,
+      { eventId: `race-${randomUUID()}`, capturedAt: Date.now(), deviceId: 'PI4_RACE', verified: true, verificationScore: 0.95, livenessScore: 0.96, syncSummary: false },
+    )
+    const shiftChange = () => shifts.assignOrUpdate({ employee_id: employee.id, date, shift_type: 'MORNING' }, admin.id, 'ADMIN')
+
+    const outcomes = await queueBoth('2026-12', scan, shiftChange)
+    for (const outcome of outcomes) {
+      if (outcome.status === 'rejected') {
+        expect(String(outcome.reason)).not.toMatch(/Transaction.*(expired|not found)|deadlock/i)
+      }
+    }
+    expect(outcomes[0].status).toBe('fulfilled')
+    expect(outcomes[1].status).toBe('fulfilled')
+
+    const logs = await db.attendance_logs.findMany({ where: { employee_id: employee.id } })
+    const savedShift = await db.employee_shifts.findFirst({ where: { employee_id: employee.id, work_date: new Date(`${date}T00:00:00Z`) } })
+    expect(logs.length).toBe(1)
+    expect(savedShift?.shift_type).toBe('MORNING')
+  })
 })

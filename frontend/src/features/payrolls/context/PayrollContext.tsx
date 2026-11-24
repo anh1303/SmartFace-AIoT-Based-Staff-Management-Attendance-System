@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { usePayroll, type PayrollItemUpdates } from '../hooks/usePayroll';
 import type { PayrollRecord, BonusPenaltyPolicy } from '../types';
 import { useAuth } from '@/features/auth';
@@ -15,13 +15,22 @@ export interface PayrollContextType {
   finalizePayrollPeriod: (period: string) => void;
   unlockPayrollPeriod: (period: string) => void;
   updateBonusPenalty: (data: Partial<Omit<BonusPenaltyPolicy, 'id'>>) => Promise<BonusPenaltyPolicy | void>;
+  _retainData: () => () => void;
 }
 
 const PayrollContext = createContext<PayrollContextType | undefined>(undefined);
 
 export const PayrollProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, isInitializing } = useAuth();
-  const payrollHook = usePayroll(Boolean(currentUser) && !isInitializing);
+  const [dataConsumers, setDataConsumers] = useState(0);
+  const retainData = useCallback(() => {
+    setDataConsumers((count) => count + 1);
+    return () => {
+      setDataConsumers((count) => Math.max(0, count - 1));
+    };
+  }, []);
+
+  const payrollHook = usePayroll(Boolean(currentUser) && !isInitializing && dataConsumers > 0);
 
   const value = useMemo<PayrollContextType>(() => ({
     payroll: payrollHook.payroll,
@@ -39,6 +48,7 @@ export const PayrollProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateBonusPenalty: async (data) => {
       return await payrollHook.updateBonusPenalty(data);
     },
+    _retainData: retainData,
   }), [
     payrollHook.payroll,
     payrollHook.bonusPenalty,
@@ -51,6 +61,7 @@ export const PayrollProvider: React.FC<{ children: React.ReactNode }> = ({ child
     payrollHook.finalizePayrollPeriod,
     payrollHook.unlockPayrollPeriod,
     payrollHook.updateBonusPenalty,
+    retainData,
   ]);
 
   return (
@@ -60,10 +71,15 @@ export const PayrollProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 };
 
-export const usePayrollContext = (): PayrollContextType => {
+export const usePayrollContext = (options?: { loadData?: boolean }): PayrollContextType => {
   const context = useContext(PayrollContext);
   if (!context) {
     throw new Error('usePayrollContext must be used within a PayrollProvider');
   }
+  const loadData = options?.loadData ?? true;
+  useEffect(() => {
+    if (!loadData) return;
+    return context._retainData();
+  }, [context._retainData, loadData]);
   return context;
 };

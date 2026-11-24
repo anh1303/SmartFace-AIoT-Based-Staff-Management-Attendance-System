@@ -1,4 +1,4 @@
-type BiometricsPort = Pick<typeof import('../biometrics/public.js'), 'hasFaceLoginTemplate' | 'findBestFaceMatch'>
+type BiometricsPort = Pick<typeof import('../biometrics/public.js'), 'hasFaceLoginTemplate' | 'findActiveFaceLoginTemplateEmployeeIds' | 'findBestFaceMatch'>
 let biometrics: BiometricsPort | undefined
 export function configureAuthBiometrics(port: BiometricsPort) { biometrics = port }
 export function authBiometrics(): BiometricsPort {

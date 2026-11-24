@@ -7,7 +7,8 @@ import { safeError } from './operation.service.js'
 import { announceOperation } from './operation.gateway.js'
 import { AppError } from '../../common/AppError.js'
 
-type Handler = (job: OperationRow) => Promise<void>
+export type OperationDataChange = { domain: 'employees' | 'shifts' | 'biometrics'; employeeIds: string[] }
+type Handler = (job: OperationRow) => Promise<void | { dataChange?: OperationDataChange }>
 const handlers = new Map<string, Handler>()
 export const registerOperationHandler = (type: string, handler: Handler) => { handlers.set(type, handler) }
 export const listRegisteredOperationHandlers = () => [...handlers.keys()].sort()
@@ -40,10 +41,14 @@ export async function runOperationTick() {
       void prisma.$executeRaw`UPDATE background_operations SET lease_until = now() + interval '120 seconds' WHERE id = ${job.id}::uuid AND lease_token = ${job.lease_token}::uuid AND status = 'running'`.catch(() => { logger.warn('Operation lease heartbeat failed') })
     }, 20000)
     heartbeat.unref()
+    let dataChange: OperationDataChange | undefined
     try {
       const handler = handlers.get(job.type)
       if (!handler) throw AppError.conflict('Loại tác vụ chưa được hỗ trợ trên phiên bản máy chủ này.')
-      await handler(job)
+      const result = await handler(job)
+      if (result && typeof result === 'object' && 'dataChange' in result) {
+        dataChange = result.dataChange
+      }
     } catch (error) {
       await prisma.$executeRaw`UPDATE background_operations SET status = 'failed', error = ${safeError(error)}, revision = revision + 1, updated_at = now(), lease_until = NULL
         , completed = CASE WHEN type = 'biometric.enroll' THEN total ELSE completed END
@@ -53,7 +58,7 @@ export async function runOperationTick() {
     }
     const states = await prisma.$queryRaw<{ status: string }[]>`SELECT status FROM background_operations WHERE id = ${job.id}::uuid`
     if (states?.[0]?.status !== 'running') await prisma.$executeRaw`DELETE FROM background_operation_inputs WHERE operation_id = ${job.id}::uuid`
-    await announceOperation(job.owner_id, job.id)
+    await announceOperation(job.owner_id, job.id, dataChange)
   } catch { logger.error('Unable to poll background operations') }
   finally {
     if (heartbeat) clearInterval(heartbeat)

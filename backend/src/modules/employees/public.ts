@@ -1,8 +1,9 @@
-export { isEmployeeManager, getEmployeeScope, getManagedEmployeeIds, assertCanAccessEmployeeDetail, assertCanManageEmployee, assertCannotModifySelfControlData, assertCannotModifyOtherManager, type EmployeeActor } from './employee.permission.js'
+export { isEmployeeManager, getEmployeeScope, getManagedEmployeeIds, assertCanAccessEmployeeDetail, assertCanManageEmployee, resolveManagedEmployee, assertCannotModifySelfControlData, assertCannotModifyOtherManager, type EmployeeActor, type ManagedEmployeeTarget } from './employee.permission.js'
 export { monthlyHourlyRate, sourceHourlyRate } from './employee.wage.js'
 export {
   findEmployeeByIdOrCode,
   findEmployeesByIds,
+  findEmployeesRoomMetadata,
   findActiveEmployees,
   findActiveEmployeeIds,
   findEmployeeByUserId,

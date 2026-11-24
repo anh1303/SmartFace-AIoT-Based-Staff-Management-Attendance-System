@@ -4,6 +4,7 @@ import { prisma } from '../../config/database.js'
 import { AppError } from '../../common/AppError.js'
 import { formatVNDateISO, getTodayVNString } from '../../common/utils.js'
 import { employeeLockKey, payrollPeriodLockKey } from '../../common/lock-keys.js'
+import { acquireAdvisoryLocks } from '../../common/advisory-lock.js'
 import { assertCanManageEmployee, getEmployeeScope, findEmployeeByIdOrCode, findEmployeeByUserId } from '../employees/public.js'
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
@@ -109,7 +110,20 @@ export async function list(
   }
 
   if (typeof query.date === 'string' && query.date) {
-    where.work_date = new Date(query.date)
+    where.work_date = new Date(`${query.date.slice(0, 10)}T00:00:00.000Z`)
+  } else {
+    const startRaw = (typeof query.startDate === 'string' && query.startDate)
+      ? query.startDate
+      : (typeof query.from === 'string' && query.from ? query.from : undefined)
+    const endRaw = (typeof query.endDate === 'string' && query.endDate)
+      ? query.endDate
+      : (typeof query.to === 'string' && query.to ? query.to : undefined)
+    if (startRaw || endRaw) {
+      where.work_date = {
+        ...(startRaw ? { gte: new Date(`${startRaw.slice(0, 10)}T00:00:00.000Z`) } : {}),
+        ...(endRaw ? { lte: new Date(`${endRaw.slice(0, 10)}T00:00:00.000Z`) } : {}),
+      }
+    }
   }
 
   const shifts = await prisma.employee_shifts.findMany({
@@ -117,7 +131,10 @@ export async function list(
     include: {
       work_shifts: true,
       employees: {
-        include: { department: true },
+        select: {
+          employee_code: true,
+          department: { select: { name: true } },
+        },
       },
     },
     orderBy: { work_date: 'desc' },
@@ -209,18 +226,15 @@ export async function assignOrUpdate(data: {
     // 1. Tất cả các kỳ lương liên quan theo thứ tự tăng dần
     // 2. Nhân viên
     // 3. Tất cả các ngày công liên quan theo thứ tự tăng dần
+    // 4. Loại ca chuẩn
     const periods = Array.from(new Set(candidateDates.map(d => d.slice(0, 7)))).sort()
-    if (typeof (tx as any).$executeRaw === 'function') {
-      for (const p of periods) {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${payrollPeriodLockKey(p)}))`
-      }
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${employeeLockKey(emp.id)}))`
-      const sortedDates = [...candidateDates].sort()
-      for (const d of sortedDates) {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`attendance:${d}`}))`
-      }
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`shift-type:${standardConfig.code}`}))`
-    }
+    const sortedDates = [...candidateDates].sort()
+    await acquireAdvisoryLocks(tx, [
+      ...periods.map(p => payrollPeriodLockKey(p)),
+      employeeLockKey(emp.id),
+      ...sortedDates.map(d => `attendance:${d}`),
+      `shift-type:${standardConfig.code}`,
+    ])
 
     // Đọc lại trạng thái nhân viên bên trong transaction sau khi đã có lock
     const freshEmp = (await findEmployeeByIdOrCode(emp.id, tx)) ?? emp
@@ -236,26 +250,23 @@ export async function assignOrUpdate(data: {
 
     await assertCanManageEmployee({ id: actorUserId, role: actorRole }, emp.id, tx)
 
-    const existingShift = await tx.employee_shifts.findFirst({
+    const prevDateObj = new Date(`${prevDateStr}T00:00:00.000Z`)
+    const nextDateObj = new Date(`${nextDateStr}T00:00:00.000Z`)
+    const nearbyShifts = await tx.employee_shifts.findMany({
       where: {
         employee_id: emp.id,
-        work_date,
+        work_date: { in: [prevDateObj, work_date, nextDateObj] },
       },
       include: { work_shifts: true },
     })
+    const shiftByDate = new Map(nearbyShifts.map(row => [formatVNDateISO(row.work_date), row]))
+    const existingShift = shiftByDate.get(data.date) ?? null
 
     if (options?.expectedVersion !== undefined && (existingShift ? (existingShift as any).version ?? 1 : null) !== options.expectedVersion) {
       throw AppError.conflict('Ca đích đã được thay đổi bởi thao tác khác. Vui lòng tải lại lịch trước khi lưu.')
     }
-    const existingPrevShift = await tx.employee_shifts.findFirst({
-      where: { employee_id: emp.id, work_date: new Date(`${prevDateStr}T00:00:00.000Z`) },
-      include: { work_shifts: true },
-    })
-
-    const existingNextShift = await tx.employee_shifts.findFirst({
-      where: { employee_id: emp.id, work_date: new Date(`${nextDateStr}T00:00:00.000Z`) },
-      include: { work_shifts: true },
-    })
+    const existingPrevShift = shiftByDate.get(prevDateStr) ?? null
+    const existingNextShift = shiftByDate.get(nextDateStr) ?? null
 
     const isPrevOvernight = existingPrevShift
       ? (existingPrevShift.end_time ?? existingPrevShift.work_shifts?.end_time) <= (existingPrevShift.start_time ?? existingPrevShift.work_shifts?.start_time)
@@ -313,24 +324,9 @@ export async function assignOrUpdate(data: {
         newEnd.setUTCDate(newEnd.getUTCDate() + 1)
       }
 
-      const candidateDates = [
-        new Date(`${prevDateStr}T00:00:00.000Z`),
-        new Date(`${data.date}T00:00:00.000Z`),
-        new Date(`${nextDateStr}T00:00:00.000Z`),
-      ]
+      const adjacentShifts = nearbyShifts.filter(row => !existingShift || row.id !== existingShift.id)
 
-      const nearbyShifts = typeof tx.employee_shifts.findMany === 'function'
-        ? await tx.employee_shifts.findMany({
-            where: {
-              employee_id: emp.id,
-              work_date: { in: candidateDates },
-              ...(existingShift ? { id: { not: existingShift.id } } : {}),
-            },
-            include: { work_shifts: true },
-          })
-        : []
-
-      for (const adj of nearbyShifts) {
+      for (const adj of adjacentShifts) {
         if (adj.shift_type === 'OFF') continue
         const adjDateStr = adj.work_date.toISOString().slice(0, 10)
         const adjStartRaw = adj.start_time ?? adj.work_shifts?.start_time
